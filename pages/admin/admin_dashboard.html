@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Father & Sons Music Academy</title>
+    <!-- Tailwind CSS - Using CDN for development (warning is expected) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
@@ -18,6 +19,16 @@
                 }
             }
         }
+        // Suppress Tailwind CDN warning in console
+        if (typeof console !== 'undefined' && console.warn) {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
+                    return; // Suppress Tailwind CDN warning
+                }
+                originalWarn.apply(console, args);
+            };
+        }
     </script>
 </head>
 <body class="bg-gray-50 dark:bg-obsidian text-gray-900 dark:text-zinc-100">
@@ -26,10 +37,10 @@
         <div class="p-6">
             <h1 class="text-2xl font-serif text-gold-500 dark:text-gold-400 italic mb-8">Father & Sons</h1>
             <nav class="space-y-2">
-                <a href="#pending" onclick="loadPendingRegistrations()" class="flex items-center px-4 py-3 text-gray-700 dark:text-zinc-300 hover:bg-gold-500/10 hover:text-gold-500 dark:hover:text-gold-400 rounded-lg transition">
+                <a href="#pending" id="pendingLink" class="flex items-center px-4 py-3 text-gray-700 dark:text-zinc-300 hover:bg-gold-500/10 hover:text-gold-500 dark:hover:text-gold-400 rounded-lg transition">
                     <i class="fas fa-clock mr-3"></i> Pending Registrations
                 </a>
-                <a href="#all" onclick="loadAllRegistrations()" class="flex items-center px-4 py-3 text-gray-700 dark:text-zinc-300 hover:bg-gold-500/10 hover:text-gold-500 dark:hover:text-gold-400 rounded-lg transition">
+                <a href="#all" id="allLink" class="flex items-center px-4 py-3 text-gray-700 dark:text-zinc-300 hover:bg-gold-500/10 hover:text-gold-500 dark:hover:text-gold-400 rounded-lg transition">
                     <i class="fas fa-list mr-3"></i> All Registrations
                 </a>
                 <a href="../index.html" class="flex items-center px-4 py-3 text-gray-700 dark:text-zinc-300 hover:bg-gold-500/10 hover:text-gold-500 dark:hover:text-gold-400 rounded-lg transition">
@@ -195,8 +206,46 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="../js/mode.js"></script>
-    <script src="../js/index.js"></script>
+    <!-- Fix: Use correct relative path (../../ to go up two levels from pages/admin/ to root) -->
+    <script src="../../js/mode.js"></script>
+    <script src="../../js/index.js"></script>
+    <script>
+        // Initialize admin dashboard on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check authentication
+            if (typeof checkAuth === 'function') {
+                checkAuth();
+            }
+            
+            // Initialize payment form
+            if (typeof initPaymentForm === 'function') {
+                initPaymentForm();
+            }
+            
+            // Load pending registrations by default
+            if (typeof loadPendingRegistrations === 'function') {
+                loadPendingRegistrations();
+            }
+            
+            // Add event listeners for navigation links
+            const pendingLink = document.getElementById('pendingLink');
+            const allLink = document.getElementById('allLink');
+            
+            if (pendingLink && typeof loadPendingRegistrations === 'function') {
+                pendingLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    loadPendingRegistrations();
+                });
+            }
+            
+            if (allLink && typeof loadAllRegistrations === 'function') {
+                allLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    loadAllRegistrations();
+                });
+            }
+        });
+    </script>
 
     <!-- Theme Toggle Button -->
     <button id="themeToggle"

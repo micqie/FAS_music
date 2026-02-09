@@ -335,6 +335,29 @@ function initRegisterForm() {
     const registerForm = document.getElementById('registerForm');
     if (!registerForm) return;
 
+    // Add event listeners for password validation
+    const passwordInput = document.getElementById('registerPassword');
+    const passwordConfirmInput = document.getElementById('registerPasswordConfirm');
+    const emailInput = document.getElementById('student_email');
+
+    if (passwordInput) {
+        passwordInput.addEventListener('input', function() {
+            validatePassword();
+        });
+    }
+
+    if (passwordConfirmInput) {
+        passwordConfirmInput.addEventListener('input', function() {
+            validatePasswordMatch();
+        });
+    }
+
+    if (emailInput) {
+        emailInput.addEventListener('input', function() {
+            validateEmail(this);
+        });
+    }
+
     registerForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -552,26 +575,103 @@ function validateEmail(input) {
 // Initialize Date Picker
 function initDatePicker() {
     const dateInput = document.getElementById('student_date_of_birth');
+    const datePickerBtn = document.getElementById('datePickerBtn');
     if (!dateInput) return;
 
-    flatpickr(dateInput, {
+    if (typeof flatpickr === 'undefined') {
+        console.error('Flatpickr is not loaded');
+        return;
+    }
+
+    const flatpickrInstance = flatpickr(dateInput, {
         dateFormat: "Y-m-d",
         maxDate: "today",
+        minDate: "1900-01-01", // reasonable birth year limit
         defaultDate: null,
+
         allowInput: false,
         clickOpens: true,
+
+        /* 🔥 KEY SETTINGS FOR EASY BIRTHDATE PICKING */
+        monthSelectorType: "dropdown", // enables year dropdown
+        yearSelectorType: "dropdown",  // explicit year dropdown
+        shorthandCurrentMonth: false,
+
+        animate: true,
         theme: "dark",
-        onChange: function(selectedDates, dateStr, instance) {
-            // Update the hidden input for form submission
-            dateInput.value = dateStr;
-            // Calculate age
-            calculateAge(dateStr);
+
+        appendTo: document.body,
+
+        onChange: function (selectedDates, dateStr) {
+            if (dateStr) {
+                dateInput.value = dateStr;
+                calculateAge(dateStr);
+            }
         },
-        onReady: function(selectedDates, dateStr, instance) {
-            // Style the calendar to match the dark theme
-            instance.calendarContainer.classList.add('bg-zinc-900', 'border-gold-500');
+
+        onReady: function (_, __, instance) {
+            if (instance.calendarContainer) {
+                instance.calendarContainer.style.zIndex = '10001';
+                instance.calendarContainer.classList.add(
+                    'bg-zinc-900',
+                    'border',
+                    'border-gold-500'
+                );
+            }
+        },
+
+        onOpen: function (_, __, instance) {
+            if (instance.calendarContainer) {
+                instance.calendarContainer.style.zIndex = '10001';
+            }
         }
     });
+
+    /* Calendar icon button */
+    if (datePickerBtn) {
+        datePickerBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            flatpickrInstance.open();
+        });
+    }
+
+    /* Input open behavior */
+    ['click', 'focus'].forEach(event => {
+        dateInput.addEventListener(event, function (e) {
+            e.preventDefault();
+            flatpickrInstance.open();
+        });
+    });
+}
+// Load Branches for Registration Form
+async function loadBranches() {
+    const branchSelect = document.getElementById('branch_id');
+    if (!branchSelect) return;
+
+    try {
+        const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
+        const data = await response.json();
+
+        if (data.success && data.branches) {
+            // Clear existing options
+            branchSelect.innerHTML = '<option value="">Select Branch</option>';
+
+            // Add branches to dropdown
+            data.branches.forEach(branch => {
+                const option = document.createElement('option');
+                option.value = branch.branch_id;
+                option.textContent = branch.branch_name;
+                branchSelect.appendChild(option);
+            });
+        } else {
+            branchSelect.innerHTML = '<option value="">No branches available</option>';
+            console.error('Failed to load branches:', data.error);
+        }
+    } catch (error) {
+        console.error('Error loading branches:', error);
+        branchSelect.innerHTML = '<option value="">Error loading branches</option>';
+    }
 }
 
 // Initialize index.html functions
@@ -579,6 +679,7 @@ function initIndexPage() {
     initLoginForm();
     initRegisterForm();
     initDatePicker();
+    loadBranches();
 }
 
 // ========== ADMIN PAGE FUNCTIONS ==========
