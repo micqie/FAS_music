@@ -350,6 +350,14 @@ function initRegisterForm() {
             return;
         }
 
+        // Validate email
+        const emailInput = document.getElementById('student_email');
+        if (emailInput && !validateEmail(emailInput)) {
+            showRegisterMessage('Please enter a valid email address.', 'error');
+            emailInput.focus();
+            return;
+        }
+
         const formData = new FormData(registerForm);
         const data = {};
 
@@ -358,6 +366,13 @@ function initRegisterForm() {
             // Skip password_confirm field
             if (key === 'password_confirm') continue;
             data[key] = value;
+        }
+
+        // Ensure age is calculated if date of birth is provided
+        const dateOfBirth = data['student_date_of_birth'];
+        if (dateOfBirth && !data['student_age']) {
+            calculateAge(dateOfBirth);
+            data['student_age'] = document.getElementById('student_age').value;
         }
 
         // Set default registration fee amount (can be updated by admin later)
@@ -447,10 +462,123 @@ function initRegisterForm() {
     });
 }
 
+// Calculate Age from Date of Birth
+function calculateAge(dateOfBirth) {
+    if (!dateOfBirth) {
+        document.getElementById('calculatedAge').textContent = 'Enter date of birth to calculate age';
+        document.getElementById('calculatedAge').className = 'text-zinc-400 italic';
+        document.getElementById('student_age').value = '';
+        return;
+    }
+
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+
+    if (age < 0) {
+        document.getElementById('calculatedAge').textContent = 'Invalid date - future date selected';
+        document.getElementById('calculatedAge').className = 'text-red-400';
+        document.getElementById('student_age').value = '';
+        return;
+    }
+
+    document.getElementById('calculatedAge').textContent = `${age} years old`;
+    document.getElementById('calculatedAge').className = 'text-gold-400 font-semibold';
+    document.getElementById('student_age').value = age;
+}
+
+// Validate Email with Strict Pattern
+function validateEmail(input) {
+    const email = input.value.trim();
+    const emailValidation = document.getElementById('emailValidation');
+    
+    if (!emailValidation) return;
+
+    if (email.length === 0) {
+        emailValidation.textContent = '';
+        emailValidation.className = 'mt-1 text-xs';
+        return false;
+    }
+
+    // Strict email validation pattern
+    const emailPattern = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/;
+    
+    if (!emailPattern.test(email)) {
+        emailValidation.textContent = '✗ Please enter a valid email address (e.g., name@domain.com)';
+        emailValidation.className = 'mt-1 text-xs text-red-500';
+        input.classList.add('border-red-500');
+        input.classList.remove('border-zinc-700', 'border-gold-400');
+        return false;
+    }
+
+    // Additional checks
+    if (email.length > 254) {
+        emailValidation.textContent = '✗ Email address is too long (max 254 characters)';
+        emailValidation.className = 'mt-1 text-xs text-red-500';
+        input.classList.add('border-red-500');
+        input.classList.remove('border-zinc-700', 'border-gold-400');
+        return false;
+    }
+
+    const [localPart, domain] = email.split('@');
+    if (localPart.length > 64) {
+        emailValidation.textContent = '✗ Email local part is too long (max 64 characters)';
+        emailValidation.className = 'mt-1 text-xs text-red-500';
+        input.classList.add('border-red-500');
+        input.classList.remove('border-zinc-700', 'border-gold-400');
+        return false;
+    }
+
+    if (domain && domain.length > 253) {
+        emailValidation.textContent = '✗ Email domain is too long';
+        emailValidation.className = 'mt-1 text-xs text-red-500';
+        input.classList.add('border-red-500');
+        input.classList.remove('border-zinc-700', 'border-gold-400');
+        return false;
+    }
+
+    emailValidation.textContent = '✓ Valid email address';
+    emailValidation.className = 'mt-1 text-xs text-green-500';
+    input.classList.remove('border-red-500');
+    input.classList.add('border-green-500');
+    return true;
+}
+
+// Initialize Date Picker
+function initDatePicker() {
+    const dateInput = document.getElementById('student_date_of_birth');
+    if (!dateInput) return;
+
+    flatpickr(dateInput, {
+        dateFormat: "Y-m-d",
+        maxDate: "today",
+        defaultDate: null,
+        allowInput: false,
+        clickOpens: true,
+        theme: "dark",
+        onChange: function(selectedDates, dateStr, instance) {
+            // Update the hidden input for form submission
+            dateInput.value = dateStr;
+            // Calculate age
+            calculateAge(dateStr);
+        },
+        onReady: function(selectedDates, dateStr, instance) {
+            // Style the calendar to match the dark theme
+            instance.calendarContainer.classList.add('bg-zinc-900', 'border-gold-500');
+        }
+    });
+}
+
 // Initialize index.html functions
 function initIndexPage() {
     initLoginForm();
     initRegisterForm();
+    initDatePicker();
 }
 
 // ========== ADMIN PAGE FUNCTIONS ==========

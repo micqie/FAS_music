@@ -89,6 +89,24 @@ class User
             }
         }
 
+        // Validate email with strict pattern
+        $email = $data['student_email'] ?? '';
+        if (!empty($email)) {
+            $emailPattern = '/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/';
+            if (!preg_match($emailPattern, $email)) {
+                $this->sendJSON(['error' => 'Invalid email address format'], 400);
+            }
+            if (strlen($email) > 254) {
+                $this->sendJSON(['error' => 'Email address is too long (max 254 characters)'], 400);
+            }
+            // Check if email already exists
+            $emailCheck = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE email = ? LIMIT 1");
+            $emailCheck->execute([$email]);
+            if ($emailCheck->fetch()) {
+                $this->sendJSON(['error' => 'Email address is already registered'], 400);
+            }
+        }
+
         // Validate password policy
         $password = $data['password'];
         if (strlen($password) < 8) {
