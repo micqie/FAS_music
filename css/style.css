@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Inter:wght@300;400;600&display=swap');
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+h1, h2, h3, .font-serif {
+    font-family: 'Playfair Display', serif;
+}
+
+/* Background gradient for specific sections */
+#about {
+    background: radial-gradient(circle at top right, #121212, #0a0a0a);
+}
+
+/* Gold Button Hover Glow */
+.bg-gold-500:hover {
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+}
+
+/* Modal Overlay Animation */
+#enrollModal.flex {
+    animation: fadeIn 0.4s ease forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Light Mode Styles */
+html.light {
+    color-scheme: light;
+}
+
+html.light body {
+    background-color: #f5f5f5;
+    color: #1a1a1a;
+}
+
+html.light .bg-obsidian {
+    background-color: #ffffff;
+}
+
+html.light .bg-black\/90,
+html.light .bg-black\/95 {
+    background-color: rgba(255, 255, 255, 0.95);
+}
+
+html.light .text-zinc-100,
+html.light .text-white {
+    color: #1a1a1a;
+}
+
+html.light .text-zinc-300,
+html.light .text-zinc-400 {
+    color: #4a4a4a;
+}
+
+html.light .text-zinc-500 {
+    color: #6a6a6a;
+}
+
+html.light .bg-zinc-900 {
+    background-color: #e5e5e5;
+}
+
+html.light .bg-zinc-800 {
+    background-color: #d4d4d4;
+}
+
+html.light .border-zinc-700,
+html.light .border-zinc-800 {
+    border-color: #a3a3a3;
+}
+
+html.light .border-gold-500\/20 {
+    border-color: rgba(184, 134, 11, 0.3);
+}
+
+html.light .bg-black\/50 {
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+html.light .hover\:bg-zinc-700:hover {
+    background-color: #b8b8b8;
+}
+
+html.light .hover\:bg-gold-500\/10:hover {
+    background-color: rgba(184, 134, 11, 0.15);
+}
+
+html.light .hover\:text-gold-400:hover {
+    color: #b8860b;
+}
+
+/* Theme Toggle Button */
+#themeToggle {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+html.light #themeToggle {
+    background-color: #1a1a1a;
+    color: #f5f5f5;
+}
+
+html.light #themeToggle:hover {
+    background-color: #2a2a2a;
+}

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Father & Sons Music Academy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0a0a0a'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-obsidian dark:bg-obsidian bg-gray-50 text-zinc-100 dark:text-zinc-100 text-gray-900 selection:bg-gold-400 selection:text-black">
+
+    <nav class="fixed w-full z-50 bg-black/95 border-b border-gold-500/20 px-6 md:px-12 py-4 flex justify-between items-center">
+        <a href="#home" class="flex items-center h-10 sm:h-12 md:h-14">
+            <img src="assets/fas-logo.png" alt="Father & Sons Music Academy"
+            class="h-full w-auto object-left object-contain">
+        </a>
+
+        <div class="hidden md:flex space-x-10 items-center uppercase text-xs tracking-widest font-semibold">
+            <a href="#home" class="text-zinc-400 hover:text-gold-400 transition-colors">Home</a>
+            <a href="#about" class="text-zinc-400 hover:text-gold-400 transition-colors">Our Story</a>
+            <a href="#courses" class="text-zinc-400 hover:text-gold-400 transition-colors">Courses</a>
+            <button onclick="toggleLoginModal(true)" class="text-zinc-400 hover:text-gold-400 transition-colors">Login</button>
+            <button onclick="toggleRegisterModal(true)" class="bg-gold-500 hover:bg-gold-400 text-black px-8 py-2.5 rounded-sm transition duration-300 font-bold shadow-lg shadow-gold-500/20">
+                Register
+            </button>
+        </div>
+
+        <button class="md:hidden text-gold-400 text-2xl" onclick="toggleMobileMenu()">
+            <i class="fas fa-bars" id="menu-icon"></i>
+        </button>
+
+        <div id="mobile-menu" class="hidden absolute top-full left-0 w-full bg-black border-b border-gold-500/40 flex flex-col p-8 space-y-6 md:hidden shadow-2xl">
+            <a href="#home" onclick="toggleMobileMenu()" class="text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-800 pb-2">Home</a>
+            <a href="#about" onclick="toggleMobileMenu()" class="text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-800 pb-2">Our Story</a>
+            <a href="#courses" onclick="toggleMobileMenu()" class="text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-800 pb-2">Courses</a>
+            <button onclick="toggleLoginModal(true); toggleMobileMenu()" class="text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-800 pb-2 text-left">Login</button>
+            <button onclick="toggleRegisterModal(true); toggleMobileMenu()" class="bg-gold-500 text-black px-6 py-4 rounded-sm font-bold uppercase text-sm tracking-widest">
+                Register
+            </button>
+        </div>
+    </nav>
+
+    <header id="home" class="relative h-screen flex items-center justify-center pt-20">
+        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=2070')] bg-cover bg-center opacity-30"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-obsidian/50 via-obsidian to-obsidian"></div>
+
+        <div class="relative z-10 text-center px-4">
+            <h1 class="text-6xl md:text-8xl font-serif mb-4 italic text-gold-400">The Legacy of Sound</h1>
+            <p class="text-zinc-400 max-w-2xl mx-auto mb-10 text-lg">Empowering families through music. Join a tradition of excellence and artistic mastery.</p>
+            <div class="flex gap-4 justify-center">
+                <button onclick="toggleLoginModal(true)" class="bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-8 py-5 transition uppercase tracking-widest text-sm">Login</button>
+                <button onclick="toggleRegisterModal(true)" class="bg-gold-500 text-black font-bold px-12 py-5 hover:bg-gold-400 transition uppercase tracking-widest text-sm">Register</button>
+            </div>
+        </div>
+    </header>
+
+    <section id="about" class="py-24 px-8 max-w-6xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+            <div class="relative">
+                <div class="absolute -top-4 -left-4 w-24 h-24 border-t-2 border-l-2 border-gold-500"></div>
+                <img src="https://images.unsplash.com/photo-1514119412350-e174d90d280e?q=80&w=1000" alt="About Music" class="rounded-sm shadow-2xl grayscale hover:grayscale-0 transition duration-700">
+                <div class="absolute -bottom-4 -right-4 w-24 h-24 border-b-2 border-r-2 border-gold-500"></div>
+            </div>
+            <div>
+                <h2 class="text-4xl font-serif text-gold-400 italic mb-6 text-left">Our Heritage</h2>
+                <p class="text-zinc-400 mb-6 leading-relaxed">
+                    Founded on the principle that music is a gift passed through generations, Father & Sons Music Academy has been a cornerstone of artistic growth for over two decades.
+                </p>
+                <p class="text-zinc-400 mb-8 leading-relaxed">
+                    We specialize in a mentorship-first approach, ensuring that every student receives a personalized curriculum tailored to their unique pace and musical aspirations.
+                </p>
+                <ul class="space-y-3 text-sm tracking-wide text-gold-400/80">
+                    <li><i class="fas fa-check mr-2"></i> Professional Grade Recording Studios</li>
+                    <li><i class="fas fa-check mr-2"></i> Certified Master Instructors</li>
+                    <li><i class="fas fa-check mr-2"></i> Annual Grand Recitals</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-black border-t border-gold-500/10 pt-16 pb-8 px-8">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+            <div class="col-span-1 md:col-span-1">
+                <div class="text-gold-400 font-serif font-bold text-xl mb-4">FATHER & SONS</div>
+                <p class="text-zinc-500 text-sm">Cultivating talent, building legacy, and creating harmony since 2004.</p>
+            </div>
+            <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-widest mb-6">Quick Links</h4>
+                <ul class="text-zinc-500 text-sm space-y-4">
+                    <li><a href="#" class="hover:text-gold-400 transition">Student Portal</a></li>
+                    <li><a href="#" class="hover:text-gold-400 transition">Faculty Directory</a></li>
+                    <li><a href="#" class="hover:text-gold-400 transition">Scholarship Program</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-widest mb-6">Location</h4>
+                <p class="text-zinc-500 text-sm leading-loose">
+                    123 Symphony Lane<br>
+                    Creative District, NY 10001<br>
+                    Phone: (555) 123-4567
+                </p>
+            </div>
+            <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-widest mb-6">Socials</h4>
+                <div class="flex space-x-4 text-xl text-zinc-500">
+                    <a href="#" class="hover:text-gold-400 transition"><i class="fab fa-instagram"></i></a>
+                    <a href="#" class="hover:text-gold-400 transition"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="hover:text-gold-400 transition"><i class="fab fa-youtube"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="text-center text-zinc-600 text-[10px] uppercase tracking-[0.3em] border-t border-zinc-900 pt-8">
+            &copy; 2026 Father & Sons Music Academy. All Rights Reserved.
+        </div>
+    </footer>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+            <button onclick="toggleLoginModal(false)" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <div class="text-center mb-6">
+                <h2 class="text-3xl font-serif text-gold-400 italic mb-2">Father & Sons</h2>
+                <h3 class="text-xl font-bold text-white">Welcome Back</h3>
+            </div>
+
+            <div id="loginMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-2">
+                        <i class="fas fa-user mr-2 text-gold-400"></i>Username
+                    </label>
+                    <input type="text" id="loginUsername" required
+                        class="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-gold-400"
+                        placeholder="Enter your username">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-2">
+                        <i class="fas fa-lock mr-2 text-gold-400"></i>Password
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="loginPassword" required
+                            class="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-gold-400"
+                            placeholder="Enter your password">
+                        <button type="button" onclick="togglePassword('loginPassword', 'loginPasswordIcon')"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-gold-400">
+                            <i id="loginPasswordIcon" class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" id="loginBtn"
+                    class="w-full bg-gold-500 hover:bg-gold-400 text-black font-bold py-3 rounded-lg transition flex items-center justify-center">
+                    <span id="loginBtnText">Sign In</span>
+                    <i id="loginBtnIcon" class="fas fa-sign-in-alt ml-2"></i>
+                </button>
+            </form>
+
+            <div class="mt-4 text-center text-sm text-zinc-400">
+                Don't have an account?
+                <button onclick="toggleLoginModal(false); toggleRegisterModal(true)" class="text-gold-400 hover:text-gold-300 font-semibold">
+                    Register here
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration Modal -->
+    <div id="registerModal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/95 backdrop-blur-sm overflow-y-auto">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-4xl p-8 relative my-8">
+            <button onclick="toggleRegisterModal(false)" class="absolute top-4 right-4 text-zinc-400 hover:text-white z-10">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <div class="text-center mb-6">
+                <h2 class="text-3xl font-serif text-gold-400 italic mb-2">Father & Sons</h2>
+                <h3 class="text-xl font-bold text-white">Student & Guardian Registration</h3>
+            </div>
+
+            <div id="registerMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+            <form id="registerForm" class="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                <!-- Student Information -->
+                <div>
+                    <h4 class="text-lg font-bold text-gold-400 mb-4 flex items-center">
+                        <i class="fas fa-user-graduate mr-2"></i>Student Information
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">First Name *</label>
+                            <input type="text" name="student_first_name" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Last Name *</label>
+                            <input type="text" name="student_last_name" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Middle Name</label>
+                            <input type="text" name="student_middle_name"
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Date of Birth</label>
+                            <input type="date" name="student_date_of_birth"
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Age</label>
+                            <input type="number" name="student_age" min="1" max="100"
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Email *</label>
+                            <input type="email" name="student_email" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Phone *</label>
+                            <input type="tel" name="student_phone" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">School</label>
+                            <input type="text" name="student_school"
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Grade/Year</label>
+                            <input type="text" name="student_grade_year"
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Branch *</label>
+                            <select name="branch_id" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                <option value="">Select Branch</option>
+                                <option value="1">Main Branch</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-zinc-300 mb-2">Address</label>
+                        <textarea name="student_address" rows="2"
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"></textarea>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-zinc-300 mb-2">Health Diagnosis (if any)</label>
+                        <textarea name="student_health_diagnosis" rows="2"
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"></textarea>
+                    </div>
+                </div>
+
+                <!-- Guardian Information -->
+                <div>
+                    <h4 class="text-lg font-bold text-gold-400 mb-4 flex items-center">
+                        <i class="fas fa-users mr-2"></i>Guardian Information
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">First Name *</label>
+                            <input type="text" name="guardian_first_name" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Last Name *</label>
+                            <input type="text" name="guardian_last_name" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Relationship *</label>
+                            <select name="guardian_relationship" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                <option value="">Select Relationship</option>
+                                <option value="Father">Father</option>
+                                <option value="Mother">Mother</option>
+                                <option value="Legal Guardian">Legal Guardian</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Phone *</label>
+                            <input type="tel" name="guardian_phone" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Email</label>
+                            <input type="email" name="guardian_email"
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Occupation</label>
+                            <input type="text" name="guardian_occupation"
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-zinc-300 mb-2">Address</label>
+                        <textarea name="guardian_address" rows="2"
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"></textarea>
+                    </div>
+                </div>
+
+                <!-- Account Password -->
+                <div>
+                    <h4 class="text-lg font-bold text-gold-400 mb-4 flex items-center">
+                        <i class="fas fa-key mr-2"></i>Create Account Password
+                    </h4>
+                    <p class="text-sm text-zinc-400 mb-4">Your account will be created automatically but will remain pending until admin confirms your registration and payment.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">
+                                <i class="fas fa-lock mr-2 text-gold-400"></i>Password *
+                            </label>
+                            <div class="relative">
+                                <input type="password" id="registerPassword" name="password" required
+                                    class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-gold-400"
+                                    placeholder="Enter your password"
+                                    oninput="validatePassword()">
+                                <button type="button" onclick="togglePassword('registerPassword', 'registerPasswordIcon')"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-gold-400">
+                                    <i id="registerPasswordIcon" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <div id="passwordRequirements" class="mt-2 text-xs text-zinc-500 space-y-1">
+                                <div id="req-length" class="flex items-center">
+                                    <i class="fas fa-circle text-zinc-600 mr-2" style="font-size: 6px;"></i>
+                                    At least 8 characters
+                                </div>
+                                <div id="req-uppercase" class="flex items-center">
+                                    <i class="fas fa-circle text-zinc-600 mr-2" style="font-size: 6px;"></i>
+                                    One uppercase letter
+                                </div>
+                                <div id="req-lowercase" class="flex items-center">
+                                    <i class="fas fa-circle text-zinc-600 mr-2" style="font-size: 6px;"></i>
+                                    One lowercase letter
+                                </div>
+                                <div id="req-number" class="flex items-center">
+                                    <i class="fas fa-circle text-zinc-600 mr-2" style="font-size: 6px;"></i>
+                                    One number
+                                </div>
+                                <div id="req-special" class="flex items-center">
+                                    <i class="fas fa-circle text-zinc-600 mr-2" style="font-size: 6px;"></i>
+                                    One special character (!@#$%^&*)
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">
+                                <i class="fas fa-lock mr-2 text-gold-400"></i>Confirm Password *
+                            </label>
+                            <div class="relative">
+                                <input type="password" id="registerPasswordConfirm" name="password_confirm" required
+                                    class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-gold-400"
+                                    placeholder="Confirm your password"
+                                    oninput="validatePasswordMatch()">
+                                <button type="button" onclick="togglePassword('registerPasswordConfirm', 'registerPasswordConfirmIcon')"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-gold-400">
+                                    <i id="registerPasswordConfirmIcon" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <div id="passwordMatch" class="mt-2 text-xs"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-4">
+                    <button type="submit" id="registerSubmitBtn"
+                        class="w-full bg-gold-500 hover:bg-gold-400 text-black font-bold py-3 rounded-lg transition flex items-center justify-center">
+                        <span id="registerSubmitBtnText">Submit Registration</span>
+                        <i id="registerSubmitBtnIcon" class="fas fa-paper-plane ml-2"></i>
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-4 text-center text-sm text-zinc-400">
+                Already have an account?
+                <button onclick="toggleRegisterModal(false); toggleLoginModal(true)" class="text-gold-400 hover:text-gold-300 font-semibold">
+                    Login here
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script src="js/index.js"></script>
+
+    <!-- Theme Toggle Button -->
+    <button id="themeToggle"
+        class="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gold-500 hover:bg-gold-400 text-black shadow-lg transition-all duration-300 flex items-center justify-center group"
+        aria-label="Toggle theme">
+        <div class="relative w-6 h-6">
+            <i id="sunIcon" class="fas fa-sun absolute inset-0 transition-opacity duration-300"></i>
+            <i id="moonIcon" class="fas fa-moon absolute inset-0 transition-opacity duration-300 opacity-0"></i>
+        </div>
+    </button>
+</body>
+</html>
