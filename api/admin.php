@@ -12,7 +12,7 @@ class Admin
         $this->conn = $pdo;
     }
 
-    private function sendJSON($data, $status = 200)
+    public function sendJSON($data, $status = 200)
     {
         http_response_code($status);
         echo json_encode($data);
@@ -40,7 +40,7 @@ class Admin
     public function getPendingRegistrations()
     {
         $stmt = $this->conn->prepare("
-            SELECT 
+            SELECT
                 s.student_id,
                 s.first_name,
                 s.last_name,
@@ -73,7 +73,7 @@ class Admin
     public function getAllRegistrations()
     {
         $stmt = $this->conn->prepare("
-            SELECT 
+            SELECT
                 s.student_id,
                 s.first_name,
                 s.last_name,
@@ -100,6 +100,7 @@ class Admin
             'registrations' => $stmt->fetchAll(PDO::FETCH_ASSOC)
         ]);
     }
+
 
     // ✅ Approve student
     public function approveStudent($json)

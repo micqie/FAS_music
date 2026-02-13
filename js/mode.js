@@ -2,16 +2,12 @@
 window.ThemeMode = {
     // Initialize theme mode
     init() {
-        // Check if we're on index.html (should stay dark by default)
-        const isIndexPage = window.location.pathname.includes('index.html') ||
-                           (window.location.pathname.endsWith('/') && !window.location.pathname.includes('admin'));
-
         // Check for saved theme preference
         let savedTheme = localStorage.getItem('theme');
 
-        // If no saved theme, set default based on page
+        // If no saved theme, default to dark (project-wide)
         if (!savedTheme) {
-            savedTheme = isIndexPage ? 'dark' : 'light';
+            savedTheme = 'dark';
             localStorage.setItem('theme', savedTheme);
         }
 
@@ -39,7 +35,7 @@ window.ThemeMode = {
 
     // Toggle between dark and light mode
     toggle() {
-        const currentTheme = localStorage.getItem('theme') || 'light';
+        const currentTheme = localStorage.getItem('theme') || 'dark';
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         this.setTheme(newTheme);
     },
@@ -50,7 +46,7 @@ window.ThemeMode = {
         const existingButton = document.getElementById('themeToggle');
         if (existingButton) {
             // Button exists in HTML, just update the icon
-            const currentTheme = localStorage.getItem('theme') || 'light';
+            const currentTheme = localStorage.getItem('theme') || 'dark';
             this.updateToggleIcon(currentTheme);
             return;
         }
@@ -81,7 +77,7 @@ window.ThemeMode = {
         button.appendChild(iconContainer);
 
         document.body.appendChild(button);
-        const currentTheme = localStorage.getItem('theme') || 'light';
+        const currentTheme = localStorage.getItem('theme') || 'dark';
         this.updateToggleIcon(currentTheme);
     },
 
@@ -105,13 +101,9 @@ window.ThemeMode = {
 
     // Get current theme
     getCurrentTheme() {
-        // Check if we're on index.html (should stay dark by default)
-        const isIndexPage = window.location.pathname.includes('index.html') ||
-                           (window.location.pathname.endsWith('/') && !window.location.pathname.includes('admin'));
-
         const savedTheme = localStorage.getItem('theme');
         if (!savedTheme) {
-            return isIndexPage ? 'dark' : 'light';
+            return 'dark';
         }
         return savedTheme;
     }

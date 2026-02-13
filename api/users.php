@@ -64,8 +64,74 @@ class User
                 $this->sendJSON(['error' => 'Your account is pending admin approval. Please wait for approval before logging in.'], 403);
             }
 
+            // Detect default password "123" for students (first-login change requirement)
+            $mustChangePassword = false;
+            if ($user['role_name'] === 'Student' && password_verify('123', $user['password'])) {
+                $mustChangePassword = true;
+            }
+
             unset($user['password']);
-            $this->sendJSON(['success' => true, 'message' => 'Login successful', 'user' => $user]);
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Login successful',
+                'user' => $user,
+                'must_change_password' => $mustChangePassword
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function changePassword($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode($json, true);
+        $userId = $data['user_id'] ?? null;
+        $oldPassword = $data['old_password'] ?? '';
+        $newPassword = $data['new_password'] ?? '';
+
+        if (empty($userId) || empty($oldPassword) || empty($newPassword)) {
+            $this->sendJSON(['error' => 'user_id, old_password and new_password are required'], 400);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("SELECT user_id, password FROM tbl_users WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                $this->sendJSON(['error' => 'User not found'], 404);
+            }
+
+            if (!password_verify($oldPassword, $user['password'])) {
+                $this->sendJSON(['error' => 'Current password is incorrect'], 400);
+            }
+
+            // Validate new password with same strong policy as registration
+            if (strlen($newPassword) < 8) {
+                $this->sendJSON(['error' => 'New password must be at least 8 characters long'], 400);
+            }
+            if (!preg_match('/[A-Z]/', $newPassword)) {
+                $this->sendJSON(['error' => 'New password must contain at least one uppercase letter'], 400);
+            }
+            if (!preg_match('/[a-z]/', $newPassword)) {
+                $this->sendJSON(['error' => 'New password must contain at least one lowercase letter'], 400);
+            }
+            if (!preg_match('/[0-9]/', $newPassword)) {
+                $this->sendJSON(['error' => 'New password must contain at least one number'], 400);
+            }
+            if (!preg_match('/[!@#$%^&*]/', $newPassword)) {
+                $this->sendJSON(['error' => 'New password must contain at least one special character (!@#$%^&*)'], 400);
+            }
+
+            $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
+            $update = $this->conn->prepare("UPDATE tbl_users SET password = ? WHERE user_id = ?");
+            $update->execute([$hashed, $userId]);
+
+            $this->sendJSON(['success' => true, 'message' => 'Password changed successfully']);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
@@ -79,9 +145,11 @@ class User
 
         $data = json_decode($json, true);
 
+        $isWalkIn = !empty($data['is_walkin']); // admin-added student
+
         $required = ['student_first_name', 'student_last_name', 'student_email',
                      'student_phone', 'guardian_first_name', 'guardian_last_name',
-                     'guardian_relationship', 'guardian_phone', 'branch_id', 'password'];
+                     'guardian_relationship', 'guardian_phone', 'branch_id'];
 
         foreach ($required as $field) {
             if (empty($data[$field])) {
@@ -107,22 +175,33 @@ class User
             }
         }
 
-        // Validate password policy
-        $password = $data['password'];
-        if (strlen($password) < 8) {
-            $this->sendJSON(['error' => 'Password must be at least 8 characters long'], 400);
-        }
-        if (!preg_match('/[A-Z]/', $password)) {
-            $this->sendJSON(['error' => 'Password must contain at least one uppercase letter'], 400);
-        }
-        if (!preg_match('/[a-z]/', $password)) {
-            $this->sendJSON(['error' => 'Password must contain at least one lowercase letter'], 400);
-        }
-        if (!preg_match('/[0-9]/', $password)) {
-            $this->sendJSON(['error' => 'Password must contain at least one number'], 400);
-        }
-        if (!preg_match('/[!@#$%^&*]/', $password)) {
-            $this->sendJSON(['error' => 'Password must contain at least one special character (!@#$%^&*)'], 400);
+        // Determine password:
+        // - Admin-added (walk-in): default simple password "123" (no strict validation)
+        // - Self-registration: strong password policy
+        if ($isWalkIn) {
+            $password = '123';
+        } else {
+            if (empty($data['password'])) {
+                $this->sendJSON(['error' => 'Password is required'], 400);
+            }
+            $password = $data['password'];
+
+            // Validate password policy for self-registration
+            if (strlen($password) < 8) {
+                $this->sendJSON(['error' => 'Password must be at least 8 characters long'], 400);
+            }
+            if (!preg_match('/[A-Z]/', $password)) {
+                $this->sendJSON(['error' => 'Password must contain at least one uppercase letter'], 400);
+            }
+            if (!preg_match('/[a-z]/', $password)) {
+                $this->sendJSON(['error' => 'Password must contain at least one lowercase letter'], 400);
+            }
+            if (!preg_match('/[0-9]/', $password)) {
+                $this->sendJSON(['error' => 'Password must contain at least one number'], 400);
+            }
+            if (!preg_match('/[!@#$%^&*]/', $password)) {
+                $this->sendJSON(['error' => 'Password must contain at least one special character (!@#$%^&*)'], 400);
+            }
         }
 
         // Set default registration fee if not provided
@@ -198,7 +277,6 @@ class User
 
             // Create user account (status will be Inactive until admin approves)
             $username = $data['username'] ?? $data['student_email'];
-            $password = $data['password'];
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
             $stmtUser = $this->conn->prepare("
@@ -359,6 +437,9 @@ switch ($action) {
         break;
     case 'pay-registration-fee':
         $user->payRegistrationFee(file_get_contents('php://input'));
+        break;
+    case 'change-password':
+        $user->changePassword(file_get_contents('php://input'));
         break;
     default:
         $user->sendJSON(['error' => 'Invalid action'], 400);

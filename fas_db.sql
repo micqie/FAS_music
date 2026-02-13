@@ -85,13 +85,24 @@ CREATE TABLE tbl_student_guardians (
     UNIQUE KEY unique_student_guardian (student_id, guardian_id)
 );
 
--- 7️⃣ INSTRUMENTS (Master list of instruments that can be taught)
+-- Master table for instrument types
+CREATE TABLE tbl_instrument_types (
+    type_id INT AUTO_INCREMENT PRIMARY KEY,
+    type_name VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT
+);
+
+-- Instruments table now links to type_id
 CREATE TABLE tbl_instruments (
     instrument_id INT AUTO_INCREMENT PRIMARY KEY,
-    instrument_name VARCHAR(100) NOT NULL,
-    instrument_type VARCHAR(50), -- e.g., String, Wind, Percussion, Keyboard
-    description TEXT,
-    status ENUM('Active','Inactive') DEFAULT 'Active'
+    branch_id INT NOT NULL,
+    instrument_name VARCHAR(100),
+    type_id INT NOT NULL,
+    serial_number VARCHAR(50),
+    `condition` VARCHAR(50),
+    status ENUM('Available','In Use','Under Repair','Inactive') DEFAULT 'Available',
+    FOREIGN KEY (branch_id) REFERENCES tbl_branches(branch_id),
+    FOREIGN KEY (type_id) REFERENCES tbl_instrument_types(type_id)
 );
 
 -- 8️⃣ STUDENT INSTRUMENT PREFERENCES (Instruments students want to learn)
@@ -279,6 +290,8 @@ CREATE TABLE tbl_student_progress (
     FOREIGN KEY (session_id) REFERENCES tbl_sessions(session_id),
     FOREIGN KEY (instrument_id) REFERENCES tbl_instruments(instrument_id)
 );
+
+
 
 -- 2️⃣0️⃣ REGISTRATION PAYMENTS (For registration fee)
 CREATE TABLE tbl_registration_payments (

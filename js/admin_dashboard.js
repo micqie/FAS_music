@@ -12,7 +12,6 @@ async function apiGet(endpoint) {
     });
     return res.json();
 }
-
 async function apiPost(endpoint, data) {
     const res = await fetch(`${baseApiUrl}/${endpoint}`, {
         method: 'POST',
@@ -133,17 +132,17 @@ function displayRegistrations(registrations) {
                 <td class="px-6 py-4">
                     <div class="flex gap-2">
                         <button onclick="viewDetails(${reg.student_id})"
-                            class="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded text-sm transition">
-                            <i class="fas fa-eye"></i>
+                            class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold text-blue-200 bg-blue-500/15 border border-blue-500/30 hover:bg-blue-500/25 hover:border-blue-400/60 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.2)] transition">
+                            <i class="fas fa-eye text-xs opacity-80 group-hover:opacity-100"></i>View
                         </button>
                         ${reg.registration_status === 'Pending' ? `
                             <button onclick="openPaymentModal(${reg.student_id})"
-                                class="px-3 py-1 bg-gold-500/20 hover:bg-gold-500/30 text-gold-400 rounded text-sm transition">
-                                <i class="fas fa-money-bill-wave"></i>
+                                class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold text-gold-200 bg-gradient-to-r from-gold-500/20 to-gold-400/10 border border-gold-500/40 hover:from-gold-500/30 hover:to-gold-400/20 shadow-[0_6px_20px_rgba(184,134,11,0.2)] transition">
+                                <i class="fas fa-money-bill-wave text-xs opacity-80 group-hover:opacity-100"></i>Pay
                             </button>
                             <button onclick="rejectRegistration(${reg.student_id})"
-                                class="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-sm transition">
-                                <i class="fas fa-times"></i>
+                                class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold text-red-200 bg-red-500/15 border border-red-500/40 hover:bg-red-500/25 hover:border-red-400/60 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.15)] transition">
+                                <i class="fas fa-times text-xs opacity-80 group-hover:opacity-100"></i>Reject
                             </button>
                         ` : ''}
                     </div>

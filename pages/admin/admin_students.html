@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Students</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0a0a0a'
+                    }
+                }
+            }
+        }
+        // Suppress Tailwind CDN warning in console
+        if (typeof console !== 'undefined' && console.warn) {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
+                    return; // Suppress Tailwind CDN warning
+                }
+                originalWarn.apply(console, args);
+            };
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-obsidian text-gray-900 dark:text-zinc-100">
+    <!-- Top Navigation Bar -->
+    <nav class="fixed top-0 left-0 right-0 h-16 bg-black/95 dark:bg-black border-b border-gold-500/20 z-50 flex items-center justify-between px-6 shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-lg bg-gold-500/20 border border-gold-500/30 flex items-center justify-center">
+                <i class="fas fa-music text-gold-500 text-lg"></i>
+            </div>
+            <div>
+                <p class="text-xs text-zinc-400 uppercase tracking-wider">Father & Sons</p>
+                <p class="text-sm font-semibold text-white">Music Academy</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3" id="userInfoNav">
+            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
+                <i class="fas fa-user-circle text-gold-400 text-xl"></i>
+                <div class="text-right">
+                    <p class="text-xs text-zinc-400" id="userRoleNav">Admin</p>
+                    <p class="text-sm font-medium text-white" id="userNameNav">Loading...</p>
+                </div>
+                <i class="fas fa-chevron-down text-zinc-400 text-xs ml-2"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar -->
+    <div class="fixed inset-y-0 left-0 w-64 bg-black border-r border-gold-500/20 z-40 shadow-lg pt-16">
+        <div class="p-6 h-full flex flex-col">
+            <nav class="space-y-2 flex-1">
+                <a href="dashboard.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+                </a>
+                <a href="admin_registration.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-user-plus mr-3"></i> Registrations
+                </a>
+                <a href="admin_students.html" class="flex items-center px-4 py-3 text-gold-400 bg-gold-500/10 rounded-lg">
+                    <i class="fas fa-users mr-3"></i> Students
+                </a>
+                <a href="../../index.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-home mr-3"></i> Home
+                </a>
+            </nav>
+            <div class="border-t border-gold-500/20 pt-6">
+                <button onclick="logout()" class="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt mr-3"></i> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="ml-64 pt-24 p-8">
+        <div class="mb-8 flex items-center justify-between gap-4">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Students</h2>
+                <p class="text-gray-600 dark:text-zinc-400 text-sm max-w-2xl">
+                    Add new students manually and see them appear immediately in the registered students list below.
+                    Accounts created here will use the student's email as username and default password
+                    <span class="font-mono font-semibold">123</span>. On their first login, they must change this password.
+                </p>
+            </div>
+        </div>
+
+        <!-- Add New Student (button opens modal) -->
+        <div class="mb-6 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-user-plus text-gold-400"></i>
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Add New Student</h3>
+            </div>
+            <button id="openAddStudentModalBtn"
+                class="inline-flex items-center px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                <i class="fas fa-plus mr-2"></i>
+                New Student
+            </button>
+        </div>
+
+        <!-- Registered Students Table -->
+        <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg overflow-hidden shadow-sm">
+            <div class="p-6 border-b border-gray-200 dark:border-gold-500/20 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">Registered Students</h3>
+                <span class="text-xs text-gray-500 dark:text-zinc-400">All students from your FAS database</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-black/50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Student</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Contact</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Branch</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Registration</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Created</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentsTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading students...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Student Modal -->
+    <div id="addStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-3xl p-8 relative">
+            <button id="closeAddStudentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <h3 class="text-2xl font-bold text-white mb-2">Add New Student</h3>
+            <p class="text-zinc-400 text-xs mb-4">
+                This will create a student account using the student's email as username and default password
+                <span class="font-mono font-semibold">123</span>. They will be required to change it on first login.
+            </p>
+
+            <div id="walkinMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+            <form id="walkinForm" class="space-y-6">
+                <!-- Student Info -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-4 text-white">Student Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">First Name *</label>
+                            <input type="text" name="student_first_name" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">Last Name *</label>
+                            <input type="text" name="student_last_name" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">Email *</label>
+                            <input type="email" name="student_email" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">Phone *</label>
+                            <input type="text" name="student_phone" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">Branch *</label>
+                            <select name="branch_id" id="walkin_branch_id" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                <option value="">Loading branches...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">Registration Fee (PHP)</label>
+                            <input type="number" name="registration_fee_amount" min="0" step="0.01"
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                                placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Guardian Info -->
+                <div class="pt-4 border-t border-zinc-800">
+                    <h3 class="text-lg font-semibold mb-4 text-white">Guardian Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">First Name *</label>
+                            <input type="text" name="guardian_first_name" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">Last Name *</label>
+                            <input type="text" name="guardian_last_name" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">Relationship *</label>
+                            <input type="text" name="guardian_relationship" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                                placeholder="Parent / Guardian">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-1">Phone *</label>
+                            <input type="text" name="guardian_phone" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-zinc-800 flex items-center justify-end gap-3">
+                    <button type="button" id="cancelAddStudentBtn"
+                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="walkinSubmitBtn"
+                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                        <span id="walkinSubmitBtnText">Create Student</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../../js/mode.js"></script>
+    <script src="../../js/index.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load user info in top nav
+            if (typeof Auth !== 'undefined' && Auth.getUser) {
+                const user = Auth.getUser();
+                if (user) {
+                    const userNameNav = document.getElementById('userNameNav');
+                    const userRoleNav = document.getElementById('userRoleNav');
+                    if (userNameNav) userNameNav.textContent = user.username || user.email || 'Admin';
+                    if (userRoleNav) userRoleNav.textContent = user.role_name || 'Admin';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

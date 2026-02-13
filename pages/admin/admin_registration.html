@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Registrations</title>
+    <!-- Tailwind CSS - Using CDN for development (warning is expected) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0a0a0a'
+                    }
+                }
+            }
+        }
+        // Suppress Tailwind CDN warning in console
+        if (typeof console !== 'undefined' && console.warn) {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
+                    return; // Suppress Tailwind CDN warning
+                }
+                originalWarn.apply(console, args);
+            };
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-obsidian text-gray-900 dark:text-zinc-100">
+    <!-- Top Navigation Bar -->
+    <nav class="fixed top-0 left-0 right-0 h-16 bg-black/95 dark:bg-black border-b border-gold-500/20 z-50 flex items-center justify-between px-6 shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-lg bg-gold-500/20 border border-gold-500/30 flex items-center justify-center">
+                <i class="fas fa-music text-gold-500 text-lg"></i>
+            </div>
+            <div>
+                <p class="text-xs text-zinc-400 uppercase tracking-wider">Father & Sons</p>
+                <p class="text-sm font-semibold text-white">Music Academy</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3" id="userInfoNav">
+            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
+                <i class="fas fa-user-circle text-gold-400 text-xl"></i>
+                <div class="text-right">
+                    <p class="text-xs text-zinc-400" id="userRoleNav">Admin</p>
+                    <p class="text-sm font-medium text-white" id="userNameNav">Loading...</p>
+                </div>
+                <i class="fas fa-chevron-down text-zinc-400 text-xs ml-2"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar -->
+    <div class="fixed inset-y-0 left-0 w-64 bg-black border-r border-gold-500/20 z-40 shadow-lg pt-16">
+        <div class="p-6 h-full flex flex-col">
+            <nav class="space-y-2 flex-1">
+                <a href="dashboard.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+                </a>
+
+                <!-- Registrations -->
+                <button data-toggle="registrationMenu"
+                    class="dropdown-toggle w-full flex items-center justify-between px-4 py-3 text-gold-400 bg-gold-500/10 rounded-lg transition">
+                    <span class="flex items-center">
+                        <i class="fas fa-user-plus mr-3"></i> Registrations
+                    </span>
+                    <i class="fas fa-chevron-down text-zinc-300"></i>
+                </button>
+                <div id="registrationMenu" class="ml-6 space-y-1">
+                    <a href="#all" id="linkAllRegistrations" class="block px-4 py-2 text-zinc-400 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">All Registrations</a>
+                    <a href="#pending" id="linkPendingRegistrations" class="block px-4 py-2 text-zinc-400 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">Pending Registrations</a>
+                </div>
+
+                <a href="admin_students.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-users mr-3"></i> Students
+                </a>
+                <a href="../../index.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-home mr-3"></i> Home
+                </a>
+            </nav>
+            <div class="border-t border-gold-500/20 pt-6">
+                <button onclick="logout()" class="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt mr-3"></i> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="ml-64 pt-24 p-8">
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Registrations</h2>
+            <p class="text-gray-600 dark:text-zinc-400">Manage student registrations and payments</p>
+        </div>
+
+        <!-- Messages -->
+        <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+        <!-- Registrations Table -->
+        <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg overflow-hidden shadow-sm">
+            <div class="p-6 border-b border-gray-200 dark:border-gold-500/20 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white" id="tableTitle">Pending Registrations</h3>
+                    <p class="text-xs text-gray-500 dark:text-zinc-400 mt-1" id="tableSubtitle">Showing registrations that need approval / payment confirmation.</p>
+                </div>
+                <div class="flex gap-2">
+                    <a href="#pending" id="btnPending" class="px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black font-semibold text-sm transition">
+                        Pending
+                    </a>
+                    <a href="#all" id="btnAll" class="px-4 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-900 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white border border-gray-200 dark:border-white/10 font-semibold text-sm transition">
+                        All
+                    </a>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-black/50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Student</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Guardian</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Branch</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Fee</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Date</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="registrationsTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
+                        <tr>
+                            <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Confirmation Modal -->
+    <div id="paymentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div class="relative w-full max-w-md rounded-2xl border border-white/10 bg-gradient-to-b from-black/95 via-black/90 to-black/80 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.6)] ring-1 ring-gold-500/20">
+            <button onclick="closePaymentModal()" class="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white transition">
+                <i class="fas fa-times text-base"></i>
+            </button>
+
+            <div class="mb-6">
+                <p class="text-xs uppercase tracking-[0.2em] text-gold-400/80">Payment</p>
+                <h3 class="text-2xl font-bold text-white">Confirm Payment</h3>
+                <p class="text-zinc-400 text-sm mt-1" id="paymentStudentInfo"></p>
+            </div>
+
+            <div id="paymentMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+            <form id="paymentForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-2">Amount (PHP) *</label>
+                    <input type="number" id="paymentAmount" step="0.01" min="0" required
+                        class="w-full px-4 py-2.5 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-500/20 transition">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-2">Payment Method *</label>
+                    <select id="paymentMethod" required
+                        class="w-full px-4 py-2.5 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-500/20 transition">
+                        <option value="">Select Method</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Card">Card</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="GCash">GCash</option>
+                        <option value="Check">Check</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-2">Receipt Number</label>
+                    <input type="text" id="receiptNumber"
+                        class="w-full px-4 py-2.5 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-500/20 transition">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-2">Notes</label>
+                    <textarea id="paymentNotes" rows="2"
+                        class="w-full px-4 py-2.5 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-500/20 transition"></textarea>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" id="confirmPaymentBtn"
+                        class="flex-1 rounded-xl bg-gradient-to-r from-gold-500 to-gold-400 text-black font-bold py-3 shadow-[0_12px_30px_rgba(184,134,11,0.35)] hover:from-gold-400 hover:to-gold-300 transition">
+                        <span id="confirmPaymentBtnText">Confirm Payment</span>
+                    </button>
+                    <button type="button" onclick="closePaymentModal()"
+                        class="px-6 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold py-3 border border-white/10 transition">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="detailsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+        <div class="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-gradient-to-b from-black/95 via-black/90 to-black/80 p-8 shadow-[0_30px_90px_rgba(0,0,0,0.6)] ring-1 ring-gold-500/20 my-8">
+            <button onclick="closeDetailsModal()" class="absolute top-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white transition">
+                <i class="fas fa-times text-base"></i>
+            </button>
+
+            <div class="mb-6">
+                <p class="text-xs uppercase tracking-[0.2em] text-gold-400/80">Registration</p>
+                <h3 class="text-2xl font-bold text-white">Registration Details</h3>
+            </div>
+            <div id="detailsContent" class="space-y-6"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../../js/mode.js"></script>
+    <script src="../../js/index.js"></script>
+    <script>
+        function setActiveMode(mode) {
+            const title = document.getElementById('tableTitle');
+            const subtitle = document.getElementById('tableSubtitle');
+            const btnPending = document.getElementById('btnPending');
+            const btnAll = document.getElementById('btnAll');
+
+            const pendingActive = 'px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black font-semibold text-sm transition';
+            const normalBtn = 'px-4 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-900 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white border border-gray-200 dark:border-white/10 font-semibold text-sm transition';
+
+            if (mode === 'all') {
+                if (title) title.textContent = 'All Registrations';
+                if (subtitle) subtitle.textContent = 'Showing all registrations in the system.';
+                if (btnAll) btnAll.className = pendingActive;
+                if (btnPending) btnPending.className = normalBtn;
+                if (typeof loadAllRegistrations === 'function') loadAllRegistrations();
+            } else {
+                if (title) title.textContent = 'Pending Registrations';
+                if (subtitle) subtitle.textContent = 'Showing registrations that need approval / payment confirmation.';
+                if (btnPending) btnPending.className = pendingActive;
+                if (btnAll) btnAll.className = normalBtn;
+                if (typeof loadPendingRegistrations === 'function') loadPendingRegistrations();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof checkAuth === 'function') {
+                checkAuth();
+            }
+            
+            // Load user info in top nav
+            if (typeof Auth !== 'undefined' && Auth.getUser) {
+                const user = Auth.getUser();
+                if (user) {
+                    const userNameNav = document.getElementById('userNameNav');
+                    const userRoleNav = document.getElementById('userRoleNav');
+                    if (userNameNav) userNameNav.textContent = user.username || user.email || 'Admin';
+                    if (userRoleNav) userRoleNav.textContent = user.role_name || 'Admin';
+                }
+            }
+            
+            // Side nav dropdowns
+            document.querySelectorAll('.dropdown-toggle').forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.dataset.toggle;
+                    const target = document.getElementById(targetId);
+                    if (target) target.classList.toggle('hidden');
+                });
+            });
+            
+            if (typeof initPaymentForm === 'function') {
+                initPaymentForm();
+            }
+
+            const hash = (window.location.hash || '').replace('#', '').toLowerCase();
+            setActiveMode(hash === 'all' ? 'all' : 'pending');
+
+            window.addEventListener('hashchange', () => {
+                const h = (window.location.hash || '').replace('#', '').toLowerCase();
+                setActiveMode(h === 'all' ? 'all' : 'pending');
+            });
+        });
+    </script>
+
+    <!-- Theme Toggle Button -->
+    <button id="themeToggle"
+        class="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gold-500 hover:bg-gold-400 text-black shadow-lg transition-all duration-300 flex items-center justify-center group"
+        aria-label="Toggle theme">
+        <div class="relative w-6 h-6">
+            <i id="sunIcon" class="fas fa-sun absolute inset-0 transition-opacity duration-300"></i>
+            <i id="moonIcon" class="fas fa-moon absolute inset-0 transition-opacity duration-300 opacity-0"></i>
+        </div>
+    </button>
+</body>
+</html>
+
+

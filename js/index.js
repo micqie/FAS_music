@@ -1,30 +1,46 @@
-// Base API URL
-const baseApiUrl = sessionStorage.getItem("baseAPIUrl") || "http://localhost/FAS_music/api";
+// Base API URL - with fallback for tracking prevention
+let baseApiUrl;
+try {
+    baseApiUrl = sessionStorage.getItem("baseAPIUrl") || "http://localhost/FAS_music/api";
+} catch (e) {
+    // Browser tracking prevention blocked storage access
+    baseApiUrl = "http://localhost/FAS_music/api";
+}
 
 let currentStudentId = null;
 let currentRegistration = null;
 
-// Authentication Utility (integrated)
+// Authentication Utility (integrated) - with storage access protection
 const Auth = {
     // Get current user from sessionStorage
     getUser() {
-        const userStr = sessionStorage.getItem('user');
-        if (!userStr) return null;
         try {
+            const userStr = sessionStorage.getItem('user');
+            if (!userStr) return null;
             return JSON.parse(userStr);
         } catch (e) {
+            // Storage access blocked or parse error
             return null;
         }
     },
 
     // Set user in sessionStorage
     setUser(user) {
-        sessionStorage.setItem('user', JSON.stringify(user));
+        try {
+            sessionStorage.setItem('user', JSON.stringify(user));
+        } catch (e) {
+            // Storage access blocked - log warning but continue
+            console.warn('Unable to save user to sessionStorage. Browser tracking prevention may be enabled.');
+        }
     },
 
     // Remove user from sessionStorage
     logout() {
-        sessionStorage.removeItem('user');
+        try {
+            sessionStorage.removeItem('user');
+        } catch (e) {
+            // Storage access blocked - continue anyway
+        }
         window.location.href = '../index.html';
     },
 
@@ -148,7 +164,7 @@ function validatePassword() {
 function updateRequirement(id, met) {
     const element = document.getElementById(id);
     if (!element) return;
-    
+
     const icon = element.querySelector('i');
     if (met) {
         icon.classList.remove('fa-circle', 'text-zinc-600');
@@ -274,6 +290,34 @@ function initLoginForm() {
             const data = await response.json();
 
             if (data.success && data.user) {
+                // If student is using default password, force change on first login
+                if (data.must_change_password) {
+                    await Swal.fire({
+                        icon: 'info',
+                        title: 'Change Your Password',
+                        text: 'You are using the default password. You must change it now to continue.',
+                        confirmButtonColor: '#b8860b'
+                    });
+
+                    await promptPasswordChange(data.user, password);
+
+                    // Ask user to log in again after password change
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Please Login Again',
+                        text: 'Use your new password to login.',
+                        confirmButtonColor: '#b8860b'
+                    });
+
+                    if (loginBtn) loginBtn.disabled = false;
+                    if (loginBtnText) loginBtnText.textContent = 'Sign In';
+                    if (loginBtnIcon) {
+                        loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
+                        loginBtnIcon.classList.add('fa-sign-in-alt');
+                    }
+                    return;
+                }
+
                 // Store user in sessionStorage
                 Auth.setUser(data.user);
 
@@ -290,7 +334,7 @@ function initLoginForm() {
                 // Redirect based on role
                 setTimeout(() => {
                     if (data.user.role_name === 'Admin' || data.user.role_name === 'SuperAdmin') {
-                        window.location.href = 'pages/admin/admin_dashboard.html';
+                        window.location.href = 'pages/admin/dashboard.html';
                     } else {
                         window.location.href = 'index.html';
                     }
@@ -434,7 +478,7 @@ function initRegisterForm() {
             if (result.success) {
                 showRegisterMessage(result.message || 'Registration submitted successfully! Your account is pending admin approval.', 'success');
                 registerForm.reset();
-                
+
                 // Reset password validation indicators
                 if (document.getElementById('passwordRequirements')) {
                     ['req-length', 'req-uppercase', 'req-lowercase', 'req-number', 'req-special'].forEach(id => {
@@ -498,7 +542,7 @@ function calculateAge(dateOfBirth) {
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
         age--;
     }
@@ -519,7 +563,7 @@ function calculateAge(dateOfBirth) {
 function validateEmail(input) {
     const email = input.value.trim();
     const emailValidation = document.getElementById('emailValidation');
-    
+
     if (!emailValidation) return;
 
     if (email.length === 0) {
@@ -530,7 +574,7 @@ function validateEmail(input) {
 
     // Strict email validation pattern
     const emailPattern = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/;
-    
+
     if (!emailPattern.test(email)) {
         emailValidation.textContent = '✗ Please enter a valid email address (e.g., name@domain.com)';
         emailValidation.className = 'mt-1 text-xs text-red-500';
@@ -583,6 +627,9 @@ function initDatePicker() {
         return;
     }
 
+    const currentTheme = (localStorage.getItem('theme') || 'light').toLowerCase();
+    const isDark = currentTheme === 'dark';
+
     const flatpickrInstance = flatpickr(dateInput, {
         dateFormat: "Y-m-d",
         maxDate: "today",
@@ -598,7 +645,7 @@ function initDatePicker() {
         shorthandCurrentMonth: false,
 
         animate: true,
-        theme: "dark",
+        theme: isDark ? "dark" : "light",
 
         appendTo: document.body,
 
@@ -612,11 +659,12 @@ function initDatePicker() {
         onReady: function (_, __, instance) {
             if (instance.calendarContainer) {
                 instance.calendarContainer.style.zIndex = '10001';
-                instance.calendarContainer.classList.add(
-                    'bg-zinc-900',
-                    'border',
-                    'border-gold-500'
-                );
+                instance.calendarContainer.classList.add('border', 'border-gold-500');
+                if (isDark) {
+                    instance.calendarContainer.classList.add('bg-zinc-900');
+                } else {
+                    instance.calendarContainer.classList.add('bg-white');
+                }
             }
         },
 
@@ -682,6 +730,91 @@ function initIndexPage() {
     loadBranches();
 }
 
+// Prompt student to change password on first login (when using default "123")
+async function promptPasswordChange(user, currentPassword) {
+    try {
+        const { value: formValues } = await Swal.fire({
+            title: 'Change Your Password',
+            html:
+                '<div class="text-left text-sm mb-3">' +
+                    '<p class="mb-1">For security, please change your default password <strong>123</strong>.</p>' +
+                    '<ul class="list-disc list-inside text-xs text-zinc-300">' +
+                        '<li>At least 8 characters</li>' +
+                        '<li>Include uppercase, lowercase, number and special character (!@#$%^&*)</li>' +
+                    '</ul>' +
+                '</div>' +
+                '<input id="swal-new-password" class="swal2-input" type="password" placeholder="New password">' +
+                '<input id="swal-confirm-password" class="swal2-input" type="password" placeholder="Confirm new password">',
+            focusConfirm: false,
+            allowOutsideClick: false,
+            preConfirm: () => {
+                const newPass = document.getElementById('swal-new-password').value || '';
+                const confirmPass = document.getElementById('swal-confirm-password').value || '';
+
+                if (!newPass || !confirmPass) {
+                    Swal.showValidationMessage('Please fill in both password fields');
+                    return false;
+                }
+                if (newPass !== confirmPass) {
+                    Swal.showValidationMessage('Passwords do not match');
+                    return false;
+                }
+                if (newPass.length < 8 ||
+                    !/[A-Z]/.test(newPass) ||
+                    !/[a-z]/.test(newPass) ||
+                    !/[0-9]/.test(newPass) ||
+                    !/[!@#$%^&*]/.test(newPass)) {
+                    Swal.showValidationMessage('Password must meet all complexity requirements.');
+                    return false;
+                }
+
+                return { newPassword: newPass };
+            }
+        });
+
+        if (!formValues) {
+            return;
+        }
+
+        const response = await fetch(`${baseApiUrl}/users.php?action=change-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: user.user_id,
+                old_password: currentPassword,
+                new_password: formValues.newPassword
+            })
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Password Change Failed',
+                text: result.error || 'Unable to change password. Please try again.',
+                confirmButtonColor: '#b8860b'
+            });
+            return;
+        }
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Password Updated',
+            text: 'Your password has been changed successfully.',
+            confirmButtonColor: '#b8860b'
+        });
+    } catch (err) {
+        console.error('Error changing password:', err);
+        await Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'An unexpected error occurred. Please try again.',
+            confirmButtonColor: '#b8860b'
+        });
+    }
+}
+
 // ========== ADMIN PAGE FUNCTIONS ==========
 
 // Check authentication
@@ -705,6 +838,215 @@ function logout() {
     Auth.logout();
 }
 
+// Load branches for walk-in admin form
+async function loadWalkinBranches() {
+    const branchSelect = document.getElementById('walkin_branch_id');
+    if (!branchSelect) return;
+
+    try {
+        const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
+        const data = await response.json();
+
+        if (data.success && data.branches) {
+            branchSelect.innerHTML = '<option value=\"\">Select Branch</option>';
+            data.branches.forEach(branch => {
+                const option = document.createElement('option');
+                option.value = branch.branch_id;
+                option.textContent = branch.branch_name;
+                branchSelect.appendChild(option);
+            });
+        } else {
+            branchSelect.innerHTML = '<option value=\"\">No branches available</option>';
+        }
+    } catch (error) {
+        console.error('Error loading branches for walk-in:', error);
+        branchSelect.innerHTML = '<option value=\"\">Error loading branches</option>';
+    }
+}
+
+// Initialize walk-in admin page
+function initWalkinPage() {
+    const form = document.getElementById('walkinForm');
+    const modal = document.getElementById('addStudentModal');
+    const openBtn = document.getElementById('openAddStudentModalBtn');
+    const closeBtn = document.getElementById('closeAddStudentModalBtn');
+    const cancelBtn = document.getElementById('cancelAddStudentBtn');
+
+    if (!form || !modal) return;
+
+    // Helpers to toggle modal
+    const openModal = () => {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    };
+    const closeModal = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        form.reset();
+        const msgDiv = document.getElementById('walkinMessage');
+        if (msgDiv) msgDiv.classList.add('hidden');
+    };
+
+    if (openBtn) openBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal();
+    });
+    if (closeBtn) closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeModal();
+    });
+    if (cancelBtn) cancelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeModal();
+    });
+
+    loadWalkinBranches();
+    loadStudentsForAdmin();
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const btn = document.getElementById('walkinSubmitBtn');
+        const btnText = document.getElementById('walkinSubmitBtnText');
+        const msgDiv = document.getElementById('walkinMessage');
+
+        if (btn) btn.disabled = true;
+        if (btnText) btnText.textContent = 'Creating...';
+
+        const formData = new FormData(form);
+        const data = {};
+        for (let [key, value] of formData.entries()) {
+            data[key] = value;
+        }
+
+        // mark as walk-in so backend knows password is default
+        data['is_walkin'] = true;
+
+        try {
+            const response = await fetch(`${baseApiUrl}/users.php?action=register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                if (msgDiv) {
+                    msgDiv.className = 'mb-4 p-3 rounded text-sm bg-green-900/50 border border-green-500 text-green-200';
+                    msgDiv.textContent = result.message || 'Student created successfully with default password 123.';
+                    msgDiv.classList.remove('hidden');
+                }
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Student Created',
+                    html: `Student has been created.<br><br>
+                           <strong>Username:</strong> ${result.username || data['student_email']}<br>
+                           <strong>Default Password:</strong> 123<br><br>
+                           They will be required to change this on first login.`,
+                    confirmButtonColor: '#b8860b'
+                });
+                closeModal();
+                loadStudentsForAdmin();
+            } else {
+                if (msgDiv) {
+                    msgDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
+                    msgDiv.textContent = result.error || 'Failed to create walk-in student.';
+                    msgDiv.classList.remove('hidden');
+                }
+            }
+        } catch (error) {
+            console.error('Walk-in create error:', error);
+            if (msgDiv) {
+                msgDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
+                msgDiv.textContent = 'An error occurred. Please try again.';
+                msgDiv.classList.remove('hidden');
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.textContent = 'Create Walk-in Student';
+        }
+    });
+}
+
+// Load and display all students for admin_students page
+async function loadStudentsForAdmin() {
+    const tableBody = document.getElementById('studentsTable');
+    if (!tableBody) return;
+
+    try {
+        const data = await apiGet('students.php?action=get-all-students');
+        const students = data.success ? data.students : [];
+
+        if (!students || students.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-6 py-8 text-center text-zinc-400">
+                        <i class="fas fa-inbox text-2xl mb-2"></i>
+                        <p>No students found</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tableBody.innerHTML = students.map(s => {
+            const statusColors = {
+                'Pending': 'text-yellow-400 bg-yellow-400/10',
+                'Fee Paid': 'text-green-400 bg-green-400/10',
+                'Approved': 'text-blue-400 bg-blue-400/10',
+                'Rejected': 'text-red-400 bg-red-400/10'
+            };
+            const statusClass = statusColors[s.registration_status] || 'text-zinc-400 bg-zinc-400/10';
+
+            const activeBadge = s.status === 'Active'
+                ? '<span class="px-2 py-1 rounded text-xs font-semibold bg-green-400/10 text-green-400">Active</span>'
+                : '<span class="px-2 py-1 rounded text-xs font-semibold bg-zinc-400/10 text-zinc-300">Inactive</span>';
+
+            return `
+                <tr class="hover:bg-gold-500/5 transition">
+                    <td class="px-6 py-4">
+                        <div class="font-medium text-white">${s.first_name} ${s.last_name}</div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-zinc-300">
+                        <div>${s.email || ''}</div>
+                        <div class="text-zinc-500">${s.phone || ''}</div>
+                    </td>
+                    <td class="px-6 py-4 text-zinc-300">
+                        ${s.branch_name || ''}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-zinc-300">
+                        <div>Fee: ₱${parseFloat(s.registration_fee_amount || 0).toFixed(2)}</div>
+                        <div>Paid: ₱${parseFloat(s.registration_fee_paid || 0).toFixed(2)}</div>
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        <div class="mb-1">
+                            <span class="px-2 py-1 rounded text-xs font-semibold ${statusClass}">
+                                ${s.registration_status}
+                            </span>
+                        </div>
+                        ${activeBadge}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-zinc-400">
+                        ${new Date(s.created_at).toLocaleDateString()}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Failed to load students:', error);
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="px-6 py-8 text-center text-red-400">
+                    Failed to load students.
+                </td>
+            </tr>
+        `;
+    }
+}
+
 // Show message
 function showMessage(message, type = 'error') {
     const messageDiv = document.getElementById('message');
@@ -722,7 +1064,10 @@ function showMessage(message, type = 'error') {
 
 // Load Pending Registrations
 async function loadPendingRegistrations() {
-    document.getElementById('tableTitle').textContent = 'Pending Registrations';
+    const tableTitle = document.getElementById('tableTitle');
+    if (tableTitle) {
+        tableTitle.textContent = 'Pending Registrations';
+    }
 
     try {
         const data = await apiGet('admin.php?action=get-pending-registrations');
@@ -738,7 +1083,10 @@ async function loadPendingRegistrations() {
 
 // Load All Registrations
 async function loadAllRegistrations() {
-    document.getElementById('tableTitle').textContent = 'All Registrations';
+    const tableTitle = document.getElementById('tableTitle');
+    if (tableTitle) {
+        tableTitle.textContent = 'All Registrations';
+    }
 
     try {
         const data = await apiGet('admin.php?action=get-all-registrations');
@@ -755,6 +1103,11 @@ async function loadAllRegistrations() {
 // Display Registrations
 function displayRegistrations(registrations) {
     const tbody = document.getElementById('registrationsTable');
+    
+    if (!tbody) {
+        // Table doesn't exist on this page (e.g., dashboard page)
+        return;
+    }
 
     if (!registrations || registrations.length === 0) {
         tbody.innerHTML = `
@@ -831,19 +1184,26 @@ function updateStats(registrations) {
         pending: 0,
         feePaid: 0,
         approved: 0,
-        total: registrations.length
+        total: registrations ? registrations.length : 0
     };
 
-    registrations.forEach(reg => {
-        if (reg.registration_status === 'Pending') stats.pending++;
-        if (reg.registration_status === 'Fee Paid') stats.feePaid++;
-        if (reg.registration_status === 'Approved') stats.approved++;
-    });
+    if (registrations) {
+        registrations.forEach(reg => {
+            if (reg.registration_status === 'Pending') stats.pending++;
+            if (reg.registration_status === 'Fee Paid') stats.feePaid++;
+            if (reg.registration_status === 'Approved') stats.approved++;
+        });
+    }
 
-    document.getElementById('statPending').textContent = stats.pending;
-    document.getElementById('statFeePaid').textContent = stats.feePaid;
-    document.getElementById('statApproved').textContent = stats.approved;
-    document.getElementById('statTotal').textContent = stats.total;
+    const statPending = document.getElementById('statPending');
+    const statFeePaid = document.getElementById('statFeePaid');
+    const statApproved = document.getElementById('statApproved');
+    const statTotal = document.getElementById('statTotal');
+    
+    if (statPending) statPending.textContent = stats.pending;
+    if (statFeePaid) statFeePaid.textContent = stats.feePaid;
+    if (statApproved) statApproved.textContent = stats.approved;
+    if (statTotal) statTotal.textContent = stats.total;
 }
 
 // View Details
@@ -1033,12 +1393,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if we're on index.html or admin page
     const loginForm = document.getElementById('loginForm');
     const adminTable = document.getElementById('registrationsTable');
+    const walkinForm = document.getElementById('walkinForm');
 
     if (loginForm) {
-        // We're on index.html
         initIndexPage();
+    } else if (walkinForm) {
+        checkAuth();
+        initWalkinPage();
     } else if (adminTable) {
-        // We're on admin page
         checkAuth();
         initPaymentForm();
         loadPendingRegistrations();
