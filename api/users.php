@@ -222,28 +222,64 @@ class User
             $roleId = $role['role_id'];
 
             // Insert Student
-            $stmtStudent = $this->conn->prepare("
-                INSERT INTO tbl_students (
-                    branch_id, first_name, last_name, middle_name, date_of_birth,
-                    age, phone, email, address, school, grade_year, health_diagnosis,
-                    registration_fee_amount, registration_status, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Inactive')
-            ");
-            $stmtStudent->execute([
-                $data['branch_id'],
-                $data['student_first_name'],
-                $data['student_last_name'],
-                $data['student_middle_name'] ?? null,
-                $data['student_date_of_birth'] ?? null,
-                $data['student_age'] ?? null,
-                $data['student_phone'],
-                $data['student_email'],
-                $data['student_address'] ?? null,
-                $data['student_school'] ?? null,
-                $data['student_grade_year'] ?? null,
-                $data['student_health_diagnosis'] ?? null,
-                $data['registration_fee_amount']
-            ]);
+            // Check if session_package_id column exists
+            $hasSessionPackageCol = false;
+            try {
+                $checkCol = $this->conn->query("SHOW COLUMNS FROM tbl_students LIKE 'session_package_id'");
+                $hasSessionPackageCol = $checkCol->rowCount() > 0;
+            } catch (PDOException $e) {
+                // Table might not exist or error checking
+            }
+
+            if ($hasSessionPackageCol) {
+                $stmtStudent = $this->conn->prepare("
+                    INSERT INTO tbl_students (
+                        branch_id, first_name, last_name, middle_name, date_of_birth,
+                        age, phone, email, address, school, grade_year, health_diagnosis,
+                        registration_fee_amount, session_package_id, registration_status, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Inactive')
+                ");
+                $stmtStudent->execute([
+                    $data['branch_id'],
+                    $data['student_first_name'],
+                    $data['student_last_name'],
+                    $data['student_middle_name'] ?? null,
+                    $data['student_date_of_birth'] ?? null,
+                    $data['student_age'] ?? null,
+                    $data['student_phone'],
+                    $data['student_email'],
+                    $data['student_address'] ?? null,
+                    $data['student_school'] ?? null,
+                    $data['student_grade_year'] ?? null,
+                    $data['student_health_diagnosis'] ?? null,
+                    $data['registration_fee_amount'],
+                    $data['session_package_id'] ?? null
+                ]);
+            } else {
+                // Fallback if column doesn't exist
+                $stmtStudent = $this->conn->prepare("
+                    INSERT INTO tbl_students (
+                        branch_id, first_name, last_name, middle_name, date_of_birth,
+                        age, phone, email, address, school, grade_year, health_diagnosis,
+                        registration_fee_amount, registration_status, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Inactive')
+                ");
+                $stmtStudent->execute([
+                    $data['branch_id'],
+                    $data['student_first_name'],
+                    $data['student_last_name'],
+                    $data['student_middle_name'] ?? null,
+                    $data['student_date_of_birth'] ?? null,
+                    $data['student_age'] ?? null,
+                    $data['student_phone'],
+                    $data['student_email'],
+                    $data['student_address'] ?? null,
+                    $data['student_school'] ?? null,
+                    $data['student_grade_year'] ?? null,
+                    $data['student_health_diagnosis'] ?? null,
+                    $data['registration_fee_amount']
+                ]);
+            }
 
             $studentId = $this->conn->lastInsertId();
 

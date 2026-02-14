@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Instruments</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0a0a0a'
+                    }
+                }
+            }
+        }
+        // Suppress Tailwind CDN warning in console
+        if (typeof console !== 'undefined' && console.warn) {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
+                    return;
+                }
+                originalWarn.apply(console, args);
+            };
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-obsidian text-gray-900 dark:text-zinc-100">
+    <!-- Top Navigation Bar -->
+    <nav class="fixed top-0 left-0 right-0 h-16 bg-black/95 dark:bg-black border-b border-gold-500/20 z-50 flex items-center justify-between px-6 shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-lg bg-gold-500/20 border border-gold-500/30 flex items-center justify-center">
+                <i class="fas fa-music text-gold-500 text-lg"></i>
+            </div>
+            <div>
+                <p class="text-xs text-zinc-400 uppercase tracking-wider">Father & Sons</p>
+                <p class="text-sm font-semibold text-white">Music Academy</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3" id="userInfoNav">
+            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
+                <i class="fas fa-user-circle text-gold-400 text-xl"></i>
+                <div class="text-right">
+                    <p class="text-xs text-zinc-400" id="userRoleNav">Admin</p>
+                    <p class="text-sm font-medium text-white" id="userNameNav">Loading...</p>
+                </div>
+                <i class="fas fa-chevron-down text-zinc-400 text-xs ml-2"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar -->
+    <div class="fixed inset-y-0 left-0 w-64 bg-black border-r border-gold-500/20 z-40 shadow-lg pt-16">
+        <div class="p-6 h-full flex flex-col">
+            <nav class="space-y-2 flex-1">
+                <a href="admin_dashboard.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+                </a>
+                <a href="admin_registration.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-user-plus mr-3"></i> Registrations
+                </a>
+                <a href="admin_students.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-users mr-3"></i> Students
+                </a>
+                <a href="admin_instruments.html" class="flex items-center px-4 py-3 text-gold-400 bg-gold-500/10 rounded-lg">
+                    <i class="fas fa-guitar mr-3"></i> Instruments
+                </a>
+                <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-calendar-alt mr-3"></i> Sessions
+                </a>
+                <a href="admin_package.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-box mr-3"></i> Packages
+                </a>
+            </nav>
+            <div class="border-t border-gold-500/20 pt-6">
+                <button onclick="logout()" class="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt mr-3"></i> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="ml-64 pt-24 p-8">
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Instruments</h2>
+                <p class="text-gray-600 dark:text-zinc-400">Manage instruments and instrument types</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="openAddTypeModalBtn"
+                    class="inline-flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold rounded-lg shadow transition">
+                    <i class="fas fa-plus mr-2"></i>
+                    Add Type
+                </button>
+                <button id="openAddInstrumentModalBtn"
+                    class="inline-flex items-center px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                    <i class="fas fa-plus mr-2"></i>
+                    Add Instrument
+                </button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+        <!-- Filters -->
+        <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+                    <i class="fas fa-filter mr-2 text-gold-500"></i>Filter by Branch
+                </label>
+                <select id="branchFilter" class="w-full px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-gold-500/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-gold-500 dark:focus:border-gold-400">
+                    <option value="">All Branches</option>
+                </select>
+            </div>
+            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+                    <i class="fas fa-filter mr-2 text-gold-500"></i>Filter by Type
+                </label>
+                <select id="typeFilter" class="w-full px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-gold-500/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-gold-500 dark:focus:border-gold-400">
+                    <option value="">All Types</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Instruments Table -->
+        <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg overflow-hidden shadow-sm">
+            <div class="p-6 border-b border-gray-200 dark:border-gold-500/20 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">All Instruments</h3>
+                <span class="text-xs text-gray-500 dark:text-zinc-400" id="instrumentCount">Loading...</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-black/50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Instrument</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Branch</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Serial Number</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Condition</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="instrumentsTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading instruments...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Instrument Type Modal -->
+    <div id="addTypeModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+            <button id="closeAddTypeModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <h3 class="text-2xl font-bold text-white mb-2">Add Instrument Type</h3>
+            <p class="text-zinc-400 text-xs mb-4">Create a new instrument type category</p>
+
+            <div id="typeMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+            <form id="addTypeForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Type Name *</label>
+                    <input type="text" id="typeName" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="e.g., Piano, Guitar, Violin">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
+                    <textarea id="typeDescription" rows="3"
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="Optional description"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-3 pt-4">
+                    <button type="button" id="cancelAddTypeBtn"
+                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitTypeBtn"
+                        class="inline-flex items-center px-6 py-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold rounded-lg shadow transition">
+                        <span id="submitTypeBtnText">Add Type</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Instrument Modal -->
+    <div id="addInstrumentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
+            <button id="closeAddInstrumentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <h3 class="text-2xl font-bold text-white mb-2">Add Instrument</h3>
+            <p class="text-zinc-400 text-xs mb-4">Add a new instrument to the inventory</p>
+
+            <div id="instrumentMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+            <form id="addInstrumentForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Branch *</label>
+                        <select id="instrumentBranchId" required
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <option value="">Select Branch</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Instrument Type *</label>
+                        <select id="instrumentTypeId" required
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <option value="">Select Type</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Instrument Name *</label>
+                        <input type="text" id="instrumentName" required
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                            placeholder="e.g., Yamaha Piano Model XYZ">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Serial Number</label>
+                        <input type="text" id="serialNumber"
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                            placeholder="Optional">
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 pt-4">
+                    <button type="button" id="cancelAddInstrumentBtn"
+                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitInstrumentBtn"
+                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                        <span id="submitInstrumentBtnText">Add Instrument</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../../js/mode.js"></script>
+    <script src="../../js/index.js"></script>
+    <script>
+        let allInstruments = [];
+        let filteredInstruments = [];
+
+        // Show message
+        function showMessage(message, type = 'error') {
+            const messageDiv = document.getElementById('message');
+            if (!messageDiv) return;
+
+            messageDiv.className = `mb-4 p-3 rounded text-sm ${
+                type === 'error' ? 'bg-red-900/50 border border-red-500 text-red-200' :
+                'bg-green-900/50 border border-green-500 text-green-200'
+            }`;
+            messageDiv.textContent = message;
+            messageDiv.classList.remove('hidden');
+
+            setTimeout(() => {
+                messageDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Load branches
+        async function loadBranches() {
+            const branchFilter = document.getElementById('branchFilter');
+            const instrumentBranchId = document.getElementById('instrumentBranchId');
+            
+            try {
+                const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
+                const data = await response.json();
+
+                if (data.success && data.branches) {
+                    const options = data.branches.map(branch => 
+                        `<option value="${branch.branch_id}">${branch.branch_name}</option>`
+                    ).join('');
+
+                    if (branchFilter) {
+                        branchFilter.innerHTML = '<option value="">All Branches</option>' + options;
+                    }
+                    if (instrumentBranchId) {
+                        instrumentBranchId.innerHTML = '<option value="">Select Branch</option>' + options;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load branches:', error);
+            }
+        }
+
+        // Load instrument types
+        async function loadInstrumentTypes() {
+            const typeFilter = document.getElementById('typeFilter');
+            const instrumentTypeId = document.getElementById('instrumentTypeId');
+            
+            try {
+                const response = await fetch(`${baseApiUrl}/instruments.php?action=get-types`);
+                const data = await response.json();
+
+                if (data.success && data.types) {
+                    const options = data.types.map(type => 
+                        `<option value="${type.type_id}">${type.type_name}</option>`
+                    ).join('');
+
+                    if (typeFilter) {
+                        typeFilter.innerHTML = '<option value="">All Types</option>' + options;
+                    }
+                    if (instrumentTypeId) {
+                        instrumentTypeId.innerHTML = '<option value="">Select Type</option>' + options;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load instrument types:', error);
+            }
+        }
+
+        // Load instruments
+        async function loadInstruments() {
+            const tableBody = document.getElementById('instrumentsTable');
+            if (!tableBody) return;
+
+            try {
+                const branchFilter = document.getElementById('branchFilter');
+                const typeFilter = document.getElementById('typeFilter');
+                
+                let url = `${baseApiUrl}/instruments.php?action=get-instruments`;
+                if (branchFilter && branchFilter.value) {
+                    url += `&branch_id=${branchFilter.value}`;
+                }
+                if (typeFilter && typeFilter.value) {
+                    url += `&type_id=${typeFilter.value}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success && data.instruments) {
+                    allInstruments = data.instruments;
+                    filteredInstruments = allInstruments;
+                    displayInstruments();
+                    updateInstrumentCount();
+                } else {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                                <i class="fas fa-inbox text-2xl mb-2"></i>
+                                <p>No instruments found</p>
+                            </td>
+                        </tr>
+                    `;
+                    allInstruments = [];
+                    filteredInstruments = [];
+                    updateInstrumentCount();
+                }
+            } catch (error) {
+                console.error('Failed to load instruments:', error);
+                const tableBody = document.getElementById('instrumentsTable');
+                if (tableBody) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
+                                <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                                <p>Failed to load instruments</p>
+                            </td>
+                        </tr>
+                    `;
+                }
+            }
+        }
+
+        // Display instruments
+        function displayInstruments() {
+            const tableBody = document.getElementById('instrumentsTable');
+            if (!tableBody) return;
+
+            if (!filteredInstruments || filteredInstruments.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                            <i class="fas fa-inbox text-2xl mb-2"></i>
+                            <p>No instruments found</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const statusColors = {
+                'Active': 'bg-green-500/10 text-green-500 border-green-500/20',
+                'Available': 'bg-green-500/10 text-green-500 border-green-500/20',
+                'In Use': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+                'Under Repair': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+                'Inactive': 'bg-gray-500/10 text-gray-500 border-gray-500/20'
+            };
+
+            tableBody.innerHTML = filteredInstruments.map(instrument => {
+                const statusClass = statusColors[instrument.status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+                
+                return `
+                    <tr class="hover:bg-gold-500/5 transition">
+                        <td class="px-6 py-4">
+                            <div class="font-medium text-gray-900 dark:text-white">${instrument.instrument_name || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 text-gray-900 dark:text-white">${instrument.type_name || 'N/A'}</td>
+                        <td class="px-6 py-4 text-gray-900 dark:text-white">${instrument.branch_name || 'N/A'}</td>
+                        <td class="px-6 py-4 text-gray-500 dark:text-zinc-400">${instrument.serial_number || '-'}</td>
+                        <td class="px-6 py-4 text-gray-900 dark:text-white">${instrument.condition || '-'}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
+                                ${instrument.status || 'N/A'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Update instrument count
+        function updateInstrumentCount() {
+            const countDiv = document.getElementById('instrumentCount');
+            if (countDiv) {
+                const count = filteredInstruments.length;
+                const total = allInstruments.length;
+                countDiv.textContent = `Showing ${count} ${count === 1 ? 'instrument' : 'instruments'}${total !== count ? ` (${total} total)` : ''}`;
+            }
+        }
+
+        // Add Instrument Type
+        async function addInstrumentType() {
+            const form = document.getElementById('addTypeForm');
+            const typeName = document.getElementById('typeName');
+            const typeDescription = document.getElementById('typeDescription');
+            const submitBtn = document.getElementById('submitTypeBtn');
+            const submitBtnText = document.getElementById('submitTypeBtnText');
+            const messageDiv = document.getElementById('typeMessage');
+
+            if (!form || !typeName) return;
+
+            submitBtn.disabled = true;
+            submitBtnText.textContent = 'Adding...';
+
+            try {
+                const response = await fetch(`${baseApiUrl}/instruments.php?action=add-type`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type_name: typeName.value.trim(),
+                        description: typeDescription.value.trim() || null
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('Instrument type added successfully', 'success');
+                    if (messageDiv) {
+                        messageDiv.className = 'mb-4 p-3 rounded text-sm bg-green-900/50 border border-green-500 text-green-200';
+                        messageDiv.textContent = result.message || 'Instrument type added successfully';
+                        messageDiv.classList.remove('hidden');
+                    }
+                    form.reset();
+                    closeAddTypeModal();
+                    await loadInstrumentTypes();
+                } else {
+                    if (messageDiv) {
+                        messageDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
+                        messageDiv.textContent = result.error || 'Failed to add instrument type';
+                        messageDiv.classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to add instrument type:', error);
+                if (messageDiv) {
+                    messageDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
+                    messageDiv.textContent = 'An error occurred. Please try again.';
+                    messageDiv.classList.remove('hidden');
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtnText.textContent = 'Add Type';
+            }
+        }
+
+        // Add Instrument
+        async function addInstrument() {
+            const form = document.getElementById('addInstrumentForm');
+            const submitBtn = document.getElementById('submitInstrumentBtn');
+            const submitBtnText = document.getElementById('submitInstrumentBtnText');
+            const messageDiv = document.getElementById('instrumentMessage');
+
+            if (!form) return;
+
+            submitBtn.disabled = true;
+            submitBtnText.textContent = 'Adding...';
+
+            try {
+                const formData = {
+                    branch_id: document.getElementById('instrumentBranchId').value,
+                    instrument_name: document.getElementById('instrumentName').value.trim(),
+                    type_id: document.getElementById('instrumentTypeId').value,
+                    serial_number: document.getElementById('serialNumber').value.trim() || null
+                };
+
+                const response = await fetch(`${baseApiUrl}/instruments.php?action=add-instrument`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('Instrument added successfully', 'success');
+                    if (messageDiv) {
+                        messageDiv.className = 'mb-4 p-3 rounded text-sm bg-green-900/50 border border-green-500 text-green-200';
+                        messageDiv.textContent = result.message || 'Instrument added successfully';
+                        messageDiv.classList.remove('hidden');
+                    }
+                    form.reset();
+                    closeAddInstrumentModal();
+                    await loadInstruments();
+                } else {
+                    if (messageDiv) {
+                        messageDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
+                        messageDiv.textContent = result.error || 'Failed to add instrument';
+                        messageDiv.classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to add instrument:', error);
+                if (messageDiv) {
+                    messageDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
+                    messageDiv.textContent = 'An error occurred. Please try again.';
+                    messageDiv.classList.remove('hidden');
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtnText.textContent = 'Add Instrument';
+            }
+        }
+
+        // Modal functions
+        function openAddTypeModal() {
+            const modal = document.getElementById('addTypeModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeAddTypeModal() {
+            const modal = document.getElementById('addTypeModal');
+            const form = document.getElementById('addTypeForm');
+            const messageDiv = document.getElementById('typeMessage');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            if (form) form.reset();
+            if (messageDiv) messageDiv.classList.add('hidden');
+        }
+
+        function openAddInstrumentModal() {
+            const modal = document.getElementById('addInstrumentModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeAddInstrumentModal() {
+            const modal = document.getElementById('addInstrumentModal');
+            const form = document.getElementById('addInstrumentForm');
+            const messageDiv = document.getElementById('instrumentMessage');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            if (form) form.reset();
+            if (messageDiv) messageDiv.classList.add('hidden');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load user info in top nav
+            if (typeof Auth !== 'undefined' && Auth.getUser) {
+                const user = Auth.getUser();
+                if (user) {
+                    const userNameNav = document.getElementById('userNameNav');
+                    const userRoleNav = document.getElementById('userRoleNav');
+                    if (userNameNav) userNameNav.textContent = user.username || user.email || 'Admin';
+                    if (userRoleNav) userRoleNav.textContent = user.role_name || 'Admin';
+                }
+            }
+
+            // Load data
+            loadBranches();
+            loadInstrumentTypes();
+            loadInstruments();
+
+            // Modal event listeners
+            document.getElementById('openAddTypeModalBtn')?.addEventListener('click', openAddTypeModal);
+            document.getElementById('closeAddTypeModalBtn')?.addEventListener('click', closeAddTypeModal);
+            document.getElementById('cancelAddTypeBtn')?.addEventListener('click', closeAddTypeModal);
+            document.getElementById('addTypeForm')?.addEventListener('submit', function(e) {
+                e.preventDefault();
+                addInstrumentType();
+            });
+
+            document.getElementById('openAddInstrumentModalBtn')?.addEventListener('click', openAddInstrumentModal);
+            document.getElementById('closeAddInstrumentModalBtn')?.addEventListener('click', closeAddInstrumentModal);
+            document.getElementById('cancelAddInstrumentBtn')?.addEventListener('click', closeAddInstrumentModal);
+            document.getElementById('addInstrumentForm')?.addEventListener('submit', function(e) {
+                e.preventDefault();
+                addInstrument();
+            });
+
+            // Filter event listeners
+            document.getElementById('branchFilter')?.addEventListener('change', loadInstruments);
+            document.getElementById('typeFilter')?.addEventListener('change', loadInstruments);
+        });
+    </script>
+</body>
+</html>
+

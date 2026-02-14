@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Sessions</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0a0a0a'
+                    }
+                }
+            }
+        }
+        if (typeof console !== 'undefined' && console.warn) {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+                originalWarn.apply(console, args);
+            };
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-obsidian text-gray-900 dark:text-zinc-100">
+    <!-- Top Navigation Bar -->
+    <nav class="fixed top-0 left-0 right-0 h-16 bg-black/95 dark:bg-black border-b border-gold-500/20 z-50 flex items-center justify-between px-6 shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-lg bg-gold-500/20 border border-gold-500/30 flex items-center justify-center">
+                <i class="fas fa-music text-gold-500 text-lg"></i>
+            </div>
+            <div>
+                <p class="text-xs text-zinc-400 uppercase tracking-wider">Father & Sons</p>
+                <p class="text-sm font-semibold text-white">Music Academy</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3" id="userInfoNav">
+            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
+                <i class="fas fa-user-circle text-gold-400 text-xl"></i>
+                <div class="text-right">
+                    <p class="text-xs text-zinc-400" id="userRoleNav">Admin</p>
+                    <p class="text-sm font-medium text-white" id="userNameNav">Loading...</p>
+                </div>
+                <i class="fas fa-chevron-down text-zinc-400 text-xs ml-2"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar -->
+    <div class="fixed inset-y-0 left-0 w-64 bg-black border-r border-gold-500/20 z-40 shadow-lg pt-16">
+        <div class="p-6 h-full flex flex-col">
+            <nav class="space-y-2 flex-1">
+                <a href="admin_dashboard.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+                </a>
+                <a href="admin_registration.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-user-plus mr-3"></i> Registrations
+                </a>
+                <a href="admin_students.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-users mr-3"></i> Students
+                </a>
+                <a href="admin_instruments.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-guitar mr-3"></i> Instruments
+                </a>
+                <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-gold-400 bg-gold-500/10 rounded-lg">
+                    <i class="fas fa-calendar-alt mr-3"></i> Sessions
+                </a>
+                <a href="admin_package.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-box mr-3"></i> Packages
+                </a>
+            </nav>
+            <div class="border-t border-gold-500/20 pt-6">
+                <button onclick="logout()" class="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt mr-3"></i> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="ml-64 pt-24 p-8">
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Session Packages</h2>
+                <p class="text-gray-600 dark:text-zinc-400">Manage lesson session packages and instrument limits for registration</p>
+            </div>
+            <button id="openAddPackageModalBtn"
+                class="inline-flex items-center px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                <i class="fas fa-plus mr-2"></i>
+                Add Package
+            </button>
+        </div>
+
+        <!-- Messages -->
+        <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+        <!-- Package rules info -->
+        <div class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="h-10 w-10 rounded-lg bg-gold-500/20 flex items-center justify-center">
+                        <i class="fas fa-drum text-gold-500"></i>
+                    </div>
+                    <span class="font-semibold text-gray-900 dark:text-white">12 Sessions</span>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-zinc-400">1 package = <strong class="text-gold-500">1 instrument only</strong></p>
+            </div>
+            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="h-10 w-10 rounded-lg bg-gold-500/20 flex items-center justify-center">
+                        <i class="fas fa-guitar text-gold-500"></i>
+                    </div>
+                    <span class="font-semibold text-gray-900 dark:text-white">20 Sessions</span>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-zinc-400">1 package = <strong class="text-gold-500">2 instruments</strong></p>
+            </div>
+            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="h-10 w-10 rounded-lg bg-gold-500/20 flex items-center justify-center">
+                        <i class="fas fa-music text-gold-500"></i>
+                    </div>
+                    <span class="font-semibold text-gray-900 dark:text-white">20+ Sessions</span>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-zinc-400">1 package = <strong class="text-gold-500">3 instruments</strong></p>
+            </div>
+        </div>
+
+        <!-- Session Packages Table -->
+        <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg overflow-hidden shadow-sm">
+            <div class="p-6 border-b border-gray-200 dark:border-gold-500/20 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">All Session Packages</h3>
+                <span class="text-xs text-gray-500 dark:text-zinc-400" id="packageCount">0 packages</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-black/50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Package Name</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Sessions</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Max Instruments</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Description</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="packagesTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
+                        <tr>
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading packages...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Package Modal -->
+    <div id="packageModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+            <button id="closePackageModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <h3 class="text-2xl font-bold text-white mb-2" id="packageModalTitle">Add Session Package</h3>
+            <p class="text-zinc-400 text-xs mb-4">Define sessions and how many instruments the student can pick for this package.</p>
+
+            <div id="packageMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+            <form id="packageForm" class="space-y-4">
+                <input type="hidden" id="packageId" value="">
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Package Name *</label>
+                    <input type="text" id="packageName" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="e.g., Basic 12, Standard 20, Premium 20+">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Number of Sessions *</label>
+                    <input type="number" id="packageSessions" min="1" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="12, 20, or 24">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Max Instruments *</label>
+                    <select id="packageMaxInstruments" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        <option value="1">1 instrument</option>
+                        <option value="2">2 instruments</option>
+                        <option value="3">3 instruments</option>
+                    </select>
+                    <p class="text-xs text-zinc-500 mt-1">12 sessions → 1, 20 sessions → 2, 20+ → 3</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
+                    <textarea id="packageDescription" rows="2"
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="Optional"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-3 pt-4">
+                    <button type="button" id="cancelPackageBtn"
+                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitPackageBtn"
+                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                        <span id="submitPackageBtnText">Save Package</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../../js/mode.js"></script>
+    <script src="../../js/index.js"></script>
+    <script>
+        let packages = [];
+
+        function showMessage(message, type = 'error') {
+            const messageDiv = document.getElementById('message');
+            if (!messageDiv) return;
+            messageDiv.className = `mb-4 p-3 rounded text-sm ${
+                type === 'error' ? 'bg-red-900/50 border border-red-500 text-red-200' :
+                'bg-green-900/50 border border-green-500 text-green-200'
+            }`;
+            messageDiv.textContent = message;
+            messageDiv.classList.remove('hidden');
+            setTimeout(() => messageDiv.classList.add('hidden'), 5000);
+        }
+
+        function showPackageModalMessage(msg, type) {
+            const el = document.getElementById('packageMessage');
+            if (!el) return;
+            el.className = `mb-4 p-3 rounded text-sm ${type === 'error' ? 'bg-red-900/50 text-red-200' : 'bg-green-900/50 text-green-200'}`;
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        async function loadPackages() {
+            const tableBody = document.getElementById('packagesTable');
+            const countEl = document.getElementById('packageCount');
+            if (!tableBody) return;
+
+            try {
+                const response = await fetch(`${baseApiUrl}/sessions.php?action=get-packages`);
+                const data = await response.json();
+
+                if (data.success && Array.isArray(data.packages)) {
+                    packages = data.packages;
+                } else {
+                    packages = getDefaultPackages();
+                }
+            } catch (e) {
+                packages = getDefaultPackages();
+            }
+
+            renderPackages(tableBody);
+            if (countEl) countEl.textContent = packages.length + ' package(s)';
+        }
+
+        function getDefaultPackages() {
+            return [
+                { package_id: 1, package_name: 'Basic (12 Sessions)', sessions: 12, max_instruments: 1, description: '1 instrument only' },
+                { package_id: 2, package_name: 'Standard (20 Sessions)', sessions: 20, max_instruments: 2, description: '2 instruments' },
+                { package_id: 3, package_name: 'Premium (20+ Sessions)', sessions: 24, max_instruments: 3, description: '3 instruments' }
+            ];
+        }
+
+        function renderPackages(tableBody) {
+            if (!packages.length) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                            <i class="fas fa-calendar-alt text-3xl mb-2 text-gold-500/50"></i>
+                            <p>No session packages yet. Add one to get started.</p>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = packages.map(p => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-black/30 transition">
+                    <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">${escapeHtml(p.package_name)}</td>
+                    <td class="px-6 py-4 text-gray-700 dark:text-zinc-300">${p.sessions}</td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gold-500/20 text-gold-600 dark:text-gold-400">
+                            ${p.max_instruments} instrument${p.max_instruments > 1 ? 's' : ''}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-zinc-400">${escapeHtml(p.description || '—')}</td>
+                    <td class="px-6 py-4">
+                        <button onclick="openEditPackage(${p.package_id})" class="text-gold-500 hover:text-gold-400 mr-3" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deletePackage(${p.package_id})" class="text-red-500 hover:text-red-400" title="Delete">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function openAddPackageModal() {
+            document.getElementById('packageModalTitle').textContent = 'Add Session Package';
+            document.getElementById('submitPackageBtnText').textContent = 'Save Package';
+            document.getElementById('packageId').value = '';
+            document.getElementById('packageForm').reset();
+            document.getElementById('packageMessage').classList.add('hidden');
+            document.getElementById('packageModal').classList.remove('hidden');
+            document.getElementById('packageModal').classList.add('flex');
+        }
+
+        function openEditPackage(id) {
+            const p = packages.find(x => x.package_id == id);
+            if (!p) return;
+            document.getElementById('packageModalTitle').textContent = 'Edit Session Package';
+            document.getElementById('submitPackageBtnText').textContent = 'Update Package';
+            document.getElementById('packageId').value = p.package_id;
+            document.getElementById('packageName').value = p.package_name;
+            document.getElementById('packageSessions').value = p.sessions;
+            document.getElementById('packageMaxInstruments').value = p.max_instruments;
+            document.getElementById('packageDescription').value = p.description || '';
+            document.getElementById('packageMessage').classList.add('hidden');
+            document.getElementById('packageModal').classList.remove('hidden');
+            document.getElementById('packageModal').classList.add('flex');
+        }
+
+        function closePackageModal() {
+            const modal = document.getElementById('packageModal');
+            const msg = document.getElementById('packageMessage');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            if (msg) msg.classList.add('hidden');
+        }
+
+        async function savePackage(e) {
+            e.preventDefault();
+            const id = document.getElementById('packageId').value;
+            const name = document.getElementById('packageName').value.trim();
+            const sessions = parseInt(document.getElementById('packageSessions').value, 10);
+            const maxInstruments = parseInt(document.getElementById('packageMaxInstruments').value, 10);
+            const description = document.getElementById('packageDescription').value.trim();
+
+            if (!name || sessions < 1 || maxInstruments < 1 || maxInstruments > 3) {
+                showPackageModalMessage('Please fill required fields. Max instruments must be 1–3.', 'error');
+                return;
+            }
+
+            const payload = { package_name: name, sessions, max_instruments: maxInstruments, description };
+            if (id) payload.package_id = id;
+
+            try {
+                const action = id ? 'update-package' : 'add-package';
+                const response = await fetch(`${baseApiUrl}/sessions.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, ...payload })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    closePackageModal();
+                    showMessage(id ? 'Package updated.' : 'Package added.', 'success');
+                    loadPackages();
+                } else {
+                    showPackageModalMessage(data.error || 'Failed to save package.', 'error');
+                }
+            } catch (err) {
+                if (err.message && err.message.includes('fetch')) {
+                    const newP = {
+                        package_id: id || (packages.length ? Math.max(...packages.map(x => x.package_id)) + 1 : 1),
+                        package_name: name,
+                        sessions,
+                        max_instruments: maxInstruments,
+                        description
+                    };
+                    if (id) {
+                        const idx = packages.findIndex(x => x.package_id == id);
+                        if (idx >= 0) packages[idx] = newP;
+                    } else {
+                        packages.push(newP);
+                    }
+                    closePackageModal();
+                    showMessage(id ? 'Package updated (local).' : 'Package added (local). Add API for persistence.', 'success');
+                    loadPackages();
+                } else {
+                    showPackageModalMessage('Network error. Try again.', 'error');
+                }
+            }
+        }
+
+        async function deletePackage(id) {
+            const p = packages.find(x => x.package_id == id);
+            const name = p ? p.package_name : 'this package';
+            const result = await Swal.fire({
+                title: 'Delete Package?',
+                text: `Remove "${name}"? This cannot be undone.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#b8860b',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes, delete'
+            });
+            if (!result.isConfirmed) return;
+
+            try {
+                const response = await fetch(`${baseApiUrl}/sessions.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'delete-package', package_id: id })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('Package deleted.', 'success');
+                    loadPackages();
+                } else {
+                    showMessage(data.error || 'Delete failed.', 'error');
+                }
+            } catch (e) {
+                packages = packages.filter(p => p.package_id != id);
+                showMessage('Package removed (local). Add API for persistence.', 'success');
+                loadPackages();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof Auth !== 'undefined' && Auth.getUser) {
+                const user = Auth.getUser();
+                if (user) {
+                    const userNameNav = document.getElementById('userNameNav');
+                    const userRoleNav = document.getElementById('userRoleNav');
+                    if (userNameNav) userNameNav.textContent = user.username || user.email || 'Admin';
+                    if (userRoleNav) userRoleNav.textContent = user.role_name || 'Admin';
+                }
+            }
+
+            loadPackages();
+
+            document.getElementById('openAddPackageModalBtn')?.addEventListener('click', openAddPackageModal);
+            document.getElementById('closePackageModalBtn')?.addEventListener('click', closePackageModal);
+            document.getElementById('cancelPackageBtn')?.addEventListener('click', closePackageModal);
+            document.getElementById('packageForm')?.addEventListener('submit', savePackage);
+        });
+    </script>
+</body>
+</html>

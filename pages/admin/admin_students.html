@@ -58,7 +58,7 @@
     <div class="fixed inset-y-0 left-0 w-64 bg-black border-r border-gold-500/20 z-40 shadow-lg pt-16">
         <div class="p-6 h-full flex flex-col">
             <nav class="space-y-2 flex-1">
-                <a href="dashboard.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                <a href="admin_dashboard.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
                     <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
                 </a>
                 <a href="admin_registration.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
@@ -67,8 +67,14 @@
                 <a href="admin_students.html" class="flex items-center px-4 py-3 text-gold-400 bg-gold-500/10 rounded-lg">
                     <i class="fas fa-users mr-3"></i> Students
                 </a>
-                <a href="../../index.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-home mr-3"></i> Home
+                <a href="admin_instruments.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-guitar mr-3"></i> Instruments
+                </a>
+                <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-calendar-alt mr-3"></i> Sessions
+                </a>
+                <a href="admin_package.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-box mr-3"></i> Packages
                 </a>
             </nav>
             <div class="border-t border-gold-500/20 pt-6">
@@ -81,35 +87,29 @@
 
     <!-- Main Content -->
     <div class="ml-64 pt-24 p-8">
-        <div class="mb-8 flex items-center justify-between gap-4">
-            <div>
-                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Students</h2>
-                <p class="text-gray-600 dark:text-zinc-400 text-sm max-w-2xl">
-                    Add new students manually and see them appear immediately in the registered students list below.
-                    Accounts created here will use the student's email as username and default password
-                    <span class="font-mono font-semibold">123</span>. On their first login, they must change this password.
-                </p>
-            </div>
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Students</h2>
+            <p class="text-gray-600 dark:text-zinc-400">View and filter students by branch</p>
         </div>
 
-        <!-- Add New Student (button opens modal) -->
-        <div class="mb-6 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <i class="fas fa-user-plus text-gold-400"></i>
-                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Add New Student</h3>
+        <!-- Branch Filter -->
+        <div class="mb-6">
+            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+                    <i class="fas fa-filter mr-2 text-gold-500"></i>Filter by Branch
+                </label>
+                <select id="branchFilter" class="w-full md:w-64 px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-gold-500/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-gold-500 dark:focus:border-gold-400">
+                    <option value="">All Branches</option>
+                </select>
+                <p class="text-xs text-gray-500 dark:text-zinc-400 mt-2" id="studentCount">Loading...</p>
             </div>
-            <button id="openAddStudentModalBtn"
-                class="inline-flex items-center px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
-                <i class="fas fa-plus mr-2"></i>
-                New Student
-            </button>
         </div>
 
         <!-- Registered Students Table -->
         <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg overflow-hidden shadow-sm">
             <div class="p-6 border-b border-gray-200 dark:border-gold-500/20 flex items-center justify-between">
                 <h3 class="text-xl font-bold text-gray-900 dark:text-white">Registered Students</h3>
-                <span class="text-xs text-gray-500 dark:text-zinc-400">All students from your FAS database</span>
+                <span class="text-xs text-gray-500 dark:text-zinc-400" id="tableCount">All students from your FAS database</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -136,108 +136,168 @@
         </div>
     </div>
 
-    <!-- Add Student Modal -->
-    <div id="addStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-3xl p-8 relative">
-            <button id="closeAddStudentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-
-            <h3 class="text-2xl font-bold text-white mb-2">Add New Student</h3>
-            <p class="text-zinc-400 text-xs mb-4">
-                This will create a student account using the student's email as username and default password
-                <span class="font-mono font-semibold">123</span>. They will be required to change it on first login.
-            </p>
-
-            <div id="walkinMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
-
-            <form id="walkinForm" class="space-y-6">
-                <!-- Student Info -->
-                <div>
-                    <h3 class="text-lg font-semibold mb-4 text-white">Student Information</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">First Name *</label>
-                            <input type="text" name="student_first_name" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Last Name *</label>
-                            <input type="text" name="student_last_name" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Email *</label>
-                            <input type="email" name="student_email" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Phone *</label>
-                            <input type="text" name="student_phone" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Branch *</label>
-                            <select name="branch_id" id="walkin_branch_id" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                                <option value="">Loading branches...</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Registration Fee (PHP)</label>
-                            <input type="number" name="registration_fee_amount" min="0" step="0.01"
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
-                                placeholder="0.00">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Guardian Info -->
-                <div class="pt-4 border-t border-zinc-800">
-                    <h3 class="text-lg font-semibold mb-4 text-white">Guardian Information</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">First Name *</label>
-                            <input type="text" name="guardian_first_name" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Last Name *</label>
-                            <input type="text" name="guardian_last_name" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Relationship *</label>
-                            <input type="text" name="guardian_relationship" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
-                                placeholder="Parent / Guardian">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Phone *</label>
-                            <input type="text" name="guardian_phone" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="pt-4 border-t border-zinc-800 flex items-center justify-end gap-3">
-                    <button type="button" id="cancelAddStudentBtn"
-                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
-                        Cancel
-                    </button>
-                    <button type="submit" id="walkinSubmitBtn"
-                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
-                        <span id="walkinSubmitBtnText">Create Student</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/mode.js"></script>
     <script src="../../js/index.js"></script>
     <script>
+        let allStudents = [];
+        let filteredStudents = [];
+
+        // Load branches for filter
+        async function loadBranchesForFilter() {
+            const branchFilter = document.getElementById('branchFilter');
+            if (!branchFilter) return Promise.resolve();
+
+            try {
+                const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
+                const data = await response.json();
+
+                if (data.success && data.branches) {
+                    branchFilter.innerHTML = '<option value="">All Branches</option>';
+                    data.branches.forEach(branch => {
+                        const option = document.createElement('option');
+                        option.value = branch.branch_id;
+                        option.textContent = branch.branch_name;
+                        branchFilter.appendChild(option);
+                    });
+                }
+                return Promise.resolve();
+            } catch (error) {
+                console.error('Failed to load branches:', error);
+                return Promise.resolve();
+            }
+        }
+
+        // Filter students by branch
+        function filterStudentsByBranch(branchId) {
+            if (!branchId || branchId === '') {
+                filteredStudents = allStudents;
+            } else {
+                // Filter by branch_id (convert to number for comparison)
+                filteredStudents = allStudents.filter(student => {
+                    // Handle both string and number comparisons
+                    const studentBranchId = student.branch_id ? String(student.branch_id) : null;
+                    const filterBranchId = String(branchId);
+                    return studentBranchId === filterBranchId;
+                });
+            }
+            displayFilteredStudents();
+            updateStudentCount();
+        }
+
+        // Display filtered students
+        function displayFilteredStudents() {
+            const tableBody = document.getElementById('studentsTable');
+            if (!tableBody) return;
+
+            if (!filteredStudents || filteredStudents.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                            <i class="fas fa-inbox text-2xl mb-2"></i>
+                            <p>No students found</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tableBody.innerHTML = filteredStudents.map(student => {
+                const statusColors = {
+                    'Pending': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+                    'Fee Paid': 'bg-green-500/10 text-green-500 border-green-500/20',
+                    'Approved': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+                    'Active': 'bg-green-500/10 text-green-500 border-green-500/20',
+                    'Inactive': 'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                };
+                const statusClass = statusColors[student.registration_status] || statusColors[student.status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+
+                return `
+                    <tr class="hover:bg-gold-500/5 transition">
+                        <td class="px-6 py-4">
+                            <div class="font-medium text-gray-900 dark:text-white">${student.first_name} ${student.last_name}</div>
+                            <div class="text-sm text-gray-500 dark:text-zinc-400">${student.email || ''}</div>
+                        </td>
+                        <td class="px-6 py-4 text-gray-900 dark:text-white">${student.phone || ''}</td>
+                        <td class="px-6 py-4 text-gray-900 dark:text-white">${student.branch_name || 'N/A'}</td>
+                        <td class="px-6 py-4">
+                            <div class="text-gray-900 dark:text-white">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</div>
+                            ${student.registration_fee_paid ? `<div class="text-xs text-gray-500 dark:text-zinc-400">Paid: ₱${parseFloat(student.registration_fee_paid).toFixed(2)}</div>` : ''}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
+                                ${student.registration_status || student.status || 'N/A'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-gray-500 dark:text-zinc-400 text-sm">
+                            ${new Date(student.created_at).toLocaleDateString()}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Update student count
+        function updateStudentCount() {
+            const studentCount = document.getElementById('studentCount');
+            const tableCount = document.getElementById('tableCount');
+            const branchFilter = document.getElementById('branchFilter');
+            const selectedBranch = branchFilter ? branchFilter.options[branchFilter.selectedIndex] : null;
+            const branchName = selectedBranch && selectedBranch.value ? selectedBranch.textContent : 'All Branches';
+            const count = filteredStudents.length;
+            const total = allStudents.length;
+
+            if (studentCount) {
+                studentCount.textContent = `Showing ${count} ${count === 1 ? 'student' : 'students'}${selectedBranch && selectedBranch.value ? ` in ${branchName}` : ''} (${total} total)`;
+            }
+            if (tableCount) {
+                tableCount.textContent = `${count} ${count === 1 ? 'student' : 'students'}${selectedBranch && selectedBranch.value ? ` in ${branchName}` : ''}`;
+            }
+        }
+
+        // Load students
+        async function loadStudents() {
+            const tableBody = document.getElementById('studentsTable');
+            if (!tableBody) return;
+
+            try {
+                const data = await apiGet('students.php?action=get-all-students');
+                if (data.success && data.students) {
+                    allStudents = data.students;
+                    // Apply current filter if one is selected
+                    const branchFilter = document.getElementById('branchFilter');
+                    const selectedBranchId = branchFilter ? branchFilter.value : '';
+                    filterStudentsByBranch(selectedBranchId);
+                } else {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                                <i class="fas fa-inbox text-2xl mb-2"></i>
+                                <p>No students found</p>
+                            </td>
+                        </tr>
+                    `;
+                    allStudents = [];
+                    filteredStudents = [];
+                    updateStudentCount();
+                }
+            } catch (error) {
+                console.error('Failed to load students:', error);
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>Failed to load students</p>
+                        </td>
+                    </tr>
+                `;
+                allStudents = [];
+                filteredStudents = [];
+                updateStudentCount();
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             // Load user info in top nav
             if (typeof Auth !== 'undefined' && Auth.getUser) {
@@ -248,6 +308,19 @@
                     if (userNameNav) userNameNav.textContent = user.username || user.email || 'Admin';
                     if (userRoleNav) userRoleNav.textContent = user.role_name || 'Admin';
                 }
+            }
+
+            // Load branches first, then students
+            loadBranchesForFilter().then(() => {
+                loadStudents();
+            });
+
+            // Branch filter change handler
+            const branchFilter = document.getElementById('branchFilter');
+            if (branchFilter) {
+                branchFilter.addEventListener('change', function() {
+                    filterStudentsByBranch(this.value);
+                });
             }
         });
     </script>

@@ -269,11 +269,6 @@
                                 class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-2">School</label>
-                            <input type="text" name="student_school"
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
                             <label class="block text-sm font-medium text-zinc-300 mb-2">Grade/Year</label>
                             <input type="text" name="student_grade_year"
                                 class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
@@ -347,6 +342,63 @@
                         <label class="block text-sm font-medium text-zinc-300 mb-2">Address</label>
                         <textarea name="guardian_address" rows="2"
                             class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"></textarea>
+                    </div>
+                </div>
+
+                <!-- Session Package & Instruments -->
+                <div>
+                    <h4 class="text-lg font-bold text-gold-400 mb-4 flex items-center">
+                        <i class="fas fa-calendar-alt mr-2"></i>Session Package & Instruments
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Session Package *</label>
+                            <select id="sessionPackage" name="session_package_id" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                <option value="">Select Package</option>
+                            </select>
+                            <p class="text-xs text-zinc-500 mt-1">12 sessions = 1 instrument, 20 sessions = 2 instruments</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-300 mb-2">Payment Type *</label>
+                            <select id="paymentType" name="payment_type" required
+                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                <option value="">Select Payment Type</option>
+                                <option value="downpayment">Downpayment</option>
+                                <option value="fullpayment">Full Payment</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-zinc-300 mb-2">Instruments to learn *</label>
+                        <p class="text-xs text-zinc-500 mb-2">Choose type then pick an available instrument at your branch</p>
+                        <div id="instrumentsContainer" class="space-y-4">
+                            <p class="text-sm text-zinc-500">Select a branch and session package first</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Summary -->
+                <div class="bg-zinc-900/50 border border-gold-500/30 rounded-lg p-4">
+                    <h4 class="text-lg font-bold text-gold-400 mb-3 flex items-center">
+                        <i class="fas fa-calculator mr-2"></i>Payment Summary
+                    </h4>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between text-zinc-300">
+                            <span>Registration Fee:</span>
+                            <span class="font-semibold">₱1,000.00</span>
+                        </div>
+                        <div class="flex justify-between text-zinc-300">
+                            <span>Session Package:</span>
+                            <span id="sessionFeeDisplay" class="font-semibold">₱0.00</span>
+                        </div>
+                        <div class="border-t border-zinc-700 pt-2 mt-2">
+                            <div class="flex justify-between text-gold-400 font-bold text-lg">
+                                <span>Total Amount:</span>
+                                <span id="totalAmountDisplay">₱1,000.00</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="registration_fee_amount" name="registration_fee_amount" value="1000">
                     </div>
                 </div>
 

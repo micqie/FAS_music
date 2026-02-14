@@ -379,6 +379,34 @@ function initRegisterForm() {
     const registerForm = document.getElementById('registerForm');
     if (!registerForm) return;
 
+    // Load session packages and instruments
+    loadSessionPackages();
+    
+    // Watch for branch changes to load instruments
+    const branchSelect = document.getElementById('branch_id');
+    if (branchSelect) {
+        branchSelect.addEventListener('change', function() {
+            loadInstrumentsForRegistration(this.value);
+        });
+    }
+
+    // Watch for session package changes
+    const sessionPackageSelect = document.getElementById('sessionPackage');
+    if (sessionPackageSelect) {
+        sessionPackageSelect.addEventListener('change', function() {
+            updateInstrumentSelection();
+            calculateTotalFee();
+        });
+    }
+
+    // Watch for payment type changes
+    const paymentTypeSelect = document.getElementById('paymentType');
+    if (paymentTypeSelect) {
+        paymentTypeSelect.addEventListener('change', function() {
+            calculateTotalFee();
+        });
+    }
+
     // Add event listeners for password validation
     const passwordInput = document.getElementById('registerPassword');
     const passwordConfirmInput = document.getElementById('registerPasswordConfirm');
@@ -442,9 +470,45 @@ function initRegisterForm() {
             data['student_age'] = document.getElementById('student_age').value;
         }
 
-        // Set default registration fee amount (can be updated by admin later)
-        if (!data['registration_fee_amount']) {
-            data['registration_fee_amount'] = 0;
+        // Collect selected instruments from dropdowns
+        const selectedInstruments = [];
+        const instrumentSelects = document.querySelectorAll('select[name="instruments[]"]');
+        const seen = new Set();
+        instrumentSelects.forEach(sel => {
+            const val = sel.value ? parseInt(sel.value, 10) : 0;
+            if (val && !seen.has(val)) {
+                selectedInstruments.push(val);
+                seen.add(val);
+            }
+        });
+
+        // Validate session package and instruments
+        const sessionPackageId = data['session_package_id'];
+        if (!sessionPackageId) {
+            showRegisterMessage('Please select a session package.', 'error');
+            return;
+        }
+
+        if (selectedInstruments.length === 0) {
+            showRegisterMessage('Please select at least one instrument.', 'error');
+            return;
+        }
+
+        // Validate payment type
+        if (!data['payment_type']) {
+            showRegisterMessage('Please select a payment type.', 'error');
+            return;
+        }
+
+        // Add instruments to data
+        data['instruments'] = selectedInstruments;
+        
+        // Calculate and set registration fee amount
+        const totalFee = calculateTotalFee();
+        if (totalFee > 0) {
+            data['registration_fee_amount'] = totalFee;
+        } else {
+            data['registration_fee_amount'] = 1000; // Default registration fee
         }
 
         // Use email as username if not provided
@@ -527,6 +591,261 @@ function initRegisterForm() {
             }
         }
     });
+}
+
+// Load Session Packages
+let sessionPackages = [];
+async function loadSessionPackages() {
+    const select = document.getElementById('sessionPackage');
+    if (!select) return;
+
+    try {
+        const response = await fetch(`${baseApiUrl}/sessions.php?action=get-packages`);
+        const data = await response.json();
+        
+        if (data.success && data.packages) {
+            sessionPackages = data.packages;
+            select.innerHTML = '<option value="">Select Package</option>';
+            data.packages.forEach(pkg => {
+                const option = document.createElement('option');
+                option.value = pkg.package_id;
+                option.textContent = `${pkg.package_name} (${pkg.sessions} sessions, ${pkg.max_instruments} instrument${pkg.max_instruments > 1 ? 's' : ''})`;
+                option.setAttribute('data-sessions', pkg.sessions);
+                option.setAttribute('data-max-instruments', pkg.max_instruments);
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load session packages:', error);
+        // Fallback to default packages
+        sessionPackages = [
+            { package_id: 1, sessions: 12, max_instruments: 1 },
+            { package_id: 2, sessions: 20, max_instruments: 2 }
+        ];
+        select.innerHTML = `
+            <option value="">Select Package</option>
+            <option value="1" data-sessions="12" data-max-instruments="1">Basic (12 Sessions, 1 instrument)</option>
+            <option value="2" data-sessions="20" data-max-instruments="2">Standard (20 Sessions, 2 instruments)</option>
+        `;
+    }
+}
+
+// Load Instruments for Registration
+let availableInstruments = [];
+async function loadInstrumentsForRegistration(branchId) {
+    if (!branchId) {
+        const container = document.getElementById('instrumentsContainer');
+        if (container) container.innerHTML = '<p class="text-sm text-zinc-500">Select a branch first</p>';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${baseApiUrl}/instruments.php?action=get-instruments&branch_id=${branchId}`);
+        const data = await response.json();
+        
+        if (data.success && data.instruments) {
+            availableInstruments = data.instruments;
+            updateInstrumentSelection();
+        } else {
+            const container = document.getElementById('instrumentsContainer');
+            if (container) container.innerHTML = '<p class="text-sm text-red-400">No instruments available for this branch</p>';
+        }
+    } catch (error) {
+        console.error('Failed to load instruments:', error);
+        const container = document.getElementById('instrumentsContainer');
+        if (container) container.innerHTML = '<p class="text-sm text-red-400">Failed to load instruments</p>';
+    }
+}
+
+// Get unique instrument types from available instruments (for branch)
+function getAvailableTypes() {
+    const seen = new Set();
+    const types = [];
+    availableInstruments.forEach(inst => {
+        const id = inst.type_id;
+        const name = inst.type_name || 'Other';
+        if (id != null && !seen.has(id)) {
+            seen.add(id);
+            types.push({ type_id: id, type_name: name });
+        }
+    });
+    return types.sort((a, b) => (a.type_name || '').localeCompare(b.type_name || ''));
+}
+
+// Get instruments filtered by type_id
+function getInstrumentsByType(typeId) {
+    if (!typeId) return [];
+    return availableInstruments.filter(inst => inst.type_id == typeId);
+}
+
+// Update Instrument Selection UI: Type dropdown first, then Instrument dropdown (filtered by type)
+function updateInstrumentSelection() {
+    const container = document.getElementById('instrumentsContainer');
+    if (!container) return;
+
+    const sessionPackageSelect = document.getElementById('sessionPackage');
+    if (!sessionPackageSelect || !sessionPackageSelect.value) {
+        container.innerHTML = '<p class="text-sm text-zinc-500">Select a session package first</p>';
+        return;
+    }
+
+    const selectedOption = sessionPackageSelect.options[sessionPackageSelect.selectedIndex];
+    const maxInstruments = parseInt(selectedOption.getAttribute('data-max-instruments') || '1');
+
+    if (availableInstruments.length === 0) {
+        container.innerHTML = '<p class="text-sm text-zinc-500">Select a branch to see available instruments</p>';
+        return;
+    }
+
+    const types = getAvailableTypes();
+    const typeOptionsHtml = types.map(t => 
+        `<option value="${t.type_id}">${escapeHtml(t.type_name)}</option>`
+    ).join('');
+
+    let html = '';
+    for (let i = 1; i <= maxInstruments; i++) {
+        const slotLabel = maxInstruments === 1 ? 'Instrument' : `Instrument ${i}`;
+        html += `
+            <div class="p-3 bg-zinc-900/50 rounded-lg border border-zinc-700 space-y-2">
+                <label class="block text-sm font-medium text-zinc-300">${slotLabel} *</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-zinc-500 mb-1">Type</label>
+                        <select class="instrument-type-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onInstrumentTypeChange(${i})">
+                            <option value="">Select type...</option>
+                            ${typeOptionsHtml}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-500 mb-1">Instrument</label>
+                        <select name="instruments[]" class="instrument-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onInstrumentDropdownChange()">
+                            <option value="">Select instrument...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+function onInstrumentTypeChange(slot) {
+    const typeSelect = document.querySelector(`select.instrument-type-select[data-slot="${slot}"]`);
+    const instrumentSelect = document.querySelector(`select.instrument-select[data-slot="${slot}"]`);
+    if (!typeSelect || !instrumentSelect) return;
+
+    const typeId = typeSelect.value;
+    instrumentSelect.innerHTML = '<option value="">Select instrument...</option>';
+    instrumentSelect.value = '';
+
+    if (typeId) {
+        const instruments = getInstrumentsByType(typeId);
+        instruments.forEach(inst => {
+            const opt = document.createElement('option');
+            opt.value = inst.instrument_id;
+            opt.textContent = inst.instrument_name || 'Instrument';
+            instrumentSelect.appendChild(opt);
+        });
+    }
+    onInstrumentDropdownChange();
+}
+
+function onInstrumentDropdownChange() {
+    const selects = document.querySelectorAll('select.instrument-select');
+    const used = new Set();
+    selects.forEach(select => {
+        const val = select.value;
+        if (val) used.add(val);
+    });
+    selects.forEach(select => {
+        const currentVal = select.value;
+        Array.from(select.options).forEach(opt => {
+            if (opt.value === '') return;
+            const othersUsed = used.has(opt.value) && opt.value !== currentVal;
+            opt.disabled = othersUsed;
+        });
+    });
+    calculateTotalFee();
+}
+
+// Validate Instrument Selection (dropdowns) - ensure at least one selected, no duplicates
+function validateInstrumentSelection() {
+    calculateTotalFee();
+}
+
+// Calculate Total Fee
+function calculateTotalFee() {
+    const registrationFee = 1000;
+    const sessionPackageSelect = document.getElementById('sessionPackage');
+    const paymentTypeSelect = document.getElementById('paymentType');
+    
+    if (!sessionPackageSelect || !sessionPackageSelect.value || !paymentTypeSelect || !paymentTypeSelect.value) {
+        const sessionFeeEl = document.getElementById('sessionFeeDisplay');
+        const totalEl = document.getElementById('totalAmountDisplay');
+        const feeInput = document.getElementById('registration_fee_amount');
+        if (sessionFeeEl) sessionFeeEl.textContent = '₱0.00';
+        if (totalEl) totalEl.textContent = `₱${registrationFee.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        if (feeInput) feeInput.value = registrationFee;
+        return registrationFee;
+    }
+
+    const selectedOption = sessionPackageSelect.options[sessionPackageSelect.selectedIndex];
+    const sessions = parseInt(selectedOption.getAttribute('data-sessions') || '0');
+    const paymentType = paymentTypeSelect.value;
+
+    // Check if saxophone is selected (from dropdowns)
+    const selectedInstruments = Array.from(document.querySelectorAll('select[name="instruments[]"]'))
+        .map(sel => sel.value ? parseInt(sel.value, 10) : 0)
+        .filter(id => id > 0);
+    const hasSaxophone = selectedInstruments.some(id => {
+        const instrument = availableInstruments.find(inst => inst.instrument_id === id);
+        return instrument && (instrument.instrument_name.toLowerCase().includes('saxophone') || 
+                             instrument.type_name?.toLowerCase().includes('saxophone'));
+    });
+
+    let sessionFee = 0;
+
+    if (paymentType === 'downpayment') {
+        if (sessions === 12) {
+            sessionFee = 3000;
+        } else if (sessions === 20) {
+            sessionFee = 5000;
+        }
+    } else if (paymentType === 'fullpayment') {
+        if (hasSaxophone) {
+            if (sessions === 12) {
+                sessionFee = 8100;
+            } else if (sessions === 20) {
+                sessionFee = 13000;
+            }
+        } else {
+            if (sessions === 12) {
+                sessionFee = 7450;
+            } else if (sessions === 20) {
+                sessionFee = 11800;
+            }
+        }
+    }
+
+    const total = registrationFee + sessionFee;
+
+    const sessionFeeEl = document.getElementById('sessionFeeDisplay');
+    const totalEl = document.getElementById('totalAmountDisplay');
+    const feeInput = document.getElementById('registration_fee_amount');
+    
+    if (sessionFeeEl) sessionFeeEl.textContent = `₱${sessionFee.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    if (totalEl) totalEl.textContent = `₱${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    if (feeInput) feeInput.value = total;
+
+    return total;
+}
+
+// Escape HTML helper
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Calculate Age from Date of Birth
