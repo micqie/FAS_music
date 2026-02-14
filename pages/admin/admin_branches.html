@@ -200,23 +200,21 @@
         let branches = [];
 
         function showMessage(message, type = 'error') {
-            const messageDiv = document.getElementById('message');
-            if (!messageDiv) return;
-            messageDiv.className = `mb-4 p-3 rounded text-sm ${
-                type === 'error' ? 'bg-red-900/50 border border-red-500 text-red-200' :
-                'bg-green-900/50 border border-green-500 text-green-200'
-            }`;
-            messageDiv.textContent = message;
-            messageDiv.classList.remove('hidden');
-            setTimeout(() => messageDiv.classList.add('hidden'), 5000);
+            Swal.fire({
+                icon: type === 'success' ? 'success' : 'error',
+                title: type === 'success' ? 'Success' : 'Error',
+                text: message,
+                confirmButtonColor: '#b8860b'
+            });
         }
 
         function showBranchModalMessage(msg, type) {
-            const el = document.getElementById('branchMessage');
-            if (!el) return;
-            el.className = `mb-4 p-3 rounded text-sm ${type === 'error' ? 'bg-red-900/50 text-red-200' : 'bg-green-900/50 text-green-200'}`;
-            el.textContent = msg;
-            el.classList.remove('hidden');
+            Swal.fire({
+                icon: type === 'success' ? 'success' : 'error',
+                title: type === 'success' ? 'Success' : 'Error',
+                text: msg,
+                confirmButtonColor: '#b8860b'
+            });
         }
 
         async function loadBranches() {

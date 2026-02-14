@@ -124,11 +124,12 @@
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Registration</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Status</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Created</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="studentsTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                            <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading students...</p>
                             </td>
@@ -139,6 +140,99 @@
         </div>
     </div>
 
+    <!-- View Student Modal -->
+    <div id="viewStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-lg p-8 relative max-h-[90vh] overflow-y-auto">
+            <button type="button" id="closeViewStudentModal" class="absolute top-4 right-4 text-zinc-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            <h3 class="text-xl font-bold text-white mb-4">Student Details</h3>
+            <div id="viewStudentContent" class="space-y-3 text-sm text-zinc-300"></div>
+        </div>
+    </div>
+
+    <!-- Edit Student Modal -->
+    <div id="editStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-lg p-8 relative max-h-[90vh] overflow-y-auto">
+            <button type="button" id="closeEditStudentModal" class="absolute top-4 right-4 text-zinc-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            <h3 class="text-xl font-bold text-white mb-4">Edit Student</h3>
+            <form id="editStudentForm" class="space-y-3">
+                <input type="hidden" id="editStudentId" value="">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1">First Name *</label>
+                        <input type="text" id="editFirstName" required class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1">Last Name *</label>
+                        <input type="text" id="editLastName" required class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-400 mb-1">Middle Name</label>
+                    <input type="text" id="editMiddleName" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-400 mb-1">Email</label>
+                    <input type="email" id="editEmail" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-400 mb-1">Phone</label>
+                    <input type="text" id="editPhone" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-400 mb-1">Address</label>
+                    <textarea id="editAddress" rows="2" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-400 mb-1">Branch *</label>
+                    <select id="editBranchId" required class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                        <option value="">Select branch</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1">Date of Birth</label>
+                        <input type="date" id="editDateOfBirth" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1">Age</label>
+                        <input type="number" id="editAge" min="0" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1">Registration Fee (₱)</label>
+                        <input type="number" id="editRegFeeAmount" min="0" step="0.01" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1">Paid (₱)</label>
+                        <input type="number" id="editRegFeePaid" min="0" step="0.01" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1">Registration Status</label>
+                        <select id="editRegistrationStatus" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                            <option value="Pending">Pending</option>
+                            <option value="Fee Paid">Fee Paid</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1">Status</label>
+                        <select id="editStatus" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pt-4 flex justify-end gap-2">
+                    <button type="button" id="cancelEditStudent" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded">Update Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/mode.js"></script>
@@ -197,7 +291,7 @@
             if (!filteredStudents || filteredStudents.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
                             <i class="fas fa-inbox text-2xl mb-2"></i>
                             <p>No students found</p>
                         </td>
@@ -215,30 +309,43 @@
                     'Inactive': 'bg-gray-500/10 text-gray-500 border-gray-500/20'
                 };
                 const statusClass = statusColors[student.registration_status] || statusColors[student.status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+                const sid = student.student_id;
 
                 return `
                     <tr class="hover:bg-gold-500/5 transition">
                         <td class="px-6 py-4">
-                            <div class="font-medium text-gray-900 dark:text-white">${student.first_name} ${student.last_name}</div>
-                            <div class="text-sm text-gray-500 dark:text-zinc-400">${student.email || ''}</div>
+                            <div class="font-medium text-gray-900 dark:text-white">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
+                            <div class="text-sm text-gray-500 dark:text-zinc-400">${escapeHtml(student.email || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-gray-900 dark:text-white">${student.phone || ''}</td>
-                        <td class="px-6 py-4 text-gray-900 dark:text-white">${student.branch_name || 'N/A'}</td>
+                        <td class="px-6 py-4 text-gray-900 dark:text-white">${escapeHtml(student.phone || '')}</td>
+                        <td class="px-6 py-4 text-gray-900 dark:text-white">${escapeHtml(student.branch_name || 'N/A')}</td>
                         <td class="px-6 py-4">
                             <div class="text-gray-900 dark:text-white">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</div>
                             ${student.registration_fee_paid ? `<div class="text-xs text-gray-500 dark:text-zinc-400">Paid: ₱${parseFloat(student.registration_fee_paid).toFixed(2)}</div>` : ''}
                         </td>
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
-                                ${student.registration_status || student.status || 'N/A'}
+                                ${escapeHtml(student.registration_status || student.status || 'N/A')}
                             </span>
                         </td>
                         <td class="px-6 py-4 text-gray-500 dark:text-zinc-400 text-sm">
-                            ${new Date(student.created_at).toLocaleDateString()}
+                            ${student.created_at ? new Date(student.created_at).toLocaleDateString() : '—'}
+                        </td>
+                        <td class="px-6 py-4">
+                            <button type="button" onclick="openViewStudent(${sid})" class="text-blue-400 hover:text-blue-300 mr-2" title="View"><i class="fas fa-eye"></i></button>
+                            <button type="button" onclick="openEditStudent(${sid})" class="text-gold-500 hover:text-gold-400 mr-2" title="Edit"><i class="fas fa-edit"></i></button>
+                            <button type="button" onclick="deleteStudentAction(${sid})" class="text-red-500 hover:text-red-400" title="Delete"><i class="fas fa-trash-alt"></i></button>
                         </td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // Update student count
@@ -275,7 +382,7 @@
                 } else {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                            <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
                                 <i class="fas fa-inbox text-2xl mb-2"></i>
                                 <p>No students found</p>
                             </td>
@@ -289,7 +396,7 @@
                 console.error('Failed to load students:', error);
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
+                        <td colspan="7" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Failed to load students</p>
                         </td>
@@ -298,6 +405,168 @@
                 allStudents = [];
                 filteredStudents = [];
                 updateStudentCount();
+            }
+        }
+
+        // View student: fetch full details and show in modal
+        async function openViewStudent(studentId) {
+            try {
+                const res = await fetch(`${baseApiUrl}/students.php?action=get-student&student_id=${studentId}`);
+                const data = await res.json();
+                if (!data.success || !data.student) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Student not found', confirmButtonColor: '#b8860b' });
+                    return;
+                }
+                const s = data.student;
+                const fmt = (v) => (v != null && v !== '') ? v : '—';
+                const fmtDate = (v) => v ? new Date(v).toLocaleDateString() : '—';
+                const fmtMoney = (v) => v != null ? '₱' + parseFloat(v).toFixed(2) : '—';
+                document.getElementById('viewStudentContent').innerHTML = `
+                    <p><span class="text-zinc-500">Name:</span> ${escapeHtml(s.first_name)} ${escapeHtml(s.last_name || '')} ${escapeHtml(s.middle_name || '')}</p>
+                    <p><span class="text-zinc-500">Email:</span> ${escapeHtml(fmt(s.email))}</p>
+                    <p><span class="text-zinc-500">Phone:</span> ${escapeHtml(fmt(s.phone))}</p>
+                    <p><span class="text-zinc-500">Address:</span> ${escapeHtml(fmt(s.address))}</p>
+                    <p><span class="text-zinc-500">Branch:</span> ${escapeHtml(fmt(s.branch_name))}</p>
+                    <p><span class="text-zinc-500">Date of birth:</span> ${fmtDate(s.date_of_birth)}</p>
+                    <p><span class="text-zinc-500">Age:</span> ${fmt(s.age)}</p>
+                    <p><span class="text-zinc-500">Registration fee:</span> ${fmtMoney(s.registration_fee_amount)} | Paid: ${fmtMoney(s.registration_fee_paid)}</p>
+                    <p><span class="text-zinc-500">Registration status:</span> ${escapeHtml(fmt(s.registration_status))}</p>
+                    <p><span class="text-zinc-500">Status:</span> ${escapeHtml(fmt(s.status))}</p>
+                    <p><span class="text-zinc-500">Created:</span> ${fmtDate(s.created_at)}</p>
+                `;
+                document.getElementById('viewStudentModal').classList.remove('hidden');
+                document.getElementById('viewStudentModal').classList.add('flex');
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load student', confirmButtonColor: '#b8860b' });
+            }
+        }
+
+        function closeViewStudentModal() {
+            document.getElementById('viewStudentModal').classList.add('hidden');
+            document.getElementById('viewStudentModal').classList.remove('flex');
+        }
+
+        // Edit student: fetch student + branches, fill form, show modal
+        async function openEditStudent(studentId) {
+            try {
+                const [resStudent, resBranches] = await Promise.all([
+                    fetch(`${baseApiUrl}/students.php?action=get-student&student_id=${studentId}`),
+                    fetch(`${baseApiUrl}/branch.php?action=get-branches-all`)
+                ]);
+                const dataStudent = await resStudent.json();
+                const dataBranches = await resBranches.json();
+                if (!dataStudent.success || !dataStudent.student) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: dataStudent.error || 'Student not found', confirmButtonColor: '#b8860b' });
+                    return;
+                }
+                const s = dataStudent.student;
+                document.getElementById('editStudentId').value = s.student_id;
+                document.getElementById('editFirstName').value = s.first_name || '';
+                document.getElementById('editLastName').value = s.last_name || '';
+                document.getElementById('editMiddleName').value = s.middle_name || '';
+                document.getElementById('editEmail').value = s.email || '';
+                document.getElementById('editPhone').value = s.phone || '';
+                document.getElementById('editAddress').value = s.address || '';
+                document.getElementById('editDateOfBirth').value = s.date_of_birth || '';
+                document.getElementById('editAge').value = s.age != null ? s.age : '';
+                document.getElementById('editRegFeeAmount').value = s.registration_fee_amount != null ? s.registration_fee_amount : '';
+                document.getElementById('editRegFeePaid').value = s.registration_fee_paid != null ? s.registration_fee_paid : '';
+                document.getElementById('editRegistrationStatus').value = s.registration_status || 'Pending';
+                document.getElementById('editStatus').value = s.status || 'Inactive';
+
+                const branchSelect = document.getElementById('editBranchId');
+                branchSelect.innerHTML = '<option value="">Select branch</option>';
+                if (dataBranches.success && dataBranches.branches) {
+                    dataBranches.branches.forEach(b => {
+                        const opt = document.createElement('option');
+                        opt.value = b.branch_id;
+                        opt.textContent = b.branch_name;
+                        if (b.branch_id == s.branch_id) opt.selected = true;
+                        branchSelect.appendChild(opt);
+                    });
+                }
+                if (!s.branch_id && dataBranches.branches && dataBranches.branches.length)
+                    branchSelect.selectedIndex = 1;
+
+                document.getElementById('editStudentModal').classList.remove('hidden');
+                document.getElementById('editStudentModal').classList.add('flex');
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load student', confirmButtonColor: '#b8860b' });
+            }
+        }
+
+        function closeEditStudentModal() {
+            document.getElementById('editStudentModal').classList.add('hidden');
+            document.getElementById('editStudentModal').classList.remove('flex');
+        }
+
+        async function saveEditStudent(e) {
+            e.preventDefault();
+            const id = document.getElementById('editStudentId').value;
+            const payload = {
+                action: 'update-student',
+                student_id: parseInt(id, 10),
+                first_name: document.getElementById('editFirstName').value.trim(),
+                last_name: document.getElementById('editLastName').value.trim(),
+                middle_name: document.getElementById('editMiddleName').value.trim(),
+                email: document.getElementById('editEmail').value.trim(),
+                phone: document.getElementById('editPhone').value.trim(),
+                address: document.getElementById('editAddress').value.trim(),
+                branch_id: parseInt(document.getElementById('editBranchId').value, 10),
+                date_of_birth: document.getElementById('editDateOfBirth').value || null,
+                age: document.getElementById('editAge').value ? parseInt(document.getElementById('editAge').value, 10) : null,
+                registration_fee_amount: document.getElementById('editRegFeeAmount').value ? parseFloat(document.getElementById('editRegFeeAmount').value) : null,
+                registration_fee_paid: document.getElementById('editRegFeePaid').value ? parseFloat(document.getElementById('editRegFeePaid').value) : null,
+                registration_status: document.getElementById('editRegistrationStatus').value,
+                status: document.getElementById('editStatus').value
+            };
+            try {
+                const res = await fetch(`${baseApiUrl}/students.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeEditStudentModal();
+                    Swal.fire({ icon: 'success', title: 'Success', text: 'Student updated.', confirmButtonColor: '#b8860b' });
+                    loadStudents();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Update failed', confirmButtonColor: '#b8860b' });
+                }
+            } catch (err) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Network error. Try again.', confirmButtonColor: '#b8860b' });
+            }
+        }
+
+        async function deleteStudentAction(studentId) {
+            const student = allStudents.find(s => s.student_id == studentId);
+            const name = student ? `${student.first_name} ${student.last_name}` : 'this student';
+            const result = await Swal.fire({
+                title: 'Deactivate Student?',
+                text: `Deactivate "${name}"? The record will be kept but marked inactive.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#b8860b',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes, deactivate'
+            });
+            if (!result.isConfirmed) return;
+            try {
+                const res = await fetch(`${baseApiUrl}/students.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'delete-student', student_id: studentId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    Swal.fire({ icon: 'success', title: 'Success', text: 'Student deactivated.', confirmButtonColor: '#b8860b' });
+                    loadStudents();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Failed to deactivate', confirmButtonColor: '#b8860b' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Network error. Try again.', confirmButtonColor: '#b8860b' });
             }
         }
 
@@ -325,6 +594,11 @@
                     filterStudentsByBranch(this.value);
                 });
             }
+
+            document.getElementById('closeViewStudentModal')?.addEventListener('click', closeViewStudentModal);
+            document.getElementById('closeEditStudentModal')?.addEventListener('click', closeEditStudentModal);
+            document.getElementById('cancelEditStudent')?.addEventListener('click', closeEditStudentModal);
+            document.getElementById('editStudentForm')?.addEventListener('submit', saveEditStudent);
         });
     </script>
 </body>

@@ -242,7 +242,7 @@
                 }
             } catch (error) {
                 console.error('Failed to load dashboard stats:', error);
-                showMessage('Failed to load dashboard statistics', 'error');
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load dashboard statistics', confirmButtonColor: '#b8860b' });
             }
         }
 

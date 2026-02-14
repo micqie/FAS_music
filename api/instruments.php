@@ -15,6 +15,64 @@ class Instruments
     public function __construct($pdo)
     {
         $this->conn = $pdo;
+        $this->ensureInstrumentSchema();
+    }
+
+    /** Ensure instrument types table and instrument columns exist (replaces run_instrument_migration.php) */
+    private function ensureInstrumentSchema()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_instrument_types (
+                    type_id INT AUTO_INCREMENT PRIMARY KEY,
+                    type_name VARCHAR(50) NOT NULL UNIQUE,
+                    description TEXT
+                )
+            ");
+            $this->conn->exec("
+                INSERT IGNORE INTO tbl_instrument_types (type_name, description)
+                VALUES ('Other', 'General/uncategorized instrument type')
+            ");
+
+            $stmt = $this->conn->query("DESCRIBE tbl_instruments");
+            if ($stmt === false) return;
+            $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            if (!in_array('type_id', $columns)) {
+                $this->conn->exec("ALTER TABLE tbl_instruments ADD COLUMN type_id INT NULL");
+                $defaultTypeId = $this->conn->query("SELECT type_id FROM tbl_instrument_types WHERE type_name = 'Other' LIMIT 1")->fetchColumn();
+                if ($defaultTypeId) {
+                    $this->conn->exec("UPDATE tbl_instruments SET type_id = " . (int)$defaultTypeId . " WHERE type_id IS NULL");
+                }
+                $this->conn->exec("ALTER TABLE tbl_instruments MODIFY COLUMN type_id INT NOT NULL");
+                try {
+                    $this->conn->exec("ALTER TABLE tbl_instruments ADD CONSTRAINT fk_instruments_type FOREIGN KEY (type_id) REFERENCES tbl_instrument_types(type_id)");
+                } catch (PDOException $e) { /* FK may already exist */ }
+                $columns[] = 'type_id';
+            }
+
+            if (!in_array('serial_number', $columns)) {
+                $this->conn->exec("ALTER TABLE tbl_instruments ADD COLUMN serial_number VARCHAR(50) NULL");
+            }
+            if (!in_array('condition', $columns)) {
+                $this->conn->exec("ALTER TABLE tbl_instruments ADD COLUMN `condition` VARCHAR(50) NULL");
+            }
+
+            $stmt = $this->conn->query("DESCRIBE tbl_instruments");
+            $columns = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
+            if (in_array('status', $columns)) {
+                try {
+                    $this->conn->exec("ALTER TABLE tbl_instruments MODIFY COLUMN status ENUM('Active','Available','In Use','Under Repair','Inactive') DEFAULT 'Active'");
+                    $this->conn->exec("UPDATE tbl_instruments SET status = 'Active' WHERE status IS NULL OR status = ''");
+                } catch (PDOException $e) { /* ignore */ }
+            } else {
+                $this->conn->exec("ALTER TABLE tbl_instruments ADD COLUMN status ENUM('Active','Available','In Use','Under Repair','Inactive') DEFAULT 'Active'");
+            }
+
+            $this->conn->exec("UPDATE tbl_instruments SET `condition` = 'Available' WHERE `condition` IS NULL OR `condition` = ''");
+        } catch (PDOException $e) {
+            // Schema may already be up to date; do not break API
+        }
     }
 
     private function sendJSON($data, $statusCode = 200)
