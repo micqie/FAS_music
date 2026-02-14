@@ -158,6 +158,12 @@
                         <option value="">Select Package</option>
                     </select>
                     <p class="text-xs text-zinc-500 mt-1">12 sessions = 1 instrument, 20 sessions = 2 instruments</p>
+                    <div id="assignPackagePriceSummary" class="hidden mt-3 bg-zinc-900/50 border border-gold-500/30 rounded-lg p-3">
+                        <div class="flex justify-between text-sm text-zinc-300">
+                            <span>Package price:</span>
+                            <span id="assignPackagePriceDisplay" class="font-semibold text-gold-400">₱0.00</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="flex items-center justify-end gap-3 pt-4">
                     <button type="button" id="cancelAssignPackageBtn"
@@ -229,12 +235,16 @@
                     const select = document.getElementById('assignPackageSelect');
                     if (select) {
                         select.innerHTML = '<option value="">Select Package</option>';
+                        const formatPrice = (n) => (n != null && !isNaN(n)) ? `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₱0.00';
                         data.packages.forEach(pkg => {
                             const option = document.createElement('option');
                             option.value = pkg.package_id;
-                            option.textContent = `${pkg.package_name} (${pkg.sessions} sessions, ${pkg.max_instruments} instrument${pkg.max_instruments > 1 ? 's' : ''})`;
+                            const priceStr = formatPrice(pkg.price);
+                            option.textContent = `${pkg.package_name} (${pkg.sessions} sessions, ${pkg.max_instruments} instrument${pkg.max_instruments > 1 ? 's' : ''}) — ${priceStr}`;
+                            option.setAttribute('data-price', pkg.price != null ? pkg.price : '0');
                             select.appendChild(option);
                         });
+                        select.addEventListener('change', updateAssignPackagePriceDisplay);
                     }
                 }
             } catch (error) {
@@ -332,6 +342,18 @@
             return div.innerHTML;
         }
 
+        function updateAssignPackagePriceDisplay() {
+            const select = document.getElementById('assignPackageSelect');
+            const summary = document.getElementById('assignPackagePriceSummary');
+            const display = document.getElementById('assignPackagePriceDisplay');
+            if (!select || !summary || !display) return;
+            const opt = select.options[select.selectedIndex];
+            const price = opt && opt.value ? parseFloat(opt.getAttribute('data-price') || '0') : 0;
+            const formatted = `₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            display.textContent = formatted;
+            summary.classList.toggle('hidden', !opt || !opt.value);
+        }
+
         function openAssignPackageModal(studentId, studentName, currentPackageId) {
             const modal = document.getElementById('assignPackageModal');
             const studentInfo = document.getElementById('assignPackageStudentInfo');
@@ -343,6 +365,7 @@
                 studentIdInput.value = studentId;
                 packageSelect.value = currentPackageId || '';
                 document.getElementById('assignPackageMessage').classList.add('hidden');
+                updateAssignPackagePriceDisplay();
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
             }

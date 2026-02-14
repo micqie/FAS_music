@@ -334,7 +334,7 @@ function initLoginForm() {
                 // Redirect based on role
                 setTimeout(() => {
                     if (data.user.role_name === 'Admin' || data.user.role_name === 'SuperAdmin') {
-                        window.location.href = 'pages/admin/dashboard.html';
+                        window.location.href = 'pages/admin/admin_dashboard.html';
                     } else {
                         window.location.href = 'index.html';
                     }
@@ -612,6 +612,7 @@ async function loadSessionPackages() {
                 option.textContent = `${pkg.package_name} (${pkg.sessions} sessions, ${pkg.max_instruments} instrument${pkg.max_instruments > 1 ? 's' : ''})`;
                 option.setAttribute('data-sessions', pkg.sessions);
                 option.setAttribute('data-max-instruments', pkg.max_instruments);
+                option.setAttribute('data-price', (pkg.price != null && !isNaN(pkg.price)) ? String(pkg.price) : '0');
                 select.appendChild(option);
             });
         }
@@ -619,13 +620,13 @@ async function loadSessionPackages() {
         console.error('Failed to load session packages:', error);
         // Fallback to default packages
         sessionPackages = [
-            { package_id: 1, sessions: 12, max_instruments: 1 },
-            { package_id: 2, sessions: 20, max_instruments: 2 }
+            { package_id: 1, sessions: 12, max_instruments: 1, price: 7450 },
+            { package_id: 2, sessions: 20, max_instruments: 2, price: 11800 }
         ];
         select.innerHTML = `
             <option value="">Select Package</option>
-            <option value="1" data-sessions="12" data-max-instruments="1">Basic (12 Sessions, 1 instrument)</option>
-            <option value="2" data-sessions="20" data-max-instruments="2">Standard (20 Sessions, 2 instruments)</option>
+            <option value="1" data-sessions="12" data-max-instruments="1" data-price="7450">Basic (12 Sessions, 1 instrument)</option>
+            <option value="2" data-sessions="20" data-max-instruments="2" data-price="11800">Standard (20 Sessions, 2 instruments)</option>
         `;
     }
 }
@@ -792,6 +793,7 @@ function calculateTotalFee() {
     const selectedOption = sessionPackageSelect.options[sessionPackageSelect.selectedIndex];
     const sessions = parseInt(selectedOption.getAttribute('data-sessions') || '0');
     const paymentType = paymentTypeSelect.value;
+    const basePrice = parseFloat(selectedOption.getAttribute('data-price') || '0');
 
     // Check if saxophone is selected (from dropdowns)
     const selectedInstruments = Array.from(document.querySelectorAll('select[name="instruments[]"]'))
@@ -799,30 +801,38 @@ function calculateTotalFee() {
         .filter(id => id > 0);
     const hasSaxophone = selectedInstruments.some(id => {
         const instrument = availableInstruments.find(inst => inst.instrument_id === id);
-        return instrument && (instrument.instrument_name.toLowerCase().includes('saxophone') || 
+        return instrument && (instrument.instrument_name.toLowerCase().includes('saxophone') ||
                              instrument.type_name?.toLowerCase().includes('saxophone'));
     });
 
     let sessionFee = 0;
-
-    if (paymentType === 'downpayment') {
-        if (sessions === 12) {
-            sessionFee = 3000;
-        } else if (sessions === 20) {
-            sessionFee = 5000;
-        }
-    } else if (paymentType === 'fullpayment') {
-        if (hasSaxophone) {
-            if (sessions === 12) {
-                sessionFee = 8100;
-            } else if (sessions === 20) {
-                sessionFee = 13000;
+    // Use database price when available (tbl_session_packages.price)
+    if (basePrice > 0) {
+        if (paymentType === 'downpayment') {
+            // Ratios from original: 12 sessions 3000/7450, 20 sessions 5000/11800
+            const downpaymentRatio = sessions === 12 ? (3000 / 7450) : (sessions === 20 ? (5000 / 11800) : 0.42);
+            sessionFee = Math.round(basePrice * downpaymentRatio);
+        } else if (paymentType === 'fullpayment') {
+            if (hasSaxophone) {
+                // Saxophone premium: 12 sessions 8100/7450, 20 sessions 13000/11800
+                const saxophoneMultiplier = sessions === 12 ? (8100 / 7450) : (sessions === 20 ? (13000 / 11800) : 1.09);
+                sessionFee = Math.round(basePrice * saxophoneMultiplier);
+            } else {
+                sessionFee = basePrice;
             }
-        } else {
-            if (sessions === 12) {
-                sessionFee = 7450;
-            } else if (sessions === 20) {
-                sessionFee = 11800;
+        }
+    } else {
+        // Fallback when price not in DB (legacy)
+        if (paymentType === 'downpayment') {
+            if (sessions === 12) sessionFee = 3000;
+            else if (sessions === 20) sessionFee = 5000;
+        } else if (paymentType === 'fullpayment') {
+            if (hasSaxophone) {
+                if (sessions === 12) sessionFee = 8100;
+                else if (sessions === 20) sessionFee = 13000;
+            } else {
+                if (sessions === 12) sessionFee = 7450;
+                else if (sessions === 20) sessionFee = 11800;
             }
         }
     }

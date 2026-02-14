@@ -26,18 +26,32 @@ class SessionPackages
                 package_name VARCHAR(100) NOT NULL,
                 sessions INT NOT NULL,
                 max_instruments TINYINT NOT NULL DEFAULT 1,
+                price DECIMAL(10,2) NOT NULL DEFAULT 0,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ");
+        $this->ensurePriceColumn();
         $stmt = $this->conn->query("SELECT COUNT(*) FROM tbl_session_packages");
         if ((int) $stmt->fetchColumn() === 0) {
             $this->conn->exec("
-                INSERT INTO tbl_session_packages (package_name, sessions, max_instruments, description) VALUES
-                ('Basic (12 Sessions)', 12, 1, '1 instrument only'),
-                ('Standard (20 Sessions)', 20, 2, '2 instruments'),
-                ('Premium (20+ Sessions)', 24, 3, '3 instruments')
+                INSERT INTO tbl_session_packages (package_name, sessions, max_instruments, price, description) VALUES
+                ('Basic (12 Sessions)', 12, 1, 7450.00, '1 instrument only'),
+                ('Standard (20 Sessions)', 20, 2, 11800.00, '2 instruments'),
+                ('Premium (20+ Sessions)', 24, 3, 14200.00, '3 instruments')
             ");
+        }
+    }
+
+    private function ensurePriceColumn()
+    {
+        try {
+            $stmt = $this->conn->query("SHOW COLUMNS FROM tbl_session_packages LIKE 'price'");
+            if ($stmt->rowCount() === 0) {
+                $this->conn->exec("ALTER TABLE tbl_session_packages ADD COLUMN price DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER max_instruments");
+            }
+        } catch (PDOException $e) {
+            // Column may already exist
         }
     }
 
@@ -55,7 +69,7 @@ class SessionPackages
         }
         try {
             $stmt = $this->conn->query("
-                SELECT package_id, package_name, sessions, max_instruments, description
+                SELECT package_id, package_name, sessions, max_instruments, COALESCE(price, 0) AS price, description
                 FROM tbl_session_packages
                 ORDER BY sessions ASC, package_id ASC
             ");
@@ -75,6 +89,7 @@ class SessionPackages
         $name = trim($data['package_name'] ?? '');
         $sessions = (int) ($data['sessions'] ?? 0);
         $maxInstruments = (int) ($data['max_instruments'] ?? 1);
+        $price = isset($data['price']) ? (float) $data['price'] : 0;
         $description = trim($data['description'] ?? '');
 
         if ($name === '') {
@@ -89,10 +104,10 @@ class SessionPackages
 
         try {
             $stmt = $this->conn->prepare("
-                INSERT INTO tbl_session_packages (package_name, sessions, max_instruments, description)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO tbl_session_packages (package_name, sessions, max_instruments, price, description)
+                VALUES (?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$name, $sessions, $maxInstruments, $description ?: null]);
+            $stmt->execute([$name, $sessions, $maxInstruments, $price, $description ?: null]);
             $this->sendJSON(['success' => true, 'package_id' => (int) $this->conn->lastInsertId()]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
@@ -109,6 +124,7 @@ class SessionPackages
         $name = trim($data['package_name'] ?? '');
         $sessions = (int) ($data['sessions'] ?? 0);
         $maxInstruments = (int) ($data['max_instruments'] ?? 1);
+        $price = isset($data['price']) ? (float) $data['price'] : 0;
         $description = trim($data['description'] ?? '');
 
         if ($id < 1) {
@@ -127,10 +143,10 @@ class SessionPackages
         try {
             $stmt = $this->conn->prepare("
                 UPDATE tbl_session_packages
-                SET package_name = ?, sessions = ?, max_instruments = ?, description = ?
+                SET package_name = ?, sessions = ?, max_instruments = ?, price = ?, description = ?
                 WHERE package_id = ?
             ");
-            $stmt->execute([$name, $sessions, $maxInstruments, $description ?: null, $id]);
+            $stmt->execute([$name, $sessions, $maxInstruments, $price, $description ?: null, $id]);
             if ($stmt->rowCount() === 0) {
                 $this->sendJSON(['error' => 'Package not found'], 404);
             }

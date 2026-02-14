@@ -30,6 +30,7 @@ ALTER TABLE tbl_instruments MODIFY COLUMN type_id INT NOT NULL;
 
 -- 6. Add foreign key (drop first if it exists from partial migration)
 -- MySQL will error if FK doesn't exist - that's OK, just run the ADD
+
 ALTER TABLE tbl_instruments 
 ADD CONSTRAINT fk_instruments_type 
 FOREIGN KEY (type_id) REFERENCES tbl_instrument_types(type_id);

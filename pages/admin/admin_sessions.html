@@ -143,13 +143,14 @@
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Package Name</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Sessions</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Max Instruments</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Price</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Description</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="packagesTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
                         <tr>
-                            <td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading packages...</p>
                             </td>
@@ -195,6 +196,12 @@
                         <option value="3">3 instruments</option>
                     </select>
                     <p class="text-xs text-zinc-500 mt-1">12 sessions → 1, 20 sessions → 2, 20+ → 3</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Price (₱) *</label>
+                    <input type="number" id="packagePrice" min="0" step="0.01" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="e.g., 7450.00">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
@@ -266,17 +273,22 @@
 
         function getDefaultPackages() {
             return [
-                { package_id: 1, package_name: 'Basic (12 Sessions)', sessions: 12, max_instruments: 1, description: '1 instrument only' },
-                { package_id: 2, package_name: 'Standard (20 Sessions)', sessions: 20, max_instruments: 2, description: '2 instruments' },
-                { package_id: 3, package_name: 'Premium (20+ Sessions)', sessions: 24, max_instruments: 3, description: '3 instruments' }
+                { package_id: 1, package_name: 'Basic (12 Sessions)', sessions: 12, max_instruments: 1, price: 7450, description: '1 instrument only' },
+                { package_id: 2, package_name: 'Standard (20 Sessions)', sessions: 20, max_instruments: 2, price: 11800, description: '2 instruments' },
+                { package_id: 3, package_name: 'Premium (20+ Sessions)', sessions: 24, max_instruments: 3, price: 14200, description: '3 instruments' }
             ];
+        }
+
+        function formatPrice(n) {
+            if (n == null || isNaN(n)) return '—';
+            return '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         function renderPackages(tableBody) {
             if (!packages.length) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
                             <i class="fas fa-calendar-alt text-3xl mb-2 text-gold-500/50"></i>
                             <p>No session packages yet. Add one to get started.</p>
                         </td>
@@ -293,6 +305,7 @@
                             ${p.max_instruments} instrument${p.max_instruments > 1 ? 's' : ''}
                         </span>
                     </td>
+                    <td class="px-6 py-4 font-semibold text-gold-500 dark:text-gold-400">${formatPrice(p.price)}</td>
                     <td class="px-6 py-4 text-sm text-gray-600 dark:text-zinc-400">${escapeHtml(p.description || '—')}</td>
                     <td class="px-6 py-4">
                         <button onclick="openEditPackage(${p.package_id})" class="text-gold-500 hover:text-gold-400 mr-3" title="Edit">
@@ -318,6 +331,7 @@
             document.getElementById('submitPackageBtnText').textContent = 'Save Package';
             document.getElementById('packageId').value = '';
             document.getElementById('packageForm').reset();
+            document.getElementById('packagePrice').value = '';
             document.getElementById('packageMessage').classList.add('hidden');
             document.getElementById('packageModal').classList.remove('hidden');
             document.getElementById('packageModal').classList.add('flex');
@@ -332,6 +346,7 @@
             document.getElementById('packageName').value = p.package_name;
             document.getElementById('packageSessions').value = p.sessions;
             document.getElementById('packageMaxInstruments').value = p.max_instruments;
+            document.getElementById('packagePrice').value = p.price != null && !isNaN(p.price) ? p.price : '';
             document.getElementById('packageDescription').value = p.description || '';
             document.getElementById('packageMessage').classList.add('hidden');
             document.getElementById('packageModal').classList.remove('hidden');
@@ -354,14 +369,19 @@
             const name = document.getElementById('packageName').value.trim();
             const sessions = parseInt(document.getElementById('packageSessions').value, 10);
             const maxInstruments = parseInt(document.getElementById('packageMaxInstruments').value, 10);
+            const price = parseFloat(document.getElementById('packagePrice').value);
             const description = document.getElementById('packageDescription').value.trim();
 
             if (!name || sessions < 1 || maxInstruments < 1 || maxInstruments > 3) {
                 showPackageModalMessage('Please fill required fields. Max instruments must be 1–3.', 'error');
                 return;
             }
+            if (isNaN(price) || price < 0) {
+                showPackageModalMessage('Please enter a valid price (0 or greater).', 'error');
+                return;
+            }
 
-            const payload = { package_name: name, sessions, max_instruments: maxInstruments, description };
+            const payload = { package_name: name, sessions, max_instruments: maxInstruments, price: price, description };
             if (id) payload.package_id = id;
 
             try {
@@ -387,6 +407,7 @@
                         package_name: name,
                         sessions,
                         max_instruments: maxInstruments,
+                        price: price,
                         description
                     };
                     if (id) {
