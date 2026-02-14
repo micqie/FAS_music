@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Student Packages</title>
+    <title>Admin - Packages</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
@@ -73,6 +73,9 @@
                 <a href="admin_package.html" class="flex items-center px-4 py-3 text-gold-400 bg-gold-500/10 rounded-lg">
                     <i class="fas fa-box mr-3"></i> Packages
                 </a>
+                <a href="admin_branches.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
+                    <i class="fas fa-map-marker-alt mr-3"></i> Branches
+                </a>
             </nav>
             <div class="border-t border-gold-500/20 pt-6">
                 <button onclick="logout()" class="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition">
@@ -86,49 +89,73 @@
     <div class="ml-64 pt-24 p-8">
         <div class="mb-8 flex items-center justify-between">
             <div>
-                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Student Packages</h2>
-                <p class="text-gray-600 dark:text-zinc-400">Assign session packages to active students</p>
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Session Packages</h2>
+                <p class="text-gray-600 dark:text-zinc-400">Manage lesson session packages and instrument limits for registration</p>
             </div>
+            <button id="openAddPackageModalBtn"
+                class="inline-flex items-center px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                <i class="fas fa-plus mr-2"></i>
+                Add Package
+            </button>
         </div>
 
         <!-- Messages -->
         <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
 
-        <!-- Filters -->
-        <div class="mb-6">
+        <!-- Package rules info -->
+        <div class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
-                    <i class="fas fa-filter mr-2 text-gold-500"></i>Filter by Branch
-                </label>
-                <select id="branchFilter" class="w-full md:w-64 px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-gold-500/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-gold-500 dark:focus:border-gold-400">
-                    <option value="">All Branches</option>
-                </select>
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="h-10 w-10 rounded-lg bg-gold-500/20 flex items-center justify-center">
+                        <i class="fas fa-drum text-gold-500"></i>
+                    </div>
+                    <span class="font-semibold text-gray-900 dark:text-white">12 Sessions</span>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-zinc-400">1 package = <strong class="text-gold-500">1 instrument only</strong></p>
+            </div>
+            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="h-10 w-10 rounded-lg bg-gold-500/20 flex items-center justify-center">
+                        <i class="fas fa-guitar text-gold-500"></i>
+                    </div>
+                    <span class="font-semibold text-gray-900 dark:text-white">20 Sessions</span>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-zinc-400">1 package = <strong class="text-gold-500">2 instruments</strong></p>
+            </div>
+            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="h-10 w-10 rounded-lg bg-gold-500/20 flex items-center justify-center">
+                        <i class="fas fa-music text-gold-500"></i>
+                    </div>
+                    <span class="font-semibold text-gray-900 dark:text-white">20+ Sessions</span>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-zinc-400">1 package = <strong class="text-gold-500">3 instruments</strong></p>
             </div>
         </div>
 
-        <!-- Students Table -->
+        <!-- Session Packages Table -->
         <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg overflow-hidden shadow-sm">
             <div class="p-6 border-b border-gray-200 dark:border-gold-500/20 flex items-center justify-between">
-                <h3 class="text-xl font-bold text-gray-900 dark:text-white">Active Students</h3>
-                <span class="text-xs text-gray-500 dark:text-zinc-400" id="studentCount">Loading...</span>
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">All Session Packages</h3>
+                <span class="text-xs text-gray-500 dark:text-zinc-400" id="packageCount">0 packages</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-50 dark:bg-black/50">
                         <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Branch</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Current Package</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Package Name</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Sessions</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Max Instruments</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Price</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Description</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="studentsTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
+                    <tbody id="packagesTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
                         <tr>
                             <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading students...</p>
+                                <p>Loading packages...</p>
                             </td>
                         </tr>
                     </tbody>
@@ -137,42 +164,62 @@
         </div>
     </div>
 
-    <!-- Assign Package Modal -->
-    <div id="assignPackageModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <!-- Add/Edit Package Modal -->
+    <div id="packageModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
         <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
-            <button id="closeAssignPackageModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+            <button id="closePackageModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2">Assign Session Package</h3>
-            <p class="text-zinc-400 text-xs mb-4" id="assignPackageStudentInfo">Select a session package for this student</p>
+            <h3 class="text-2xl font-bold text-white mb-2" id="packageModalTitle">Add Session Package</h3>
+            <p class="text-zinc-400 text-xs mb-4">Define sessions and how many instruments the student can pick for this package.</p>
 
-            <div id="assignPackageMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+            <div id="packageMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
 
-            <form id="assignPackageForm" class="space-y-4">
-                <input type="hidden" id="assignStudentId" value="">
+            <form id="packageForm" class="space-y-4">
+                <input type="hidden" id="packageId" value="">
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Session Package *</label>
-                    <select id="assignPackageSelect" required
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Package Name *</label>
+                    <input type="text" id="packageName" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="e.g., Basic 12, Standard 20, Premium 20+">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Number of Sessions *</label>
+                    <input type="number" id="packageSessions" min="1" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="12, 20, or 24">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Max Instruments *</label>
+                    <select id="packageMaxInstruments" required
                         class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        <option value="">Select Package</option>
+                        <option value="1">1 instrument</option>
+                        <option value="2">2 instruments</option>
+                        <option value="3">3 instruments</option>
                     </select>
-                    <p class="text-xs text-zinc-500 mt-1">12 sessions = 1 instrument, 20 sessions = 2 instruments</p>
-                    <div id="assignPackagePriceSummary" class="hidden mt-3 bg-zinc-900/50 border border-gold-500/30 rounded-lg p-3">
-                        <div class="flex justify-between text-sm text-zinc-300">
-                            <span>Package price:</span>
-                            <span id="assignPackagePriceDisplay" class="font-semibold text-gold-400">₱0.00</span>
-                        </div>
-                    </div>
+                    <p class="text-xs text-zinc-500 mt-1">12 sessions → 1, 20 sessions → 2, 20+ → 3</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Price (₱) *</label>
+                    <input type="number" id="packagePrice" min="0" step="0.01" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="e.g., 7450.00">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
+                    <textarea id="packageDescription" rows="2"
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        placeholder="Optional"></textarea>
                 </div>
                 <div class="flex items-center justify-end gap-3 pt-4">
-                    <button type="button" id="cancelAssignPackageBtn"
+                    <button type="button" id="cancelPackageBtn"
                         class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
                         Cancel
                     </button>
-                    <button type="submit" id="submitAssignPackageBtn"
+                    <button type="submit" id="submitPackageBtn"
                         class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
-                        <span id="submitAssignPackageBtnText">Assign Package</span>
+                        <span id="submitPackageBtnText">Save Package</span>
                     </button>
                 </div>
             </form>
@@ -183,8 +230,7 @@
     <script src="../../js/mode.js"></script>
     <script src="../../js/index.js"></script>
     <script>
-        let allStudents = [];
-        let packagePagePackages = [];
+        let packages = [];
 
         function showMessage(message, type = 'error') {
             const messageDiv = document.getElementById('message');
@@ -198,141 +244,82 @@
             setTimeout(() => messageDiv.classList.add('hidden'), 5000);
         }
 
-        function showAssignPackageMessage(msg, type) {
-            const el = document.getElementById('assignPackageMessage');
+        function showPackageModalMessage(msg, type) {
+            const el = document.getElementById('packageMessage');
             if (!el) return;
             el.className = `mb-4 p-3 rounded text-sm ${type === 'error' ? 'bg-red-900/50 text-red-200' : 'bg-green-900/50 text-green-200'}`;
             el.textContent = msg;
             el.classList.remove('hidden');
         }
 
-        async function loadBranches() {
-            const branchFilter = document.getElementById('branchFilter');
-            if (!branchFilter) return;
-
-            try {
-                const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
-                const data = await response.json();
-
-                if (data.success && data.branches) {
-                    const options = data.branches.map(branch => 
-                        `<option value="${branch.branch_id}">${branch.branch_name}</option>`
-                    ).join('');
-                    branchFilter.innerHTML = '<option value="">All Branches</option>' + options;
-                }
-            } catch (error) {
-                console.error('Failed to load branches:', error);
-            }
-        }
-
-        async function loadSessionPackages() {
-            try {
-                const response = await fetch(`${baseApiUrl}/sessions.php?action=get-packages`);
-                const data = await response.json();
-                
-                if (data.success && data.packages) {
-                    packagePagePackages = data.packages;
-                    const select = document.getElementById('assignPackageSelect');
-                    if (select) {
-                        select.innerHTML = '<option value="">Select Package</option>';
-                        const formatPrice = (n) => (n != null && !isNaN(n)) ? `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₱0.00';
-                        data.packages.forEach(pkg => {
-                            const option = document.createElement('option');
-                            option.value = pkg.package_id;
-                            const priceStr = formatPrice(pkg.price);
-                            option.textContent = `${pkg.package_name} (${pkg.sessions} sessions, ${pkg.max_instruments} instrument${pkg.max_instruments > 1 ? 's' : ''}) — ${priceStr}`;
-                            option.setAttribute('data-price', pkg.price != null ? pkg.price : '0');
-                            select.appendChild(option);
-                        });
-                        select.addEventListener('change', updateAssignPackagePriceDisplay);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load session packages:', error);
-            }
-        }
-
-        async function loadActiveStudents() {
-            const tableBody = document.getElementById('studentsTable');
-            const countEl = document.getElementById('studentCount');
+        async function loadPackages() {
+            const tableBody = document.getElementById('packagesTable');
+            const countEl = document.getElementById('packageCount');
             if (!tableBody) return;
 
             try {
-                const branchFilter = document.getElementById('branchFilter');
-                let url = `${baseApiUrl}/students.php?action=get-active-students`;
-                if (branchFilter && branchFilter.value) {
-                    url += `&branch_id=${branchFilter.value}`;
-                }
-
-                const response = await fetch(url);
+                const response = await fetch(`${baseApiUrl}/sessions.php?action=get-packages`);
                 const data = await response.json();
 
-                if (data.success && data.students) {
-                    allStudents = data.students;
-                    renderStudents(tableBody);
-                    if (countEl) countEl.textContent = `${data.students.length} student(s)`;
+                if (data.success && Array.isArray(data.packages)) {
+                    packages = data.packages;
                 } else {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
-                                <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                                <p>No active students found.</p>
-                            </td>
-                        </tr>`;
-                    if (countEl) countEl.textContent = '0 students';
+                    packages = getDefaultPackages();
                 }
-            } catch (error) {
-                console.error('Failed to load students:', error);
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
-                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                            <p>Failed to load students. Please try again.</p>
-                        </td>
-                    </tr>`;
+            } catch (e) {
+                packages = getDefaultPackages();
             }
+
+            renderPackages(tableBody);
+            if (countEl) countEl.textContent = packages.length + ' package(s)';
         }
 
-        function renderStudents(tableBody) {
-            if (!allStudents.length) {
+        function getDefaultPackages() {
+            return [
+                { package_id: 1, package_name: 'Basic (12 Sessions)', sessions: 12, max_instruments: 1, price: 7450, description: '1 instrument only' },
+                { package_id: 2, package_name: 'Standard (20 Sessions)', sessions: 20, max_instruments: 2, price: 11800, description: '2 instruments' },
+                { package_id: 3, package_name: 'Premium (20+ Sessions)', sessions: 24, max_instruments: 3, price: 14200, description: '3 instruments' }
+            ];
+        }
+
+        function formatPrice(n) {
+            if (n == null || isNaN(n)) return '—';
+            return '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function renderPackages(tableBody) {
+            if (!packages.length) {
                 tableBody.innerHTML = `
                     <tr>
                         <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
-                            <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                            <p>No active students found.</p>
+                            <i class="fas fa-calendar-alt text-3xl mb-2 text-gold-500/50"></i>
+                            <p>No session packages yet. Add one to get started.</p>
                         </td>
                     </tr>`;
                 return;
             }
 
-            tableBody.innerHTML = allStudents.map(student => {
-                const packageName = student.package_name || 'Not Assigned';
-                const sessions = student.sessions || '—';
-                const statusBadge = student.registration_status === 'Fee Paid' 
-                    ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-600 dark:text-green-400">Fee Paid</span>'
-                    : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-600 dark:text-yellow-400">Pending</span>';
-
-                return `
-                    <tr class="hover:bg-gray-50 dark:hover:bg-black/30 transition">
-                        <td class="px-6 py-4">
-                            <div class="font-medium text-gray-900 dark:text-white">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
-                            <div class="text-sm text-gray-500 dark:text-zinc-400">${escapeHtml(student.email || '')}</div>
-                        </td>
-                        <td class="px-6 py-4 text-gray-700 dark:text-zinc-300">${escapeHtml(student.branch_name || '—')}</td>
-                        <td class="px-6 py-4">
-                            <span class="text-sm ${student.package_name ? 'text-gold-500 font-medium' : 'text-zinc-500'}">${escapeHtml(packageName)}</span>
-                        </td>
-                        <td class="px-6 py-4 text-gray-700 dark:text-zinc-300">${sessions}</td>
-                        <td class="px-6 py-4">${statusBadge}</td>
-                        <td class="px-6 py-4">
-                            <button onclick="openAssignPackageModal(${student.student_id}, '${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}', ${student.session_package_id || 'null'})" 
-                                class="text-gold-500 hover:text-gold-400" title="Assign/Update Package">
-                                <i class="fas fa-box"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+            tableBody.innerHTML = packages.map(p => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-black/30 transition">
+                    <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">${escapeHtml(p.package_name)}</td>
+                    <td class="px-6 py-4 text-gray-700 dark:text-zinc-300">${p.sessions}</td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gold-500/20 text-gold-600 dark:text-gold-400">
+                            ${p.max_instruments} instrument${p.max_instruments > 1 ? 's' : ''}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 font-semibold text-gold-500 dark:text-gold-400">${formatPrice(p.price)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-zinc-400">${escapeHtml(p.description || '—')}</td>
+                    <td class="px-6 py-4">
+                        <button onclick="openEditPackage(${p.package_id})" class="text-gold-500 hover:text-gold-400 mr-3" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deletePackage(${p.package_id})" class="text-red-500 hover:text-red-400" title="Delete">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
         }
 
         function escapeHtml(text) {
@@ -342,38 +329,36 @@
             return div.innerHTML;
         }
 
-        function updateAssignPackagePriceDisplay() {
-            const select = document.getElementById('assignPackageSelect');
-            const summary = document.getElementById('assignPackagePriceSummary');
-            const display = document.getElementById('assignPackagePriceDisplay');
-            if (!select || !summary || !display) return;
-            const opt = select.options[select.selectedIndex];
-            const price = opt && opt.value ? parseFloat(opt.getAttribute('data-price') || '0') : 0;
-            const formatted = `₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            display.textContent = formatted;
-            summary.classList.toggle('hidden', !opt || !opt.value);
+        function openAddPackageModal() {
+            document.getElementById('packageModalTitle').textContent = 'Add Session Package';
+            document.getElementById('submitPackageBtnText').textContent = 'Save Package';
+            document.getElementById('packageId').value = '';
+            document.getElementById('packageForm').reset();
+            document.getElementById('packagePrice').value = '';
+            document.getElementById('packageMessage').classList.add('hidden');
+            document.getElementById('packageModal').classList.remove('hidden');
+            document.getElementById('packageModal').classList.add('flex');
         }
 
-        function openAssignPackageModal(studentId, studentName, currentPackageId) {
-            const modal = document.getElementById('assignPackageModal');
-            const studentInfo = document.getElementById('assignPackageStudentInfo');
-            const studentIdInput = document.getElementById('assignStudentId');
-            const packageSelect = document.getElementById('assignPackageSelect');
-
-            if (modal && studentInfo && studentIdInput && packageSelect) {
-                studentInfo.textContent = `Select a session package for ${studentName}`;
-                studentIdInput.value = studentId;
-                packageSelect.value = currentPackageId || '';
-                document.getElementById('assignPackageMessage').classList.add('hidden');
-                updateAssignPackagePriceDisplay();
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
-            }
+        function openEditPackage(id) {
+            const p = packages.find(x => x.package_id == id);
+            if (!p) return;
+            document.getElementById('packageModalTitle').textContent = 'Edit Session Package';
+            document.getElementById('submitPackageBtnText').textContent = 'Update Package';
+            document.getElementById('packageId').value = p.package_id;
+            document.getElementById('packageName').value = p.package_name;
+            document.getElementById('packageSessions').value = p.sessions;
+            document.getElementById('packageMaxInstruments').value = p.max_instruments;
+            document.getElementById('packagePrice').value = p.price != null && !isNaN(p.price) ? p.price : '';
+            document.getElementById('packageDescription').value = p.description || '';
+            document.getElementById('packageMessage').classList.add('hidden');
+            document.getElementById('packageModal').classList.remove('hidden');
+            document.getElementById('packageModal').classList.add('flex');
         }
 
-        function closeAssignPackageModal() {
-            const modal = document.getElementById('assignPackageModal');
-            const msg = document.getElementById('assignPackageMessage');
+        function closePackageModal() {
+            const modal = document.getElementById('packageModal');
+            const msg = document.getElementById('packageMessage');
             if (modal) {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
@@ -381,38 +366,99 @@
             if (msg) msg.classList.add('hidden');
         }
 
-        async function assignPackage(e) {
+        async function savePackage(e) {
             e.preventDefault();
-            const studentId = document.getElementById('assignStudentId').value;
-            const packageId = document.getElementById('assignPackageSelect').value;
+            const id = document.getElementById('packageId').value;
+            const name = document.getElementById('packageName').value.trim();
+            const sessions = parseInt(document.getElementById('packageSessions').value, 10);
+            const maxInstruments = parseInt(document.getElementById('packageMaxInstruments').value, 10);
+            const price = parseFloat(document.getElementById('packagePrice').value);
+            const description = document.getElementById('packageDescription').value.trim();
 
-            if (!studentId || !packageId) {
-                showAssignPackageMessage('Please select a package.', 'error');
+            if (!name || sessions < 1 || maxInstruments < 1 || maxInstruments > 3) {
+                showPackageModalMessage('Please fill required fields. Max instruments must be 1–3.', 'error');
+                return;
+            }
+            if (isNaN(price) || price < 0) {
+                showPackageModalMessage('Please enter a valid price (0 or greater).', 'error');
                 return;
             }
 
+            const payload = { package_name: name, sessions, max_instruments: maxInstruments, price: price, description };
+            if (id) payload.package_id = id;
+
             try {
-                const response = await fetch(`${baseApiUrl}/students.php`, {
+                const action = id ? 'update-package' : 'add-package';
+                const response = await fetch(`${baseApiUrl}/sessions.php`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'assign-package',
-                        student_id: parseInt(studentId),
-                        session_package_id: parseInt(packageId)
-                    })
+                    body: JSON.stringify({ action, ...payload })
                 });
                 const data = await response.json();
 
                 if (data.success) {
-                    closeAssignPackageModal();
-                    showMessage('Package assigned successfully.', 'success');
-                    loadActiveStudents();
+                    closePackageModal();
+                    showMessage(id ? 'Package updated.' : 'Package added.', 'success');
+                    loadPackages();
                 } else {
-                    showAssignPackageMessage(data.error || 'Failed to assign package.', 'error');
+                    showPackageModalMessage(data.error || 'Failed to save package.', 'error');
                 }
-            } catch (error) {
-                console.error('Failed to assign package:', error);
-                showAssignPackageMessage('Network error. Please try again.', 'error');
+            } catch (err) {
+                if (err.message && err.message.includes('fetch')) {
+                    const newP = {
+                        package_id: id || (packages.length ? Math.max(...packages.map(x => x.package_id)) + 1 : 1),
+                        package_name: name,
+                        sessions,
+                        max_instruments: maxInstruments,
+                        price: price,
+                        description
+                    };
+                    if (id) {
+                        const idx = packages.findIndex(x => x.package_id == id);
+                        if (idx >= 0) packages[idx] = newP;
+                    } else {
+                        packages.push(newP);
+                    }
+                    closePackageModal();
+                    showMessage(id ? 'Package updated (local).' : 'Package added (local). Add API for persistence.', 'success');
+                    loadPackages();
+                } else {
+                    showPackageModalMessage('Network error. Try again.', 'error');
+                }
+            }
+        }
+
+        async function deletePackage(id) {
+            const p = packages.find(x => x.package_id == id);
+            const name = p ? p.package_name : 'this package';
+            const result = await Swal.fire({
+                title: 'Delete Package?',
+                text: `Remove "${name}"? This cannot be undone.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#b8860b',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes, delete'
+            });
+            if (!result.isConfirmed) return;
+
+            try {
+                const response = await fetch(`${baseApiUrl}/sessions.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'delete-package', package_id: id })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('Package deleted.', 'success');
+                    loadPackages();
+                } else {
+                    showMessage(data.error || 'Delete failed.', 'error');
+                }
+            } catch (e) {
+                packages = packages.filter(p => p.package_id != id);
+                showMessage('Package removed (local). Add API for persistence.', 'success');
+                loadPackages();
             }
         }
 
@@ -427,14 +473,12 @@
                 }
             }
 
-            loadBranches();
-            loadSessionPackages();
-            loadActiveStudents();
+            loadPackages();
 
-            document.getElementById('branchFilter')?.addEventListener('change', loadActiveStudents);
-            document.getElementById('closeAssignPackageModalBtn')?.addEventListener('click', closeAssignPackageModal);
-            document.getElementById('cancelAssignPackageBtn')?.addEventListener('click', closeAssignPackageModal);
-            document.getElementById('assignPackageForm')?.addEventListener('submit', assignPackage);
+            document.getElementById('openAddPackageModalBtn')?.addEventListener('click', openAddPackageModal);
+            document.getElementById('closePackageModalBtn')?.addEventListener('click', closePackageModal);
+            document.getElementById('cancelPackageBtn')?.addEventListener('click', closePackageModal);
+            document.getElementById('packageForm')?.addEventListener('submit', savePackage);
         });
     </script>
 </body>

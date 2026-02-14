@@ -1,11 +1,4 @@
 <?php
-/**
- * Migration: Add type_id column to tbl_instruments
- * Fixes: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'type_id'
- * 
- * Run this file directly in browser: http://localhost/FAS_music/migrations/run_instrument_migration.php
- * Or via CLI: php run_instrument_migration.php
- */
 
 require_once dirname(__DIR__) . '/api/db_connect.php';
 
