@@ -8,101 +8,104 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
         tailwind.config = {
-            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        gold: { 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
-                        obsidian: '#0a0a0a'
-                    }
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
                 }
             }
         }
-        // Suppress Tailwind CDN warning in console
-        if (typeof console !== 'undefined' && console.warn) {
-            const originalWarn = console.warn;
-            console.warn = function(...args) {
-                if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
-                    return;
-                }
-                originalWarn.apply(console, args);
-            };
-        }
     </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .dark-glass { background: rgba(15, 17, 21, 0.9); backdrop-filter: blur(10px); }
+        .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: white !important; }
+    </style>
 </head>
-<body class="bg-gray-50 dark:bg-obsidian text-gray-900 dark:text-zinc-100">
-    <!-- Top Navigation Bar -->
-    <nav class="fixed top-0 left-0 right-0 h-16 bg-black/95 dark:bg-black border-b border-gold-500/20 z-50 flex items-center justify-between px-6 shadow-lg">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-lg bg-gold-500/20 border border-gold-500/30 flex items-center justify-center">
-                <i class="fas fa-music text-gold-500 text-lg"></i>
-            </div>
-            <div>
-                <p class="text-xs text-zinc-400 uppercase tracking-wider">Father & Sons</p>
-                <p class="text-sm font-semibold text-white">Music Academy</p>
-            </div>
+<body class="bg-[#f1f5f9] text-slate-900 antialiased">
+
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-8">
+            <a href="admin_dashboard.html" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
         </div>
-        <div class="flex items-center gap-3" id="userInfoNav">
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
-                <i class="fas fa-user-circle text-gold-400 text-xl"></i>
-                <div class="text-right">
-                    <p class="text-xs text-zinc-400" id="userRoleNav">Admin</p>
-                    <p class="text-sm font-medium text-white" id="userNameNav">Loading...</p>
+        <div class="flex items-center gap-6">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="userNameNav" class="text-sm font-semibold text-white">Administrator</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Portal Access</span>
+            </div>
+            <div class="h-10 w-10 rounded-full border-2 border-gold-500/30 p-0.5">
+                <div class="w-full h-full rounded-full bg-darkSlate flex items-center justify-center">
+                    <i class="fas fa-user-tie text-gold-400"></i>
                 </div>
-                <i class="fas fa-chevron-down text-zinc-400 text-xs ml-2"></i>
             </div>
         </div>
     </nav>
 
-    <!-- Sidebar -->
-    <div class="fixed inset-y-0 left-0 w-64 bg-black border-r border-gold-500/20 z-40 shadow-lg pt-16">
-        <div class="p-6 h-full flex flex-col">
-            <nav class="space-y-2 flex-1">
-                <a href="admin_dashboard.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
-                </a>
-                <a href="admin_registration.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-user-plus mr-3"></i> Registrations
-                </a>
-                <a href="admin_students.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-users mr-3"></i> Students
-                </a>
-                <a href="admin_instruments.html" class="flex items-center px-4 py-3 text-gold-400 bg-gold-500/10 rounded-lg">
-                    <i class="fas fa-guitar mr-3"></i> Instruments
-                </a>
-                <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-calendar-alt mr-3"></i> Sessions
-                </a>
-                <a href="admin_package.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-box mr-3"></i> Packages
-                </a>
-                <a href="admin_branches.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-map-marker-alt mr-3"></i> Branches
-                </a>
-            </nav>
-            <div class="border-t border-gold-500/20 pt-6">
-                <button onclick="logout()" class="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition">
-                    <i class="fas fa-sign-out-alt mr-3"></i> Logout
-                </button>
+    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5">
+        <div class="px-6 space-y-8 flex-1 mt-4">
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Management</h3>
+                <nav class="space-y-2">
+                    <a href="admin_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-chart-line mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
+                    </a>
+                    <a href="admin_registration.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-id-card mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Registrations
+                    </a>
+                    <a href="admin_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Students
+                    </a>
+                    <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
+                </nav>
+            </div>
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Academy Assets</h3>
+                <nav class="space-y-2">
+                    <a href="admin_instruments.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-guitar mr-3"></i> Instruments
+                    </a>
+                    <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
+                    </a>
+                    <a href="admin_package.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-box mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Packages
+                    </a>
+                </nav>
             </div>
         </div>
-    </div>
+        <div class="p-6 border-t border-white/5">
+            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-red-400 bg-red-400/10 hover:bg-red-400/20 rounded-xl transition-all border border-red-400/20">
+                <i class="fas fa-sign-out-alt"></i> Sign Out
+            </button>
+        </div>
+    </aside>
 
     <!-- Main Content -->
-    <div class="ml-64 pt-24 p-8">
-        <div class="mb-8 flex items-center justify-between">
-            <div>
-                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Instruments</h2>
-                <p class="text-gray-600 dark:text-zinc-400">Manage instruments and instrument types</p>
-            </div>
-            <div class="flex gap-3">
-                <button id="openAddTypeModalBtn"
-                    class="inline-flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold rounded-lg shadow transition">
-                    <i class="fas fa-plus mr-2"></i>
-                    Add Type
-                </button>
-                <button id="openAddInstrumentModalBtn"
-                    class="inline-flex items-center px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+    <main class="lg:ml-72 pt-28 p-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="mb-10 flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">Instruments</h1>
+                    <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
+                    <p class="text-slate-500 mt-2">Manage instruments and instrument types</p>
+                </div>
+                <div class="flex gap-3">
+                    <button id="openAddTypeModalBtn"
+                        class="inline-flex items-center px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold rounded-xl shadow transition">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add Type
+                    </button>
+                    <button id="openAddInstrumentModalBtn"
+                        class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/25 transition-all duration-200">
                     <i class="fas fa-plus mr-2"></i>
                     Add Instrument
                 </button>
@@ -114,45 +117,45 @@
 
         <!-- Filters -->
         <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <label class="block text-sm font-medium text-slate-700 mb-2">
                     <i class="fas fa-filter mr-2 text-gold-500"></i>Filter by Branch
                 </label>
-                <select id="branchFilter" class="w-full px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-gold-500/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-gold-500 dark:focus:border-gold-400">
+                <select id="branchFilter" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
                     <option value="">All Branches</option>
                 </select>
             </div>
-            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <label class="block text-sm font-medium text-slate-700 mb-2">
                     <i class="fas fa-filter mr-2 text-gold-500"></i>Filter by Type
                 </label>
-                <select id="typeFilter" class="w-full px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-gold-500/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-gold-500 dark:focus:border-gold-400">
+                <select id="typeFilter" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
                     <option value="">All Types</option>
                 </select>
             </div>
         </div>
 
         <!-- Instruments Table -->
-        <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg overflow-hidden shadow-sm">
-            <div class="p-6 border-b border-gray-200 dark:border-gold-500/20 flex items-center justify-between">
-                <h3 class="text-xl font-bold text-gray-900 dark:text-white">All Instruments</h3>
-                <span class="text-xs text-gray-500 dark:text-zinc-400" id="instrumentCount">Loading...</span>
+        <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-guitar mr-2 text-gold-500"></i>All Instruments</h3>
+                <span class="text-xs text-slate-500" id="instrumentCount">Loading...</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
-                    <thead class="bg-gray-50 dark:bg-black/50">
+                    <thead class="bg-slate-50">
                         <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Instrument</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Type</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Branch</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Serial Number</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Condition</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instrument</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Condition</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                         </tr>
                     </thead>
-                    <tbody id="instrumentsTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
+                    <tbody id="instrumentsTable" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading instruments...</p>
                             </td>
@@ -161,7 +164,8 @@
                 </table>
             </div>
         </div>
-    </div>
+        </div>
+    </main>
 
     <!-- Add Instrument Type Modal -->
     <div id="addTypeModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -278,13 +282,13 @@
         async function loadBranches() {
             const branchFilter = document.getElementById('branchFilter');
             const instrumentBranchId = document.getElementById('instrumentBranchId');
-            
+
             try {
                 const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
                 const data = await response.json();
 
                 if (data.success && data.branches) {
-                    const options = data.branches.map(branch => 
+                    const options = data.branches.map(branch =>
                         `<option value="${branch.branch_id}">${branch.branch_name}</option>`
                     ).join('');
 
@@ -304,13 +308,13 @@
         async function loadInstrumentTypes() {
             const typeFilter = document.getElementById('typeFilter');
             const instrumentTypeId = document.getElementById('instrumentTypeId');
-            
+
             try {
                 const response = await fetch(`${baseApiUrl}/instruments.php?action=get-types`);
                 const data = await response.json();
 
                 if (data.success && data.types) {
-                    const options = data.types.map(type => 
+                    const options = data.types.map(type =>
                         `<option value="${type.type_id}">${type.type_name}</option>`
                     ).join('');
 
@@ -334,7 +338,7 @@
             try {
                 const branchFilter = document.getElementById('branchFilter');
                 const typeFilter = document.getElementById('typeFilter');
-                
+
                 let url = `${baseApiUrl}/instruments.php?action=get-instruments`;
                 if (branchFilter && branchFilter.value) {
                     url += `&branch_id=${branchFilter.value}`;
@@ -354,7 +358,7 @@
                 } else {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-inbox text-2xl mb-2"></i>
                                 <p>No instruments found</p>
                             </td>
@@ -371,7 +375,7 @@
                     tableBody.innerHTML = `
                         <tr>
                             <td colspan="6" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
-                                <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                                <i class="fas fa-exclamation-circle text-2xl mb-2 text-red-500"></i>
                                 <p>Failed to load instruments</p>
                             </td>
                         </tr>
@@ -388,7 +392,7 @@
             if (!filteredInstruments || filteredInstruments.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                             <i class="fas fa-inbox text-2xl mb-2"></i>
                             <p>No instruments found</p>
                         </td>
@@ -407,16 +411,16 @@
 
             tableBody.innerHTML = filteredInstruments.map(instrument => {
                 const statusClass = statusColors[instrument.status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
-                
+
                 return `
-                    <tr class="hover:bg-gold-500/5 transition">
+                    <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-6 py-4">
-                            <div class="font-medium text-gray-900 dark:text-white">${instrument.instrument_name || 'N/A'}</div>
+                            <div class="font-medium text-slate-900">${instrument.instrument_name || 'N/A'}</div>
                         </td>
-                        <td class="px-6 py-4 text-gray-900 dark:text-white">${instrument.type_name || 'N/A'}</td>
-                        <td class="px-6 py-4 text-gray-900 dark:text-white">${instrument.branch_name || 'N/A'}</td>
-                        <td class="px-6 py-4 text-gray-500 dark:text-zinc-400">${instrument.serial_number || '-'}</td>
-                        <td class="px-6 py-4 text-gray-900 dark:text-white">${instrument.condition || '-'}</td>
+                        <td class="px-6 py-4 text-slate-900">${instrument.type_name || 'N/A'}</td>
+                        <td class="px-6 py-4 text-slate-900">${instrument.branch_name || 'N/A'}</td>
+                        <td class="px-6 py-4 text-slate-500">${instrument.serial_number || '-'}</td>
+                        <td class="px-6 py-4 text-slate-900">${instrument.condition || '-'}</td>
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
                                 ${instrument.status || 'N/A'}
@@ -444,7 +448,6 @@
             const typeDescription = document.getElementById('typeDescription');
             const submitBtn = document.getElementById('submitTypeBtn');
             const submitBtnText = document.getElementById('submitTypeBtnText');
-            const messageDiv = document.getElementById('typeMessage');
 
             if (!form || !typeName) return;
 
@@ -464,29 +467,16 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showMessage('Instrument type added successfully', 'success');
-                    if (messageDiv) {
-                        messageDiv.className = 'mb-4 p-3 rounded text-sm bg-green-900/50 border border-green-500 text-green-200';
-                        messageDiv.textContent = result.message || 'Instrument type added successfully';
-                        messageDiv.classList.remove('hidden');
-                    }
+                    showMessage(result.message || 'Instrument type added successfully', 'success');
                     form.reset();
                     closeAddTypeModal();
                     await loadInstrumentTypes();
                 } else {
-                    if (messageDiv) {
-                        messageDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
-                        messageDiv.textContent = result.error || 'Failed to add instrument type';
-                        messageDiv.classList.remove('hidden');
-                    }
+                    showMessage(result.error || 'Failed to add instrument type', 'error');
                 }
             } catch (error) {
                 console.error('Failed to add instrument type:', error);
-                if (messageDiv) {
-                    messageDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
-                    messageDiv.textContent = 'An error occurred. Please try again.';
-                    messageDiv.classList.remove('hidden');
-                }
+                showMessage('An error occurred. Please try again.', 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtnText.textContent = 'Add Type';
@@ -498,7 +488,6 @@
             const form = document.getElementById('addInstrumentForm');
             const submitBtn = document.getElementById('submitInstrumentBtn');
             const submitBtnText = document.getElementById('submitInstrumentBtnText');
-            const messageDiv = document.getElementById('instrumentMessage');
 
             if (!form) return;
 
@@ -522,29 +511,16 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showMessage('Instrument added successfully', 'success');
-                    if (messageDiv) {
-                        messageDiv.className = 'mb-4 p-3 rounded text-sm bg-green-900/50 border border-green-500 text-green-200';
-                        messageDiv.textContent = result.message || 'Instrument added successfully';
-                        messageDiv.classList.remove('hidden');
-                    }
+                    showMessage(result.message || 'Instrument added successfully', 'success');
                     form.reset();
                     closeAddInstrumentModal();
                     await loadInstruments();
                 } else {
-                    if (messageDiv) {
-                        messageDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
-                        messageDiv.textContent = result.error || 'Failed to add instrument';
-                        messageDiv.classList.remove('hidden');
-                    }
+                    showMessage(result.error || 'Failed to add instrument', 'error');
                 }
             } catch (error) {
                 console.error('Failed to add instrument:', error);
-                if (messageDiv) {
-                    messageDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
-                    messageDiv.textContent = 'An error occurred. Please try again.';
-                    messageDiv.classList.remove('hidden');
-                }
+                showMessage('An error occurred. Please try again.', 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtnText.textContent = 'Add Instrument';
@@ -598,9 +574,7 @@
                 const user = Auth.getUser();
                 if (user) {
                     const userNameNav = document.getElementById('userNameNav');
-                    const userRoleNav = document.getElementById('userRoleNav');
                     if (userNameNav) userNameNav.textContent = user.username || user.email || 'Admin';
-                    if (userRoleNav) userRoleNav.textContent = user.role_name || 'Admin';
                 }
             }
 
@@ -633,4 +607,5 @@
     </script>
 </body>
 </html>
+
 

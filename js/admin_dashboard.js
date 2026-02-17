@@ -1,5 +1,17 @@
-// Base API URL
-const baseApiUrl = sessionStorage.getItem("baseAPIUrl") || "http://localhost/FAS_music/api";
+// Base API URL (same-origin safe)
+const baseApiUrl = (() => {
+    const fallback = `${window.location.origin}/FAS_music/api`;
+    try {
+        const stored = sessionStorage.getItem("baseAPIUrl") || '';
+        if (!stored) return fallback;
+        const resolved = new URL(stored, window.location.origin);
+        return resolved.origin === window.location.origin
+            ? resolved.href.replace(/\/$/, '')
+            : fallback;
+    } catch (e) {
+        return fallback;
+    }
+})();
 
 let currentStudentId = null;
 let currentRegistration = null;
@@ -35,19 +47,14 @@ function logout() {
     Auth.logout();
 }
 
-// Show message
+// Show message (SweetAlert)
 function showMessage(message, type = 'error') {
-    const messageDiv = document.getElementById('message');
-    messageDiv.className = `mb-4 p-3 rounded text-sm ${
-        type === 'error' ? 'bg-red-900/50 border border-red-500 text-red-200' :
-        'bg-green-900/50 border border-green-500 text-green-200'
-    }`;
-    messageDiv.textContent = message;
-    messageDiv.classList.remove('hidden');
-
-    setTimeout(() => {
-        messageDiv.classList.add('hidden');
-    }, 5000);
+    Swal.fire({
+        icon: type === 'success' ? 'success' : 'error',
+        title: type === 'success' ? 'Success' : 'Error',
+        text: message,
+        confirmButtonColor: '#b8860b'
+    });
 }
 
 // Load Pending Registrations
@@ -339,3 +346,5 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
     loadPendingRegistrations();
 });
+
+

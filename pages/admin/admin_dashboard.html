@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Father & Sons Music Academy</title>
-    <!-- Tailwind CSS -->
+    <title>Admin Dashboard | Father & Sons</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
@@ -12,195 +12,204 @@
             theme: {
                 extend: {
                     colors: {
-                        gold: { 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
-                        obsidian: '#0a0a0a'
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui'],
                     }
                 }
             }
         }
     </script>
     <style>
-        /* Custom scrollbar for a minimal look */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #d1d1d1; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #b8860b; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .dark-glass { background: rgba(15, 17, 21, 0.9); backdrop-filter: blur(10px); }
+        .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: white !important; }
     </style>
 </head>
-<body class="bg-slate-50 text-gray-800 font-sans antialiased">
+<body class="bg-[#f1f5f9] text-slate-900 antialiased">
 
-    <!-- Top Navigation Bar (Black for Brand Identity) -->
-     <nav class="fixed w-full z-50 bg-white/50 dark:bg-obsidian/50 backdrop-blur-lg border-b border-zinc-200 px-6 md:px-12 py-3 flex justify-between items-center transition-all duration-300 shadow-sm">
-        <a href="#home" class="flex items-center h-10 sm:h-12 md:h-14">
-            <!-- Assumption: Logo handles its own color. Added dark:brightness-200 for dark mode support -->
-            <img src="../../assets/fas-logo.png" alt="Father & Sons Music Academy"
-            class="h-full w-auto object-left object-contain ">
-        </a>
-        <div class="flex items-center gap-4">
-            <span id="userNameNav" class="text-sm font-medium text-slate-700 dark:text-slate-300"></span>
-            <button onclick="logout()" class="text-sm text-red-500 hover:text-red-700 transition">Logout</button>
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-8">
+            <a href="#" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
+        </div>
 
-
-
-
-
+        <div class="flex items-center gap-6">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="userNameNav" class="text-sm font-semibold text-white">Administrator</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Portal Access</span>
+            </div>
+            <div class="h-10 w-10 rounded-full border-2 border-gold-500/30 p-0.5">
+                <div class="w-full h-full rounded-full bg-darkSlate flex items-center justify-center">
+                    <i class="fas fa-user-tie text-gold-400"></i>
+                </div>
+            </div>
+        </div>
     </nav>
 
-    <!-- Sidebar (White/Premium Minimal) -->
-    <div class="fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-40 pt-20 shadow-sm">
-        <div class="p-6 h-full flex flex-col">
-            <div class="mb-8">
-                 <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Main Menu</p>
-            </div>
-            <nav class="space-y-1 flex-1">
-                <a href="admin_dashboard.html" class="flex items-center px-4 py-2.5 text-sm font-semibold text-black bg-gold-400 rounded-lg shadow-sm transition-all duration-200">
-                    <i class="fas fa-tachometer-alt mr-3 text-black"></i> Dashboard
-                </a>
-                <a href="admin_registration.html" class="flex items-center px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-black rounded-lg transition">
-                    <i class="fas fa-user-plus mr-3 text-slate-400"></i> Registrations
-                </a>
-                <a href="admin_students.html" class="flex items-center px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-black rounded-lg transition">
-                    <i class="fas fa-users mr-3 text-slate-400"></i> Students
-                </a>
-                <a href="admin_instruments.html" class="flex items-center px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-black rounded-lg transition">
-                    <i class="fas fa-guitar mr-3 text-slate-400"></i> Instruments
-                </a>
-                <a href="admin_sessions.html" class="flex items-center px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-black rounded-lg transition">
-                    <i class="fas fa-calendar-alt mr-3 text-slate-400"></i> Sessions
-                </a>
-                <a href="admin_package.html" class="flex items-center px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-black rounded-lg transition">
-                    <i class="fas fa-box mr-3 text-slate-400"></i> Packages
-                </a>
-                <a href="admin_branches.html" class="flex items-center px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-black rounded-lg transition">
-                    <i class="fas fa-map-marker-alt mr-3 text-slate-400"></i> Branches
-                </a>
-            </nav>
-            <div class="border-t border-slate-200 pt-4">
-                <button onclick="logout()" class="w-full flex items-center px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 rounded-lg transition">
-                    <i class="fas fa-sign-out-alt mr-3"></i> Logout
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="ml-64 pt-24 p-8">
-
-        <!-- Page Header -->
-        <div class="mb-10">
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h1>
-            <p class="text-slate-500 text-sm mt-1">Welcome back! Here's what's happening today.</p>
-        </div>
-
-        <!-- Messages -->
-        <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
-
-        <!-- Stats Cards (Minimal White) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-            <!-- Pending Card -->
-            <a href="admin_registration.html#pending" class="block bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md hover:border-gold-400 transition-all group">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="h-10 w-10 rounded-full bg-gold-100 flex items-center justify-center">
-                        <i class="fas fa-clock text-gold-600"></i>
-                    </div>
-                    <span class="text-xs font-medium text-slate-400 group-hover:text-gold-600 transition">View All</span>
-                </div>
-                <p id="statPending" class="text-3xl font-bold text-slate-900">0</p>
-                <p class="text-xs text-slate-500 mt-1 uppercase tracking-wider font-medium">Pending Approvals</p>
-            </a>
-
-            <!-- Fee Paid Card -->
-            <a href="admin_registration.html#all" class="block bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md hover:border-green-400 transition-all group">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="h-10 w-10 rounded-full bg-green-50 flex items-center justify-center">
-                        <i class="fas fa-check-circle text-green-500"></i>
-                    </div>
-                    <span class="text-xs font-medium text-slate-400 group-hover:text-green-500 transition">View All</span>
-                </div>
-                <p id="statFeePaid" class="text-3xl font-bold text-slate-900">0</p>
-                <p class="text-xs text-slate-500 mt-1 uppercase tracking-wider font-medium">Fees Paid</p>
-            </a>
-
-            <!-- Approved Card -->
-            <a href="admin_registration.html#all" class="block bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md hover:border-blue-400 transition-all group">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center">
-                        <i class="fas fa-user-check text-blue-500"></i>
-                    </div>
-                    <span class="text-xs font-medium text-slate-400 group-hover:text-blue-500 transition">View All</span>
-                </div>
-                <p id="statApproved" class="text-3xl font-bold text-slate-900">0</p>
-                <p class="text-xs text-slate-500 mt-1 uppercase tracking-wider font-medium">Total Approved</p>
-            </a>
-
-            <!-- Total Card -->
-            <a href="admin_registration.html#all" class="block bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md hover:border-purple-400 transition-all group">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="h-10 w-10 rounded-full bg-purple-50 flex items-center justify-center">
-                        <i class="fas fa-users text-purple-500"></i>
-                    </div>
-                    <span class="text-xs font-medium text-slate-400 group-hover:text-purple-500 transition">View All</span>
-                </div>
-                <p id="statTotal" class="text-3xl font-bold text-slate-900">0</p>
-                <p class="text-xs text-slate-500 mt-1 uppercase tracking-wider font-medium">Total Registrations</p>
-            </a>
-        </div>
-
-        <!-- Two Column Layout -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-
-            <!-- Recent Activity (2/3 width) -->
-            <div class="lg:col-span-2 bg-white border border-slate-200 rounded-xl shadow-sm">
-                <div class="flex items-center justify-between p-6 border-b border-slate-100">
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-900">Recent Registrations</h3>
-                        <p class="text-xs text-slate-400 mt-1">Latest system entries</p>
-                    </div>
-                    <a href="admin_registration.html#all" class="text-xs font-semibold text-gold-600 hover:text-gold-700 bg-gold-50 px-3 py-1.5 rounded-md transition">
-                        View All <i class="fas fa-arrow-right ml-1"></i>
+    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5">
+        <div class="px-6 space-y-8 flex-1 mt-4">
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Management</h3>
+                <nav class="space-y-2">
+                    <a href="admin_dashboard.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-chart-line mr-3"></i> Dashboard
                     </a>
+                    <a href="admin_registration.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-id-card mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Registrations
+                    </a>
+                    <a href="admin_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Students
+                    </a>
+                    <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
+                </nav>
+            </div>
+
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Academy Assets</h3>
+                <nav class="space-y-2">
+                    <a href="admin_instruments.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-guitar mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Instruments
+                    </a>
+                    <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <div class="p-6 border-t border-white/5">
+            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-red-400 bg-red-400/10 hover:bg-red-400/20 rounded-xl transition-all border border-red-400/20">
+                <i class="fas fa-sign-out-alt"></i> Sign Out
+            </button>
+        </div>
+    </aside>
+
+    <main class="lg:ml-72 pt-28 p-8">
+        <div class="max-w-7xl mx-auto">
+
+            <div class="mb-10">
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Executive Dashboard</h1>
+                <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pending</p>
+                            <h2 id="statPending" class="text-3xl font-bold text-slate-800">0</h2>
+                        </div>
+                        <div class="p-2 bg-amber-50 rounded-lg"><i class="fas fa-clock text-amber-500"></i></div>
+                    </div>
                 </div>
-                <div id="recentActivity" class="p-6">
-                    <div class="text-center py-10 text-slate-400">
-                        <i class="fas fa-spinner fa-spin text-xl mb-2"></i>
-                        <p class="text-sm">Loading...</p>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Revenue</p>
+                            <h2 id="statFeePaid" class="text-3xl font-bold text-slate-800">0</h2>
+                        </div>
+                        <div class="p-2 bg-emerald-50 rounded-lg"><i class="fas fa-coins text-emerald-500"></i></div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Students</p>
+                            <h2 id="statApproved" class="text-3xl font-bold text-slate-800">0</h2>
+                        </div>
+                        <div class="p-2 bg-blue-50 rounded-lg"><i class="fas fa-user-check text-blue-500"></i></div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total</p>
+                            <h2 id="statTotal" class="text-3xl font-bold text-slate-800">0</h2>
+                        </div>
+                        <div class="p-2 bg-slate-100 rounded-lg"><i class="fas fa-database text-slate-500"></i></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Quick Actions & Branches (1/3 width) -->
-            <div class="space-y-8">
-                <!-- Quick Actions -->
-                <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-                    <h3 class="text-lg font-bold text-slate-900 mb-4">Quick Actions</h3>
+            <!-- Quick Actions & Branches Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2 bg-gold-500/10 rounded-lg text-gold-500"><i class="fas fa-bolt"></i></div>
+                        <div>
+                            <h2 class="font-bold text-black">Quick Actions</h2>
+                            <p class="text-xs text-slate-500">Common admin tasks</p>
+                        </div>
+                    </div>
+
                     <div class="space-y-3">
-                        <a href="admin_registration.html#pending" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-slate-50 hover:bg-gold-100 transition group">
-                            <i class="fas fa-bolt text-slate-400 group-hover:text-gold-600 transition"></i>
-                            <span class="text-sm font-medium text-slate-700 group-hover:text-black">Process Pending</span>
+                        <a href="admin_registration.html?status=Pending" class="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-gold-500/10 hover:border-gold-500/20 transition-all group">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-clock text-gold-500"></i>
+                                <span class="text-sm font-semibold">View Pending Registrations</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-xs text-slate-600 group-hover:text-gold-500"></i>
                         </a>
-                        <a href="admin_students.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-slate-50 hover:bg-blue-50 transition group">
-                            <i class="fas fa-user-plus text-slate-400 group-hover:text-blue-500 transition"></i>
-                            <span class="text-sm font-medium text-slate-700 group-hover:text-black">Manage Students</span>
+                        <a href="admin_registration.html" class="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-list text-slate-400"></i>
+                                <span class="text-sm font-semibold">View All Registrations</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-xs text-slate-600 group-hover:text-white"></i>
                         </a>
-                        <a href="admin_instruments.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-slate-50 hover:bg-purple-50 transition group">
-                            <i class="fas fa-sliders-h text-slate-400 group-hover:text-purple-500 transition"></i>
-                            <span class="text-sm font-medium text-slate-700 group-hover:text-black">Instrument Setup</span>
+                        <a href="admin_students.html" class="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-users text-slate-400"></i>
+                                <span class="text-sm font-semibold">Manage Students</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-xs text-slate-600 group-hover:text-white"></i>
                         </a>
                     </div>
                 </div>
 
-                <!-- Branches -->
-                <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-                    <h3 class="text-lg font-bold text-slate-900 mb-4">Active Branches</h3>
-                    <div id="branchesList" class="space-y-3">
-                         <div class="text-center py-6 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-lg mb-2"></i>
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2 bg-blue-500/10 rounded-lg text-blue-400"><i class="fas fa-building"></i></div>
+                        <div>
+                            <h2 class="font-bold text-black">Branches</h2>
+                            <p class="text-xs text-slate-500">Active locations</p>
+                        </div>
+                    </div>
+                    <div id="branchesList" class="space-y-3 max-h-[240px] overflow-y-auto pr-2">
+                        <div class="animate-pulse flex space-x-4 p-4 bg-white/5 rounded-xl">
+                            <div class="rounded-lg bg-slate-700 h-10 w-10"></div>
+                            <div class="flex-1 space-y-4 py-1">
+                                <div class="h-4 bg-slate-700 rounded w-3/4"></div>
+                                <div class="h-4 bg-slate-700 rounded w-1/2"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Recent Activity Table -->
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+                <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex justify-between items-center">
+                    <h3 class="font-bold text-slate-800"><i class="fas fa-history mr-2 text-gold-500"></i> Recent Registrations</h3>
+                    <a href="admin_registration.html" class="text-xs font-bold text-gold-600 hover:text-gold-700">View History</a>
+                </div>
+                <div id="recentActivity" class="divide-y divide-slate-100">
+                    <div class="p-20 text-center"><i class="fas fa-spinner fa-spin text-gold-500"></i></div>
+                </div>
+            </div>
+
         </div>
-    </div>
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -217,7 +226,7 @@
                 }
             } catch (error) {
                 console.error('Failed to load dashboard stats:', error);
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load dashboard statistics', confirmButtonColor: '#b8860b' });
+                showMessage('Failed to load dashboard statistics', 'error');
             }
         }
 
@@ -228,9 +237,9 @@
 
             if (!registrations || registrations.length === 0) {
                 recentDiv.innerHTML = `
-                    <div class="text-center py-10">
-                        <i class="fas fa-inbox text-4xl text-slate-200 mb-3"></i>
-                        <p class="text-slate-400 text-sm">No registrations found</p>
+                    <div class="text-center py-8 text-black">
+                        <i class="fas fa-inbox text-4xl text-gray-300 dark:text-zinc-700 mb-3"></i>
+                        <p class="text-gray-500 dark:text-zinc-400">No registrations yet</p>
                     </div>
                 `;
                 return;
@@ -239,25 +248,25 @@
             const recent = registrations.slice(0, 5);
             recentDiv.innerHTML = recent.map(reg => {
                 const statusColors = {
-                    'Pending': 'bg-yellow-50 text-yellow-700 border-yellow-100',
-                    'Fee Paid': 'bg-green-50 text-green-700 border-green-100',
-                    'Approved': 'bg-blue-50 text-blue-700 border-blue-100',
-                    'Rejected': 'bg-red-50 text-red-700 border-red-100'
+                    'Pending': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+                    'Fee Paid': 'bg-green-500/10 text-green-500 border-green-500/20',
+                    'Approved': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+                    'Rejected': 'bg-red-500/10 text-red-500 border-red-500/20'
                 };
-                const statusClass = statusColors[reg.registration_status] || 'bg-slate-50 text-slate-700 border-slate-100';
+                const statusClass = statusColors[reg.registration_status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
 
                 return `
-                    <div class="flex items-center justify-between py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 px-2 -mx-2 rounded transition">
+                    <div class="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gold-500/10 hover:bg-gray-50 dark:hover:bg-white/5 transition mb-2">
                         <div class="flex items-center gap-3">
-                            <div class="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
-                                <i class="fas fa-user text-slate-400 text-xs"></i>
+                            <div class="h-10 w-10 rounded-full bg-gold-500/10 dark:bg-gold-500/20 flex items-center justify-center">
+                                <i class="fas fa-user text-gold-500 dark:text-gold-400"></i>
                             </div>
                             <div>
-                                <p class="text-sm font-medium text-slate-800">${reg.first_name} ${reg.last_name}</p>
-                                <p class="text-xs text-slate-400">${reg.branch_name || 'No branch'} • ${new Date(reg.created_at).toLocaleDateString()}</p>
+                                <p class="font-medium text-black ">${reg.first_name} ${reg.last_name}</p>
+                                <p class="text-xs text-gray-500 dark:text-zinc-400">${reg.branch_name || 'No branch'} • ${new Date(reg.created_at).toLocaleDateString()}</p>
                             </div>
                         </div>
-                        <span class="px-2.5 py-1 rounded text-xs font-medium border ${statusClass}">
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold border ${statusClass}">
                             ${reg.registration_status}
                         </span>
                     </div>
@@ -276,34 +285,53 @@
 
                 if (data.success && data.branches && data.branches.length > 0) {
                     branchesDiv.innerHTML = data.branches.map(branch => `
-                        <div class="flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:border-slate-200 transition">
-                            <div class="h-8 w-8 rounded bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <i class="fas fa-building text-slate-400 text-xs"></i>
+                        <div class="flex items-start gap-3 p-4 rounded-lg border border-gray-200 dark:border-gold-500/10 hover:bg-gray-50 dark:hover:bg-white/5 transition">
+                            <div class="h-10 w-10 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-building text-blue-500 dark:text-blue-400"></i>
                             </div>
-                            <div>
-                                <p class="text-sm font-medium text-slate-800">${branch.branch_name}</p>
-                                ${branch.address ? `<p class="text-xs text-slate-400 mt-0.5">${branch.address}</p>` : ''}
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-gray-900 dark:text-black truncate">${branch.branch_name}</p>
+                                ${branch.address ? `<p class="text-xs text-gray-500 dark:text-zinc-400 truncate mt-1">${branch.address}</p>` : ''}
+                                ${branch.phone ? `<p class="text-xs text-gray-500 dark:text-zinc-400 mt-1"><i class="fas fa-phone mr-1"></i>${branch.phone}</p>` : ''}
                             </div>
                         </div>
                     `).join('');
                 } else {
-                    branchesDiv.innerHTML = `<p class="text-center text-slate-400 text-xs py-4">No branches found</p>`;
+                    branchesDiv.innerHTML = `
+                        <div class="text-center py-8">
+                            <i class="fas fa-building text-4xl text-gray-300 dark:text-zinc-700 mb-3"></i>
+                            <p class="text-gray-500 dark:text-zinc-400">No branches found</p>
+                        </div>
+                    `;
                 }
             } catch (error) {
                 console.error('Failed to load branches:', error);
-                branchesDiv.innerHTML = `<p class="text-center text-red-400 text-xs py-4">Failed to load</p>`;
+                branchesDiv.innerHTML = `
+                    <div class="text-center py-8 text-red-500 dark:text-red-400">
+                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                        <p>Failed to load branches</p>
+                    </div>
+                `;
             }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            if (typeof checkAuth === 'function') checkAuth();
+            if (typeof checkAuth === 'function') {
+                checkAuth();
+            }
+
+            // Load user info in top nav
             if (typeof Auth !== 'undefined' && Auth.getUser) {
                 const user = Auth.getUser();
                 if (user) {
                     const userNameNav = document.getElementById('userNameNav');
+                    const userRoleNav = document.getElementById('userRoleNav');
                     if (userNameNav) userNameNav.textContent = user.username || user.email || 'Admin';
+                    if (userRoleNav) userRoleNav.textContent = user.role_name || 'Admin';
                 }
             }
+
+            // Load dashboard data
             loadDashboardStats();
             loadBranches();
         });

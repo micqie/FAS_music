@@ -8,129 +8,131 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
         tailwind.config = {
-            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        gold: { 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
-                        obsidian: '#0a0a0a'
-                    }
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
                 }
             }
         }
-        // Suppress Tailwind CDN warning in console
-        if (typeof console !== 'undefined' && console.warn) {
-            const originalWarn = console.warn;
-            console.warn = function(...args) {
-                if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
-                    return; // Suppress Tailwind CDN warning
-                }
-                originalWarn.apply(console, args);
-            };
-        }
     </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .dark-glass { background: rgba(15, 17, 21, 0.9); backdrop-filter: blur(10px); }
+        .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: white !important; }
+    </style>
 </head>
-<body class="bg-gray-50 dark:bg-obsidian text-gray-900 dark:text-zinc-100">
-    <!-- Top Navigation Bar -->
-    <nav class="fixed top-0 left-0 right-0 h-16 bg-black/95 dark:bg-black border-b border-gold-500/20 z-50 flex items-center justify-between px-6 shadow-lg">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-lg bg-gold-500/20 border border-gold-500/30 flex items-center justify-center">
-                <i class="fas fa-music text-gold-500 text-lg"></i>
-            </div>
-            <div>
-                <p class="text-xs text-zinc-400 uppercase tracking-wider">Father & Sons</p>
-                <p class="text-sm font-semibold text-white">Music Academy</p>
-            </div>
+<body class="bg-[#f1f5f9] text-slate-900 antialiased">
+
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-8">
+            <a href="admin_dashboard.html" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
         </div>
-        <div class="flex items-center gap-3" id="userInfoNav">
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
-                <i class="fas fa-user-circle text-gold-400 text-xl"></i>
-                <div class="text-right">
-                    <p class="text-xs text-zinc-400" id="userRoleNav">Admin</p>
-                    <p class="text-sm font-medium text-white" id="userNameNav">Loading...</p>
+        <div class="flex items-center gap-6">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="userNameNav" class="text-sm font-semibold text-white">Administrator</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Portal Access</span>
+            </div>
+            <div class="h-10 w-10 rounded-full border-2 border-gold-500/30 p-0.5">
+                <div class="w-full h-full rounded-full bg-darkSlate flex items-center justify-center">
+                    <i class="fas fa-user-tie text-gold-400"></i>
                 </div>
-                <i class="fas fa-chevron-down text-zinc-400 text-xs ml-2"></i>
             </div>
         </div>
     </nav>
 
-    <!-- Sidebar -->
-    <div class="fixed inset-y-0 left-0 w-64 bg-black border-r border-gold-500/20 z-40 shadow-lg pt-16">
-        <div class="p-6 h-full flex flex-col">
-            <nav class="space-y-2 flex-1">
-                <a href="admin_dashboard.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
-                </a>
-                <a href="admin_registration.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-user-plus mr-3"></i> Registrations
-                </a>
-                <a href="admin_students.html" class="flex items-center px-4 py-3 text-gold-400 bg-gold-500/10 rounded-lg">
-                    <i class="fas fa-users mr-3"></i> Students
-                </a>
-                <a href="admin_instruments.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-guitar mr-3"></i> Instruments
-                </a>
-                <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-calendar-alt mr-3"></i> Sessions
-                </a>
-                <a href="admin_package.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-box mr-3"></i> Packages
-                </a>
-                <a href="admin_branches.html" class="flex items-center px-4 py-3 text-zinc-300 hover:bg-gold-500/10 hover:text-gold-400 rounded-lg transition">
-                    <i class="fas fa-map-marker-alt mr-3"></i> Branches
-                </a>
-            </nav>
-            <div class="border-t border-gold-500/20 pt-6">
-                <button onclick="logout()" class="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition">
-                    <i class="fas fa-sign-out-alt mr-3"></i> Logout
-                </button>
+    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5">
+        <div class="px-6 space-y-8 flex-1 mt-4">
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Management</h3>
+                <nav class="space-y-2">
+                    <a href="admin_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-chart-line mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
+                    </a>
+                    <a href="admin_registration.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-id-card mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Registrations
+                    </a>
+                    <a href="admin_students.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-user-graduate mr-3"></i> Students
+                    </a>
+                    <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
+                </nav>
+            </div>
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Academy Assets</h3>
+                <nav class="space-y-2">
+                    <a href="admin_instruments.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-guitar mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Instruments
+                    </a>
+                    <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
+                    </a>
+                    <a href="admin_package.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-box mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Packages
+                    </a>
+                </nav>
             </div>
         </div>
-    </div>
+        <div class="p-6 border-t border-white/5">
+            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-red-400 bg-red-400/10 hover:bg-red-400/20 rounded-xl transition-all border border-red-400/20">
+                <i class="fas fa-sign-out-alt"></i> Sign Out
+            </button>
+        </div>
+    </aside>
 
     <!-- Main Content -->
-    <div class="ml-64 pt-24 p-8">
-        <div class="mb-8">
-            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Students</h2>
-            <p class="text-gray-600 dark:text-zinc-400">View and filter students by branch</p>
-        </div>
+    <main class="lg:ml-72 pt-28 p-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="mb-10">
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Students</h1>
+                <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
+                <p class="text-slate-500 mt-2">View and filter students by branch</p>
+            </div>
 
         <!-- Branch Filter -->
         <div class="mb-6">
-            <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg p-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <label class="block text-sm font-medium text-slate-700 mb-2">
                     <i class="fas fa-filter mr-2 text-gold-500"></i>Filter by Branch
                 </label>
-                <select id="branchFilter" class="w-full md:w-64 px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-gold-500/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-gold-500 dark:focus:border-gold-400">
+                <select id="branchFilter" class="w-full md:w-64 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
                     <option value="">All Branches</option>
                 </select>
-                <p class="text-xs text-gray-500 dark:text-zinc-400 mt-2" id="studentCount">Loading...</p>
+                <p class="text-xs text-slate-500 mt-2" id="studentCount">Loading...</p>
             </div>
         </div>
 
         <!-- Registered Students Table -->
-        <div class="bg-white dark:bg-black/50 border border-gray-200 dark:border-gold-500/20 rounded-lg overflow-hidden shadow-sm">
-            <div class="p-6 border-b border-gray-200 dark:border-gold-500/20 flex items-center justify-between">
-                <h3 class="text-xl font-bold text-gray-900 dark:text-white">Registered Students</h3>
-                <span class="text-xs text-gray-500 dark:text-zinc-400" id="tableCount">All students from your FAS database</span>
+        <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-user-graduate mr-2 text-gold-500"></i>Registered Students</h3>
+                <span class="text-xs text-slate-500" id="tableCount">All students from your FAS database</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
-                    <thead class="bg-gray-50 dark:bg-black/50">
+                    <thead class="bg-slate-50">
                         <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Contact</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Branch</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Registration</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Created</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">Actions</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Student</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Contact</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Branch</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Registration</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Created</th>
                         </tr>
                     </thead>
-                    <tbody id="studentsTable" class="divide-y divide-gray-200 dark:divide-gold-500/10">
+                    <tbody id="studentsTable" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2 text-gold-500"></i>
                                 <p>Loading students...</p>
                             </td>
                         </tr>
@@ -138,101 +140,8 @@
                 </table>
             </div>
         </div>
-    </div>
-
-    <!-- View Student Modal -->
-    <div id="viewStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-lg p-8 relative max-h-[90vh] overflow-y-auto">
-            <button type="button" id="closeViewStudentModal" class="absolute top-4 right-4 text-zinc-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
-            <h3 class="text-xl font-bold text-white mb-4">Student Details</h3>
-            <div id="viewStudentContent" class="space-y-3 text-sm text-zinc-300"></div>
         </div>
-    </div>
-
-    <!-- Edit Student Modal -->
-    <div id="editStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-lg p-8 relative max-h-[90vh] overflow-y-auto">
-            <button type="button" id="closeEditStudentModal" class="absolute top-4 right-4 text-zinc-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
-            <h3 class="text-xl font-bold text-white mb-4">Edit Student</h3>
-            <form id="editStudentForm" class="space-y-3">
-                <input type="hidden" id="editStudentId" value="">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-zinc-400 mb-1">First Name *</label>
-                        <input type="text" id="editFirstName" required class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-zinc-400 mb-1">Last Name *</label>
-                        <input type="text" id="editLastName" required class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-zinc-400 mb-1">Middle Name</label>
-                    <input type="text" id="editMiddleName" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-zinc-400 mb-1">Email</label>
-                    <input type="email" id="editEmail" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-zinc-400 mb-1">Phone</label>
-                    <input type="text" id="editPhone" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-zinc-400 mb-1">Address</label>
-                    <textarea id="editAddress" rows="2" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm"></textarea>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-zinc-400 mb-1">Branch *</label>
-                    <select id="editBranchId" required class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                        <option value="">Select branch</option>
-                    </select>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-zinc-400 mb-1">Date of Birth</label>
-                        <input type="date" id="editDateOfBirth" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-zinc-400 mb-1">Age</label>
-                        <input type="number" id="editAge" min="0" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-zinc-400 mb-1">Registration Fee (₱)</label>
-                        <input type="number" id="editRegFeeAmount" min="0" step="0.01" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-zinc-400 mb-1">Paid (₱)</label>
-                        <input type="number" id="editRegFeePaid" min="0" step="0.01" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-zinc-400 mb-1">Registration Status</label>
-                        <select id="editRegistrationStatus" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                            <option value="Pending">Pending</option>
-                            <option value="Fee Paid">Fee Paid</option>
-                            <option value="Approved">Approved</option>
-                            <option value="Rejected">Rejected</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-zinc-400 mb-1">Status</label>
-                        <select id="editStatus" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-white text-sm">
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="pt-4 flex justify-end gap-2">
-                    <button type="button" id="cancelEditStudent" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded">Update Student</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/mode.js"></script>
@@ -291,8 +200,8 @@
             if (!filteredStudents || filteredStudents.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
-                            <i class="fas fa-inbox text-2xl mb-2"></i>
+                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <i class="fas fa-inbox text-2xl mb-2 text-gold-500/50"></i>
                             <p>No students found</p>
                         </td>
                     </tr>
@@ -309,43 +218,30 @@
                     'Inactive': 'bg-gray-500/10 text-gray-500 border-gray-500/20'
                 };
                 const statusClass = statusColors[student.registration_status] || statusColors[student.status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
-                const sid = student.student_id;
 
                 return `
-                    <tr class="hover:bg-gold-500/5 transition">
+                    <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-6 py-4">
-                            <div class="font-medium text-gray-900 dark:text-white">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
-                            <div class="text-sm text-gray-500 dark:text-zinc-400">${escapeHtml(student.email || '')}</div>
+                            <div class="font-medium text-slate-900">${student.first_name} ${student.last_name}</div>
+                            <div class="text-sm text-slate-500">${student.email || ''}</div>
                         </td>
-                        <td class="px-6 py-4 text-gray-900 dark:text-white">${escapeHtml(student.phone || '')}</td>
-                        <td class="px-6 py-4 text-gray-900 dark:text-white">${escapeHtml(student.branch_name || 'N/A')}</td>
+                        <td class="px-6 py-4 text-slate-800">${student.phone || ''}</td>
+                        <td class="px-6 py-4 text-slate-800">${student.branch_name || 'N/A'}</td>
                         <td class="px-6 py-4">
-                            <div class="text-gray-900 dark:text-white">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</div>
-                            ${student.registration_fee_paid ? `<div class="text-xs text-gray-500 dark:text-zinc-400">Paid: ₱${parseFloat(student.registration_fee_paid).toFixed(2)}</div>` : ''}
+                            <div class="text-slate-800 font-medium">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</div>
+                            ${student.registration_fee_paid ? `<div class="text-xs text-slate-500">Paid: ₱${parseFloat(student.registration_fee_paid).toFixed(2)}</div>` : ''}
                         </td>
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
-                                ${escapeHtml(student.registration_status || student.status || 'N/A')}
+                                ${student.registration_status || student.status || 'N/A'}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-gray-500 dark:text-zinc-400 text-sm">
-                            ${student.created_at ? new Date(student.created_at).toLocaleDateString() : '—'}
-                        </td>
-                        <td class="px-6 py-4">
-                            <button type="button" onclick="openViewStudent(${sid})" class="text-blue-400 hover:text-blue-300 mr-2" title="View"><i class="fas fa-eye"></i></button>
-                            <button type="button" onclick="openEditStudent(${sid})" class="text-gold-500 hover:text-gold-400 mr-2" title="Edit"><i class="fas fa-edit"></i></button>
-                            <button type="button" onclick="deleteStudentAction(${sid})" class="text-red-500 hover:text-red-400" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                        <td class="px-6 py-4 text-slate-500 text-sm">
+                            ${new Date(student.created_at).toLocaleDateString()}
                         </td>
                     </tr>
                 `;
             }).join('');
-        }
-
-        function escapeHtml(text) {
-            if (text == null) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
         }
 
         // Update student count
@@ -382,7 +278,7 @@
                 } else {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
+                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-zinc-400">
                                 <i class="fas fa-inbox text-2xl mb-2"></i>
                                 <p>No students found</p>
                             </td>
@@ -396,7 +292,7 @@
                 console.error('Failed to load students:', error);
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
+                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Failed to load students</p>
                         </td>
@@ -408,177 +304,16 @@
             }
         }
 
-        // View student: fetch full details and show in modal
-        async function openViewStudent(studentId) {
-            try {
-                const res = await fetch(`${baseApiUrl}/students.php?action=get-student&student_id=${studentId}`);
-                const data = await res.json();
-                if (!data.success || !data.student) {
-                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Student not found', confirmButtonColor: '#b8860b' });
-                    return;
-                }
-                const s = data.student;
-                const fmt = (v) => (v != null && v !== '') ? v : '—';
-                const fmtDate = (v) => v ? new Date(v).toLocaleDateString() : '—';
-                const fmtMoney = (v) => v != null ? '₱' + parseFloat(v).toFixed(2) : '—';
-                document.getElementById('viewStudentContent').innerHTML = `
-                    <p><span class="text-zinc-500">Name:</span> ${escapeHtml(s.first_name)} ${escapeHtml(s.last_name || '')} ${escapeHtml(s.middle_name || '')}</p>
-                    <p><span class="text-zinc-500">Email:</span> ${escapeHtml(fmt(s.email))}</p>
-                    <p><span class="text-zinc-500">Phone:</span> ${escapeHtml(fmt(s.phone))}</p>
-                    <p><span class="text-zinc-500">Address:</span> ${escapeHtml(fmt(s.address))}</p>
-                    <p><span class="text-zinc-500">Branch:</span> ${escapeHtml(fmt(s.branch_name))}</p>
-                    <p><span class="text-zinc-500">Date of birth:</span> ${fmtDate(s.date_of_birth)}</p>
-                    <p><span class="text-zinc-500">Age:</span> ${fmt(s.age)}</p>
-                    <p><span class="text-zinc-500">Registration fee:</span> ${fmtMoney(s.registration_fee_amount)} | Paid: ${fmtMoney(s.registration_fee_paid)}</p>
-                    <p><span class="text-zinc-500">Registration status:</span> ${escapeHtml(fmt(s.registration_status))}</p>
-                    <p><span class="text-zinc-500">Status:</span> ${escapeHtml(fmt(s.status))}</p>
-                    <p><span class="text-zinc-500">Created:</span> ${fmtDate(s.created_at)}</p>
-                `;
-                document.getElementById('viewStudentModal').classList.remove('hidden');
-                document.getElementById('viewStudentModal').classList.add('flex');
-            } catch (e) {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load student', confirmButtonColor: '#b8860b' });
-            }
-        }
-
-        function closeViewStudentModal() {
-            document.getElementById('viewStudentModal').classList.add('hidden');
-            document.getElementById('viewStudentModal').classList.remove('flex');
-        }
-
-        // Edit student: fetch student + branches, fill form, show modal
-        async function openEditStudent(studentId) {
-            try {
-                const [resStudent, resBranches] = await Promise.all([
-                    fetch(`${baseApiUrl}/students.php?action=get-student&student_id=${studentId}`),
-                    fetch(`${baseApiUrl}/branch.php?action=get-branches-all`)
-                ]);
-                const dataStudent = await resStudent.json();
-                const dataBranches = await resBranches.json();
-                if (!dataStudent.success || !dataStudent.student) {
-                    Swal.fire({ icon: 'error', title: 'Error', text: dataStudent.error || 'Student not found', confirmButtonColor: '#b8860b' });
-                    return;
-                }
-                const s = dataStudent.student;
-                document.getElementById('editStudentId').value = s.student_id;
-                document.getElementById('editFirstName').value = s.first_name || '';
-                document.getElementById('editLastName').value = s.last_name || '';
-                document.getElementById('editMiddleName').value = s.middle_name || '';
-                document.getElementById('editEmail').value = s.email || '';
-                document.getElementById('editPhone').value = s.phone || '';
-                document.getElementById('editAddress').value = s.address || '';
-                document.getElementById('editDateOfBirth').value = s.date_of_birth || '';
-                document.getElementById('editAge').value = s.age != null ? s.age : '';
-                document.getElementById('editRegFeeAmount').value = s.registration_fee_amount != null ? s.registration_fee_amount : '';
-                document.getElementById('editRegFeePaid').value = s.registration_fee_paid != null ? s.registration_fee_paid : '';
-                document.getElementById('editRegistrationStatus').value = s.registration_status || 'Pending';
-                document.getElementById('editStatus').value = s.status || 'Inactive';
-
-                const branchSelect = document.getElementById('editBranchId');
-                branchSelect.innerHTML = '<option value="">Select branch</option>';
-                if (dataBranches.success && dataBranches.branches) {
-                    dataBranches.branches.forEach(b => {
-                        const opt = document.createElement('option');
-                        opt.value = b.branch_id;
-                        opt.textContent = b.branch_name;
-                        if (b.branch_id == s.branch_id) opt.selected = true;
-                        branchSelect.appendChild(opt);
-                    });
-                }
-                if (!s.branch_id && dataBranches.branches && dataBranches.branches.length)
-                    branchSelect.selectedIndex = 1;
-
-                document.getElementById('editStudentModal').classList.remove('hidden');
-                document.getElementById('editStudentModal').classList.add('flex');
-            } catch (e) {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load student', confirmButtonColor: '#b8860b' });
-            }
-        }
-
-        function closeEditStudentModal() {
-            document.getElementById('editStudentModal').classList.add('hidden');
-            document.getElementById('editStudentModal').classList.remove('flex');
-        }
-
-        async function saveEditStudent(e) {
-            e.preventDefault();
-            const id = document.getElementById('editStudentId').value;
-            const payload = {
-                action: 'update-student',
-                student_id: parseInt(id, 10),
-                first_name: document.getElementById('editFirstName').value.trim(),
-                last_name: document.getElementById('editLastName').value.trim(),
-                middle_name: document.getElementById('editMiddleName').value.trim(),
-                email: document.getElementById('editEmail').value.trim(),
-                phone: document.getElementById('editPhone').value.trim(),
-                address: document.getElementById('editAddress').value.trim(),
-                branch_id: parseInt(document.getElementById('editBranchId').value, 10),
-                date_of_birth: document.getElementById('editDateOfBirth').value || null,
-                age: document.getElementById('editAge').value ? parseInt(document.getElementById('editAge').value, 10) : null,
-                registration_fee_amount: document.getElementById('editRegFeeAmount').value ? parseFloat(document.getElementById('editRegFeeAmount').value) : null,
-                registration_fee_paid: document.getElementById('editRegFeePaid').value ? parseFloat(document.getElementById('editRegFeePaid').value) : null,
-                registration_status: document.getElementById('editRegistrationStatus').value,
-                status: document.getElementById('editStatus').value
-            };
-            try {
-                const res = await fetch(`${baseApiUrl}/students.php`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (data.success) {
-                    closeEditStudentModal();
-                    Swal.fire({ icon: 'success', title: 'Success', text: 'Student updated.', confirmButtonColor: '#b8860b' });
-                    loadStudents();
-                } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Update failed', confirmButtonColor: '#b8860b' });
-                }
-            } catch (err) {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Network error. Try again.', confirmButtonColor: '#b8860b' });
-            }
-        }
-
-        async function deleteStudentAction(studentId) {
-            const student = allStudents.find(s => s.student_id == studentId);
-            const name = student ? `${student.first_name} ${student.last_name}` : 'this student';
-            const result = await Swal.fire({
-                title: 'Deactivate Student?',
-                text: `Deactivate "${name}"? The record will be kept but marked inactive.`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#b8860b',
-                cancelButtonColor: '#6b7280',
-                confirmButtonText: 'Yes, deactivate'
-            });
-            if (!result.isConfirmed) return;
-            try {
-                const res = await fetch(`${baseApiUrl}/students.php`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'delete-student', student_id: studentId })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    Swal.fire({ icon: 'success', title: 'Success', text: 'Student deactivated.', confirmButtonColor: '#b8860b' });
-                    loadStudents();
-                } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Failed to deactivate', confirmButtonColor: '#b8860b' });
-                }
-            } catch (e) {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Network error. Try again.', confirmButtonColor: '#b8860b' });
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
+            if (typeof checkAuth === 'function') {
+                checkAuth();
+            }
             // Load user info in top nav
             if (typeof Auth !== 'undefined' && Auth.getUser) {
                 const user = Auth.getUser();
                 if (user) {
                     const userNameNav = document.getElementById('userNameNav');
-                    const userRoleNav = document.getElementById('userRoleNav');
                     if (userNameNav) userNameNav.textContent = user.username || user.email || 'Admin';
-                    if (userRoleNav) userRoleNav.textContent = user.role_name || 'Admin';
                 }
             }
 
@@ -594,11 +329,6 @@
                     filterStudentsByBranch(this.value);
                 });
             }
-
-            document.getElementById('closeViewStudentModal')?.addEventListener('click', closeViewStudentModal);
-            document.getElementById('closeEditStudentModal')?.addEventListener('click', closeEditStudentModal);
-            document.getElementById('cancelEditStudent')?.addEventListener('click', closeEditStudentModal);
-            document.getElementById('editStudentForm')?.addEventListener('submit', saveEditStudent);
         });
     </script>
 </body>

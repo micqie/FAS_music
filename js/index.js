@@ -1,11 +1,41 @@
-// Base API URL - with fallback for tracking prevention
+// Base API URL - derive from current origin to avoid localhost/127.0.0.1 CORS mismatch
 let baseApiUrl;
-try {
-    baseApiUrl = sessionStorage.getItem("baseAPIUrl") || "http://localhost/FAS_music/api";
-} catch (e) {
-    // Browser tracking prevention blocked storage access
-    baseApiUrl = "http://localhost/FAS_music/api";
-}
+(function initApiBaseUrl() {
+    const defaultApiUrl = `${window.location.origin}/FAS_music/api`;
+    let storedApiUrl = '';
+
+    try {
+        storedApiUrl = sessionStorage.getItem("baseAPIUrl") || '';
+    } catch (e) {
+        storedApiUrl = '';
+    }
+
+    // Prefer stored URL only when it's same-origin or relative
+    if (storedApiUrl) {
+        try {
+            const resolved = new URL(storedApiUrl, window.location.origin);
+            if (resolved.origin === window.location.origin) {
+                baseApiUrl = resolved.href.replace(/\/$/, '');
+            } else {
+                baseApiUrl = defaultApiUrl;
+            }
+        } catch (e) {
+            baseApiUrl = defaultApiUrl;
+        }
+    } else {
+        baseApiUrl = defaultApiUrl;
+    }
+
+    // Keep global access explicit for inline page scripts
+    window.baseApiUrl = baseApiUrl;
+
+    // Wire axios if available
+    if (typeof axios !== 'undefined') {
+        axios.defaults.baseURL = baseApiUrl;
+        axios.defaults.withCredentials = true;
+        axios.defaults.headers.common['Content-Type'] = 'application/json';
+    }
+})();
 
 let currentStudentId = null;
 let currentRegistration = null;
@@ -59,6 +89,10 @@ const Auth = {
 
 // Helper functions for API requests
 async function apiGet(endpoint) {
+    if (typeof axios !== 'undefined') {
+        const res = await axios.get(`/${endpoint}`);
+        return res.data;
+    }
     const res = await fetch(`${baseApiUrl}/${endpoint}`, {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
@@ -67,6 +101,10 @@ async function apiGet(endpoint) {
 }
 
 async function apiPost(endpoint, data) {
+    if (typeof axios !== 'undefined') {
+        const res = await axios.post(`/${endpoint}`, data);
+        return res.data;
+    }
     const res = await fetch(`${baseApiUrl}/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -218,37 +256,31 @@ function toggleMobileMenu() {
     }
 }
 
-// Show Message Helper
+// Show Message Helper (SweetAlert)
 function showLoginMessage(message, type = 'error') {
-    const messageDiv = document.getElementById('loginMessage');
-    if (!messageDiv) return;
-
-    messageDiv.className = `mb-4 p-3 rounded text-sm ${
-        type === 'error' ? 'bg-red-900/50 border border-red-500 text-red-200' :
-        'bg-green-900/50 border border-green-500 text-green-200'
-    }`;
-    messageDiv.textContent = message;
-    messageDiv.classList.remove('hidden');
-
-    setTimeout(() => {
-        messageDiv.classList.add('hidden');
-    }, 5000);
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            icon: type === 'success' ? 'success' : 'error',
+            title: type === 'success' ? 'Success' : 'Error',
+            text: message,
+            confirmButtonColor: '#b8860b'
+        });
+    } else {
+        alert(message);
+    }
 }
 
 function showRegisterMessage(message, type = 'error') {
-    const messageDiv = document.getElementById('registerMessage');
-    if (!messageDiv) return;
-
-    messageDiv.className = `mb-4 p-3 rounded text-sm ${
-        type === 'error' ? 'bg-red-900/50 border border-red-500 text-red-200' :
-        'bg-green-900/50 border border-green-500 text-green-200'
-    }`;
-    messageDiv.textContent = message;
-    messageDiv.classList.remove('hidden');
-
-    setTimeout(() => {
-        messageDiv.classList.add('hidden');
-    }, 5000);
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            icon: type === 'success' ? 'success' : 'error',
+            title: type === 'success' ? 'Success' : 'Error',
+            text: message,
+            confirmButtonColor: '#b8860b'
+        });
+    } else {
+        alert(message);
+    }
 }
 
 // Login Form Handler
@@ -1263,11 +1295,6 @@ function initWalkinPage() {
             const result = await response.json();
 
             if (result.success) {
-                if (msgDiv) {
-                    msgDiv.className = 'mb-4 p-3 rounded text-sm bg-green-900/50 border border-green-500 text-green-200';
-                    msgDiv.textContent = result.message || 'Student created successfully with default password 123.';
-                    msgDiv.classList.remove('hidden');
-                }
                 Swal.fire({
                     icon: 'success',
                     title: 'Student Created',
@@ -1280,19 +1307,11 @@ function initWalkinPage() {
                 closeModal();
                 loadStudentsForAdmin();
             } else {
-                if (msgDiv) {
-                    msgDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
-                    msgDiv.textContent = result.error || 'Failed to create walk-in student.';
-                    msgDiv.classList.remove('hidden');
-                }
+                showMessage(result.error || 'Failed to create walk-in student.', 'error');
             }
         } catch (error) {
             console.error('Walk-in create error:', error);
-            if (msgDiv) {
-                msgDiv.className = 'mb-4 p-3 rounded text-sm bg-red-900/50 border border-red-500 text-red-200';
-                msgDiv.textContent = 'An error occurred. Please try again.';
-                msgDiv.classList.remove('hidden');
-            }
+            showMessage('An error occurred. Please try again.', 'error');
         } finally {
             if (btn) btn.disabled = false;
             if (btnText) btnText.textContent = 'Create Walk-in Student';
@@ -1378,22 +1397,16 @@ async function loadStudentsForAdmin() {
 
 // Show message (SweetAlert)
 function showMessage(message, type = 'error') {
-    if (typeof Swal === 'undefined') {
-        const messageDiv = document.getElementById('message');
-        if (messageDiv) {
-            messageDiv.className = `mb-4 p-3 rounded text-sm ${type === 'error' ? 'bg-red-900/50 border border-red-500 text-red-200' : 'bg-green-900/50 border border-green-500 text-green-200'}`;
-            messageDiv.textContent = message;
-            messageDiv.classList.remove('hidden');
-            setTimeout(() => messageDiv.classList.add('hidden'), 5000);
-        }
-        return;
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            icon: type === 'success' ? 'success' : 'error',
+            title: type === 'success' ? 'Success' : 'Error',
+            text: message,
+            confirmButtonColor: '#b8860b'
+        });
+    } else {
+        alert(message);
     }
-    Swal.fire({
-        icon: type === 'success' ? 'success' : 'error',
-        title: type === 'success' ? 'Success' : 'Error',
-        text: message,
-        confirmButtonColor: '#b8860b'
-    });
 }
 
 // Load Pending Registrations
