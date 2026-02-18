@@ -226,90 +226,200 @@
     </div>
 
     <!-- Register Student Modal -->
-    <div id="registerStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-3xl p-8 relative">
+    <div id="registerStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-4xl p-8 relative my-8">
             <button id="closeRegisterStudentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2">Register Student</h3>
+            <h3 class="text-2xl font-bold text-white mb-2">Register Student (Admin)</h3>
             <p class="text-zinc-400 text-xs mb-4">
-                This will create a student account using the student's email as username and default password
-                <span class="font-mono font-semibold">123</span>. They will be required to change it on first login.
+                This will create a student account using the student's email as username and a
+                <span class="font-mono font-semibold">simple default password</span> (currently <span class="font-mono">123</span>).
+                On first login, the student will be <span class="font-semibold text-gold-400">required to change this password</span>
+                to a strong one for security.
             </p>
 
             <div id="walkinMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
 
-            <form id="walkinForm" class="space-y-6">
-                <!-- Student Info -->
+            <form id="walkinForm" class="space-y-8 max-h-[70vh] overflow-y-auto pr-1">
+                <!-- Student Information -->
                 <div>
-                    <h3 class="text-lg font-semibold mb-4 text-white">Student Information</h3>
+                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
+                        Student Information
+                    </h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">First Name *</label>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">First Name *</label>
                             <input type="text" name="student_first_name" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Last Name *</label>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Last Name *</label>
                             <input type="text" name="student_last_name" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Email *</label>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Middle Name</label>
+                            <input type="text" name="student_middle_name"
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Date of Birth *</label>
+                            <input type="date" name="student_date_of_birth" id="walkin_student_dob" required
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Age</label>
+                            <div id="walkin_student_age_display" class="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-sm text-zinc-300 text-sm">
+                                — Select date of birth —
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Email *</label>
                             <input type="email" name="student_email" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Phone *</label>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Phone *</label>
                             <input type="text" name="student_phone" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Branch *</label>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Grade/Year</label>
+                            <input type="text" name="student_grade_year"
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Branch *</label>
                             <select name="branch_id" id="walkin_branch_id" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
                                 <option value="">Loading branches...</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Registration Fee (PHP)</label>
-                            <input type="number" name="registration_fee_amount" min="0" step="0.01"
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
-                                placeholder="0.00">
-                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Address</label>
+                        <textarea name="student_address" rows="2"
+                            class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Health Diagnosis (if any)</label>
+                        <textarea name="student_health_diagnosis" rows="2"
+                            class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
                     </div>
                 </div>
 
-                <!-- Guardian Info -->
-                <div class="pt-4 border-t border-zinc-800">
-                    <h3 class="text-lg font-semibold mb-4 text-white">Guardian Information</h3>
+                <!-- Guardian Information (required only if student is under 18) -->
+                <div id="walkin_guardian_section">
+                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
+                        Guardian Information <span id="guardian_required_badge" class="text-xs font-normal text-zinc-500 ml-2 hidden">(Required for minors under 18)</span>
+                    </h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">First Name *</label>
-                            <input type="text" name="guardian_first_name" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">First Name</label>
+                            <input type="text" name="guardian_first_name"
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Last Name *</label>
-                            <input type="text" name="guardian_last_name" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">Last Name</label>
+                            <input type="text" name="guardian_last_name"
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Relationship *</label>
-                            <input type="text" name="guardian_relationship" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
-                                placeholder="Parent / Guardian">
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">Relationship</label>
+                            <select name="guardian_relationship"
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
+                                <option value="">Select Relationship</option>
+                                <option value="Father">Father</option>
+                                <option value="Mother">Mother</option>
+                                <option value="Legal Guardian">Legal Guardian</option>
+                                <option value="Other">Other</option>
+                            </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-zinc-300 mb-1">Phone *</label>
-                            <input type="text" name="guardian_phone" required
-                                class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">Phone</label>
+                            <input type="text" name="guardian_phone"
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Email</label>
+                            <input type="email" name="guardian_email"
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Occupation</label>
+                            <input type="text" name="guardian_occupation"
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Address</label>
+                        <textarea name="guardian_address" rows="2"
+                            class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
+                    </div>
+                </div>
+
+                <!-- Session Package & Instruments -->
+                <div>
+                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
+                        Session Package & Instruments
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Session Package *</label>
+                            <select id="walkin_sessionPackage" name="session_package_id" required
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                                <option value="">Select Package</option>
+                            </select>
+                            <p class="text-[10px] text-zinc-500 mt-1 uppercase tracking-wide">
+                                12 sessions = 1 instrument, 20 sessions = 2 instruments
+                            </p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Payment Type *</label>
+                            <select id="walkin_paymentType" name="payment_type" required
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                                <option value="">Select Payment Type</option>
+                                <option value="downpayment">Downpayment</option>
+                                <option value="fullpayment">Full Payment</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Instruments to Learn *</label>
+                        <div id="walkin_instrumentsContainer" class="space-y-4 p-4 bg-zinc-900/70 border border-dashed border-zinc-700 rounded-sm text-zinc-400 text-sm">
+                            Select a branch and session package first
                         </div>
                     </div>
                 </div>
 
-                <div class="pt-4 border-t border-zinc-800 flex items-center justify-end gap-3">
+                <!-- Payment Summary -->
+                <div class="bg-zinc-900/70 border border-zinc-700 rounded-sm p-6">
+                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest">
+                        Payment Summary
+                    </h4>
+                    <div class="space-y-3 text-sm text-zinc-300">
+                        <div class="flex justify-between">
+                            <span>Registration Fee:</span>
+                            <span class="font-semibold text-white">₱1,000.00</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Session Package:</span>
+                            <span id="walkin_sessionFeeDisplay" class="font-semibold text-white">₱0.00</span>
+                        </div>
+                        <div class="border-t border-zinc-700 pt-3 mt-3">
+                            <div class="flex justify-between text-white font-bold text-base">
+                                <span>Total Amount:</span>
+                                <span id="walkin_totalAmountDisplay">₱1,000.00</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="walkin_registration_fee_amount" name="registration_fee_amount" value="1000">
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="pt-4 flex items-center justify-end gap-3">
                     <button type="button" id="cancelRegisterStudentBtn"
                         class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
                         Cancel
@@ -381,11 +491,15 @@
                 registerModal.classList.remove('hidden');
                 registerModal.classList.add('flex');
                 if (typeof loadWalkinBranches === 'function') loadWalkinBranches();
+                if (typeof updateWalkinAgeAndGuardianRequired === 'function') updateWalkinAgeAndGuardianRequired();
             };
             const closeRegisterModal = () => {
                 registerModal.classList.add('hidden');
                 registerModal.classList.remove('flex');
-                if (walkinForm) walkinForm.reset();
+                if (walkinForm) {
+                    walkinForm.reset();
+                    if (typeof updateWalkinAgeAndGuardianRequired === 'function') updateWalkinAgeAndGuardianRequired();
+                }
                 const msgDiv = document.getElementById('walkinMessage');
                 if (msgDiv) msgDiv.classList.add('hidden');
             };

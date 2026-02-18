@@ -69,7 +69,7 @@ class Admin
         ]);
     }
 
-    // 🔍 Get all registrations with guardian and branch info
+    // 🔍 Get all registrations with guardian and branch info (excludes Rejected - they are removed/counted separately)
     public function getAllRegistrations()
     {
         $stmt = $this->conn->prepare("
@@ -91,6 +91,7 @@ class Admin
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
+            WHERE s.registration_status != 'Rejected'
             ORDER BY s.created_at DESC
         ");
         $stmt->execute();
@@ -157,7 +158,7 @@ class Admin
         }
     }
 
-    // ❌ Reject student
+    // ❌ Reject student (removes from DB so they are not counted as registered)
     public function rejectStudent($json)
     {
         $data = json_decode($json, true);
@@ -166,19 +167,59 @@ class Admin
             $this->sendJSON(['error' => 'student_id required'], 400);
         }
 
-        $stmt = $this->conn->prepare("
-            UPDATE tbl_students
-            SET registration_status = 'Rejected',
-                status = 'Inactive'
-            WHERE student_id = ?
-        ");
+        $studentId = (int) $data['student_id'];
 
-        $stmt->execute([$data['student_id']]);
+        try {
+            $this->conn->beginTransaction();
 
-        $this->sendJSON([
-            'success' => true,
-            'message' => 'Student rejected'
-        ]);
+            // Get student email before delete (for user account removal)
+            $stmtStudent = $this->conn->prepare("SELECT email FROM tbl_students WHERE student_id = ?");
+            $stmtStudent->execute([$studentId]);
+            $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+
+            if (!$student) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Student not found'], 404);
+            }
+
+            $email = $student['email'] ?? null;
+
+            // Delete user account (linked by email) so they cannot login
+            if (!empty($email)) {
+                $roleStmt = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = 'Student' LIMIT 1");
+                $roleStmt->execute();
+                $role = $roleStmt->fetch(PDO::FETCH_ASSOC);
+                if ($role) {
+                    $stmtUser = $this->conn->prepare("DELETE FROM tbl_users WHERE email = ? AND role_id = ?");
+                    $stmtUser->execute([$email, $role['role_id']]);
+                }
+            }
+
+            // Delete student (CASCADE will remove tbl_student_guardians, tbl_registration_payments, tbl_student_instruments)
+            $stmtDelete = $this->conn->prepare("DELETE FROM tbl_students WHERE student_id = ?");
+            $stmtDelete->execute([$studentId]);
+
+            $this->conn->commit();
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Registration rejected and removed from the system'
+            ]);
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            // If delete fails (e.g. enrollments exist), fall back to marking as Rejected
+            $stmt = $this->conn->prepare("
+                UPDATE tbl_students
+                SET registration_status = 'Rejected',
+                    status = 'Inactive'
+                WHERE student_id = ?
+            ");
+            $stmt->execute([$studentId]);
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Registration rejected'
+            ]);
+        }
     }
 
     // 💰 Confirm Payment

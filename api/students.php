@@ -17,7 +17,7 @@ class StudentsApi
         $this->conn = $pdo;
     }
 
-    private function sendJSON($data, $status = 200)
+    public function sendJSON($data, $status = 200)
     {
         http_response_code($status);
         echo json_encode($data);
@@ -46,6 +46,39 @@ class StudentsApi
         }
     }
 
+    /** Ensure tbl_student_instruments exists (created during registration) */
+    private function ensureStudentInstrumentsTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_instruments (
+                    student_instrument_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    instrument_id INT NOT NULL,
+                    priority_order INT NOT NULL DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+            // Attempt to add indexes (safe if already exists)
+            try { $this->conn->exec("CREATE INDEX idx_student_instruments_student ON tbl_student_instruments(student_id)"); } catch (PDOException $e) {}
+            try { $this->conn->exec("CREATE INDEX idx_student_instruments_instrument ON tbl_student_instruments(instrument_id)"); } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+            // Do not break API
+        }
+    }
+
+    /** Check whether a table exists in current DB */
+    private function tableExists($tableName)
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     // Get all students for admin_students page
     public function getAllStudents()
     {
@@ -66,6 +99,7 @@ class StudentsApi
                 b.branch_name
             FROM tbl_students s
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+            WHERE s.registration_status != 'Rejected'
             ORDER BY s.created_at DESC
         ");
         $stmt->execute();
@@ -224,7 +258,7 @@ class StudentsApi
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
                 LEFT JOIN tbl_session_packages sp ON s.session_package_id = sp.package_id
-                WHERE s.status = 'Active' AND s.registration_status = 'Fee Paid'
+                WHERE s.status = 'Active' AND s.registration_status IN ('Fee Paid', 'Approved')
             ";
         } else {
             $sql = "
@@ -240,7 +274,7 @@ class StudentsApi
                     b.branch_name
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                WHERE s.status = 'Active' AND s.registration_status = 'Fee Paid'
+                WHERE s.status = 'Active' AND s.registration_status IN ('Fee Paid', 'Approved')
             ";
         }
 
@@ -339,6 +373,134 @@ class StudentsApi
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Student Portal payload:
+     * - profile (tbl_students)
+     * - branch
+     * - session package (if available)
+     * - instruments (tbl_student_instruments -> tbl_instruments + type)
+     * - guardians (primary + all)
+     * - computed balance (registration_fee_amount - registration_fee_paid)
+     */
+    public function getStudentPortal()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $email = trim($_GET['email'] ?? '');
+        if ($email === '') {
+            $this->sendJSON(['error' => 'Email is required'], 400);
+        }
+
+        $this->ensureSessionPackageColumn();
+        $this->ensureStudentInstrumentsTable();
+
+        $hasPackagesTable = $this->tableExists('tbl_session_packages');
+        $hasPackageCol = false;
+        try {
+            $colCheck = $this->conn->query("SHOW COLUMNS FROM tbl_students LIKE 'session_package_id'");
+            $hasPackageCol = $colCheck && $colCheck->rowCount() > 0;
+        } catch (PDOException $e) { /* ignore */ }
+
+        try {
+            if ($hasPackagesTable && $hasPackageCol) {
+                $stmtStudent = $this->conn->prepare("
+                    SELECT
+                        s.*,
+                        b.branch_name,
+                        sp.package_name,
+                        sp.sessions AS package_sessions,
+                        sp.max_instruments AS package_max_instruments,
+                        COALESCE(sp.price, 0) AS package_price
+                    FROM tbl_students s
+                    LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+                    LEFT JOIN tbl_session_packages sp ON s.session_package_id = sp.package_id
+                    WHERE s.email = ?
+                    LIMIT 1
+                ");
+            } else {
+                $stmtStudent = $this->conn->prepare("
+                    SELECT
+                        s.*,
+                        b.branch_name
+                    FROM tbl_students s
+                    LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+                    WHERE s.email = ?
+                    LIMIT 1
+                ");
+            }
+            $stmtStudent->execute([$email]);
+            $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+
+            if (!$student) {
+                $this->sendJSON(['error' => 'Student not found for this email'], 404);
+            }
+
+            // Balance calculation (amount due)
+            $amount = (float) ($student['registration_fee_amount'] ?? 0);
+            $paid = (float) ($student['registration_fee_paid'] ?? 0);
+            $student['balance_due'] = max(0, $amount - $paid);
+
+            // Instruments currently associated with student
+            $instruments = [];
+            try {
+                $stmtInstruments = $this->conn->prepare("
+                    SELECT
+                        si.instrument_id,
+                        si.priority_order,
+                        i.instrument_name,
+                        i.serial_number,
+                        i.`condition`,
+                        i.status,
+                        it.type_name
+                    FROM tbl_student_instruments si
+                    INNER JOIN tbl_instruments i ON si.instrument_id = i.instrument_id
+                    LEFT JOIN tbl_instrument_types it ON i.type_id = it.type_id
+                    WHERE si.student_id = ?
+                    ORDER BY si.priority_order ASC, si.student_instrument_id ASC
+                ");
+                $stmtInstruments->execute([(int) $student['student_id']]);
+                $instruments = $stmtInstruments->fetchAll(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                $instruments = [];
+            }
+
+            // Guardians
+            $guardians = [];
+            $primaryGuardian = null;
+            try {
+                $stmtGuardians = $this->conn->prepare("
+                    SELECT
+                        g.*,
+                        sg.is_primary_guardian
+                    FROM tbl_guardians g
+                    INNER JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
+                    WHERE sg.student_id = ?
+                    ORDER BY (sg.is_primary_guardian = 'Y') DESC, g.guardian_id ASC
+                ");
+                $stmtGuardians->execute([(int) $student['student_id']]);
+                $guardians = $stmtGuardians->fetchAll(PDO::FETCH_ASSOC);
+                if (!empty($guardians)) {
+                    $primaryGuardian = $guardians[0];
+                }
+            } catch (PDOException $e) {
+                $guardians = [];
+                $primaryGuardian = null;
+            }
+
+            $this->sendJSON([
+                'success' => true,
+                'student' => $student,
+                'guardians' => $guardians,
+                'primary_guardian' => $primaryGuardian,
+                'instruments' => $instruments
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
 }
 
 $studentsApi = new StudentsApi($conn);
@@ -367,6 +529,9 @@ switch ($action) {
         break;
     case 'assign-package':
         $studentsApi->assignPackage();
+        break;
+    case 'get-student-portal':
+        $studentsApi->getStudentPortal();
         break;
     default:
         $studentsApi->sendJSON(['error' => 'Invalid action'], 400);

@@ -414,3 +414,94 @@ CREATE INDEX idx_payments_enrollment ON tbl_payments(enrollment_id);
 CREATE INDEX idx_payments_date ON tbl_payments(payment_date);
 CREATE INDEX idx_recitals_date ON tbl_recitals(recital_date);
 CREATE INDEX idx_attendance_session ON tbl_attendance(session_id);
+-- ============================================
+-- SCHEDULING MODULE (FAS MUSIC SCHOOL)
+-- ============================================
+
+-- 1️⃣ ROOMS (Per Branch)
+CREATE TABLE tbl_rooms (
+    room_id INT AUTO_INCREMENT PRIMARY KEY,
+    branch_id INT NOT NULL,
+    room_name VARCHAR(50) NOT NULL,
+    capacity INT DEFAULT 1,
+    room_type ENUM('Private Lesson','Group Room','Recital Hall','Other') DEFAULT 'Private Lesson',
+    status ENUM('Available','Under Maintenance','Inactive') DEFAULT 'Available',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (branch_id) REFERENCES tbl_branches(branch_id),
+    UNIQUE KEY unique_room_per_branch (branch_id, room_name)
+);
+
+-- 2️⃣ TEACHER AVAILABILITY (Weekly Template)
+CREATE TABLE tbl_teacher_availability (
+    availability_id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id INT NOT NULL,
+    branch_id INT NOT NULL,
+    day_of_week ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    status ENUM('Available','Unavailable') DEFAULT 'Available',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (teacher_id) REFERENCES tbl_teachers(teacher_id) ON DELETE CASCADE,
+    FOREIGN KEY (branch_id) REFERENCES tbl_branches(branch_id)
+);
+
+-- 3️⃣ RECURRING SCHEDULE (Auto Weekly Lessons)
+CREATE TABLE tbl_recurring_schedule (
+    recurring_id INT AUTO_INCREMENT PRIMARY KEY,
+    enrollment_id INT NOT NULL,
+    teacher_id INT NOT NULL,
+    room_id INT NOT NULL,
+    day_of_week ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status ENUM('Active','Stopped') DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (enrollment_id) REFERENCES tbl_enrollments(enrollment_id),
+    FOREIGN KEY (teacher_id) REFERENCES tbl_teachers(teacher_id),
+    FOREIGN KEY (room_id) REFERENCES tbl_rooms(room_id)
+);
+
+-- 4️⃣ MASTER SCHEDULE (ACTUAL BOOKINGS / CONFLICT CONTROL)
+CREATE TABLE tbl_schedule (
+    schedule_id INT AUTO_INCREMENT PRIMARY KEY,
+    branch_id INT NOT NULL,
+    teacher_id INT NOT NULL,
+    room_id INT NOT NULL,
+    enrollment_id INT,
+    session_id INT,
+    schedule_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    schedule_type ENUM('Lesson','Makeup','Recital','Blocked','Other') DEFAULT 'Lesson',
+    status ENUM('Scheduled','Completed','Cancelled') DEFAULT 'Scheduled',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (branch_id) REFERENCES tbl_branches(branch_id),
+    FOREIGN KEY (teacher_id) REFERENCES tbl_teachers(teacher_id),
+    FOREIGN KEY (room_id) REFERENCES tbl_rooms(room_id),
+    FOREIGN KEY (enrollment_id) REFERENCES tbl_enrollments(enrollment_id),
+    FOREIGN KEY (session_id) REFERENCES tbl_sessions(session_id)
+);
+
+-- 5️⃣ MODIFY EXISTING SESSIONS TABLE (ADD ROOM SUPPORT)
+ALTER TABLE tbl_sessions
+ADD COLUMN room_id INT,
+ADD FOREIGN KEY (room_id) REFERENCES tbl_rooms(room_id);
+
+-- 6️⃣ PERFORMANCE INDEXES
+CREATE INDEX idx_schedule_teacher_date
+ON tbl_schedule(teacher_id, schedule_date);
+
+CREATE INDEX idx_schedule_room_date
+ON tbl_schedule(room_id, schedule_date);
+
+CREATE INDEX idx_schedule_branch_date
+ON tbl_schedule(branch_id, schedule_date);
+
+CREATE INDEX idx_teacher_availability
+ON tbl_teacher_availability(teacher_id, day_of_week);
+
+-- ============================================
+-- END OF SCHEDULING MODULE
+-- ============================================

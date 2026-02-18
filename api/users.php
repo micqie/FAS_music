@@ -144,41 +144,91 @@ class User
         }
 
         $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid request data'], 400);
+        }
 
-        $isWalkIn = !empty($data['is_walkin']); // admin-added student
-
-        $required = ['student_first_name', 'student_last_name', 'student_email',
-                     'student_phone', 'guardian_first_name', 'guardian_last_name',
-                     'guardian_relationship', 'guardian_phone', 'branch_id'];
-
-        foreach ($required as $field) {
-            if (empty($data[$field])) {
-                $this->sendJSON(['error' => "Field $field is required"], 400);
+        // Normalize string fields (trim)
+        foreach (['student_first_name', 'student_last_name', 'student_email', 'student_phone', 'branch_id',
+                  'guardian_first_name', 'guardian_last_name', 'guardian_relationship', 'guardian_phone'] as $k) {
+            if (isset($data[$k]) && is_string($data[$k])) {
+                $data[$k] = trim($data[$k]);
             }
         }
 
-        // Validate email with strict pattern
-        $email = $data['student_email'] ?? '';
+        // Admin-added student (walk-in/admin panel) should be immediately registered.
+        // Public self-registration from index remains pending.
+        $isWalkIn = filter_var(($data['is_walkin'] ?? false), FILTER_VALIDATE_BOOLEAN);
+        $registrationSource = strtolower(trim((string)($data['registration_source'] ?? '')));
+        $isAdminRegistration = $isWalkIn || in_array($registrationSource, ['admin', 'walkin', 'staff'], true);
+
+        // Base required fields (student only)
+        $required = ['student_first_name', 'student_last_name', 'student_email',
+                     'student_phone', 'branch_id'];
+        $fieldLabels = [
+            'student_first_name' => 'First Name',
+            'student_last_name' => 'Last Name',
+            'student_email' => 'Email',
+            'student_phone' => 'Phone',
+            'branch_id' => 'Branch'
+        ];
+
+        foreach ($required as $field) {
+            $val = $data[$field] ?? '';
+            if ($val === '' || $val === null) {
+                $label = $fieldLabels[$field] ?? $field;
+                $this->sendJSON(['error' => ucfirst($label) . ' is required'], 400);
+            }
+        }
+
+        // Calculate age from date_of_birth for guardian requirement
+        $dateOfBirth = $data['student_date_of_birth'] ?? null;
+        $age = null;
+        if (!empty($dateOfBirth)) {
+            $dob = new DateTime($dateOfBirth);
+            $now = new DateTime();
+            $age = $now->diff($dob)->y;
+        }
+        $isMinor = ($age === null) || ($age < 18); // No DOB or under 18 = require guardian
+
+        // Guardian required only for minors (under 18)
+        if ($isMinor) {
+            $guardianLabels = [
+                'guardian_first_name' => 'Guardian First Name',
+                'guardian_last_name' => 'Guardian Last Name',
+                'guardian_relationship' => 'Guardian Relationship',
+                'guardian_phone' => 'Guardian Phone'
+            ];
+            foreach (['guardian_first_name', 'guardian_last_name', 'guardian_relationship', 'guardian_phone'] as $field) {
+                $val = $data[$field] ?? '';
+                if ($val === '' || $val === null) {
+                    $label = $guardianLabels[$field] ?? $field;
+                    $this->sendJSON(['error' => 'Guardian information is required for students under 18. Please fill in ' . $label . '.'], 400);
+                }
+            }
+        }
+
+        // Validate email
+        $email = trim($data['student_email'] ?? '');
         if (!empty($email)) {
-            $emailPattern = '/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/';
-            if (!preg_match($emailPattern, $email)) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $this->sendJSON(['error' => 'Invalid email address format'], 400);
             }
             if (strlen($email) > 254) {
                 $this->sendJSON(['error' => 'Email address is too long (max 254 characters)'], 400);
             }
-            // Check if email already exists
-            $emailCheck = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE email = ? LIMIT 1");
-            $emailCheck->execute([$email]);
-            if ($emailCheck->fetch()) {
-                $this->sendJSON(['error' => 'Email address is already registered'], 400);
+            // Check if email or username already exists (email is used as username)
+            $dupCheck = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
+            $dupCheck->execute([$email, $email]);
+            if ($dupCheck->fetch()) {
+                $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
             }
         }
 
         // Determine password:
         // - Admin-added (walk-in): default simple password "123" (no strict validation)
         // - Self-registration: strong password policy
-        if ($isWalkIn) {
+        if ($isAdminRegistration) {
             $password = '123';
         } else {
             if (empty($data['password'])) {
@@ -231,13 +281,16 @@ class User
                 // Table might not exist or error checking
             }
 
+            $regStatus = $isAdminRegistration ? 'Approved' : 'Pending';
+            $studentStatus = $isAdminRegistration ? 'Active' : 'Inactive';
+
             if ($hasSessionPackageCol) {
                 $stmtStudent = $this->conn->prepare("
                     INSERT INTO tbl_students (
                         branch_id, first_name, last_name, middle_name, date_of_birth,
                         age, phone, email, address, school, grade_year, health_diagnosis,
                         registration_fee_amount, session_package_id, registration_status, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Inactive')
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmtStudent->execute([
                     $data['branch_id'],
@@ -245,7 +298,7 @@ class User
                     $data['student_last_name'],
                     $data['student_middle_name'] ?? null,
                     $data['student_date_of_birth'] ?? null,
-                    $data['student_age'] ?? null,
+                    $age ?? $data['student_age'] ?? null,
                     $data['student_phone'],
                     $data['student_email'],
                     $data['student_address'] ?? null,
@@ -253,7 +306,9 @@ class User
                     $data['student_grade_year'] ?? null,
                     $data['student_health_diagnosis'] ?? null,
                     $data['registration_fee_amount'],
-                    $data['session_package_id'] ?? null
+                    $data['session_package_id'] ?? null,
+                    $regStatus,
+                    $studentStatus
                 ]);
             } else {
                 // Fallback if column doesn't exist
@@ -262,7 +317,7 @@ class User
                         branch_id, first_name, last_name, middle_name, date_of_birth,
                         age, phone, email, address, school, grade_year, health_diagnosis,
                         registration_fee_amount, registration_status, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Inactive')
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmtStudent->execute([
                     $data['branch_id'],
@@ -270,48 +325,56 @@ class User
                     $data['student_last_name'],
                     $data['student_middle_name'] ?? null,
                     $data['student_date_of_birth'] ?? null,
-                    $data['student_age'] ?? null,
+                    $age ?? $data['student_age'] ?? null,
                     $data['student_phone'],
                     $data['student_email'],
                     $data['student_address'] ?? null,
                     $data['student_school'] ?? null,
                     $data['student_grade_year'] ?? null,
                     $data['student_health_diagnosis'] ?? null,
-                    $data['registration_fee_amount']
+                    $data['registration_fee_amount'],
+                    $regStatus,
+                    $studentStatus
                 ]);
             }
 
             $studentId = $this->conn->lastInsertId();
 
-            // Insert Guardian
-            $stmtGuardian = $this->conn->prepare("
-                INSERT INTO tbl_guardians (
-                    first_name, last_name, relationship_type, phone,
-                    occupation, email, address, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
-            ");
-            $stmtGuardian->execute([
-                $data['guardian_first_name'],
-                $data['guardian_last_name'],
-                $data['guardian_relationship'],
-                $data['guardian_phone'],
-                $data['guardian_occupation'] ?? null,
-                $data['guardian_email'] ?? null,
-                $data['guardian_address'] ?? null
-            ]);
+            // Insert Guardian and link only when guardian info is provided (required for minors, optional for 18+)
+            $guardianId = null;
+            $hasGuardianData = !empty($data['guardian_first_name']) && !empty($data['guardian_last_name'])
+                && !empty($data['guardian_relationship']) && !empty($data['guardian_phone']);
 
-            $guardianId = $this->conn->lastInsertId();
+            if ($hasGuardianData) {
+                $stmtGuardian = $this->conn->prepare("
+                    INSERT INTO tbl_guardians (
+                        first_name, last_name, relationship_type, phone,
+                        occupation, email, address, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
+                ");
+                $stmtGuardian->execute([
+                    $data['guardian_first_name'],
+                    $data['guardian_last_name'],
+                    $data['guardian_relationship'],
+                    $data['guardian_phone'],
+                    $data['guardian_occupation'] ?? null,
+                    $data['guardian_email'] ?? null,
+                    $data['guardian_address'] ?? null
+                ]);
+                $guardianId = $this->conn->lastInsertId();
 
-            // Link Student and Guardian
-            $stmtLink = $this->conn->prepare("
-                INSERT INTO tbl_student_guardians (
-                    student_id, guardian_id, is_primary_guardian,
-                    can_enroll, can_pay, emergency_contact
-                ) VALUES (?, ?, 'Y', 'Y', 'Y', 'Y')
-            ");
-            $stmtLink->execute([$studentId, $guardianId]);
+                // Link Student and Guardian
+                $stmtLink = $this->conn->prepare("
+                    INSERT INTO tbl_student_guardians (
+                        student_id, guardian_id, is_primary_guardian,
+                        can_enroll, can_pay, emergency_contact
+                    ) VALUES (?, ?, 'Y', 'Y', 'Y', 'Y')
+                ");
+                $stmtLink->execute([$studentId, $guardianId]);
+            }
 
-            // Create user account (status will be Inactive until admin approves)
+            // Create user account (Active for walk-in/admin, Inactive for self-registration until admin approves)
+            $userStatus = $isAdminRegistration ? 'Active' : 'Inactive';
             $username = $data['username'] ?? $data['student_email'];
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
@@ -319,7 +382,7 @@ class User
                 INSERT INTO tbl_users (
                     username, password, role_id, first_name, last_name,
                     email, phone, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Inactive')
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmtUser->execute([
                 $username,
@@ -328,7 +391,8 @@ class User
                 $data['student_first_name'],
                 $data['student_last_name'],
                 $data['student_email'],
-                $data['student_phone']
+                $data['student_phone'],
+                $userStatus
             ]);
 
             $userId = $this->conn->lastInsertId();
@@ -348,16 +412,25 @@ class User
 
             $this->sendJSON([
                 'success' => true,
-                'message' => 'Registration submitted successfully. Your account is pending admin approval.',
+                'message' => $isAdminRegistration
+                    ? 'Student registered successfully. Account is active and can log in immediately.'
+                    : 'Registration submitted successfully. Your account is pending admin approval.',
                 'student_id' => $studentId,
                 'guardian_id' => $guardianId,
                 'user_id' => $userId,
                 'username' => $username,
-                'registration_status' => 'Pending',
+                'registration_status' => $regStatus,
                 'registration_fee_amount' => $data['registration_fee_amount'],
-                'account_status' => 'Inactive - Pending Admin Approval'
+                'account_status' => $isAdminRegistration ? 'Active - Can log in' : 'Inactive - Pending Admin Approval'
             ]);
 
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            // User-friendly message for duplicate email/username
+            if ($e->getCode() == 23000 && (strpos($e->getMessage(), 'Duplicate entry') !== false || strpos($e->getMessage(), 'username') !== false || strpos($e->getMessage(), 'email') !== false)) {
+                $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
+            }
+            $this->sendJSON(['error' => 'Registration failed: ' . $e->getMessage()], 500);
         } catch (Exception $e) {
             $this->conn->rollBack();
             $this->sendJSON(['error' => 'Registration failed: ' . $e->getMessage()], 500);

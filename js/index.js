@@ -71,7 +71,11 @@ const Auth = {
         } catch (e) {
             // Storage access blocked - continue anyway
         }
-        window.location.href = '../index.html';
+        // Redirect to app root index from any nested page
+        const appBase = (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+            ? baseApiUrl.slice(0, -4)
+            : `${window.location.origin}/FAS_music`;
+        window.location.href = `${appBase}/index.html`;
     },
 
     // Check if user is authenticated
@@ -367,6 +371,8 @@ function initLoginForm() {
                 setTimeout(() => {
                     if (data.user.role_name === 'Admin' || data.user.role_name === 'SuperAdmin') {
                         window.location.href = 'pages/admin/admin_dashboard.html';
+                    } else if (data.user.role_name === 'Student') {
+                        window.location.href = 'pages/student/student_dashboard.html';
                     } else {
                         window.location.href = 'index.html';
                     }
@@ -465,15 +471,21 @@ function initRegisterForm() {
     registerForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        // Prevent double submit
+        if (registerForm.dataset.submitting === '1') return;
+        registerForm.dataset.submitting = '1';
+
         // Validate password policy
         if (!validatePassword()) {
             showRegisterMessage('Please ensure your password meets all requirements.', 'error');
+            registerForm.dataset.submitting = '0';
             return;
         }
 
         // Validate password match
         if (!validatePasswordMatch()) {
             showRegisterMessage('Passwords do not match. Please try again.', 'error');
+            registerForm.dataset.submitting = '0';
             return;
         }
 
@@ -482,6 +494,7 @@ function initRegisterForm() {
         if (emailInput && !validateEmail(emailInput)) {
             showRegisterMessage('Please enter a valid email address.', 'error');
             emailInput.focus();
+            registerForm.dataset.submitting = '0';
             return;
         }
 
@@ -518,22 +531,26 @@ function initRegisterForm() {
         const sessionPackageId = data['session_package_id'];
         if (!sessionPackageId) {
             showRegisterMessage('Please select a session package.', 'error');
+            registerForm.dataset.submitting = '0';
             return;
         }
 
         if (selectedInstruments.length === 0) {
             showRegisterMessage('Please select at least one instrument.', 'error');
+            registerForm.dataset.submitting = '0';
             return;
         }
 
         // Validate payment type
         if (!data['payment_type']) {
             showRegisterMessage('Please select a payment type.', 'error');
+            registerForm.dataset.submitting = '0';
             return;
         }
 
         // Add instruments to data
         data['instruments'] = selectedInstruments;
+        data['registration_source'] = 'public';
         
         // Calculate and set registration fee amount
         const totalFee = calculateTotalFee();
@@ -569,9 +586,19 @@ function initRegisterForm() {
                 body: JSON.stringify(data)
             });
 
-            const result = await response.json();
+            const responseText = await response.text();
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (parseErr) {
+                console.error('Registration 400 - Response was not JSON:', responseText);
+                showRegisterMessage('Registration failed. The server returned an invalid response. Check the browser console (F12) for details.', 'error');
+                registerForm.dataset.submitting = '0';
+                return;
+            }
 
             if (result.success) {
+                registerForm.dataset.submitting = '0';
                 showRegisterMessage(result.message || 'Registration submitted successfully! Your account is pending admin approval.', 'success');
                 registerForm.reset();
 
@@ -604,17 +631,15 @@ function initRegisterForm() {
                     confirmButtonColor: '#b8860b'
                 });
             } else {
-                showRegisterMessage(result.error || 'Registration failed. Please try again.', 'error');
-                if (registerBtn) registerBtn.disabled = false;
-                if (registerBtnText) registerBtnText.textContent = 'Submit Registration';
-                if (registerBtnIcon) {
-                    registerBtnIcon.classList.remove('fa-spinner', 'fa-spin');
-                    registerBtnIcon.classList.add('fa-paper-plane');
-                }
+                const errMsg = result.error || 'Registration failed. Please try again.';
+                console.error('Registration failed (400):', errMsg, result);
+                showRegisterMessage(errMsg, 'error');
             }
         } catch (error) {
             console.error('Registration error:', error);
             showRegisterMessage('An error occurred. Please try again.', 'error');
+        } finally {
+            registerForm.dataset.submitting = '0';
             if (registerBtn) registerBtn.disabled = false;
             if (registerBtnText) registerBtnText.textContent = 'Submit Registration';
             if (registerBtnIcon) {
@@ -1189,9 +1214,325 @@ function checkAuth() {
             confirmButtonColor: '#b8860b',
             confirmButtonText: 'Go to Login'
         }).then(() => {
-            window.location.href = '../index.html';
+            const appBase = (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+                ? baseApiUrl.slice(0, -4)
+                : `${window.location.origin}/FAS_music`;
+            window.location.href = `${appBase}/index.html`;
         });
     }
+}
+
+// ========== STUDENT PAGE FUNCTIONS ==========
+
+function checkStudentAuth() {
+    const user = Auth.getUser();
+    if (!user || user.role_name !== 'Student') {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Access Denied',
+            text: 'You must be logged in as a Student to access this page.',
+            confirmButtonColor: '#b8860b',
+            confirmButtonText: 'Go to Login'
+        }).then(() => {
+            const appBase = (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+                ? baseApiUrl.slice(0, -4)
+                : `${window.location.origin}/FAS_music`;
+            window.location.href = `${appBase}/index.html`;
+        });
+        return false;
+    }
+    return true;
+}
+
+async function fetchStudentPortalDataByEmail(email) {
+    const url = `${baseApiUrl}/students.php?action=get-student-portal&email=${encodeURIComponent(email)}`;
+    const res = await fetch(url);
+    return res.json();
+}
+
+async function fetchAttendanceSummary(studentId) {
+    const url = `${baseApiUrl}/attendance.php?action=get-summary&student_id=${encodeURIComponent(studentId)}`;
+    const res = await fetch(url);
+    return res.json();
+}
+
+async function fetchAttendanceList(studentId, limit = 50) {
+    const url = `${baseApiUrl}/attendance.php?action=get-student-attendance&student_id=${encodeURIComponent(studentId)}&limit=${encodeURIComponent(limit)}`;
+    const res = await fetch(url);
+    return res.json();
+}
+
+function formatCurrencyPHP(amount) {
+    const n = Number(amount || 0);
+    return `₱${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value ?? '';
+}
+
+function setHtml(id, html) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+}
+
+function badgeClassForRegistrationStatus(status) {
+    switch (String(status || '')) {
+        case 'Approved': return 'bg-blue-500/15 text-blue-400 border border-blue-500/25';
+        case 'Fee Paid': return 'bg-green-500/15 text-green-400 border border-green-500/25';
+        case 'Pending': return 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/25';
+        case 'Rejected': return 'bg-red-500/15 text-red-400 border border-red-500/25';
+        default: return 'bg-zinc-500/15 text-zinc-300 border border-zinc-500/25';
+    }
+}
+
+function renderInstrumentChips(instruments) {
+    if (!Array.isArray(instruments) || instruments.length === 0) {
+        return `<div class="text-sm text-zinc-400 italic">No instruments assigned yet.</div>`;
+    }
+    return instruments.map(inst => {
+        const name = escapeHtml(inst.instrument_name || 'Instrument');
+        const type = escapeHtml(inst.type_name || '');
+        const meta = type ? `<span class="text-[10px] text-zinc-400 ml-2">(${type})</span>` : '';
+        return `<div class="inline-flex items-center px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white">
+            <i class="fas fa-music mr-2 text-gold-400"></i>${name}${meta}
+        </div>`;
+    }).join('');
+}
+
+function buildStudentQrPayload(student) {
+    // Simple stable payload for QR scanning (can be extended to signed tokens later)
+    const sid = student?.student_id ?? '';
+    const email = student?.email ?? '';
+    return `FAS_ATTENDANCE|STUDENT|${sid}|${email}`;
+}
+
+function renderQrCode(targetElId, payload) {
+    const target = document.getElementById(targetElId);
+    if (!target) return;
+    target.innerHTML = '';
+    if (!payload) {
+        target.innerHTML = '<div class="text-sm text-zinc-400">QR data unavailable.</div>';
+        return;
+    }
+    if (typeof QRCode === 'undefined') {
+        target.innerHTML = '<div class="text-sm text-zinc-400">QR library not loaded.</div>';
+        return;
+    }
+    // QRCode.js expects a DOM element
+    // eslint-disable-next-line no-new
+    new QRCode(target, {
+        text: payload,
+        width: 200,
+        height: 200,
+        colorDark: '#d4af37',
+        colorLight: '#0f1115',
+        correctLevel: QRCode.CorrectLevel.M
+    });
+}
+
+async function initStudentDashboardPage() {
+    if (!checkStudentAuth()) return;
+    const user = Auth.getUser();
+    if (!user?.email) {
+        showMessage('Your account email is missing. Please contact admin.', 'error');
+        return;
+    }
+
+    setText('studentNavName', user.username || user.email || 'Student');
+
+    const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (!portal.success) {
+        showMessage(portal.error || 'Failed to load your profile.', 'error');
+        return;
+    }
+
+    const s = portal.student;
+    setText('studentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
+    setText('studentBranch', s.branch_name || '—');
+    setHtml('studentStatusBadge', `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(s.registration_status)}">${escapeHtml(s.registration_status || '—')}</span>`);
+
+    setText('balanceDue', formatCurrencyPHP(s.balance_due));
+    setText('amountPaid', formatCurrencyPHP(s.registration_fee_paid || 0));
+    setText('amountTotal', formatCurrencyPHP(s.registration_fee_amount || 0));
+
+    // Package
+    setText('packageName', s.package_name || 'Not assigned yet');
+    setText('packageSessions', s.package_sessions ? `${s.package_sessions} sessions` : '—');
+    setText('packageMaxInstruments', s.package_max_instruments ? `${s.package_max_instruments} instrument(s)` : '—');
+
+    // Instruments
+    setHtml('instrumentChips', renderInstrumentChips(portal.instruments));
+
+    // Attendance summary (optional)
+    const summaryRes = await fetchAttendanceSummary(s.student_id);
+    if (summaryRes.success) {
+        const attended = summaryRes.summary?.present_count ?? 0;
+        setText('sessionsAttended', String(attended));
+        const total = Number(s.package_sessions || 0);
+        const remaining = total > 0 ? Math.max(0, total - attended) : 0;
+        setText('sessionsRemaining', total > 0 ? String(remaining) : '—');
+        setText('lastAttended', summaryRes.summary?.last_attended_at ? new Date(summaryRes.summary.last_attended_at).toLocaleString() : '—');
+    } else {
+        setText('sessionsAttended', '0');
+        setText('sessionsRemaining', '—');
+        setText('lastAttended', '—');
+    }
+
+    // QR code
+    const payload = buildStudentQrPayload(s);
+    setText('qrPayloadText', payload);
+    renderQrCode('qrCodeBox', payload);
+}
+
+async function initStudentQrPage() {
+    if (!checkStudentAuth()) return;
+    const user = Auth.getUser();
+    setText('studentNavName', user.username || user.email || 'Student');
+
+    const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (!portal.success) {
+        showMessage(portal.error || 'Failed to load your QR code.', 'error');
+        return;
+    }
+    const s = portal.student;
+    setText('studentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
+    setText('studentEmail', s.email || '—');
+
+    const payload = buildStudentQrPayload(s);
+    setText('qrPayloadText', payload);
+    renderQrCode('qrCodeBox', payload);
+}
+
+async function initStudentSessionsPage() {
+    if (!checkStudentAuth()) return;
+    const user = Auth.getUser();
+    setText('studentNavName', user.username || user.email || 'Student');
+
+    const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (!portal.success) {
+        showMessage(portal.error || 'Failed to load sessions.', 'error');
+        return;
+    }
+    const s = portal.student;
+    setText('packageName', s.package_name || 'Not assigned yet');
+    setText('packageSessions', s.package_sessions ? `${s.package_sessions} sessions included` : '—');
+
+    const listRes = await fetchAttendanceList(s.student_id, 100);
+    if (!listRes.success) {
+        setHtml('attendanceTableBody', `
+            <tr>
+                <td colspan="4" class="px-6 py-8 text-center text-zinc-400">Failed to load attendance records.</td>
+            </tr>
+        `);
+        return;
+    }
+
+    const rows = Array.isArray(listRes.attendance) ? listRes.attendance : [];
+    if (rows.length === 0) {
+        setHtml('attendanceTableBody', `
+            <tr>
+                <td colspan="4" class="px-6 py-10 text-center text-zinc-400">
+                    <i class="fas fa-calendar-minus text-2xl mb-2"></i>
+                    <div class="font-semibold">No attendance records yet</div>
+                    <div class="text-xs text-zinc-500 mt-1">Your sessions will appear here once attendance is recorded.</div>
+                </td>
+            </tr>
+        `);
+        return;
+    }
+
+    setHtml('attendanceTableBody', rows.map(r => {
+        const dt = r.attended_at ? new Date(r.attended_at).toLocaleString() : '—';
+        const status = escapeHtml(r.status || 'Present');
+        const source = escapeHtml(r.source || '—');
+        const notes = escapeHtml(r.notes || '');
+        return `
+            <tr class="border-t border-white/10 hover:bg-white/5 transition">
+                <td class="px-6 py-4 text-sm text-white">${dt}</td>
+                <td class="px-6 py-4 text-sm text-zinc-200">${status}</td>
+                <td class="px-6 py-4 text-sm text-zinc-300">${source}</td>
+                <td class="px-6 py-4 text-sm text-zinc-400">${notes}</td>
+            </tr>
+        `;
+    }).join(''));
+}
+
+async function initStudentProfilePage() {
+    if (!checkStudentAuth()) return;
+    const user = Auth.getUser();
+    setText('studentNavName', user.username || user.email || 'Student');
+
+    const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (!portal.success) {
+        showMessage(portal.error || 'Failed to load profile.', 'error');
+        return;
+    }
+
+    const s = portal.student;
+    setText('profileStudentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
+    setText('profileBranch', s.branch_name || '—');
+
+    const form = document.getElementById('profileForm');
+    if (!form) return;
+
+    // Fill fields
+    form.student_id.value = s.student_id || '';
+    form.first_name.value = s.first_name || '';
+    form.last_name.value = s.last_name || '';
+    form.middle_name.value = s.middle_name || '';
+    form.email.value = s.email || '';
+    form.phone.value = s.phone || '';
+    form.address.value = s.address || '';
+    form.grade_year.value = s.grade_year || '';
+    form.branch_id.value = s.branch_id || '';
+
+    // Primary guardian (read-only display)
+    const g = portal.primary_guardian;
+    if (g) {
+        setText('guardianName', `${g.first_name || ''} ${g.last_name || ''}`.trim());
+        setText('guardianPhone', g.phone || '—');
+        setText('guardianRelationship', g.relationship_type || '—');
+    } else {
+        setText('guardianName', '—');
+        setText('guardianPhone', '—');
+        setText('guardianRelationship', '—');
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const payload = {
+            action: 'update-student',
+            student_id: parseInt(form.student_id.value, 10),
+            first_name: form.first_name.value.trim(),
+            last_name: form.last_name.value.trim(),
+            middle_name: form.middle_name.value.trim(),
+            email: form.email.value.trim(),
+            phone: form.phone.value.trim(),
+            address: form.address.value.trim(),
+            grade_year: form.grade_year.value.trim(),
+            branch_id: parseInt(form.branch_id.value, 10)
+        };
+
+        try {
+            const res = await fetch(`${baseApiUrl}/students.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                showMessage('Profile updated successfully.', 'success');
+            } else {
+                showMessage(data.error || 'Failed to update profile.', 'error');
+            }
+        } catch (err) {
+            console.error('Profile update error:', err);
+            showMessage('Network error. Please try again.', 'error');
+        }
+    });
 }
 
 // Logout
@@ -1225,52 +1566,380 @@ async function loadWalkinBranches() {
     }
 }
 
-// Initialize walk-in admin page
+// ===== Walk-in (Admin) registration – rich form mirroring public registration =====
+
+let walkinSessionPackages = [];
+let walkinAvailableInstruments = [];
+
+// Load session packages into admin walk-in form
+async function loadWalkinSessionPackages() {
+    const select = document.getElementById('walkin_sessionPackage');
+    if (!select) return;
+
+    try {
+        const response = await fetch(`${baseApiUrl}/sessions.php?action=get-packages`);
+        const data = await response.json();
+
+        if (data.success && data.packages) {
+            walkinSessionPackages = data.packages;
+            select.innerHTML = '<option value="">Select Package</option>';
+            data.packages.forEach(pkg => {
+                const option = document.createElement('option');
+                option.value = pkg.package_id;
+                option.textContent = `${pkg.package_name} (${pkg.sessions} sessions, ${pkg.max_instruments} instrument${pkg.max_instruments > 1 ? 's' : ''})`;
+                option.setAttribute('data-sessions', pkg.sessions);
+                option.setAttribute('data-max-instruments', pkg.max_instruments);
+                option.setAttribute('data-price', (pkg.price != null && !isNaN(pkg.price)) ? String(pkg.price) : '0');
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load walk-in session packages:', error);
+        // Fallback to same defaults as public registration
+        walkinSessionPackages = [
+            { package_id: 1, sessions: 12, max_instruments: 1, price: 7450 },
+            { package_id: 2, sessions: 20, max_instruments: 2, price: 11800 }
+        ];
+        select.innerHTML = `
+            <option value="">Select Package</option>
+            <option value="1" data-sessions="12" data-max-instruments="1" data-price="7450">Basic (12 Sessions, 1 instrument)</option>
+            <option value="2" data-sessions="20" data-max-instruments="2" data-price="11800">Standard (20 Sessions, 2 instruments)</option>
+        `;
+    }
+}
+
+// Load instruments for walk-in registration (per-branch)
+async function loadWalkinInstruments(branchId) {
+    const container = document.getElementById('walkin_instrumentsContainer');
+    if (!branchId) {
+        if (container) {
+            container.textContent = 'Select a branch and session package first';
+        }
+        walkinAvailableInstruments = [];
+        return;
+    }
+
+    try {
+        const response = await fetch(`${baseApiUrl}/instruments.php?action=get-instruments&branch_id=${branchId}`);
+        const data = await response.json();
+
+        if (data.success && data.instruments) {
+            walkinAvailableInstruments = data.instruments;
+            updateWalkinInstrumentSelection();
+        } else if (container) {
+            container.innerHTML = '<p class="text-sm text-red-400">No instruments available for this branch</p>';
+        }
+    } catch (error) {
+        console.error('Failed to load walk-in instruments:', error);
+        if (container) {
+            container.innerHTML = '<p class="text-sm text-red-400">Failed to load instruments</p>';
+        }
+    }
+}
+
+// Helpers for walk-in instrument UI
+function walkinGetAvailableTypes() {
+    const seen = new Set();
+    const types = [];
+    walkinAvailableInstruments.forEach(inst => {
+        const id = inst.type_id;
+        const name = inst.type_name || 'Other';
+        if (id != null && !seen.has(id)) {
+            seen.add(id);
+            types.push({ type_id: id, type_name: name });
+        }
+    });
+    return types.sort((a, b) => (a.type_name || '').localeCompare(b.type_name || ''));
+}
+
+function walkinGetInstrumentsByType(typeId) {
+    if (!typeId) return [];
+    return walkinAvailableInstruments.filter(inst => inst.type_id == typeId);
+}
+
+// Build instrument selectors for walk-in form
+function updateWalkinInstrumentSelection() {
+    const container = document.getElementById('walkin_instrumentsContainer');
+    if (!container) return;
+
+    const sessionPackageSelect = document.getElementById('walkin_sessionPackage');
+    if (!sessionPackageSelect || !sessionPackageSelect.value) {
+        container.textContent = 'Select a branch and session package first';
+        return;
+    }
+
+    if (walkinAvailableInstruments.length === 0) {
+        container.textContent = 'Select a branch to see available instruments';
+        return;
+    }
+
+    const selectedOption = sessionPackageSelect.options[sessionPackageSelect.selectedIndex];
+    const maxInstruments = parseInt(selectedOption.getAttribute('data-max-instruments') || '1', 10);
+
+    const types = walkinGetAvailableTypes();
+    const typeOptionsHtml = types.map(t =>
+        `<option value="${t.type_id}">${escapeHtml(t.type_name)}</option>`
+    ).join('');
+
+    let html = '';
+    for (let i = 1; i <= maxInstruments; i++) {
+        const slotLabel = maxInstruments === 1 ? 'Instrument' : `Instrument ${i}`;
+        html += `
+            <div class="p-3 bg-zinc-900/60 rounded-lg border border-zinc-700 space-y-2">
+                <label class="block text-sm font-medium text-zinc-200">${slotLabel} *</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Type</label>
+                        <select class="walkin-instrument-type-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onWalkinInstrumentTypeChange(${i})">
+                            <option value="">Select type...</option>
+                            ${typeOptionsHtml}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Instrument</label>
+                        <select name="instruments[]" class="walkin-instrument-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onWalkinInstrumentDropdownChange()">
+                            <option value="">Select instrument...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+// Global handlers for instrument dropdowns (used in HTML onchange attributes)
+function onWalkinInstrumentTypeChange(slot) {
+    const typeSelect = document.querySelector(`select.walkin-instrument-type-select[data-slot="${slot}"]`);
+    const instrumentSelect = document.querySelector(`select.walkin-instrument-select[data-slot="${slot}"]`);
+    if (!typeSelect || !instrumentSelect) return;
+
+    const typeId = typeSelect.value;
+    instrumentSelect.innerHTML = '<option value="">Select instrument...</option>';
+    instrumentSelect.value = '';
+
+    if (typeId) {
+        const instruments = walkinGetInstrumentsByType(typeId);
+        instruments.forEach(inst => {
+            const opt = document.createElement('option');
+            opt.value = inst.instrument_id;
+            opt.textContent = inst.instrument_name || 'Instrument';
+            instrumentSelect.appendChild(opt);
+        });
+    }
+    onWalkinInstrumentDropdownChange();
+}
+
+function onWalkinInstrumentDropdownChange() {
+    const selects = document.querySelectorAll('select.walkin-instrument-select');
+    const used = new Set();
+    selects.forEach(select => {
+        const val = select.value;
+        if (val) used.add(val);
+    });
+    selects.forEach(select => {
+        const currentVal = select.value;
+        Array.from(select.options).forEach(opt => {
+            if (opt.value === '') return;
+            const othersUsed = used.has(opt.value) && opt.value !== currentVal;
+            opt.disabled = othersUsed;
+        });
+    });
+    calculateWalkinTotalFee();
+}
+
+// Calculate total fee for walk-in admin registration (mirrors public logic)
+function calculateWalkinTotalFee() {
+    const registrationFee = 1000;
+    const sessionPackageSelect = document.getElementById('walkin_sessionPackage');
+    const paymentTypeSelect = document.getElementById('walkin_paymentType');
+
+    const sessionFeeEl = document.getElementById('walkin_sessionFeeDisplay');
+    const totalEl = document.getElementById('walkin_totalAmountDisplay');
+    const feeInput = document.getElementById('walkin_registration_fee_amount');
+
+    if (!sessionPackageSelect || !sessionPackageSelect.value || !paymentTypeSelect || !paymentTypeSelect.value) {
+        if (sessionFeeEl) sessionFeeEl.textContent = '₱0.00';
+        if (totalEl) totalEl.textContent = `₱${registrationFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        if (feeInput) feeInput.value = registrationFee;
+        return registrationFee;
+    }
+
+    const selectedOption = sessionPackageSelect.options[sessionPackageSelect.selectedIndex];
+    const sessions = parseInt(selectedOption.getAttribute('data-sessions') || '0', 10);
+    const paymentType = paymentTypeSelect.value;
+    const basePrice = parseFloat(selectedOption.getAttribute('data-price') || '0');
+
+    // Check if saxophone selected
+    const selectedInstruments = Array.from(document.querySelectorAll('#walkin_instrumentsContainer select[name="instruments[]"]'))
+        .map(sel => sel.value ? parseInt(sel.value, 10) : 0)
+        .filter(id => id > 0);
+    const hasSaxophone = selectedInstruments.some(id => {
+        const instrument = walkinAvailableInstruments.find(inst => inst.instrument_id === id);
+        return instrument && (instrument.instrument_name.toLowerCase().includes('saxophone') ||
+                             instrument.type_name?.toLowerCase().includes('saxophone'));
+    });
+
+    let sessionFee = 0;
+    if (basePrice > 0) {
+        if (paymentType === 'downpayment') {
+            const downpaymentRatio = sessions === 12 ? (3000 / 7450) : (sessions === 20 ? (5000 / 11800) : 0.42);
+            sessionFee = Math.round(basePrice * downpaymentRatio);
+        } else if (paymentType === 'fullpayment') {
+            if (hasSaxophone) {
+                const saxophoneMultiplier = sessions === 12 ? (8100 / 7450) : (sessions === 20 ? (13000 / 11800) : 1.09);
+                sessionFee = Math.round(basePrice * saxophoneMultiplier);
+            } else {
+                sessionFee = basePrice;
+            }
+        }
+    } else {
+        if (paymentType === 'downpayment') {
+            if (sessions === 12) sessionFee = 3000;
+            else if (sessions === 20) sessionFee = 5000;
+        } else if (paymentType === 'fullpayment') {
+            if (hasSaxophone) {
+                if (sessions === 12) sessionFee = 8100;
+                else if (sessions === 20) sessionFee = 13000;
+            } else {
+                if (sessions === 12) sessionFee = 7450;
+                else if (sessions === 20) sessionFee = 11800;
+            }
+        }
+    }
+
+    const total = registrationFee + sessionFee;
+
+    if (sessionFeeEl) sessionFeeEl.textContent = `₱${sessionFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (totalEl) totalEl.textContent = `₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (feeInput) feeInput.value = total;
+
+    return total;
+}
+
+// Calculate age from date string (YYYY-MM-DD)
+function calculateAgeFromBirthdate(dateStr) {
+    if (!dateStr) return null;
+    const dob = new Date(dateStr);
+    if (isNaN(dob.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - dob.getFullYear();
+    const m = now.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+    return age;
+}
+
+// Update age display and guardian required state for walk-in form
+function updateWalkinAgeAndGuardianRequired() {
+    const dobInput = document.getElementById('walkin_student_dob');
+    const ageDisplay = document.getElementById('walkin_student_age_display');
+    const guardianFields = document.querySelectorAll('.guardian-field');
+    const guardianLabels = document.querySelectorAll('.guardian-label');
+    const badge = document.getElementById('guardian_required_badge');
+
+    if (!dobInput || !ageDisplay) return;
+
+    const age = calculateAgeFromBirthdate(dobInput.value);
+    const isMinor = age === null || age < 18;
+
+    if (age !== null) {
+        ageDisplay.textContent = age + ' years old';
+    } else {
+        ageDisplay.textContent = '— Select date of birth —';
+    }
+
+    if (badge) badge.classList.toggle('hidden', !isMinor);
+
+    guardianFields.forEach(el => {
+        if (isMinor) {
+            el.setAttribute('required', 'required');
+        } else {
+            el.removeAttribute('required');
+        }
+    });
+
+    guardianLabels.forEach(el => {
+        const text = el.textContent.replace(/\s*\*\s*$/, '').trim();
+        el.textContent = text + (isMinor ? ' *' : '');
+    });
+}
+
+// Initialize walk-in admin page (used on admin_registration.html)
 function initWalkinPage() {
     const form = document.getElementById('walkinForm');
-    const modal = document.getElementById('addStudentModal');
-    const openBtn = document.getElementById('openAddStudentModalBtn');
-    const closeBtn = document.getElementById('closeAddStudentModalBtn');
-    const cancelBtn = document.getElementById('cancelAddStudentBtn');
+    if (!form) return;
 
-    if (!form || !modal) return;
-
-    // Helpers to toggle modal
-    const openModal = () => {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-    };
-    const closeModal = () => {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        form.reset();
-        const msgDiv = document.getElementById('walkinMessage');
-        if (msgDiv) msgDiv.classList.add('hidden');
-    };
-
-    if (openBtn) openBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        openModal();
-    });
-    if (closeBtn) closeBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        closeModal();
-    });
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        closeModal();
-    });
-
+    // Seed dropdowns
     loadWalkinBranches();
-    loadStudentsForAdmin();
+    loadWalkinSessionPackages();
+
+    const branchSelect = document.getElementById('walkin_branch_id');
+    const sessionPackageSelect = document.getElementById('walkin_sessionPackage');
+    const paymentTypeSelect = document.getElementById('walkin_paymentType');
+    const dobInput = document.getElementById('walkin_student_dob');
+
+    if (dobInput) {
+        dobInput.addEventListener('change', updateWalkinAgeAndGuardianRequired);
+        dobInput.addEventListener('input', updateWalkinAgeAndGuardianRequired);
+        // Initial state (e.g. if form is pre-filled)
+        updateWalkinAgeAndGuardianRequired();
+    }
+
+    if (branchSelect) {
+        branchSelect.addEventListener('change', function () {
+            loadWalkinInstruments(this.value);
+        });
+    }
+    if (sessionPackageSelect) {
+        sessionPackageSelect.addEventListener('change', function () {
+            updateWalkinInstrumentSelection();
+            calculateWalkinTotalFee();
+        });
+    }
+    if (paymentTypeSelect) {
+        paymentTypeSelect.addEventListener('change', function () {
+            calculateWalkinTotalFee();
+        });
+    }
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const btn = document.getElementById('walkinSubmitBtn');
         const btnText = document.getElementById('walkinSubmitBtnText');
-        const msgDiv = document.getElementById('walkinMessage');
 
+        // Collect instruments
+        const selectedInstrumentIds = [];
+        const instrumentSelects = document.querySelectorAll('#walkin_instrumentsContainer select[name="instruments[]"]');
+        const seen = new Set();
+        instrumentSelects.forEach(sel => {
+            const val = sel.value ? parseInt(sel.value, 10) : 0;
+            if (val && !seen.has(val)) {
+                selectedInstrumentIds.push(val);
+                seen.add(val);
+            }
+        });
+
+        if (selectedInstrumentIds.length === 0) {
+            showMessage('Please select at least one instrument.', 'error');
+            return;
+        }
+
+        // Ensure session package and payment type
+        if (!sessionPackageSelect || !sessionPackageSelect.value) {
+            showMessage('Please select a session package.', 'error');
+            return;
+        }
+        if (!paymentTypeSelect || !paymentTypeSelect.value) {
+            showMessage('Please select a payment type.', 'error');
+            return;
+        }
+
+        // Prevent double submit (first request can succeed, second gets "email already registered")
+        if (form.dataset.submitting === '1') {
+            return;
+        }
+        form.dataset.submitting = '1';
         if (btn) btn.disabled = true;
         if (btnText) btnText.textContent = 'Creating...';
 
@@ -1280,8 +1949,16 @@ function initWalkinPage() {
             data[key] = value;
         }
 
-        // mark as walk-in so backend knows password is default
+        // Inject instruments and calculated fee
+        data['instruments'] = selectedInstrumentIds;
+        const totalFee = calculateWalkinTotalFee();
+        if (totalFee > 0) {
+            data['registration_fee_amount'] = totalFee;
+        }
+
+        // mark as walk-in so backend uses simple default password
         data['is_walkin'] = true;
+        data['registration_source'] = 'admin';
 
         try {
             const response = await fetch(`${baseApiUrl}/users.php?action=register`, {
@@ -1292,29 +1969,46 @@ function initWalkinPage() {
                 body: JSON.stringify(data)
             });
 
-            const result = await response.json();
+            const responseText = await response.text();
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (parseErr) {
+                console.error('Walk-in registration 400 - Response was not JSON:', responseText);
+                showMessage('Registration failed. The server returned an invalid response. Check the browser console (F12) for details.', 'error');
+                return;
+            }
 
             if (result.success) {
                 Swal.fire({
                     icon: 'success',
-                    title: 'Student Created',
-                    html: `Student has been created.<br><br>
+                    title: 'Student Registered',
+                    html: `Student has been registered and can log in immediately.<br><br>
                            <strong>Username:</strong> ${result.username || data['student_email']}<br>
                            <strong>Default Password:</strong> 123<br><br>
-                           They will be required to change this on first login.`,
+                           On first login, they will be required to change this to a strong password.`,
                     confirmButtonColor: '#b8860b'
                 });
-                closeModal();
-                loadStudentsForAdmin();
+
+                // Reset form and hide modal if present
+                form.reset();
+                const modal = document.getElementById('registerStudentModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
             } else {
-                showMessage(result.error || 'Failed to create walk-in student.', 'error');
+                const errMsg = result.error || 'Registration failed. Please check all required fields and try again.';
+                console.error('Walk-in registration failed (400):', errMsg, result);
+                showMessage(errMsg, 'error');
             }
         } catch (error) {
             console.error('Walk-in create error:', error);
-            showMessage('An error occurred. Please try again.', 'error');
+            showMessage(error.message || 'An error occurred. Please try again.', 'error');
         } finally {
+            form.dataset.submitting = '0';
             if (btn) btn.disabled = false;
-            if (btnText) btnText.textContent = 'Create Walk-in Student';
+            if (btnText) btnText.textContent = 'Register Student';
         }
     });
 }
@@ -1741,6 +2435,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
     const adminTable = document.getElementById('registrationsTable');
     const walkinForm = document.getElementById('walkinForm');
+    const studentDashboard = document.getElementById('studentDashboardRoot');
+    const studentProfile = document.getElementById('studentProfileRoot');
+    const studentSessions = document.getElementById('studentSessionsRoot');
+    const studentQr = document.getElementById('studentQrRoot');
 
     if (loginForm) {
         initIndexPage();
@@ -1751,5 +2449,13 @@ document.addEventListener('DOMContentLoaded', () => {
         checkAuth();
         initPaymentForm();
         loadPendingRegistrations();
+    } else if (studentDashboard) {
+        initStudentDashboardPage();
+    } else if (studentProfile) {
+        initStudentProfilePage();
+    } else if (studentSessions) {
+        initStudentSessionsPage();
+    } else if (studentQr) {
+        initStudentQrPage();
     }
 });

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Student Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .dark-glass { background: rgba(15, 17, 21, 0.88); backdrop-filter: blur(10px); }
+        .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
+    </style>
+</head>
+<body class="bg-obsidian text-white antialiased">
+    <div id="studentDashboardRoot"></div>
+
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-6">
+            <a href="../../index.html" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
+            <div class="hidden md:block">
+                <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Student Portal</div>
+                <div class="text-sm text-zinc-300">Dashboard</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="studentNavName" class="text-sm font-semibold text-white">Student</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Account</span>
+            </div>
+            <button onclick="logout()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
+                <i class="fas fa-sign-out-alt mr-2 text-gold-400"></i>Logout
+            </button>
+        </div>
+    </nav>
+
+    <aside class="fixed inset-y-0 left-0 w-72 bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-white/5">
+        <div class="px-6 space-y-8 flex-1 mt-4">
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Navigation</h3>
+                <nav class="space-y-2">
+                    <a href="student_dashboard.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-grid-2 mr-3"></i> Dashboard
+                    </a>
+                    <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
+                    <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-user mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Profile
+                    </a>
+                    <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-qrcode mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> My QR Code
+                    </a>
+                </nav>
+            </div>
+        </div>
+        <div class="p-6 border-t border-white/5">
+            <div class="rounded-2xl border border-gold-500/20 bg-gradient-to-b from-gold-500/10 to-transparent p-4">
+                <div class="text-xs uppercase tracking-[0.25em] text-gold-400 font-bold">Tip</div>
+                <div class="text-sm text-zinc-200 mt-1">Open <span class="font-semibold">My QR Code</span> when you arrive for attendance.</div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="lg:ml-72 pt-28 p-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="mb-10">
+                <h1 class="text-3xl md:text-4xl font-black tracking-tight">Welcome back</h1>
+                <p class="text-zinc-400 mt-2">Here’s your account overview and attendance QR.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Profile Card -->
+                <div class="lg:col-span-1 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                    <div class="flex items-center gap-4">
+                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div id="studentName" class="text-lg font-extrabold truncate">—</div>
+                            <div class="text-sm text-zinc-400">Branch: <span id="studentBranch" class="text-zinc-200 font-semibold">—</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-4" id="studentStatusBadge"></div>
+
+                    <div class="mt-6 grid grid-cols-2 gap-3">
+                        <a href="student_profile.html" class="text-center px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
+                            <i class="fas fa-pen mr-2 text-gold-400"></i>Edit Profile
+                        </a>
+                        <a href="student_sessions.html" class="text-center px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
+                            <i class="fas fa-calendar mr-2 text-gold-400"></i>View Sessions
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Balance Card -->
+                <div class="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-6 shadow-2xl shadow-black/40">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Current Balance Due</div>
+                            <div id="balanceDue" class="text-3xl font-black text-gold-400 mt-2">₱0.00</div>
+                        </div>
+                        <div class="h-12 w-12 rounded-2xl bg-gold-500/15 border border-gold-500/20 grid place-items-center">
+                            <i class="fas fa-wallet text-gold-400"></i>
+                        </div>
+                    </div>
+                    <div class="mt-6 grid grid-cols-2 gap-4">
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+                            <div class="text-xs text-zinc-400">Paid</div>
+                            <div id="amountPaid" class="text-lg font-bold text-white mt-1">₱0.00</div>
+                        </div>
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+                            <div class="text-xs text-zinc-400">Total</div>
+                            <div id="amountTotal" class="text-lg font-bold text-white mt-1">₱0.00</div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-zinc-500 mt-4">Balance is computed from your registration + package fee minus recorded payments.</p>
+                </div>
+
+                <!-- Sessions Card -->
+                <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Sessions</div>
+                            <div id="packageName" class="text-xl font-extrabold mt-2">—</div>
+                        </div>
+                        <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
+                            <i class="fas fa-stopwatch text-gold-400"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-4">
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+                            <div class="text-xs text-zinc-400">Included</div>
+                            <div id="packageSessions" class="text-lg font-bold text-white mt-1">—</div>
+                        </div>
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+                            <div class="text-xs text-zinc-400">Max Instruments</div>
+                            <div id="packageMaxInstruments" class="text-lg font-bold text-white mt-1">—</div>
+                        </div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-3 gap-3">
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-3 text-center">
+                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Attended</div>
+                            <div id="sessionsAttended" class="text-xl font-black text-white mt-1">0</div>
+                        </div>
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-3 text-center">
+                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Remaining</div>
+                            <div id="sessionsRemaining" class="text-xl font-black text-white mt-1">—</div>
+                        </div>
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-3 text-center">
+                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Last</div>
+                            <div id="lastAttended" class="text-xs font-semibold text-zinc-200 mt-2">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Instruments -->
+                <div class="lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Instruments</div>
+                            <div class="text-lg font-extrabold mt-2">Your current instruments</div>
+                        </div>
+                        <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
+                            <i class="fas fa-guitar text-gold-400"></i>
+                        </div>
+                    </div>
+                    <div id="instrumentChips" class="mt-5 flex flex-wrap gap-2"></div>
+                </div>
+
+                <!-- QR -->
+                <div class="rounded-3xl border border-gold-500/25 bg-gradient-to-b from-gold-500/10 to-transparent p-6 shadow-2xl shadow-black/40">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Attendance QR</div>
+                            <div class="text-lg font-extrabold mt-2">Show this when you arrive</div>
+                        </div>
+                        <a href="student_qr.html" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                            Open Fullscreen
+                        </a>
+                    </div>
+
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                        <div class="rounded-2xl bg-obsidian/60 border border-gold-500/25 p-4 flex items-center justify-center">
+                            <div id="qrCodeBox" class="p-2"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-zinc-200 font-semibold">QR Data</div>
+                            <div id="qrPayloadText" class="mt-2 text-xs text-zinc-400 break-all font-mono">—</div>
+                            <p class="mt-4 text-xs text-zinc-500">If scanning fails, show the QR page or ask the staff to verify your student ID.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="../../js/mode.js"></script>
+    <script src="../../js/index.js"></script>
+</body>
+</html>
+
