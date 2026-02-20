@@ -88,7 +88,7 @@
                     <div id="packageSessions" class="text-sm text-zinc-300 mt-1">—</div>
                     <div class="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4">
                         <div class="text-xs text-zinc-400 uppercase tracking-widest font-bold">Note</div>
-                        <div class="text-sm text-zinc-200 mt-2">This page shows your attendance logs. Scheduling can be added later if you want calendar-based sessions.</div>
+                        <div class="text-sm text-zinc-200 mt-2">Once admin approves your enrollment request, your package and attendance will appear here.</div>
                     </div>
                 </div>
 
@@ -122,6 +122,86 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            <!-- Available Options -->
+            <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40 mb-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Available Options</div>
+                        <div class="text-lg font-extrabold mt-2">Packages & Instruments</div>
+                    </div>
+                    <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
+                        <i class="fas fa-list-check text-gold-400"></i>
+                    </div>
+                </div>
+                <div id="availablePackagesList" class="mt-4 space-y-2 text-sm text-zinc-200"></div>
+                <div class="mt-4 text-xs text-zinc-500">
+                    After selecting your preferred package and instruments, upload payment proof. Desk/admin will confirm and officially enroll you in sessions.
+                </div>
+            </div>
+
+            <!-- Request Assignment: Package, Instruments, Preferred Schedule -->
+            <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Request Enrollment</div>
+                        <div class="text-lg font-extrabold mt-2">Select package, instruments, and preferred date</div>
+                    </div>
+                    <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
+                        <i class="fas fa-calendar-plus text-gold-400"></i>
+                    </div>
+                </div>
+
+                <div id="studentRequestStatus" class="mt-4"></div>
+
+                <form id="studentPackageRequestForm" class="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div class="lg:col-span-1">
+                        <label class="block text-sm font-semibold text-zinc-200 mb-2">Session Package *</label>
+                        <select id="studentRequestPackage" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                            <option value="">Select package...</option>
+                        </select>
+                        <div id="studentRequestAmount" class="mt-2 text-xs text-gold-300 font-semibold">Estimated package amount: ₱0.00</div>
+                        <label class="block text-sm font-semibold text-zinc-200 mt-4 mb-2">Preferred Date *</label>
+                        <input type="date" id="studentRequestPreferredDate" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                    </div>
+
+                    <div class="lg:col-span-1">
+                        <label class="block text-sm font-semibold text-zinc-200 mb-2">Select Instruments *</label>
+                        <div id="studentRequestInstrumentContainer" class="space-y-2">
+                            <div class="text-sm text-zinc-500">Select a package first.</div>
+                        </div>
+                        <label class="block text-sm font-semibold text-zinc-200 mt-4 mb-2">Payment proof (optional)</label>
+                        <input type="file" id="studentRequestPaymentProof" name="package_payment_proof_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-400 file:font-semibold">
+                        <div class="text-xs text-zinc-500 mt-1">JPG, PNG, WEBP or PDF. You can upload later or bring to the branch.</div>
+                    </div>
+
+                    <div class="lg:col-span-1">
+                        <label class="block text-sm font-semibold text-zinc-200 mb-2">Preferred Day *</label>
+                        <select id="studentRequestPreferredDay" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                            <option value="">Select preferred day...</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                        </select>
+                        <div class="text-xs text-zinc-500 mt-2">Desk/admin will assign teacher and final 1-hour lesson schedule based on availability.</div>
+                    </div>
+
+                    <div class="lg:col-span-3 pt-2">
+                        <button type="submit" id="studentSubmitRequestBtn" class="px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                            Submit Request
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-6">
+                    <div class="text-sm font-semibold text-zinc-200 mb-3">Teacher availability (reference)</div>
+                    <div id="studentAvailabilityCalendar" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"></div>
                 </div>
             </div>
         </div>

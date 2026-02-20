@@ -15,7 +15,6 @@ class AttendanceApi
     public function __construct($pdo)
     {
         $this->conn = $pdo;
-        $this->ensureTables();
     }
 
     public function sendJSON($data, $status = 200)
@@ -25,23 +24,14 @@ class AttendanceApi
         exit;
     }
 
-    private function ensureTables()
+    private function tableExists($tableName)
     {
         try {
-            $this->conn->exec("
-                CREATE TABLE IF NOT EXISTS tbl_attendance (
-                    attendance_id INT AUTO_INCREMENT PRIMARY KEY,
-                    student_id INT NOT NULL,
-                    attended_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    source VARCHAR(30) NULL,
-                    notes VARCHAR(255) NULL,
-                    status ENUM('Present','Absent','Late','Excused') NOT NULL DEFAULT 'Present'
-                )
-            ");
-            try { $this->conn->exec("CREATE INDEX idx_attendance_student ON tbl_attendance(student_id)"); } catch (PDOException $e) {}
-            try { $this->conn->exec("CREATE INDEX idx_attendance_date ON tbl_attendance(attended_at)"); } catch (PDOException $e) {}
+            $stmt = $this->conn->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+            return $stmt->rowCount() > 0;
         } catch (PDOException $e) {
-            // Do not break API if schema fails
+            return false;
         }
     }
 
@@ -57,17 +47,38 @@ class AttendanceApi
         }
 
         try {
-            $stmt = $this->conn->prepare("
-                SELECT
-                    COUNT(*) AS total_records,
-                    SUM(status = 'Present') AS present_count,
-                    SUM(status = 'Late') AS late_count,
-                    SUM(status = 'Excused') AS excused_count,
-                    SUM(status = 'Absent') AS absent_count,
-                    MAX(attended_at) AS last_attended_at
-                FROM tbl_attendance
-                WHERE student_id = ?
-            ");
+            if ($this->tableExists('tbl_sessions') && $this->tableExists('tbl_enrollments')) {
+                $stmt = $this->conn->prepare("
+                    SELECT
+                        COUNT(*) AS total_records,
+                        SUM(ts.status = 'Completed') AS present_count,
+                        SUM(ts.status = 'Late') AS late_count,
+                        0 AS excused_count,
+                        SUM(ts.status IN ('Cancelled', 'No Show')) AS absent_count,
+                        MAX(
+                            CASE
+                                WHEN ts.status IN ('Completed', 'Late')
+                                    THEN TIMESTAMP(ts.session_date, COALESCE(ts.end_time, ts.start_time, '00:00:00'))
+                                ELSE NULL
+                            END
+                        ) AS last_attended_at
+                    FROM tbl_sessions ts
+                    INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+                    WHERE te.student_id = ?
+                ");
+            } else {
+                $stmt = $this->conn->prepare("
+                    SELECT
+                        COUNT(*) AS total_records,
+                        SUM(status = 'Present') AS present_count,
+                        SUM(status = 'Late') AS late_count,
+                        SUM(status = 'Excused') AS excused_count,
+                        SUM(status = 'Absent') AS absent_count,
+                        MAX(attended_at) AS last_attended_at
+                    FROM tbl_attendance
+                    WHERE student_id = ?
+                ");
+            }
             $stmt->execute([$studentId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
@@ -98,13 +109,35 @@ class AttendanceApi
         if ($limit > 200) $limit = 200;
 
         try {
-            $stmt = $this->conn->prepare("
-                SELECT attendance_id, student_id, attended_at, source, notes, status
-                FROM tbl_attendance
-                WHERE student_id = ?
-                ORDER BY attended_at DESC, attendance_id DESC
-                LIMIT $limit
-            ");
+            if ($this->tableExists('tbl_sessions') && $this->tableExists('tbl_enrollments')) {
+                $stmt = $this->conn->prepare("
+                    SELECT
+                        ts.session_id AS attendance_id,
+                        te.student_id,
+                        TIMESTAMP(ts.session_date, COALESCE(ts.start_time, '00:00:00')) AS attended_at,
+                        ts.session_type AS source,
+                        COALESCE(ts.attendance_notes, ts.notes) AS notes,
+                        CASE
+                            WHEN ts.status = 'Completed' THEN 'Present'
+                            WHEN ts.status = 'Late' THEN 'Late'
+                            WHEN ts.status IN ('Cancelled', 'No Show') THEN 'Absent'
+                            ELSE ts.status
+                        END AS status
+                    FROM tbl_sessions ts
+                    INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+                    WHERE te.student_id = ?
+                    ORDER BY ts.session_date DESC, ts.session_id DESC
+                    LIMIT $limit
+                ");
+            } else {
+                $stmt = $this->conn->prepare("
+                    SELECT attendance_id, student_id, attended_at, source, notes, status
+                    FROM tbl_attendance
+                    WHERE student_id = ?
+                    ORDER BY attended_at DESC, attendance_id DESC
+                    LIMIT $limit
+                ");
+            }
             $stmt->execute([$studentId]);
             $this->sendJSON(['success' => true, 'attendance' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         } catch (PDOException $e) {
@@ -138,6 +171,9 @@ class AttendanceApi
         $notes = isset($data['notes']) ? substr(trim((string)$data['notes']), 0, 255) : null;
 
         try {
+            if (!$this->tableExists('tbl_attendance')) {
+                $this->sendJSON(['error' => 'Attendance write endpoint is unavailable on this schema'], 400);
+            }
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_attendance (student_id, status, source, notes)
                 VALUES (?, ?, ?, ?)

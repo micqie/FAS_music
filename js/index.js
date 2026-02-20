@@ -380,7 +380,7 @@ function initLoginForm() {
             } else {
                 // Show error message with SweetAlert
                 Swal.fire({
-                    icon: 'error',
+                    icon: 'warning',
                     title: 'Login Failed',
                     text: data.error || 'Invalid username or password. Please check your credentials.',
                     confirmButtonColor: '#b8860b'
@@ -417,33 +417,8 @@ function initRegisterForm() {
     const registerForm = document.getElementById('registerForm');
     if (!registerForm) return;
 
-    // Load session packages and instruments
-    loadSessionPackages();
-    
-    // Watch for branch changes to load instruments
-    const branchSelect = document.getElementById('branch_id');
-    if (branchSelect) {
-        branchSelect.addEventListener('change', function() {
-            loadInstrumentsForRegistration(this.value);
-        });
-    }
-
-    // Watch for session package changes
-    const sessionPackageSelect = document.getElementById('sessionPackage');
-    if (sessionPackageSelect) {
-        sessionPackageSelect.addEventListener('change', function() {
-            updateInstrumentSelection();
-            calculateTotalFee();
-        });
-    }
-
-    // Watch for payment type changes
-    const paymentTypeSelect = document.getElementById('paymentType');
-    if (paymentTypeSelect) {
-        paymentTypeSelect.addEventListener('change', function() {
-            calculateTotalFee();
-        });
-    }
+    // Registration now collects only student + guardian + account details.
+    // Package/instrument availing is done later in the student dashboard.
 
     // Add event listeners for password validation
     const passwordInput = document.getElementById('registerPassword');
@@ -466,6 +441,13 @@ function initRegisterForm() {
         emailInput.addEventListener('input', function() {
             validateEmail(this);
         });
+    }
+
+    const dobInput = document.getElementById('student_date_of_birth');
+    if (dobInput) {
+        dobInput.addEventListener('change', updatePublicGuardianRequiredState);
+        dobInput.addEventListener('input', updatePublicGuardianRequiredState);
+        updatePublicGuardianRequiredState();
     }
 
     registerForm.addEventListener('submit', async (e) => {
@@ -499,70 +481,36 @@ function initRegisterForm() {
         }
 
         const formData = new FormData(registerForm);
-        const data = {};
-
-        // Convert FormData to object
-        for (let [key, value] of formData.entries()) {
-            // Skip password_confirm field
-            if (key === 'password_confirm') continue;
-            data[key] = value;
+        const proofFile = formData.get('registration_proof_file');
+        if (!(proofFile instanceof File) || !proofFile.name) {
+            showRegisterMessage('Please upload your registration payment proof.', 'error');
+            registerForm.dataset.submitting = '0';
+            return;
         }
 
-        // Ensure age is calculated if date of birth is provided
-        const dateOfBirth = data['student_date_of_birth'];
-        if (dateOfBirth && !data['student_age']) {
+        // Skip confirmation field; backend only needs the actual password.
+        formData.delete('password_confirm');
+
+        // Ensure age is calculated if date of birth is provided.
+        const dateOfBirth = formData.get('student_date_of_birth');
+        const currentAge = formData.get('student_age');
+        if (dateOfBirth && !currentAge) {
             calculateAge(dateOfBirth);
-            data['student_age'] = document.getElementById('student_age').value;
-        }
-
-        // Collect selected instruments from dropdowns
-        const selectedInstruments = [];
-        const instrumentSelects = document.querySelectorAll('select[name="instruments[]"]');
-        const seen = new Set();
-        instrumentSelects.forEach(sel => {
-            const val = sel.value ? parseInt(sel.value, 10) : 0;
-            if (val && !seen.has(val)) {
-                selectedInstruments.push(val);
-                seen.add(val);
+            const ageEl = document.getElementById('student_age');
+            if (ageEl?.value) {
+                formData.set('student_age', ageEl.value);
             }
-        });
-
-        // Validate session package and instruments
-        const sessionPackageId = data['session_package_id'];
-        if (!sessionPackageId) {
-            showRegisterMessage('Please select a session package.', 'error');
-            registerForm.dataset.submitting = '0';
-            return;
         }
 
-        if (selectedInstruments.length === 0) {
-            showRegisterMessage('Please select at least one instrument.', 'error');
-            registerForm.dataset.submitting = '0';
-            return;
-        }
+        // Initial registration fee is fixed.
+        formData.set('registration_source', 'public');
+        formData.set('registration_fee_amount', '1000');
 
-        // Validate payment type
-        if (!data['payment_type']) {
-            showRegisterMessage('Please select a payment type.', 'error');
-            registerForm.dataset.submitting = '0';
-            return;
-        }
-
-        // Add instruments to data
-        data['instruments'] = selectedInstruments;
-        data['registration_source'] = 'public';
-        
-        // Calculate and set registration fee amount
-        const totalFee = calculateTotalFee();
-        if (totalFee > 0) {
-            data['registration_fee_amount'] = totalFee;
-        } else {
-            data['registration_fee_amount'] = 1000; // Default registration fee
-        }
-
-        // Use email as username if not provided
-        if (!data['username']) {
-            data['username'] = data['student_email'];
+        // Use email as username if not provided.
+        const usernameVal = String(formData.get('username') || '').trim();
+        const studentEmailVal = String(formData.get('student_email') || '').trim();
+        if (!usernameVal && studentEmailVal) {
+            formData.set('username', studentEmailVal);
         }
 
         const registerBtn = document.getElementById('registerSubmitBtn');
@@ -580,10 +528,7 @@ function initRegisterForm() {
         try {
             const response = await fetch(`${baseApiUrl}/users.php?action=register`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
+                body: formData
             });
 
             const responseText = await response.text();
@@ -626,8 +571,9 @@ function initRegisterForm() {
                     title: 'Registration Submitted!',
                     html: `Your registration has been submitted successfully.<br><br>
                            <strong>Status:</strong> Pending Admin Approval<br>
-                           <strong>Username:</strong> ${result.username || data['student_email']}<br><br>
-                           Your account will be activated once the admin confirms your registration and payment.`,
+                           <strong>Registration Fee:</strong> ₱1,000.00<br>
+                           <strong>Username:</strong> ${result.username || studentEmailVal}<br><br>
+                           Once approved, you can log in and choose your package/instruments from your dashboard.`,
                     confirmButtonColor: '#b8860b'
                 });
             } else {
@@ -659,7 +605,7 @@ async function loadSessionPackages() {
     try {
         const response = await fetch(`${baseApiUrl}/sessions.php?action=get-packages`);
         const data = await response.json();
-        
+
         if (data.success && data.packages) {
             sessionPackages = data.packages;
             select.innerHTML = '<option value="">Select Package</option>';
@@ -700,7 +646,7 @@ async function loadInstrumentsForRegistration(branchId) {
     try {
         const response = await fetch(`${baseApiUrl}/instruments.php?action=get-instruments&branch_id=${branchId}`);
         const data = await response.json();
-        
+
         if (data.success && data.instruments) {
             availableInstruments = data.instruments;
             updateInstrumentSelection();
@@ -756,7 +702,7 @@ function updateInstrumentSelection() {
     }
 
     const types = getAvailableTypes();
-    const typeOptionsHtml = types.map(t => 
+    const typeOptionsHtml = types.map(t =>
         `<option value="${t.type_id}">${escapeHtml(t.type_name)}</option>`
     ).join('');
 
@@ -836,7 +782,7 @@ function calculateTotalFee() {
     const registrationFee = 1000;
     const sessionPackageSelect = document.getElementById('sessionPackage');
     const paymentTypeSelect = document.getElementById('paymentType');
-    
+
     if (!sessionPackageSelect || !sessionPackageSelect.value || !paymentTypeSelect || !paymentTypeSelect.value) {
         const sessionFeeEl = document.getElementById('sessionFeeDisplay');
         const totalEl = document.getElementById('totalAmountDisplay');
@@ -899,7 +845,7 @@ function calculateTotalFee() {
     const sessionFeeEl = document.getElementById('sessionFeeDisplay');
     const totalEl = document.getElementById('totalAmountDisplay');
     const feeInput = document.getElementById('registration_fee_amount');
-    
+
     if (sessionFeeEl) sessionFeeEl.textContent = `₱${sessionFee.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     if (totalEl) totalEl.textContent = `₱${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     if (feeInput) feeInput.value = total;
@@ -1332,6 +1278,388 @@ function renderQrCode(targetElId, payload) {
     });
 }
 
+function renderAvailablePackagesAndInstruments(packages, instruments) {
+    const pkgRows = Array.isArray(packages) && packages.length
+        ? packages.map(p => {
+            const sessions = Number(p.sessions || p.total_sessions || 0);
+            const maxInst = Number(p.max_instruments || 0);
+            const price = Number(p.price || 0);
+            return `<div class="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div class="font-semibold text-white">${escapeHtml(p.package_name || 'Package')}</div>
+                <div class="text-xs text-zinc-400 mt-1">${sessions} sessions • up to ${maxInst || 1} instrument(s)</div>
+                <div class="text-xs text-gold-400 mt-1">${formatCurrencyPHP(price)}</div>
+            </div>`;
+        }).join('')
+        : '<div class="text-zinc-500">No session packages available yet.</div>';
+
+    const typeSet = new Set();
+    (Array.isArray(instruments) ? instruments : []).forEach(i => {
+        const t = (i.type_name || '').trim();
+        if (t) typeSet.add(t);
+    });
+    const types = Array.from(typeSet);
+    const instHtml = types.length
+        ? `<div class="flex flex-wrap gap-2 mt-3">${types.map(t => `<span class="px-2 py-1 rounded-lg border border-gold-500/30 bg-gold-500/10 text-gold-300 text-xs font-semibold">${escapeHtml(t)}</span>`).join('')}</div>`
+        : '<div class="text-zinc-500 mt-3">No instrument types available for your branch yet.</div>';
+
+    return `${pkgRows}${instHtml}`;
+}
+
+function buildPublicFileUrl(filePath) {
+    if (!filePath) return '';
+    const raw = String(filePath || '').trim();
+    if (!raw) return '';
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const appBase = String(baseApiUrl || '').replace(/\/api\/?$/, '');
+    const cleanPath = raw.replace(/^\/+/, '');
+    return `${appBase}/${cleanPath}`;
+}
+
+function formatTime12Hour(timeString) {
+    if (!timeString) return '—';
+    const parts = String(timeString).split(':');
+    if (parts.length < 2) return timeString;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (Number.isNaN(h) || Number.isNaN(m)) return timeString;
+    const suffix = h >= 12 ? 'PM' : 'AM';
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+function formatDateLong(dateString) {
+    if (!dateString) return '';
+    const raw = String(dateString).trim();
+    if (!raw) return '';
+
+    let dt;
+    const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymd) {
+        dt = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+    } else {
+        dt = new Date(raw);
+    }
+    if (Number.isNaN(dt.getTime())) return raw;
+
+    return dt.toLocaleDateString(undefined, {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+}
+
+function renderStudentRequestStatus(latestRequest) {
+    if (!latestRequest) {
+        return '<div class="text-sm text-zinc-500">No request submitted yet.</div>';
+    }
+    const status = String(latestRequest.status || 'Pending');
+    const badgeClass = status === 'Approved'
+        ? 'bg-green-500/15 text-green-300 border border-green-500/30'
+        : status === 'Rejected'
+            ? 'bg-red-500/15 text-red-300 border border-red-500/30'
+            : 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/30';
+    const createdAt = latestRequest.created_at ? new Date(latestRequest.created_at).toLocaleString() : '—';
+    const packageName = escapeHtml(latestRequest.package_name || 'Package');
+    const amount = formatCurrencyPHP(latestRequest.requested_amount || 0);
+    const notes = latestRequest.admin_notes ? `<div class="text-xs text-zinc-400 mt-1">Admin note: ${escapeHtml(latestRequest.admin_notes)}</div>` : '';
+    const assignedTeacherName = `${latestRequest.assigned_teacher_first_name || ''} ${latestRequest.assigned_teacher_last_name || ''}`.trim();
+    const assignedDate = latestRequest.assigned_date ? formatDateLong(latestRequest.assigned_date) : '';
+    const assignedDay = latestRequest.assigned_day_of_week || '';
+    const assignedStart = latestRequest.assigned_start_time ? formatTime12Hour(latestRequest.assigned_start_time) : '';
+    const assignedEnd = latestRequest.assigned_end_time ? formatTime12Hour(latestRequest.assigned_end_time) : '';
+    const assignedRoom = latestRequest.assigned_room || '';
+    const whenText = assignedDate || [assignedDay].filter(Boolean).join(' • ');
+    const assignmentInfo = status === 'Approved' && (assignedTeacherName || assignedDate || assignedDay || assignedStart || assignedEnd || assignedRoom)
+        ? `<div class="mt-2 text-xs text-green-300 bg-green-500/10 border border-green-500/20 rounded-lg p-2">
+            <div><span class="text-green-200 font-semibold">Assigned Teacher:</span> ${escapeHtml(assignedTeacherName || '—')}</div>
+            <div><span class="text-green-200 font-semibold">Sessions start:</span> ${escapeHtml(whenText || 'Not set')}</div>
+            <div><span class="text-green-200 font-semibold">Time:</span> ${escapeHtml((assignedStart && assignedEnd) ? `${assignedStart} - ${assignedEnd}` : 'Not set')}</div>
+            <div><span class="text-green-200 font-semibold">Where:</span> ${escapeHtml(assignedRoom || 'Not set')}</div>
+        </div>`
+        : '';
+
+    return `
+        <div class="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold ${badgeClass}">${escapeHtml(status)}</span>
+                <span class="text-xs text-zinc-400">${createdAt}</span>
+            </div>
+            <div class="mt-2 text-sm text-zinc-200">${packageName} • ${amount}</div>
+            ${assignmentInfo}
+            ${notes}
+        </div>
+    `;
+}
+
+function renderStudentAvailabilityCalendar(availabilities) {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const grouped = {};
+    days.forEach(d => { grouped[d] = []; });
+
+    (Array.isArray(availabilities) ? availabilities : []).forEach(a => {
+        const day = String(a.day_of_week || '');
+        if (grouped[day]) grouped[day].push(a);
+    });
+
+    return days.map(day => {
+        const slots = grouped[day];
+        if (!slots.length) {
+            return `<div class="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div class="text-xs font-bold uppercase tracking-wider text-zinc-400">${day}</div>
+                <div class="text-xs text-zinc-500 mt-2">No active slots</div>
+            </div>`;
+        }
+        return `<div class="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div class="text-xs font-bold uppercase tracking-wider text-zinc-300">${day}</div>
+            <div class="mt-2 space-y-2">
+                ${slots.map(s => {
+                    const teacher = `${s.teacher_first_name || ''} ${s.teacher_last_name || ''}`.trim();
+                    return `<div class="rounded-lg border border-gold-500/20 bg-gold-500/10 px-2 py-1">
+                        ${teacher ? `<div class="text-xs font-semibold text-gold-200">${escapeHtml(teacher)}</div>` : ''}
+                        <div class="text-[11px] text-zinc-300">${formatTime12Hour(s.start_time)} - ${formatTime12Hour(s.end_time)}</div>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+let studentRequestAvailableInstruments = [];
+
+function getStudentRequestAvailableTypes() {
+    const seen = new Set();
+    const types = [];
+    studentRequestAvailableInstruments.forEach(inst => {
+        const id = inst.type_id;
+        const name = inst.type_name || 'Other';
+        if (id != null && !seen.has(id)) {
+            seen.add(id);
+            types.push({ type_id: id, type_name: name });
+        }
+    });
+    return types.sort((a, b) => (a.type_name || '').localeCompare(b.type_name || ''));
+}
+
+function getStudentRequestInstrumentsByType(typeId) {
+    if (!typeId) return [];
+    return studentRequestAvailableInstruments.filter(inst => String(inst.type_id) === String(typeId));
+}
+
+function renderStudentRequestInstrumentSelectors(maxInstruments, instruments) {
+    const maxCount = Math.max(1, Number(maxInstruments || 1));
+    studentRequestAvailableInstruments = Array.isArray(instruments) ? instruments : [];
+    const types = getStudentRequestAvailableTypes();
+    const typeOptionsHtml = types.map(t =>
+        `<option value="${t.type_id}">${escapeHtml(t.type_name)}</option>`
+    ).join('');
+
+    let html = '';
+    for (let i = 1; i <= maxCount; i++) {
+        const slotLabel = maxCount === 1 ? 'Instrument' : `Instrument ${i}`;
+        html += `
+            <div class="p-3 bg-zinc-900/60 rounded-lg border border-zinc-700 space-y-2">
+                <label class="block text-sm font-medium text-zinc-200">${slotLabel} *</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Type</label>
+                        <select class="student-request-instrument-type w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentTypeChange(${i})">
+                            <option value="">Select type...</option>
+                            ${typeOptionsHtml}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Instrument</label>
+                        <select class="student-request-instrument w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentDropdownChange()">
+                            <option value="">Select instrument...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    return html;
+}
+
+function onStudentRequestInstrumentTypeChange(slot) {
+    const typeSelect = document.querySelector(`select.student-request-instrument-type[data-slot="${slot}"]`);
+    const instrumentSelect = document.querySelector(`select.student-request-instrument[data-slot="${slot}"]`);
+    if (!typeSelect || !instrumentSelect) return;
+
+    const typeId = typeSelect.value;
+    instrumentSelect.innerHTML = '<option value="">Select instrument...</option>';
+    instrumentSelect.value = '';
+
+    if (typeId) {
+        const items = getStudentRequestInstrumentsByType(typeId);
+        items.forEach(inst => {
+            const opt = document.createElement('option');
+            opt.value = inst.instrument_id;
+            opt.textContent = inst.instrument_name || 'Instrument';
+            instrumentSelect.appendChild(opt);
+        });
+    }
+    onStudentRequestInstrumentDropdownChange();
+}
+
+function onStudentRequestInstrumentDropdownChange() {
+    const selects = document.querySelectorAll('select.student-request-instrument');
+    const used = new Set();
+    selects.forEach(select => {
+        const val = select.value;
+        if (val) used.add(val);
+    });
+    selects.forEach(select => {
+        const currentVal = select.value;
+        Array.from(select.options).forEach(opt => {
+            if (opt.value === '') return;
+            opt.disabled = used.has(opt.value) && opt.value !== currentVal;
+        });
+    });
+}
+
+async function fetchStudentRequestMetaByEmail(email) {
+    const url = `${baseApiUrl}/students.php?action=get-student-request-meta&email=${encodeURIComponent(email)}`;
+    const res = await fetch(url);
+    return res.json();
+}
+
+async function postStudentPackageRequest(payload) {
+    const isFormData = (typeof FormData !== 'undefined') && (payload instanceof FormData);
+    const res = await fetch(`${baseApiUrl}/students.php`, {
+        method: 'POST',
+        headers: isFormData ? undefined : { 'Content-Type': 'application/json' },
+        body: isFormData ? payload : JSON.stringify(payload)
+    });
+    return res.json();
+}
+
+function initStudentRequestSection(student, requestMeta) {
+    const statusEl = document.getElementById('studentRequestStatus');
+    const packageSelect = document.getElementById('studentRequestPackage');
+    const amountEl = document.getElementById('studentRequestAmount');
+    const instrumentsContainer = document.getElementById('studentRequestInstrumentContainer');
+    const preferredDayEl = document.getElementById('studentRequestPreferredDay');
+    const availabilityCalendar = document.getElementById('studentAvailabilityCalendar');
+    const form = document.getElementById('studentPackageRequestForm');
+    const submitBtn = document.getElementById('studentSubmitRequestBtn');
+    const preferredDateEl = document.getElementById('studentRequestPreferredDate');
+    const paymentProofEl = document.getElementById('studentRequestPaymentProof');
+
+    if (!statusEl || !packageSelect || !amountEl || !instrumentsContainer || !preferredDayEl || !availabilityCalendar || !form || !submitBtn || !preferredDateEl) {
+        return;
+    }
+
+    const packages = Array.isArray(requestMeta?.packages) ? requestMeta.packages : [];
+    const instruments = Array.isArray(requestMeta?.instruments) ? requestMeta.instruments : [];
+    const availabilities = Array.isArray(requestMeta?.availabilities) ? requestMeta.availabilities : [];
+    const latest = requestMeta?.latest_request || null;
+    const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
+
+    statusEl.innerHTML = renderStudentRequestStatus(latest);
+    availabilityCalendar.innerHTML = '<div class="text-xs text-zinc-500">Teacher availability is managed by desk/admin during assignment.</div>';
+
+    packageSelect.innerHTML = '<option value="">Select package...</option>' + packages.map(pkg => {
+        const sessions = Number(pkg.sessions || 0);
+        const maxInst = Number(pkg.max_instruments || 1);
+        const price = formatCurrencyPHP(pkg.price || 0);
+        const branchLabel = String(pkg.branch_name || requestMeta?.student?.branch_name || '').trim();
+        const branchText = branchLabel ? ` • ${escapeHtml(branchLabel)}` : '';
+        return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''})${branchText} - ${price}</option>`;
+    }).join('');
+
+    const updateRequestPackageUI = () => {
+        const selected = packageSelect.options[packageSelect.selectedIndex];
+        const maxInst = Number(selected?.getAttribute('data-max-instruments') || 0);
+        const price = Number(selected?.getAttribute('data-price') || 0);
+        amountEl.textContent = `Estimated package amount: ${formatCurrencyPHP(price)}`;
+        instrumentsContainer.innerHTML = maxInst > 0
+            ? renderStudentRequestInstrumentSelectors(maxInst, instruments)
+            : '<div class="text-sm text-zinc-500">Select a package first.</div>';
+    };
+
+    packageSelect.onchange = updateRequestPackageUI;
+    updateRequestPackageUI();
+
+    const today = new Date();
+    preferredDateEl.min = today.toISOString().split('T')[0];
+
+    if (String(student.status || '') !== 'Active') {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
+        statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Your student account is not active yet. Please contact desk/admin.</div>';
+    } else if (hasPendingRequest) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
+        statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">You already have a pending request. Wait for desk/admin decision.</div>';
+    }
+
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        if (submitBtn.disabled) return;
+
+        const packageId = parseInt(packageSelect.value, 10);
+        const preferredDate = preferredDateEl.value || '';
+        const preferredDay = preferredDayEl.value || '';
+        const instrumentIds = Array.from(document.querySelectorAll('.student-request-instrument'))
+            .map(el => parseInt(el.value, 10))
+            .filter(v => !Number.isNaN(v) && v > 0);
+        const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
+
+        if (!packageId || !preferredDate || !preferredDay || uniqueInstrumentIds.length < 1) {
+            showMessage('Please complete package, instruments, preferred date, and preferred day.', 'error');
+            return;
+        }
+        const paymentProofFile = paymentProofEl && paymentProofEl.files && paymentProofEl.files[0] ? paymentProofEl.files[0] : null;
+
+        const selectedOption = packageSelect.options[packageSelect.selectedIndex];
+        const maxInst = Number(selectedOption?.getAttribute('data-max-instruments') || 1);
+        if (uniqueInstrumentIds.length > maxInst) {
+            showMessage(`You can select up to ${maxInst} instrument(s) for this package.`, 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+        let keepDisabled = false;
+
+        try {
+            const requestFormData = new FormData();
+            requestFormData.append('action', 'submit-package-request');
+            requestFormData.append('student_id', String(Number(student.student_id)));
+            requestFormData.append('package_id', String(packageId));
+            requestFormData.append('preferred_date', preferredDate);
+            requestFormData.append('preferred_day_of_week', preferredDay);
+            requestFormData.append('instrument_ids_json', JSON.stringify(uniqueInstrumentIds));
+            if (paymentProofFile) {
+                requestFormData.append('package_payment_proof_file', paymentProofFile);
+            }
+
+            const response = await postStudentPackageRequest(requestFormData);
+            if (response.success) {
+                showMessage(response.message || 'Request submitted successfully.', 'success');
+                const user = Auth.getUser();
+                if (user?.email) {
+                    const refreshedMeta = await fetchStudentRequestMetaByEmail(user.email);
+                    if (refreshedMeta?.success) {
+                        keepDisabled = true;
+                        initStudentRequestSection(student, refreshedMeta);
+                    }
+                }
+            } else {
+                showMessage(response.error || 'Failed to submit request.', 'error');
+            }
+        } catch (error) {
+            showMessage('Network error. Please try again.', 'error');
+        } finally {
+            if (!keepDisabled) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Request';
+            }
+        }
+    };
+}
+
 async function initStudentDashboardPage() {
     if (!checkStudentAuth()) return;
     const user = Auth.getUser();
@@ -1384,6 +1712,20 @@ async function initStudentDashboardPage() {
     const payload = buildStudentQrPayload(s);
     setText('qrPayloadText', payload);
     renderQrCode('qrCodeBox', payload);
+
+    // Enrollment request (same form as on Sessions page)
+    try {
+        const meta = await fetchStudentRequestMetaByEmail(user.email);
+        const packages = meta?.success ? (meta.packages || []) : [];
+        const instruments = meta?.success ? (meta.instruments || []) : [];
+        setHtml('availablePackagesList', renderAvailablePackagesAndInstruments(packages, instruments));
+        if (meta?.success) {
+            initStudentRequestSection(s, meta);
+        }
+    } catch (e) {
+        setHtml('availablePackagesList', '<div class="text-zinc-500">Unable to load available options right now.</div>');
+        setHtml('studentAvailabilityCalendar', '<div class="text-zinc-500">Unable to load teacher availability right now.</div>');
+    }
 }
 
 async function initStudentQrPage() {
@@ -1426,37 +1768,55 @@ async function initStudentSessionsPage() {
                 <td colspan="4" class="px-6 py-8 text-center text-zinc-400">Failed to load attendance records.</td>
             </tr>
         `);
-        return;
+    } else {
+        const rows = Array.isArray(listRes.attendance) ? listRes.attendance : [];
+        if (rows.length === 0) {
+            setHtml('attendanceTableBody', `
+                <tr>
+                    <td colspan="4" class="px-6 py-10 text-center text-zinc-400">
+                        <i class="fas fa-calendar-minus text-2xl mb-2"></i>
+                        <div class="font-semibold">No attendance records yet</div>
+                        <div class="text-xs text-zinc-500 mt-1">Your sessions will appear here once admin enrolls you and attendance is recorded.</div>
+                    </td>
+                </tr>
+            `);
+        } else {
+            setHtml('attendanceTableBody', rows.map(r => {
+                const dt = r.attended_at ? new Date(r.attended_at).toLocaleString() : '—';
+                const status = escapeHtml(r.status || 'Present');
+                const source = escapeHtml(r.source || '—');
+                const notes = escapeHtml(r.notes || '');
+                return `
+                    <tr class="border-t border-white/10 hover:bg-white/5 transition">
+                        <td class="px-6 py-4 text-sm text-white">${dt}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-200">${status}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-300">${source}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-400">${notes}</td>
+                    </tr>
+                `;
+            }).join(''));
+        }
     }
 
-    const rows = Array.isArray(listRes.attendance) ? listRes.attendance : [];
-    if (rows.length === 0) {
-        setHtml('attendanceTableBody', `
-            <tr>
-                <td colspan="4" class="px-6 py-10 text-center text-zinc-400">
-                    <i class="fas fa-calendar-minus text-2xl mb-2"></i>
-                    <div class="font-semibold">No attendance records yet</div>
-                    <div class="text-xs text-zinc-500 mt-1">Your sessions will appear here once attendance is recorded.</div>
-                </td>
-            </tr>
-        `);
-        return;
+    // Enroll flow: available packages and request form (package, instruments, preferred date, payment proof)
+    try {
+        const meta = await fetchStudentRequestMetaByEmail(user.email);
+        const packages = meta?.success ? (meta.packages || []) : [];
+        const instruments = meta?.success ? (meta.instruments || []) : [];
+        const availableListEl = document.getElementById('availablePackagesList');
+        if (availableListEl) {
+            setHtml('availablePackagesList', renderAvailablePackagesAndInstruments(packages, instruments));
+        }
+        const formEl = document.getElementById('studentPackageRequestForm');
+        if (formEl && meta?.success) {
+            initStudentRequestSection(s, meta);
+        }
+    } catch (e) {
+        const availableListEl = document.getElementById('availablePackagesList');
+        if (availableListEl) setHtml('availablePackagesList', '<div class="text-zinc-500">Unable to load available options.</div>');
+        const calendarEl = document.getElementById('studentAvailabilityCalendar');
+        if (calendarEl) setHtml('studentAvailabilityCalendar', '<div class="text-zinc-500">Unable to load teacher availability.</div>');
     }
-
-    setHtml('attendanceTableBody', rows.map(r => {
-        const dt = r.attended_at ? new Date(r.attended_at).toLocaleString() : '—';
-        const status = escapeHtml(r.status || 'Present');
-        const source = escapeHtml(r.source || '—');
-        const notes = escapeHtml(r.notes || '');
-        return `
-            <tr class="border-t border-white/10 hover:bg-white/5 transition">
-                <td class="px-6 py-4 text-sm text-white">${dt}</td>
-                <td class="px-6 py-4 text-sm text-zinc-200">${status}</td>
-                <td class="px-6 py-4 text-sm text-zinc-300">${source}</td>
-                <td class="px-6 py-4 text-sm text-zinc-400">${notes}</td>
-            </tr>
-        `;
-    }).join(''));
 }
 
 async function initStudentProfilePage() {
@@ -1829,6 +2189,29 @@ function calculateAgeFromBirthdate(dateStr) {
     return age;
 }
 
+function updatePublicGuardianRequiredState() {
+    const dobInput = document.getElementById('student_date_of_birth');
+    const guardianFields = document.querySelectorAll('.guardian-field-public');
+    const guardianLabels = document.querySelectorAll('.guardian-label-public');
+    const badge = document.getElementById('guardian_required_badge_public');
+    if (!dobInput) return;
+
+    const age = calculateAgeFromBirthdate(dobInput.value);
+    const isMinorOr18Below = age !== null && age <= 18;
+
+    if (badge) badge.classList.toggle('hidden', !isMinorOr18Below);
+
+    guardianFields.forEach(el => {
+        if (isMinorOr18Below) el.setAttribute('required', 'required');
+        else el.removeAttribute('required');
+    });
+
+    guardianLabels.forEach(el => {
+        const text = el.textContent.replace(/\s*\*\s*$/, '').trim();
+        el.textContent = text + (isMinorOr18Below ? ' *' : '');
+    });
+}
+
 // Update age display and guardian required state for walk-in form
 function updateWalkinAgeAndGuardianRequired() {
     const dobInput = document.getElementById('walkin_student_dob');
@@ -1840,7 +2223,7 @@ function updateWalkinAgeAndGuardianRequired() {
     if (!dobInput || !ageDisplay) return;
 
     const age = calculateAgeFromBirthdate(dobInput.value);
-    const isMinor = age === null || age < 18;
+    const isMinor = age !== null && age <= 18;
 
     if (age !== null) {
         ageDisplay.textContent = age + ' years old';
@@ -1871,11 +2254,8 @@ function initWalkinPage() {
 
     // Seed dropdowns
     loadWalkinBranches();
-    loadWalkinSessionPackages();
 
     const branchSelect = document.getElementById('walkin_branch_id');
-    const sessionPackageSelect = document.getElementById('walkin_sessionPackage');
-    const paymentTypeSelect = document.getElementById('walkin_paymentType');
     const dobInput = document.getElementById('walkin_student_dob');
 
     if (dobInput) {
@@ -1887,18 +2267,7 @@ function initWalkinPage() {
 
     if (branchSelect) {
         branchSelect.addEventListener('change', function () {
-            loadWalkinInstruments(this.value);
-        });
-    }
-    if (sessionPackageSelect) {
-        sessionPackageSelect.addEventListener('change', function () {
-            updateWalkinInstrumentSelection();
-            calculateWalkinTotalFee();
-        });
-    }
-    if (paymentTypeSelect) {
-        paymentTypeSelect.addEventListener('change', function () {
-            calculateWalkinTotalFee();
+            // Branch still matters for profile and assignment later.
         });
     }
 
@@ -1907,33 +2276,6 @@ function initWalkinPage() {
 
         const btn = document.getElementById('walkinSubmitBtn');
         const btnText = document.getElementById('walkinSubmitBtnText');
-
-        // Collect instruments
-        const selectedInstrumentIds = [];
-        const instrumentSelects = document.querySelectorAll('#walkin_instrumentsContainer select[name="instruments[]"]');
-        const seen = new Set();
-        instrumentSelects.forEach(sel => {
-            const val = sel.value ? parseInt(sel.value, 10) : 0;
-            if (val && !seen.has(val)) {
-                selectedInstrumentIds.push(val);
-                seen.add(val);
-            }
-        });
-
-        if (selectedInstrumentIds.length === 0) {
-            showMessage('Please select at least one instrument.', 'error');
-            return;
-        }
-
-        // Ensure session package and payment type
-        if (!sessionPackageSelect || !sessionPackageSelect.value) {
-            showMessage('Please select a session package.', 'error');
-            return;
-        }
-        if (!paymentTypeSelect || !paymentTypeSelect.value) {
-            showMessage('Please select a payment type.', 'error');
-            return;
-        }
 
         // Prevent double submit (first request can succeed, second gets "email already registered")
         if (form.dataset.submitting === '1') {
@@ -1949,12 +2291,8 @@ function initWalkinPage() {
             data[key] = value;
         }
 
-        // Inject instruments and calculated fee
-        data['instruments'] = selectedInstrumentIds;
-        const totalFee = calculateWalkinTotalFee();
-        if (totalFee > 0) {
-            data['registration_fee_amount'] = totalFee;
-        }
+        // Initial registration is fixed at 1,000 and package is selected later.
+        data['registration_fee_amount'] = 1000;
 
         // mark as walk-in so backend uses simple default password
         data['is_walkin'] = true;
@@ -2144,7 +2482,7 @@ async function loadAllRegistrations() {
 // Display Registrations
 function displayRegistrations(registrations) {
     const tbody = document.getElementById('registrationsTable');
-    
+
     if (!tbody) {
         // Table doesn't exist on this page (e.g., dashboard page)
         return;
@@ -2172,6 +2510,9 @@ function displayRegistrations(registrations) {
 
         const statusClass = statusColors[reg.registration_status] || 'text-zinc-400 bg-zinc-400/10';
         const remaining = parseFloat(reg.registration_fee_amount) - parseFloat(reg.registration_fee_paid || 0);
+        const registrationProofLink = reg.registration_proof_path
+            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gold-300 hover:text-gold-200 underline mt-1"><i class="fas fa-file-alt"></i>Proof</a>`
+            : '<div class="text-xs text-zinc-500 mt-1">No proof uploaded</div>';
 
         return `
             <tr class="hover:bg-gold-500/5 transition">
@@ -2187,6 +2528,7 @@ function displayRegistrations(registrations) {
                 <td class="px-6 py-4">
                     <div class="text-white">₱${parseFloat(reg.registration_fee_amount || 0).toFixed(2)}</div>
                     ${remaining > 0 ? `<div class="text-sm text-red-400">Remaining: ₱${remaining.toFixed(2)}</div>` : ''}
+                    ${registrationProofLink}
                 </td>
                 <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded text-xs font-semibold ${statusClass}">
@@ -2240,7 +2582,7 @@ function updateStats(registrations) {
     const statFeePaid = document.getElementById('statFeePaid');
     const statApproved = document.getElementById('statApproved');
     const statTotal = document.getElementById('statTotal');
-    
+
     if (statPending) statPending.textContent = stats.pending;
     if (statFeePaid) statFeePaid.textContent = stats.feePaid;
     if (statApproved) statApproved.textContent = stats.approved;
@@ -2275,6 +2617,7 @@ async function viewDetails(studentId) {
                             <p><span class="text-zinc-400">Fee Amount:</span> <span class="text-white">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</span></p>
                             <p><span class="text-zinc-400">Paid Amount:</span> <span class="text-white">₱${parseFloat(student.registration_fee_paid || 0).toFixed(2)}</span></p>
                             <p><span class="text-zinc-400">Remaining:</span> <span class="text-white">₱${(parseFloat(student.registration_fee_amount || 0) - parseFloat(student.registration_fee_paid || 0)).toFixed(2)}</span></p>
+                            <p><span class="text-zinc-400">Payment Proof:</span> <span class="text-white">${student.registration_proof_path ? `<a class="text-gold-300 underline" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.registration_proof_path)}">View file</a>` : 'N/A'}</span></p>
                         </div>
                     </div>
                 </div>
@@ -2393,9 +2736,7 @@ function initPaymentForm() {
         const paymentData = {
             student_id: currentStudentId,
             amount: parseFloat(document.getElementById('paymentAmount').value),
-            payment_method: document.getElementById('paymentMethod').value,
-            receipt_number: document.getElementById('receiptNumber').value || null,
-            notes: document.getElementById('paymentNotes').value || null
+            payment_method: document.getElementById('paymentMethod').value
         };
 
         try {

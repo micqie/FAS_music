@@ -119,7 +119,7 @@ class Branch
         $address = trim($data['address'] ?? '');
         $phone = trim($data['phone'] ?? '');
         $email = trim($data['email'] ?? '');
-        $status = isset($data['status']) && in_array($data['status'], ['Active', 'Inactive'], true) ? $data['status'] : 'Active';
+        $status = 'Active';
 
         if ($name === '') {
             $this->sendJSON(['error' => 'Branch name is required'], 400);
@@ -150,7 +150,6 @@ class Branch
         $address = trim($data['address'] ?? '');
         $phone = trim($data['phone'] ?? '');
         $email = trim($data['email'] ?? '');
-        $status = isset($data['status']) && in_array($data['status'], ['Active', 'Inactive'], true) ? $data['status'] : 'Active';
 
         if ($id < 1) {
             $this->sendJSON(['error' => 'Branch ID is required'], 400);
@@ -162,10 +161,35 @@ class Branch
         try {
             $stmt = $this->conn->prepare("
                 UPDATE tbl_branches
-                SET branch_name = ?, address = ?, phone = ?, email = ?, status = ?
+                SET branch_name = ?, address = ?, phone = ?, email = ?
                 WHERE branch_id = ?
             ");
-            $stmt->execute([$name, $address ?: null, $phone ?: null, $email ?: null, $status, $id]);
+            $stmt->execute([$name, $address ?: null, $phone ?: null, $email ?: null, $id]);
+            if ($stmt->rowCount() === 0) {
+                $this->sendJSON(['error' => 'Branch not found'], 404);
+            }
+            $this->sendJSON(['success' => true]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // Activate branch
+    public function activateBranch()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $id = (int) ($data['branch_id'] ?? 0);
+        if ($id < 1) {
+            $this->sendJSON(['error' => 'Branch ID is required'], 400);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("UPDATE tbl_branches SET status = 'Active' WHERE branch_id = ?");
+            $stmt->execute([$id]);
             if ($stmt->rowCount() === 0) {
                 $this->sendJSON(['error' => 'Branch not found'], 404);
             }
@@ -231,6 +255,9 @@ switch ($action) {
         break;
     case 'delete-branch':
         $branch->deleteBranch();
+        break;
+    case 'activate-branch':
+        $branch->activateBranch();
         break;
     default:
         $branch->sendJSON(['error' => 'Invalid action'], 400);

@@ -1,4 +1,9 @@
 <?php
+// Suppress error display for JSON APIs
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
 require_once 'db_connect.php';
 
 header("Content-Type: application/json");
@@ -7,6 +12,13 @@ header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0);
+
+// Check if database connection exists
+if (!isset($conn) || $conn === null) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database connection failed']);
+    exit;
+}
 
 class Instruments
 {

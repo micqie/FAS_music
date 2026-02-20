@@ -66,6 +66,9 @@
                     <a href="admin_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Students
                     </a>
+                    <a href="admin_enrollments.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-clipboard-list mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Enrollments
+                    </a>
                     <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
                     </a>
@@ -81,6 +84,10 @@
                     <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
                     </a>
+                    <a href="admin_package.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-box mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Packages
+                    </a>
+
                 </nav>
             </div>
         </div>
@@ -123,7 +130,7 @@
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Students</p>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1"> Active Students</p>
                             <h2 id="statApproved" class="text-3xl font-bold text-slate-800">0</h2>
                         </div>
                         <div class="p-2 bg-blue-50 rounded-lg"><i class="fas fa-user-check text-blue-500"></i></div>
@@ -138,6 +145,7 @@
                         <div class="p-2 bg-slate-100 rounded-lg"><i class="fas fa-database text-slate-500"></i></div>
                     </div>
                 </div>
+
             </div>
 
             <!-- Quick Actions & Branches Grid -->
@@ -217,12 +225,39 @@
     <script src="../../js/index.js"></script>
     <script>
         // Load Dashboard Stats
+        function formatPeso(value) {
+            const num = Number(value) || 0;
+            return `₱${num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
         async function loadDashboardStats() {
             try {
-                const data = await apiGet('admin.php?action=get-all-registrations');
-                if (data.success && data.registrations) {
-                    updateStats(data.registrations);
-                    displayRecentActivity(data.registrations);
+                const [registrationsResult, revenueResult] = await Promise.allSettled([
+                    apiGet('admin.php?action=get-all-registrations'),
+                    apiGet('admin.php?action=get-revenue-summary')
+                ]);
+                const registrationsData = registrationsResult.status === 'fulfilled' ? registrationsResult.value : null;
+                const revenueData = revenueResult.status === 'fulfilled' ? revenueResult.value : null;
+
+                if (registrationsData && registrationsData.success && registrationsData.registrations) {
+                    updateStats(registrationsData.registrations);
+                    displayRecentActivity(registrationsData.registrations);
+                }
+
+                const revenueEl = document.getElementById('statFeePaid');
+                if (revenueEl) {
+                    if (revenueData && revenueData.success) {
+                        revenueEl.textContent = formatPeso(revenueData.total_revenue);
+                    } else if (registrationsData && registrationsData.success && registrationsData.registrations) {
+                        // Fallback: sum paid registration amounts from loaded rows
+                        const fallbackRevenue = registrationsData.registrations.reduce(
+                            (sum, reg) => sum + (parseFloat(reg.registration_fee_paid) || 0),
+                            0
+                        );
+                        revenueEl.textContent = formatPeso(fallbackRevenue);
+                    } else {
+                        revenueEl.textContent = formatPeso(0);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to load dashboard stats:', error);

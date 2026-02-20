@@ -62,6 +62,9 @@
                     <a href="admin_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Students
                     </a>
+                    <a href="admin_enrollments.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-clipboard-list mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Enrollments
+                    </a>
                     <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
                     </a>
@@ -97,6 +100,10 @@
                     <h1 class="text-3xl font-black text-slate-900 tracking-tight">Instruments</h1>
                     <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
                     <p class="text-slate-500 mt-2">Manage instruments and instrument types</p>
+                    <div class="mt-4 inline-flex rounded-xl border border-slate-200 bg-white p-1">
+                        <button id="tabInstrumentsBtn" class="px-4 py-2 rounded-lg text-sm font-semibold bg-gold-500 text-black">Instruments</button>
+                        <button id="tabTypesBtn" class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900">Types</button>
+                    </div>
                 </div>
                 <div class="flex gap-3">
                     <button id="openAddTypeModalBtn"
@@ -115,6 +122,7 @@
         <!-- Messages -->
         <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
 
+        <div id="instrumentsPanel">
         <!-- Filters -->
         <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
@@ -151,13 +159,42 @@
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Condition</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="instrumentsTable" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading instruments...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </div>
+
+        <!-- Instrument Type Master -->
+        <div id="typesPanel" class="mt-6 bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden hidden">
+            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-list mr-2 text-gold-500"></i>Instrument Type Master</h3>
+                <span class="text-xs text-slate-500" id="typeCount">Loading...</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type Name</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="typesTable" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="3" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading instrument types...</p>
                             </td>
                         </tr>
                     </tbody>
@@ -200,6 +237,110 @@
                     <button type="submit" id="submitTypeBtn"
                         class="inline-flex items-center px-6 py-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold rounded-lg shadow transition">
                         <span id="submitTypeBtnText">Add Type</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Instrument Modal -->
+    <div id="editInstrumentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
+            <button id="closeEditInstrumentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <h3 class="text-2xl font-bold text-white mb-2">Edit Instrument</h3>
+            <p class="text-zinc-400 text-xs mb-4">Update instrument details or status</p>
+
+            <form id="editInstrumentForm" class="space-y-4">
+                <input type="hidden" id="editInstrumentId">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Branch *</label>
+                        <select id="editInstrumentBranchId" required
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <option value="">Select Branch</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Instrument Type *</label>
+                        <select id="editInstrumentTypeId" required
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <option value="">Select Type</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Instrument Name *</label>
+                        <input type="text" id="editInstrumentName" required
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Serial Number</label>
+                        <input type="text" id="editSerialNumber"
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Condition</label>
+                        <input type="text" id="editCondition"
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Status *</label>
+                        <select id="editInstrumentStatus" required
+                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <option value="Active">Active</option>
+                            <option value="Available">Available</option>
+                            <option value="In Use">In Use</option>
+                            <option value="Under Repair">Under Repair</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 pt-4">
+                    <button type="button" id="cancelEditInstrumentBtn"
+                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitEditInstrumentBtn"
+                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                        <span id="submitEditInstrumentBtnText">Save Instrument</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Instrument Type Modal -->
+    <div id="editTypeModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+            <button id="closeEditTypeModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <h3 class="text-2xl font-bold text-white mb-2">Edit Instrument Type</h3>
+            <p class="text-zinc-400 text-xs mb-4">Update type name and description</p>
+
+            <form id="editTypeForm" class="space-y-4">
+                <input type="hidden" id="editTypeId">
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Type Name *</label>
+                    <input type="text" id="editTypeName" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
+                    <textarea id="editTypeDescription" rows="3"
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-3 pt-4">
+                    <button type="button" id="cancelEditTypeBtn"
+                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitEditTypeBtn"
+                        class="inline-flex items-center px-6 py-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold rounded-lg shadow transition">
+                        <span id="submitEditTypeBtnText">Save Changes</span>
                     </button>
                 </div>
             </form>
@@ -267,6 +408,8 @@
     <script>
         let allInstruments = [];
         let filteredInstruments = [];
+        let allTypes = [];
+        let allBranches = [];
 
         // Show message (SweetAlert)
         function showMessage(message, type = 'error') {
@@ -288,6 +431,7 @@
                 const data = await response.json();
 
                 if (data.success && data.branches) {
+                    allBranches = data.branches;
                     const options = data.branches.map(branch =>
                         `<option value="${branch.branch_id}">${branch.branch_name}</option>`
                     ).join('');
@@ -297,6 +441,10 @@
                     }
                     if (instrumentBranchId) {
                         instrumentBranchId.innerHTML = '<option value="">Select Branch</option>' + options;
+                    }
+                    const editBranchId = document.getElementById('editInstrumentBranchId');
+                    if (editBranchId) {
+                        editBranchId.innerHTML = '<option value="">Select Branch</option>' + options;
                     }
                 }
             } catch (error) {
@@ -314,6 +462,7 @@
                 const data = await response.json();
 
                 if (data.success && data.types) {
+                    allTypes = data.types;
                     const options = data.types.map(type =>
                         `<option value="${type.type_id}">${type.type_name}</option>`
                     ).join('');
@@ -324,10 +473,59 @@
                     if (instrumentTypeId) {
                         instrumentTypeId.innerHTML = '<option value="">Select Type</option>' + options;
                     }
+                    const editTypeId = document.getElementById('editInstrumentTypeId');
+                    if (editTypeId) {
+                        editTypeId.innerHTML = '<option value="">Select Type</option>' + options;
+                    }
+                    displayTypeMaster();
                 }
             } catch (error) {
                 console.error('Failed to load instrument types:', error);
             }
+        }
+
+        function displayTypeMaster() {
+            const tableBody = document.getElementById('typesTable');
+            const countDiv = document.getElementById('typeCount');
+            if (!tableBody) return;
+
+            if (!allTypes.length) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="px-6 py-8 text-center text-slate-500">
+                            <i class="fas fa-inbox text-2xl mb-2"></i>
+                            <p>No instrument types found</p>
+                        </td>
+                    </tr>
+                `;
+                if (countDiv) countDiv.textContent = '0 types';
+                return;
+            }
+
+            tableBody.innerHTML = allTypes.map(type => {
+                const safeName = JSON.stringify(type.type_name || '');
+                const safeDesc = JSON.stringify(type.description || '');
+                return `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="px-6 py-4 text-slate-900 font-medium">${escapeHtml(type.type_name || 'N/A')}</td>
+                    <td class="px-6 py-4 text-slate-600">${escapeHtml(type.description || '-')}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <button onclick='openEditTypeModal(${Number(type.type_id)}, ${safeName}, ${safeDesc})'
+                                class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold">
+                                Edit
+                            </button>
+                            <button onclick='deleteInstrumentType(${Number(type.type_id)}, ${safeName})'
+                                class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold">
+                                Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            }).join('');
+
+            if (countDiv) countDiv.textContent = `${allTypes.length} ${allTypes.length === 1 ? 'type' : 'types'}`;
         }
 
         // Load instruments
@@ -358,7 +556,7 @@
                 } else {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-inbox text-2xl mb-2"></i>
                                 <p>No instruments found</p>
                             </td>
@@ -374,7 +572,7 @@
                 if (tableBody) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
+                            <td colspan="7" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
                                 <i class="fas fa-exclamation-circle text-2xl mb-2 text-red-500"></i>
                                 <p>Failed to load instruments</p>
                             </td>
@@ -392,7 +590,7 @@
             if (!filteredInstruments || filteredInstruments.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                        <td colspan="7" class="px-6 py-8 text-center text-slate-500">
                             <i class="fas fa-inbox text-2xl mb-2"></i>
                             <p>No instruments found</p>
                         </td>
@@ -425,6 +623,18 @@
                             <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
                                 ${instrument.status || 'N/A'}
                             </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <button onclick="openEditInstrumentModal(${Number(instrument.instrument_id)})"
+                                    class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold">
+                                    Edit
+                                </button>
+                                <button onclick="deleteInstrument(${Number(instrument.instrument_id)}, ${JSON.stringify(instrument.instrument_name || '')})"
+                                    class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold">
+                                    Delete
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -471,6 +681,7 @@
                     form.reset();
                     closeAddTypeModal();
                     await loadInstrumentTypes();
+                    await loadInstruments();
                 } else {
                     showMessage(result.error || 'Failed to add instrument type', 'error');
                 }
@@ -481,6 +692,115 @@
                 submitBtn.disabled = false;
                 submitBtnText.textContent = 'Add Type';
             }
+        }
+
+        function decodeEntities(str) {
+            if (!str) return '';
+            const txt = document.createElement('textarea');
+            txt.innerHTML = str;
+            return txt.value;
+        }
+
+        function openEditTypeModal(typeId, typeName, description) {
+            const modal = document.getElementById('editTypeModal');
+            if (!modal) return;
+            document.getElementById('editTypeId').value = String(typeId || '');
+            document.getElementById('editTypeName').value = decodeEntities(typeName || '');
+            document.getElementById('editTypeDescription').value = decodeEntities(description || '');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeEditTypeModal() {
+            const modal = document.getElementById('editTypeModal');
+            const form = document.getElementById('editTypeForm');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            if (form) form.reset();
+        }
+
+        async function updateInstrumentType() {
+            const typeId = Number(document.getElementById('editTypeId')?.value || 0);
+            const typeName = document.getElementById('editTypeName')?.value?.trim() || '';
+            const description = document.getElementById('editTypeDescription')?.value?.trim() || '';
+            const submitBtn = document.getElementById('submitEditTypeBtn');
+            const submitBtnText = document.getElementById('submitEditTypeBtnText');
+
+            if (!typeId || !typeName) {
+                showMessage('Type ID and name are required.', 'error');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtnText.textContent = 'Saving...';
+            try {
+                const response = await fetch(`${baseApiUrl}/instruments.php?action=update-type`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type_id: typeId,
+                        type_name: typeName,
+                        description: description || null
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showMessage(result.message || 'Instrument type updated successfully', 'success');
+                    closeEditTypeModal();
+                    await loadInstrumentTypes();
+                    await loadInstruments();
+                } else {
+                    showMessage(result.error || 'Failed to update instrument type', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to update instrument type:', error);
+                showMessage('An error occurred. Please try again.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtnText.textContent = 'Save Changes';
+            }
+        }
+
+        async function deleteInstrumentType(typeId, typeName) {
+            const cleanName = decodeEntities(typeName || 'this type');
+            const confirm = await Swal.fire({
+                icon: 'warning',
+                title: 'Delete Instrument Type?',
+                text: `This will delete "${cleanName}" if not used by instruments.`,
+                showCancelButton: true,
+                confirmButtonText: 'Delete',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#dc2626'
+            });
+            if (!confirm.isConfirmed) return;
+
+            try {
+                const response = await fetch(`${baseApiUrl}/instruments.php?action=delete-type`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type_id: Number(typeId) })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showMessage(result.message || 'Instrument type deleted successfully', 'success');
+                    await loadInstrumentTypes();
+                    await loadInstruments();
+                } else {
+                    showMessage(result.error || 'Failed to delete instrument type', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to delete instrument type:', error);
+                showMessage('An error occurred. Please try again.', 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
         }
 
         // Add Instrument
@@ -568,6 +888,138 @@
             if (messageDiv) messageDiv.classList.add('hidden');
         }
 
+        function switchInstrumentTab(tab) {
+            const instrumentsPanel = document.getElementById('instrumentsPanel');
+            const typesPanel = document.getElementById('typesPanel');
+            const tabInstrumentsBtn = document.getElementById('tabInstrumentsBtn');
+            const tabTypesBtn = document.getElementById('tabTypesBtn');
+            const addTypeBtn = document.getElementById('openAddTypeModalBtn');
+            const addInstrumentBtn = document.getElementById('openAddInstrumentModalBtn');
+            if (!instrumentsPanel || !typesPanel || !tabInstrumentsBtn || !tabTypesBtn) return;
+
+            if (tab === 'types') {
+                instrumentsPanel.classList.add('hidden');
+                typesPanel.classList.remove('hidden');
+                tabTypesBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold bg-gold-500 text-black';
+                tabInstrumentsBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900';
+                if (addTypeBtn) addTypeBtn.classList.remove('hidden');
+                if (addInstrumentBtn) addInstrumentBtn.classList.add('hidden');
+            } else {
+                typesPanel.classList.add('hidden');
+                instrumentsPanel.classList.remove('hidden');
+                tabInstrumentsBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold bg-gold-500 text-black';
+                tabTypesBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900';
+                if (addTypeBtn) addTypeBtn.classList.add('hidden');
+                if (addInstrumentBtn) addInstrumentBtn.classList.remove('hidden');
+            }
+        }
+
+        function openEditInstrumentModal(instrumentId) {
+            const instrument = (allInstruments || []).find(i => Number(i.instrument_id) === Number(instrumentId));
+            if (!instrument) {
+                showMessage('Instrument not found.', 'error');
+                return;
+            }
+            const modal = document.getElementById('editInstrumentModal');
+            if (!modal) return;
+            document.getElementById('editInstrumentId').value = String(instrument.instrument_id || '');
+            document.getElementById('editInstrumentBranchId').value = String(instrument.branch_id || '');
+            document.getElementById('editInstrumentTypeId').value = String(instrument.type_id || '');
+            document.getElementById('editInstrumentName').value = instrument.instrument_name || '';
+            document.getElementById('editSerialNumber').value = instrument.serial_number || '';
+            document.getElementById('editCondition').value = instrument.condition || '';
+            document.getElementById('editInstrumentStatus').value = instrument.status || 'Active';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeEditInstrumentModal() {
+            const modal = document.getElementById('editInstrumentModal');
+            const form = document.getElementById('editInstrumentForm');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            if (form) form.reset();
+        }
+
+        async function updateInstrument() {
+            const instrumentId = Number(document.getElementById('editInstrumentId')?.value || 0);
+            const payload = {
+                instrument_id: instrumentId,
+                branch_id: Number(document.getElementById('editInstrumentBranchId')?.value || 0),
+                type_id: Number(document.getElementById('editInstrumentTypeId')?.value || 0),
+                instrument_name: document.getElementById('editInstrumentName')?.value?.trim() || '',
+                serial_number: document.getElementById('editSerialNumber')?.value?.trim() || null,
+                condition: document.getElementById('editCondition')?.value?.trim() || null,
+                status: document.getElementById('editInstrumentStatus')?.value || 'Active'
+            };
+            if (!payload.instrument_id || !payload.branch_id || !payload.type_id || !payload.instrument_name) {
+                showMessage('Please complete all required fields.', 'error');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitEditInstrumentBtn');
+            const submitBtnText = document.getElementById('submitEditInstrumentBtnText');
+            submitBtn.disabled = true;
+            submitBtnText.textContent = 'Saving...';
+            try {
+                const response = await fetch(`${baseApiUrl}/instruments.php?action=update-instrument`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showMessage(result.message || 'Instrument updated successfully', 'success');
+                    closeEditInstrumentModal();
+                    await loadInstruments();
+                } else {
+                    showMessage(result.error || 'Failed to update instrument', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to update instrument:', error);
+                showMessage('An error occurred. Please try again.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtnText.textContent = 'Save Instrument';
+            }
+        }
+
+        async function deleteInstrument(instrumentId, instrumentName) {
+            const confirm = await Swal.fire({
+                icon: 'warning',
+                title: 'Delete Instrument?',
+                text: `This will mark "${instrumentName || 'instrument'}" as Inactive.`,
+                showCancelButton: true,
+                confirmButtonText: 'Delete',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#dc2626'
+            });
+            if (!confirm.isConfirmed) return;
+
+            try {
+                const response = await fetch(`${baseApiUrl}/instruments.php?action=update-instrument`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instrument_id: Number(instrumentId),
+                        status: 'Inactive'
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showMessage('Instrument marked as Inactive.', 'success');
+                    await loadInstruments();
+                } else {
+                    showMessage(result.error || 'Failed to delete instrument', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to delete instrument:', error);
+                showMessage('An error occurred. Please try again.', 'error');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             // Load user info in top nav
             if (typeof Auth !== 'undefined' && Auth.getUser) {
@@ -582,6 +1034,7 @@
             loadBranches();
             loadInstrumentTypes();
             loadInstruments();
+            switchInstrumentTab('instruments');
 
             // Modal event listeners
             document.getElementById('openAddTypeModalBtn')?.addEventListener('click', openAddTypeModal);
@@ -599,6 +1052,20 @@
                 e.preventDefault();
                 addInstrument();
             });
+            document.getElementById('closeEditInstrumentModalBtn')?.addEventListener('click', closeEditInstrumentModal);
+            document.getElementById('cancelEditInstrumentBtn')?.addEventListener('click', closeEditInstrumentModal);
+            document.getElementById('editInstrumentForm')?.addEventListener('submit', function(e) {
+                e.preventDefault();
+                updateInstrument();
+            });
+            document.getElementById('closeEditTypeModalBtn')?.addEventListener('click', closeEditTypeModal);
+            document.getElementById('cancelEditTypeBtn')?.addEventListener('click', closeEditTypeModal);
+            document.getElementById('editTypeForm')?.addEventListener('submit', function(e) {
+                e.preventDefault();
+                updateInstrumentType();
+            });
+            document.getElementById('tabInstrumentsBtn')?.addEventListener('click', () => switchInstrumentTab('instruments'));
+            document.getElementById('tabTypesBtn')?.addEventListener('click', () => switchInstrumentTab('types'));
 
             // Filter event listeners
             document.getElementById('branchFilter')?.addEventListener('change', loadInstruments);

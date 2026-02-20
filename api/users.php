@@ -1,4 +1,9 @@
 <?php
+// Suppress error display for JSON APIs
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
 require_once 'db_connect.php';
 
 header("Content-Type: application/json");
@@ -7,6 +12,13 @@ header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0);
+
+// Check if database connection exists
+if (!isset($conn) || $conn === null) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database connection failed']);
+    exit;
+}
 
 class User
 {
@@ -17,11 +29,108 @@ class User
         $this->conn = $pdo;
     }
 
-    private function sendJSON($data, $statusCode = 200)
+    public function sendJSON($data, $statusCode = 200)
     {
         http_response_code($statusCode);
         echo json_encode($data);
         exit;
+    }
+
+    private function tableExists($tableName)
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function hasStudentColumn($columnName)
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW COLUMNS FROM tbl_students LIKE ?");
+            $stmt->execute([$columnName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function isMultipartRequest()
+    {
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? ($_SERVER['HTTP_CONTENT_TYPE'] ?? '');
+        return stripos((string)$contentType, 'multipart/form-data') !== false;
+    }
+
+    private function ensureStudentRegistrationProofColumn()
+    {
+        try {
+            $check = $this->conn->query("SHOW COLUMNS FROM tbl_students LIKE 'registration_proof_path'");
+            if ($check && $check->rowCount() > 0) return;
+            $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL");
+        } catch (PDOException $e) {
+            // Do not break registration flow
+        }
+    }
+
+    private function ensureStudentRegistrationColumns()
+    {
+        try {
+            if (!$this->hasStudentColumn('registration_fee_amount')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_fee_amount DECIMAL(10,2) DEFAULT 0");
+            }
+            if (!$this->hasStudentColumn('registration_fee_paid')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_fee_paid DECIMAL(10,2) DEFAULT 0");
+            }
+            if (!$this->hasStudentColumn('registration_status')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_status ENUM('Pending','Fee Paid','Approved','Rejected') DEFAULT 'Pending'");
+            }
+        } catch (PDOException $e) {
+            // Keep registration flow alive even if schema migration fails
+        }
+    }
+
+    private function storePaymentProofUpload($file, $scope = 'registration')
+    {
+        if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+            throw new Exception('Failed to upload payment proof file.');
+        }
+
+        $maxBytes = 5 * 1024 * 1024; // 5MB
+        $size = (int)($file['size'] ?? 0);
+        if ($size < 1 || $size > $maxBytes) {
+            throw new Exception('Payment proof file must be between 1 byte and 5MB.');
+        }
+
+        $tmpName = $file['tmp_name'] ?? '';
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+            throw new Exception('Invalid uploaded file.');
+        }
+
+        $allowedExt = ['jpg', 'jpeg', 'png', 'pdf', 'webp'];
+        $originalName = (string)($file['name'] ?? '');
+        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowedExt, true)) {
+            throw new Exception('Payment proof must be JPG, JPEG, PNG, WEBP, or PDF.');
+        }
+
+        $baseDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'payment_proofs' . DIRECTORY_SEPARATOR . $scope;
+        if (!is_dir($baseDir) && !mkdir($baseDir, 0777, true) && !is_dir($baseDir)) {
+            throw new Exception('Unable to create upload directory.');
+        }
+
+        $safeName = date('YmdHis') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+        $targetPath = $baseDir . DIRECTORY_SEPARATOR . $safeName;
+        if (!move_uploaded_file($tmpName, $targetPath)) {
+            throw new Exception('Unable to save payment proof file.');
+        }
+
+        return 'uploads/payment_proofs/' . $scope . '/' . $safeName;
     }
 
     public function login($json)
@@ -143,7 +252,8 @@ class User
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
 
-        $data = json_decode($json, true);
+        $isMultipart = $this->isMultipartRequest();
+        $data = $isMultipart ? $_POST : json_decode($json, true);
         if (!is_array($data)) {
             $this->sendJSON(['error' => 'Invalid request data'], 400);
         }
@@ -189,9 +299,9 @@ class User
             $now = new DateTime();
             $age = $now->diff($dob)->y;
         }
-        $isMinor = ($age === null) || ($age < 18); // No DOB or under 18 = require guardian
+        $isMinor = ($age !== null) && ($age <= 18); // Guardian required only for 18 and below
 
-        // Guardian required only for minors (under 18)
+        // Guardian required only for students aged 18 and below
         if ($isMinor) {
             $guardianLabels = [
                 'guardian_first_name' => 'Guardian First Name',
@@ -203,7 +313,7 @@ class User
                 $val = $data[$field] ?? '';
                 if ($val === '' || $val === null) {
                     $label = $guardianLabels[$field] ?? $field;
-                    $this->sendJSON(['error' => 'Guardian information is required for students under 18. Please fill in ' . $label . '.'], 400);
+                    $this->sendJSON(['error' => 'Guardian information is required for students aged 18 and below. Please fill in ' . $label . '.'], 400);
                 }
             }
         }
@@ -217,6 +327,61 @@ class User
             if (strlen($email) > 254) {
                 $this->sendJSON(['error' => 'Email address is too long (max 254 characters)'], 400);
             }
+
+            // One-time registration fee guard:
+            // If this email already exists as a student and already settled registration,
+            // do not allow a new registration that would charge again.
+            $hasStudentRegistrationCols =
+                $this->hasStudentColumn('registration_status')
+                && $this->hasStudentColumn('registration_fee_paid');
+
+            if ($hasStudentRegistrationCols) {
+                $existingStudentStmt = $this->conn->prepare("
+                    SELECT student_id, registration_status, registration_fee_paid
+                    FROM tbl_students
+                    WHERE email = ?
+                    LIMIT 1
+                ");
+                $existingStudentStmt->execute([$email]);
+                $existingStudent = $existingStudentStmt->fetch(PDO::FETCH_ASSOC);
+            } else {
+                $existingStudentStmt = $this->conn->prepare("
+                    SELECT
+                        s.student_id,
+                        COALESCE(e.registration_status, 'Pending') AS registration_status,
+                        COALESCE(e.registration_fee_paid, 0) AS registration_fee_paid
+                    FROM tbl_students s
+                    LEFT JOIN (
+                        SELECT e1.*
+                        FROM tbl_enrollments e1
+                        INNER JOIN (
+                            SELECT student_id, MAX(enrollment_id) AS max_enrollment_id
+                            FROM tbl_enrollments
+                            GROUP BY student_id
+                        ) latest ON latest.max_enrollment_id = e1.enrollment_id
+                    ) e ON e.student_id = s.student_id
+                    WHERE s.email = ?
+                    LIMIT 1
+                ");
+                $existingStudentStmt->execute([$email]);
+                $existingStudent = $existingStudentStmt->fetch(PDO::FETCH_ASSOC);
+            }
+            if ($existingStudent) {
+                $alreadySettled = ((float)($existingStudent['registration_fee_paid'] ?? 0) >= 1000)
+                    || in_array($existingStudent['registration_status'], ['Approved', 'Fee Paid'], true);
+
+                if ($alreadySettled) {
+                    $this->sendJSON([
+                        'error' => 'This student is already registered. The ₱1,000 registration fee is one-time only and should not be paid again.'
+                    ], 400);
+                }
+
+                // Existing record but not yet settled: avoid duplicate registration row.
+                $this->sendJSON([
+                    'error' => 'A registration request for this email already exists and is still being processed. Please wait for desk staff confirmation.'
+                ], 400);
+            }
+
             // Check if email or username already exists (email is used as username)
             $dupCheck = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
             $dupCheck->execute([$email, $email]);
@@ -254,13 +419,25 @@ class User
             }
         }
 
-        // Set default registration fee if not provided
-        if (empty($data['registration_fee_amount'])) {
-            $data['registration_fee_amount'] = 0;
+        // Initial registration fee is fixed.
+        $data['registration_fee_amount'] = 1000;
+
+        $registrationProofPath = null;
+        if ($isMultipart && isset($_FILES['registration_proof_file'])) {
+            try {
+                $registrationProofPath = $this->storePaymentProofUpload($_FILES['registration_proof_file'], 'registration');
+            } catch (Exception $e) {
+                $this->sendJSON(['error' => $e->getMessage()], 400);
+            }
+        }
+        if (!$isAdminRegistration && empty($registrationProofPath)) {
+            $this->sendJSON(['error' => 'Registration payment proof is required.'], 400);
         }
 
         try {
             $this->conn->beginTransaction();
+            $this->ensureStudentRegistrationColumns();
+            $this->ensureStudentRegistrationProofColumn();
 
             // Get default role for students
             $roleStmt = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = 'Student' LIMIT 1");
@@ -271,74 +448,68 @@ class User
 
             $roleId = $role['role_id'];
 
-            // Insert Student
-            // Check if session_package_id column exists
-            $hasSessionPackageCol = false;
-            try {
-                $checkCol = $this->conn->query("SHOW COLUMNS FROM tbl_students LIKE 'session_package_id'");
-                $hasSessionPackageCol = $checkCol->rowCount() > 0;
-            } catch (PDOException $e) {
-                // Table might not exist or error checking
-            }
+            // Insert Student (schema-aware)
+            $hasSessionPackageCol = $this->hasStudentColumn('session_package_id');
+            $hasRegistrationProofCol = $this->hasStudentColumn('registration_proof_path');
+            $hasRegAmountCol = $this->hasStudentColumn('registration_fee_amount');
+            $hasRegStatusCol = $this->hasStudentColumn('registration_status');
+            $hasRegPaidCol = $this->hasStudentColumn('registration_fee_paid');
+            $hasStudentRegistrationCols = $hasRegAmountCol && $hasRegStatusCol;
 
             $regStatus = $isAdminRegistration ? 'Approved' : 'Pending';
             $studentStatus = $isAdminRegistration ? 'Active' : 'Inactive';
 
+            $studentColumns = [
+                'branch_id', 'first_name', 'last_name', 'middle_name', 'date_of_birth',
+                'age', 'phone', 'email', 'address', 'school', 'grade_year', 'health_diagnosis',
+                'status'
+            ];
+            $studentValues = [
+                $data['branch_id'],
+                $data['student_first_name'],
+                $data['student_last_name'],
+                $data['student_middle_name'] ?? null,
+                $data['student_date_of_birth'] ?? null,
+                $age ?? $data['student_age'] ?? null,
+                $data['student_phone'],
+                $data['student_email'],
+                $data['student_address'] ?? null,
+                $data['student_school'] ?? null,
+                $data['student_grade_year'] ?? null,
+                $data['student_health_diagnosis'] ?? null,
+                $studentStatus
+            ];
+
+            if ($hasRegAmountCol) {
+                $studentColumns[] = 'registration_fee_amount';
+                $studentValues[] = $data['registration_fee_amount'];
+            }
+            if ($hasRegPaidCol) {
+                $studentColumns[] = 'registration_fee_paid';
+                $studentValues[] = 0;
+            }
+            if ($hasRegStatusCol) {
+                $studentColumns[] = 'registration_status';
+                $studentValues[] = $regStatus;
+            }
+            if ($hasRegistrationProofCol) {
+                $studentColumns[] = 'registration_proof_path';
+                $studentValues[] = $registrationProofPath;
+            }
             if ($hasSessionPackageCol) {
-                $stmtStudent = $this->conn->prepare("
-                    INSERT INTO tbl_students (
-                        branch_id, first_name, last_name, middle_name, date_of_birth,
-                        age, phone, email, address, school, grade_year, health_diagnosis,
-                        registration_fee_amount, session_package_id, registration_status, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                $stmtStudent->execute([
-                    $data['branch_id'],
-                    $data['student_first_name'],
-                    $data['student_last_name'],
-                    $data['student_middle_name'] ?? null,
-                    $data['student_date_of_birth'] ?? null,
-                    $age ?? $data['student_age'] ?? null,
-                    $data['student_phone'],
-                    $data['student_email'],
-                    $data['student_address'] ?? null,
-                    $data['student_school'] ?? null,
-                    $data['student_grade_year'] ?? null,
-                    $data['student_health_diagnosis'] ?? null,
-                    $data['registration_fee_amount'],
-                    $data['session_package_id'] ?? null,
-                    $regStatus,
-                    $studentStatus
-                ]);
-            } else {
-                // Fallback if column doesn't exist
-                $stmtStudent = $this->conn->prepare("
-                    INSERT INTO tbl_students (
-                        branch_id, first_name, last_name, middle_name, date_of_birth,
-                        age, phone, email, address, school, grade_year, health_diagnosis,
-                        registration_fee_amount, registration_status, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                $stmtStudent->execute([
-                    $data['branch_id'],
-                    $data['student_first_name'],
-                    $data['student_last_name'],
-                    $data['student_middle_name'] ?? null,
-                    $data['student_date_of_birth'] ?? null,
-                    $age ?? $data['student_age'] ?? null,
-                    $data['student_phone'],
-                    $data['student_email'],
-                    $data['student_address'] ?? null,
-                    $data['student_school'] ?? null,
-                    $data['student_grade_year'] ?? null,
-                    $data['student_health_diagnosis'] ?? null,
-                    $data['registration_fee_amount'],
-                    $regStatus,
-                    $studentStatus
-                ]);
+                $studentColumns[] = 'session_package_id';
+                $studentValues[] = $data['session_package_id'] ?? null;
             }
 
-            $studentId = $this->conn->lastInsertId();
+            $studentPlaceholders = implode(',', array_fill(0, count($studentColumns), '?'));
+            $studentColsSql = implode(', ', $studentColumns);
+            $stmtStudent = $this->conn->prepare("
+                INSERT INTO tbl_students ({$studentColsSql})
+                VALUES ({$studentPlaceholders})
+            ");
+            $stmtStudent->execute($studentValues);
+
+            $studentId = (int)$this->conn->lastInsertId();
 
             // Insert Guardian and link only when guardian info is provided (required for minors, optional for 18+)
             $guardianId = null;
@@ -421,18 +592,23 @@ class User
                 'username' => $username,
                 'registration_status' => $regStatus,
                 'registration_fee_amount' => $data['registration_fee_amount'],
+                'registration_proof_path' => $registrationProofPath,
                 'account_status' => $isAdminRegistration ? 'Active - Can log in' : 'Inactive - Pending Admin Approval'
             ]);
 
         } catch (PDOException $e) {
-            $this->conn->rollBack();
+            if ($this->conn && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
             // User-friendly message for duplicate email/username
             if ($e->getCode() == 23000 && (strpos($e->getMessage(), 'Duplicate entry') !== false || strpos($e->getMessage(), 'username') !== false || strpos($e->getMessage(), 'email') !== false)) {
                 $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
             }
             $this->sendJSON(['error' => 'Registration failed: ' . $e->getMessage()], 500);
         } catch (Exception $e) {
-            $this->conn->rollBack();
+            if ($this->conn && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
             $this->sendJSON(['error' => 'Registration failed: ' . $e->getMessage()], 500);
         }
     }
@@ -504,13 +680,35 @@ class User
             ");
             $stmtPayment->execute([$data['student_id'], $data['amount'], $data['payment_method'], $receipt, $notes]);
 
-            $newStatus = ($remaining <= 0) ? 'Fee Paid' : 'Pending';
+            // Registration payment confirmation approves account once fully paid.
+            $newStatus = ($remaining <= 0) ? 'Approved' : 'Pending';
             $stmtUpdate = $this->conn->prepare("
                 UPDATE tbl_students
                 SET registration_fee_paid = ?, registration_status = ?
                 WHERE student_id = ?
             ");
             $stmtUpdate->execute([$newPaid, $newStatus, $data['student_id']]);
+
+            if ($newStatus === 'Approved') {
+                $stmtActivateStudent = $this->conn->prepare("
+                    UPDATE tbl_students
+                    SET status = 'Active'
+                    WHERE student_id = ?
+                ");
+                $stmtActivateStudent->execute([$data['student_id']]);
+
+                $stmtEmail = $this->conn->prepare("SELECT email FROM tbl_students WHERE student_id = ?");
+                $stmtEmail->execute([$data['student_id']]);
+                $studentRow = $stmtEmail->fetch(PDO::FETCH_ASSOC);
+                if (!empty($studentRow['email'])) {
+                    $stmtActivateUser = $this->conn->prepare("
+                        UPDATE tbl_users
+                        SET status = 'Active'
+                        WHERE email = ?
+                    ");
+                    $stmtActivateUser->execute([$studentRow['email']]);
+                }
+            }
 
             $this->conn->commit();
 

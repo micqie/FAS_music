@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Student Packages</title>
+    <title>Admin - Enrollments</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
@@ -62,11 +62,11 @@
                     <a href="admin_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Students
                     </a>
-                    <a href="admin_enrollments.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-clipboard-list mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Enrollments
+                    <a href="admin_enrollments.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-clipboard-list mr-3"></i> Enrollments
                     </a>
-                    <a href="admin_sessions.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
-                        <i class="fas fa-calendar-check mr-3"></i> Sessions
+                    <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
                     </a>
                 </nav>
             </div>
@@ -92,127 +92,57 @@
         </div>
     </aside>
 
-    <!-- Main Content -->
     <main class="lg:ml-72 pt-28 p-8">
         <div class="max-w-7xl mx-auto">
             <div class="mb-10">
-                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Student Packages</h1>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Enrollment Requests</h1>
                 <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
-                <p class="text-slate-500 mt-2">Assign session packages to active students</p>
+                <p class="text-slate-500 mt-2">Review and approve student package enrollment requests</p>
             </div>
 
-        <!-- Messages -->
-        <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
+            <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
 
-        <!-- Filters -->
-        <div class="mb-6">
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <label class="block text-sm font-medium text-slate-700 mb-2">
-                    <i class="fas fa-filter mr-2 text-gold-500"></i>Filter by Branch
-                </label>
-                <select id="branchFilter" class="w-full md:w-64 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
-                    <option value="">All Branches</option>
-                </select>
+            <div class="mb-6">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">
+                        <i class="fas fa-filter mr-2 text-gold-500"></i>Filter by Branch
+                    </label>
+                    <select id="branchFilter" class="w-full md:w-64 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
+                        <option value="">All Branches</option>
+                    </select>
+                </div>
             </div>
-        </div>
 
-        <!-- Pending Student Requests -->
-        <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden mb-6">
-            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Student Requests</h3>
-                <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+                <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+                    <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Enrollment Requests</h3>
+                    <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Requested Package</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingRequestsTable" class="divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>Loading requests...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Requested Package</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pendingRequestsTable" class="divide-y divide-slate-100">
-                        <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading requests...</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Students Table -->
-        <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-box mr-2 text-gold-500"></i>Active Students</h3>
-                <span class="text-xs text-slate-500" id="studentCount">Loading...</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Current Package</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Sessions</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="studentsTable" class="divide-y divide-slate-100">
-                        <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading students...</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
         </div>
     </main>
-
-    <!-- Assign Package Modal -->
-    <div id="assignPackageModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
-            <button id="closeAssignPackageModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-
-            <h3 class="text-2xl font-bold text-white mb-2">Assign Session Package</h3>
-            <p class="text-zinc-400 text-xs mb-4" id="assignPackageStudentInfo">Select a session package for this student</p>
-
-            <div id="assignPackageMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
-
-            <form id="assignPackageForm" class="space-y-4">
-                <input type="hidden" id="assignStudentId" value="">
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Session Package *</label>
-                    <select id="assignPackageSelect" required
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                        <option value="">Select Package</option>
-                    </select>
-                    <p class="text-xs text-zinc-500 mt-1">12 sessions = 1 instrument, 20 sessions = 2 instruments</p>
-                </div>
-                <div class="flex items-center justify-end gap-3 pt-4">
-                    <button type="button" id="cancelAssignPackageBtn"
-                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
-                        Cancel
-                    </button>
-                    <button type="submit" id="submitAssignPackageBtn"
-                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
-                        <span id="submitAssignPackageBtnText">Assign Package</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <!-- Assign Request Modal -->
     <div id="assignRequestModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -278,8 +208,6 @@
     <script src="../../js/mode.js"></script>
     <script src="../../js/index.js"></script>
     <script>
-        let allStudents = [];
-        let packagePagePackages = [];
         let pendingRequestsById = {};
 
         function showMessage(message, type = 'error') {
@@ -291,54 +219,18 @@
             });
         }
 
-        function showAssignPackageMessage(msg, type) {
-            Swal.fire({
-                icon: type === 'success' ? 'success' : 'error',
-                title: type === 'success' ? 'Success' : 'Error',
-                text: msg,
-                confirmButtonColor: '#b8860b'
-            });
-        }
-
         async function loadBranches() {
             const branchFilter = document.getElementById('branchFilter');
             if (!branchFilter) return;
-
             try {
                 const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
                 const data = await response.json();
-
                 if (data.success && data.branches) {
-                    const options = data.branches.map(branch =>
-                        `<option value="${branch.branch_id}">${branch.branch_name}</option>`
-                    ).join('');
+                    const options = data.branches.map(b => `<option value="${b.branch_id}">${b.branch_name}</option>`).join('');
                     branchFilter.innerHTML = '<option value="">All Branches</option>' + options;
                 }
             } catch (error) {
                 console.error('Failed to load branches:', error);
-            }
-        }
-
-        async function loadSessionPackages() {
-            try {
-                const response = await fetch(`${baseApiUrl}/sessions.php?action=get-packages`);
-                const data = await response.json();
-
-                if (data.success && data.packages) {
-                    packagePagePackages = data.packages;
-                    const select = document.getElementById('assignPackageSelect');
-                    if (select) {
-                        select.innerHTML = '<option value="">Select Package</option>';
-                        data.packages.forEach(pkg => {
-                            const option = document.createElement('option');
-                            option.value = pkg.package_id;
-                            option.textContent = `${pkg.package_name} (${pkg.sessions} sessions, ${pkg.max_instruments} instrument${pkg.max_instruments > 1 ? 's' : ''})`;
-                            select.appendChild(option);
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load session packages:', error);
             }
         }
 
@@ -357,16 +249,24 @@
             return `${appBase}/${cleanPath}`;
         }
 
-        function formatTime12Hour(timeString) {
-            if (!timeString) return '—';
-            const parts = String(timeString).split(':');
-            if (parts.length < 2) return timeString;
-            const h = parseInt(parts[0], 10);
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function getDayNameFromDate(dateValue) {
+            if (!dateValue) return '';
+            const parts = String(dateValue).split('-');
+            if (parts.length !== 3) return '';
+            const y = parseInt(parts[0], 10);
             const m = parseInt(parts[1], 10);
-            if (Number.isNaN(h) || Number.isNaN(m)) return timeString;
-            const suffix = h >= 12 ? 'PM' : 'AM';
-            const hh = h % 12 === 0 ? 12 : h % 12;
-            return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
+            const dNum = parseInt(parts[2], 10);
+            if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(dNum)) return '';
+            const d = new Date(y, m - 1, dNum);
+            if (Number.isNaN(d.getTime())) return '';
+            return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] || '';
         }
 
         async function loadPendingRequests() {
@@ -380,7 +280,6 @@
                 if (branchFilter && branchFilter.value) {
                     url += `&branch_id=${branchFilter.value}`;
                 }
-
                 const response = await fetch(url);
                 const data = await response.json();
                 const requests = data.success && Array.isArray(data.requests) ? data.requests : [];
@@ -392,7 +291,7 @@
                         <tr>
                             <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
-                                <p>No pending student requests.</p>
+                                <p>No pending enrollment requests.</p>
                             </td>
                         </tr>`;
                     return;
@@ -406,9 +305,7 @@
                     const instruments = Array.isArray(r.instruments) && r.instruments.length
                         ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
                         : '—';
-                    const schedule = r.preferred_day_of_week
-                        ? `${escapeHtml(r.preferred_day_of_week)}`
-                        : '—';
+                    const schedule = r.preferred_day_of_week ? `${escapeHtml(r.preferred_day_of_week)}` : '—';
                     const prefDate = r.preferred_date ? new Date(r.preferred_date).toLocaleDateString() : '—';
                     const paymentProofHtml = r.payment_proof_path
                         ? `<a href="${escapeHtml(buildPublicFileUrl(r.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">View payment proof</a>`
@@ -441,29 +338,16 @@
                         </tr>`;
                 }).join('');
             } catch (error) {
-                console.error('Failed to load pending package requests:', error);
+                console.error('Failed to load pending requests:', error);
                 if (countEl) countEl.textContent = 'Error';
                 tableBody.innerHTML = `
                     <tr>
                         <td colspan="6" class="px-6 py-8 text-center text-red-500">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                            <p>Failed to load pending requests.</p>
+                            <p>Failed to load requests.</p>
                         </td>
                     </tr>`;
             }
-        }
-
-        function getDayNameFromDate(dateValue) {
-            if (!dateValue) return '';
-            const parts = String(dateValue).split('-');
-            if (parts.length !== 3) return '';
-            const y = parseInt(parts[0], 10);
-            const m = parseInt(parts[1], 10);
-            const dNum = parseInt(parts[2], 10);
-            if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(dNum)) return '';
-            const d = new Date(y, m - 1, dNum);
-            if (Number.isNaN(d.getTime())) return '';
-            return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] || '';
         }
 
         function openAssignRequestModal(requestId) {
@@ -472,7 +356,6 @@
                 showMessage('Request not found.', 'error');
                 return;
             }
-
             const modal = document.getElementById('assignRequestModal');
             const info = document.getElementById('assignRequestStudentInfo');
             const requestIdEl = document.getElementById('assignRequestId');
@@ -508,9 +391,10 @@
 
         function closeAssignRequestModal() {
             const modal = document.getElementById('assignRequestModal');
-            if (!modal) return;
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
         }
 
         async function approveStudentRequest(payload) {
@@ -525,7 +409,6 @@
                     closeAssignRequestModal();
                     showMessage(data.message || 'Request approved.', 'success');
                     loadPendingRequests();
-                    loadActiveStudents();
                 } else {
                     showMessage(data.error || 'Failed to approve request.', 'error');
                 }
@@ -604,157 +487,6 @@
             }
         }
 
-        async function loadActiveStudents() {
-            const tableBody = document.getElementById('studentsTable');
-            const countEl = document.getElementById('studentCount');
-            if (!tableBody) return;
-
-            try {
-                const branchFilter = document.getElementById('branchFilter');
-                let url = `${baseApiUrl}/students.php?action=get-active-students`;
-                if (branchFilter && branchFilter.value) {
-                    url += `&branch_id=${branchFilter.value}`;
-                }
-
-                const response = await fetch(url);
-                const data = await response.json();
-
-                if (data.success && data.students) {
-                    allStudents = data.students;
-                    renderStudents(tableBody);
-                    if (countEl) countEl.textContent = `${data.students.length} student(s)`;
-                } else {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                                <p>No active students found.</p>
-                            </td>
-                        </tr>`;
-                    if (countEl) countEl.textContent = '0 students';
-                }
-            } catch (error) {
-                console.error('Failed to load students:', error);
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
-                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                            <p>Failed to load students. Please try again.</p>
-                        </td>
-                    </tr>`;
-            }
-        }
-
-        function renderStudents(tableBody) {
-            if (!allStudents.length) {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                            <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                            <p>No active students found.</p>
-                        </td>
-                    </tr>`;
-                return;
-            }
-
-            tableBody.innerHTML = allStudents.map(student => {
-                const packageName = student.package_name || 'Not Assigned';
-                const sessions = student.sessions || '—';
-                const statusBadge = student.registration_status === 'Fee Paid'
-                    ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-600">Fee Paid</span>'
-                    : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-600">Pending</span>';
-
-                return `
-                    <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-6 py-4">
-                            <div class="font-medium text-slate-900">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
-                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
-                        </td>
-                        <td class="px-6 py-4 text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
-                        <td class="px-6 py-4">
-                            <span class="text-sm ${student.package_name ? 'text-gold-500 font-medium' : 'text-zinc-500'}">${escapeHtml(packageName)}</span>
-                        </td>
-                        <td class="px-6 py-4 text-slate-700">${sessions}</td>
-                        <td class="px-6 py-4">${statusBadge}</td>
-                        <td class="px-6 py-4">
-                            <button onclick="openAssignPackageModal(${student.student_id}, '${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}', ${student.session_package_id || 'null'})"
-                                class="text-gold-500 hover:text-gold-400" title="Assign/Update Package">
-                                <i class="fas fa-box"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function escapeHtml(text) {
-            if (text == null) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function openAssignPackageModal(studentId, studentName, currentPackageId) {
-            const modal = document.getElementById('assignPackageModal');
-            const studentInfo = document.getElementById('assignPackageStudentInfo');
-            const studentIdInput = document.getElementById('assignStudentId');
-            const packageSelect = document.getElementById('assignPackageSelect');
-
-            if (modal && studentInfo && studentIdInput && packageSelect) {
-                studentInfo.textContent = `Select a session package for ${studentName}`;
-                studentIdInput.value = studentId;
-                packageSelect.value = currentPackageId || '';
-                document.getElementById('assignPackageMessage').classList.add('hidden');
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
-            }
-        }
-
-        function closeAssignPackageModal() {
-            const modal = document.getElementById('assignPackageModal');
-            const msg = document.getElementById('assignPackageMessage');
-            if (modal) {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            }
-            if (msg) msg.classList.add('hidden');
-        }
-
-        async function assignPackage(e) {
-            e.preventDefault();
-            const studentId = document.getElementById('assignStudentId').value;
-            const packageId = document.getElementById('assignPackageSelect').value;
-
-            if (!studentId || !packageId) {
-                showAssignPackageMessage('Please select a package.', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${baseApiUrl}/students.php`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'assign-package',
-                        student_id: parseInt(studentId),
-                        session_package_id: parseInt(packageId)
-                    })
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    closeAssignPackageModal();
-                    showMessage('Package assigned successfully.', 'success');
-                    loadActiveStudents();
-                } else {
-                    showAssignPackageMessage(data.error || 'Failed to assign package.', 'error');
-                }
-            } catch (error) {
-                console.error('Failed to assign package:', error);
-                showAssignPackageMessage('Network error. Please try again.', 'error');
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
             if (typeof Auth !== 'undefined' && Auth.getUser) {
                 const user = Auth.getUser();
@@ -763,27 +495,16 @@
                     if (userNameNav) userNameNav.textContent = user.username || user.email || 'Admin';
                 }
             }
-
             loadBranches();
-            loadSessionPackages();
             loadPendingRequests();
-            loadActiveStudents();
 
-            document.getElementById('branchFilter')?.addEventListener('change', () => {
-                loadActiveStudents();
-                loadPendingRequests();
-            });
-            document.getElementById('closeAssignPackageModalBtn')?.addEventListener('click', closeAssignPackageModal);
-            document.getElementById('cancelAssignPackageBtn')?.addEventListener('click', closeAssignPackageModal);
-            document.getElementById('assignPackageForm')?.addEventListener('submit', assignPackage);
+            document.getElementById('branchFilter')?.addEventListener('change', loadPendingRequests);
             document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', closeAssignRequestModal);
             document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', closeAssignRequestModal);
             document.getElementById('assignRequestForm')?.addEventListener('submit', submitAssignRequestForm);
             document.getElementById('assignRequestDate')?.addEventListener('change', (e) => {
                 const dayEl = document.getElementById('assignRequestDay');
-                if (!dayEl) return;
-                const d = getDayNameFromDate(e.target.value || '');
-                dayEl.value = d || '';
+                if (dayEl) dayEl.value = getDayNameFromDate(e.target.value || '') || '';
             });
         });
     </script>
