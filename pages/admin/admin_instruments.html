@@ -76,6 +76,9 @@
                     <a href="admin_instruments.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
                         <i class="fas fa-guitar mr-3"></i> Instruments
                     </a>
+                    <a href="admin_maintenance.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-screwdriver-wrench mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Maintenance
+                    </a>
                     <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
                     </a>
@@ -157,14 +160,13 @@
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Condition</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="instrumentsTable" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading instruments...</p>
                             </td>
@@ -278,11 +280,6 @@
                     <div>
                         <label class="block text-sm font-medium text-zinc-300 mb-1">Serial Number</label>
                         <input type="text" id="editSerialNumber"
-                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-zinc-300 mb-1">Condition</label>
-                        <input type="text" id="editCondition"
                             class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
                     </div>
                     <div>
@@ -556,7 +553,7 @@
                 } else {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-inbox text-2xl mb-2"></i>
                                 <p>No instruments found</p>
                             </td>
@@ -572,7 +569,7 @@
                 if (tableBody) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
+                            <td colspan="6" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
                                 <i class="fas fa-exclamation-circle text-2xl mb-2 text-red-500"></i>
                                 <p>Failed to load instruments</p>
                             </td>
@@ -590,7 +587,7 @@
             if (!filteredInstruments || filteredInstruments.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                             <i class="fas fa-inbox text-2xl mb-2"></i>
                             <p>No instruments found</p>
                         </td>
@@ -618,7 +615,7 @@
                         <td class="px-6 py-4 text-slate-900">${instrument.type_name || 'N/A'}</td>
                         <td class="px-6 py-4 text-slate-900">${instrument.branch_name || 'N/A'}</td>
                         <td class="px-6 py-4 text-slate-500">${instrument.serial_number || '-'}</td>
-                        <td class="px-6 py-4 text-slate-900">${instrument.condition || '-'}</td>
+
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
                                 ${instrument.status || 'N/A'}
@@ -927,7 +924,6 @@
             document.getElementById('editInstrumentTypeId').value = String(instrument.type_id || '');
             document.getElementById('editInstrumentName').value = instrument.instrument_name || '';
             document.getElementById('editSerialNumber').value = instrument.serial_number || '';
-            document.getElementById('editCondition').value = instrument.condition || '';
             document.getElementById('editInstrumentStatus').value = instrument.status || 'Active';
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -951,7 +947,6 @@
                 type_id: Number(document.getElementById('editInstrumentTypeId')?.value || 0),
                 instrument_name: document.getElementById('editInstrumentName')?.value?.trim() || '',
                 serial_number: document.getElementById('editSerialNumber')?.value?.trim() || null,
-                condition: document.getElementById('editCondition')?.value?.trim() || null,
                 status: document.getElementById('editInstrumentStatus')?.value || 'Active'
             };
             if (!payload.instrument_id || !payload.branch_id || !payload.type_id || !payload.instrument_name) {
@@ -1074,5 +1069,3 @@
     </script>
 </body>
 </html>
-
-

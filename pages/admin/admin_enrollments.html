@@ -76,6 +76,9 @@
                     <a href="admin_instruments.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-guitar mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Instruments
                     </a>
+                    <a href="admin_maintenance.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-screwdriver-wrench mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Maintenance
+                    </a>
                     <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
                     </a>
@@ -110,10 +113,14 @@
                     <select id="branchFilter" class="w-full md:w-64 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
                         <option value="">All Branches</option>
                     </select>
+                    <div class="mt-4 inline-flex rounded-xl border border-slate-200 bg-white p-1">
+                        <button id="tabPendingBtn" class="px-4 py-2 rounded-lg text-sm font-semibold bg-gold-500 text-black">Pending</button>
+                        <button id="tabEnrolledBtn" class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900">All Enrolled</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <div id="pendingPanel" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
                 <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
                     <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Enrollment Requests</h3>
                     <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
@@ -135,6 +142,35 @@
                                 <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                     <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                     <p>Loading requests...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="enrolledPanel" class="hidden mt-6 bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+                <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+                    <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-user-check mr-2 text-gold-500"></i>All Enrolled Students (Active)</h3>
+                    <span class="text-xs text-slate-500" id="activeEnrollmentCount">Loading...</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Start Date</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activeEnrollmentsTable" class="divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>Loading enrolled students...</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -184,7 +220,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Room / Location</label>
-                        <input type="text" id="assignRequestRoom" placeholder="e.g. Room A / Studio 2" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <select id="assignRequestRoom" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                            <option value="">Select room...</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Notes</label>
@@ -204,11 +242,26 @@
         </div>
     </div>
 
+    <div id="enrollmentDetailModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-xl p-6 relative">
+            <button id="closeEnrollmentDetailModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <h3 class="text-2xl font-bold text-slate-900">Enrollment Details</h3>
+            <p id="enrollmentDetailSub" class="text-slate-500 text-sm mt-1">Active package assignment details.</p>
+            <div id="enrollmentDetailBody" class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/mode.js"></script>
     <script src="../../js/index.js"></script>
     <script>
         let pendingRequestsById = {};
+        let activeEnrollmentsById = {};
+        let availableRoomsByBranch = {};
+        let activeTab = 'pending';
 
         function showMessage(message, type = 'error') {
             Swal.fire({
@@ -269,6 +322,43 @@
             return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] || '';
         }
 
+        async function fetchRoomsForBranch(branchId) {
+            const key = Number(branchId || 0);
+            if (key > 0 && Array.isArray(availableRoomsByBranch[key])) {
+                return availableRoomsByBranch[key];
+            }
+            try {
+                let url = `${baseApiUrl}/students.php?action=get-available-rooms`;
+                if (key > 0) {
+                    url += `&branch_id=${key}`;
+                }
+                const response = await fetch(url);
+                const data = await response.json();
+                const rooms = data.success && Array.isArray(data.rooms) ? data.rooms : [];
+                availableRoomsByBranch[key] = rooms;
+                return rooms;
+            } catch (error) {
+                console.error('Failed to load rooms:', error);
+                return [];
+            }
+        }
+
+        async function populateAssignRoomDropdown(req) {
+            const roomEl = document.getElementById('assignRequestRoom');
+            if (!roomEl) return;
+
+            roomEl.innerHTML = '<option value="">Select room...</option>';
+            const rooms = await fetchRoomsForBranch(req?.branch_id || 0);
+            if (!rooms.length) {
+                roomEl.innerHTML = '<option value="">No available rooms in this branch</option>';
+                return;
+            }
+            roomEl.innerHTML = '<option value="">Select room...</option>' + rooms.map(room => {
+                const label = `${escapeHtml(room.room_name || 'Room')} (${escapeHtml(room.room_type || 'Room')}, cap ${Number(room.capacity || 1)})`;
+                return `<option value="${escapeHtml(room.room_name || '')}">${label}</option>`;
+            }).join('');
+        }
+
         async function loadPendingRequests() {
             const tableBody = document.getElementById('pendingRequestsTable');
             const countEl = document.getElementById('pendingRequestCount');
@@ -302,6 +392,8 @@
                     pendingRequestsById[String(r.request_id)] = r;
                     const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
                     const pkg = escapeHtml(r.package_name || '—');
+                    const paymentTypeRaw = String(r.payment_type || '').toLowerCase();
+                    const paymentMode = paymentTypeRaw.includes('full') ? 'Full Payment' : 'Downpayment';
                     const instruments = Array.isArray(r.instruments) && r.instruments.length
                         ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
                         : '—';
@@ -317,7 +409,10 @@
                                 <div class="text-sm text-slate-500">${escapeHtml(r.email || '')}</div>
                                 <div class="text-xs text-slate-400">${escapeHtml(r.branch_name || '')}</div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${pkg}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700">
+                                <div>${pkg}</div>
+                                <div class="text-xs text-slate-500 mt-1">Payment mode: ${escapeHtml(paymentMode)}</div>
+                            </td>
                             <td class="px-6 py-4 text-sm text-slate-700">${instruments}</td>
                             <td class="px-6 py-4 text-sm text-slate-700">
                                 <div>${schedule}</div>
@@ -350,7 +445,154 @@
             }
         }
 
-        function openAssignRequestModal(requestId) {
+        function formatDateDisplay(dateValue) {
+            if (!dateValue) return '—';
+            try { return new Date(dateValue).toLocaleDateString(); } catch (e) { return String(dateValue); }
+        }
+
+        function formatTimeDisplay(timeValue) {
+            if (!timeValue) return '—';
+            const p = String(timeValue).split(':');
+            if (p.length < 2) return String(timeValue);
+            const h = Number(p[0]);
+            const m = Number(p[1]);
+            if (Number.isNaN(h) || Number.isNaN(m)) return String(timeValue);
+            const suffix = h >= 12 ? 'PM' : 'AM';
+            const hh = h % 12 === 0 ? 12 : h % 12;
+            return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
+        }
+
+        async function loadActiveEnrollments() {
+            const tableBody = document.getElementById('activeEnrollmentsTable');
+            const countEl = document.getElementById('activeEnrollmentCount');
+            if (!tableBody) return;
+
+            try {
+                const branchFilter = document.getElementById('branchFilter');
+                let url = `${baseApiUrl}/students.php?action=get-active-enrollments`;
+                if (branchFilter && branchFilter.value) {
+                    url += `&branch_id=${branchFilter.value}`;
+                }
+                const response = await fetch(url);
+                const data = await response.json();
+                const rows = data.success && Array.isArray(data.enrollments) ? data.enrollments : [];
+
+                if (countEl) countEl.textContent = `${rows.length} active`;
+
+                if (!rows.length) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
+                                <p>No active enrollments found.</p>
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                activeEnrollmentsById = {};
+                tableBody.innerHTML = rows.map(r => {
+                    activeEnrollmentsById[String(r.enrollment_id)] = r;
+                    const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
+                    const packageName = escapeHtml(r.package_name || '—');
+                    const startDate = formatDateDisplay(r.first_session_date || r.start_date);
+                    return `
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="px-6 py-4">
+                                <div class="font-medium text-slate-900">${studentName || 'Student'}</div>
+                                <div class="text-sm text-slate-500">${escapeHtml(r.email || '')}</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-700">
+                                <div class="font-semibold">${packageName}</div>
+                                <div class="text-xs text-slate-500 mt-1">${Number(r.sessions || 0)} sessions</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-700">${escapeHtml(r.branch_name || '—')}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700">${escapeHtml(startDate)}</td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-700">Active</span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <button onclick="openEnrollmentDetailModal(${Number(r.enrollment_id)})" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold">
+                                    View
+                                </button>
+                            </td>
+                        </tr>`;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load active enrollments:', error);
+                if (countEl) countEl.textContent = 'Error';
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>Failed to load active enrollments.</p>
+                        </td>
+                    </tr>`;
+            }
+        }
+
+        function setEnrollmentTab(tab) {
+            activeTab = tab === 'active' ? 'active' : 'pending';
+            const pendingPanel = document.getElementById('pendingPanel');
+            const enrolledPanel = document.getElementById('enrolledPanel');
+            const tabPendingBtn = document.getElementById('tabPendingBtn');
+            const tabEnrolledBtn = document.getElementById('tabEnrolledBtn');
+
+            if (activeTab === 'active') {
+                if (pendingPanel) pendingPanel.classList.add('hidden');
+                if (enrolledPanel) enrolledPanel.classList.remove('hidden');
+                if (tabPendingBtn) tabPendingBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900';
+                if (tabEnrolledBtn) tabEnrolledBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold bg-gold-500 text-black';
+                loadActiveEnrollments();
+            } else {
+                if (enrolledPanel) enrolledPanel.classList.add('hidden');
+                if (pendingPanel) pendingPanel.classList.remove('hidden');
+                if (tabEnrolledBtn) tabEnrolledBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900';
+                if (tabPendingBtn) tabPendingBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold bg-gold-500 text-black';
+                loadPendingRequests();
+            }
+        }
+
+        function openEnrollmentDetailModal(enrollmentId) {
+            const row = activeEnrollmentsById[String(enrollmentId)];
+            if (!row) {
+                showMessage('Enrollment not found.', 'error');
+                return;
+            }
+            const modal = document.getElementById('enrollmentDetailModal');
+            const sub = document.getElementById('enrollmentDetailSub');
+            const body = document.getElementById('enrollmentDetailBody');
+            if (!modal || !sub || !body) return;
+
+            const studentName = `${row.first_name || ''} ${row.last_name || ''}`.trim();
+            const teacherName = `${row.teacher_first_name || ''} ${row.teacher_last_name || ''}`.trim() || 'Not assigned';
+            const startDate = formatDateDisplay(row.first_session_date || row.start_date);
+            const startTime = formatTimeDisplay(row.first_start_time);
+            const endTime = formatTimeDisplay(row.first_end_time);
+            const timeRange = (startTime !== '—' && endTime !== '—') ? `${startTime} - ${endTime}` : 'Not set';
+
+            sub.textContent = `${studentName} • ${row.package_name || 'Package'}`;
+            body.innerHTML = `
+                <div class="rounded-lg bg-slate-50 p-3 border border-slate-200"><div class="text-xs text-slate-500 uppercase">Status</div><div class="mt-1 font-semibold text-slate-900">Active</div></div>
+                <div class="rounded-lg bg-slate-50 p-3 border border-slate-200"><div class="text-xs text-slate-500 uppercase">Package</div><div class="mt-1 font-semibold text-slate-900">${escapeHtml(row.package_name || '—')}</div></div>
+                <div class="rounded-lg bg-slate-50 p-3 border border-slate-200"><div class="text-xs text-slate-500 uppercase">Teacher</div><div class="mt-1 font-semibold text-slate-900">${escapeHtml(teacherName)}</div></div>
+                <div class="rounded-lg bg-slate-50 p-3 border border-slate-200"><div class="text-xs text-slate-500 uppercase">Room</div><div class="mt-1 font-semibold text-slate-900">${escapeHtml(row.assigned_room || 'Not assigned')}</div></div>
+                <div class="rounded-lg bg-slate-50 p-3 border border-slate-200"><div class="text-xs text-slate-500 uppercase">Start Date</div><div class="mt-1 font-semibold text-slate-900">${escapeHtml(startDate)}</div></div>
+                <div class="rounded-lg bg-slate-50 p-3 border border-slate-200"><div class="text-xs text-slate-500 uppercase">Start Time</div><div class="mt-1 font-semibold text-slate-900">${escapeHtml(timeRange)}</div></div>
+            `;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeEnrollmentDetailModal() {
+            const modal = document.getElementById('enrollmentDetailModal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function openAssignRequestModal(requestId) {
             const req = pendingRequestsById[String(requestId)];
             if (!req) {
                 showMessage('Request not found.', 'error');
@@ -382,6 +624,7 @@
             dayEl.value = getDayNameFromDate(dateEl.value || '') || req.preferred_day_of_week || '';
             startEl.value = '';
             endEl.value = '';
+            await populateAssignRoomDropdown(req);
             roomEl.value = '';
             notesEl.value = '';
 
@@ -498,9 +741,15 @@
             loadBranches();
             loadPendingRequests();
 
-            document.getElementById('branchFilter')?.addEventListener('change', loadPendingRequests);
+            document.getElementById('branchFilter')?.addEventListener('change', () => {
+                if (activeTab === 'active') loadActiveEnrollments();
+                else loadPendingRequests();
+            });
+            document.getElementById('tabPendingBtn')?.addEventListener('click', () => setEnrollmentTab('pending'));
+            document.getElementById('tabEnrolledBtn')?.addEventListener('click', () => setEnrollmentTab('active'));
             document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', closeAssignRequestModal);
             document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', closeAssignRequestModal);
+            document.getElementById('closeEnrollmentDetailModalBtn')?.addEventListener('click', closeEnrollmentDetailModal);
             document.getElementById('assignRequestForm')?.addEventListener('submit', submitAssignRequestForm);
             document.getElementById('assignRequestDate')?.addEventListener('change', (e) => {
                 const dayEl = document.getElementById('assignRequestDay');

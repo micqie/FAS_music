@@ -53,6 +53,27 @@ class Admin
         }
     }
 
+    private function ensureStudentRegistrationFeesTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_registration_fees (
+                    registration_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    registration_fee_amount DECIMAL(10,2) NOT NULL DEFAULT 1000.00,
+                    registration_fee_paid DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    registration_status ENUM('Pending','Fee Paid','Approved','Rejected') NOT NULL DEFAULT 'Pending',
+                    notes TEXT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_registration_fee_student (student_id)
+                )
+            ");
+        } catch (PDOException $e) {
+            // Keep API alive
+        }
+    }
+
     private function getLatestEnrollmentIdByStudent($studentId, $statuses = [])
     {
         if (!$this->tableExists('tbl_enrollments')) {
@@ -92,26 +113,20 @@ class Admin
     // 🔍 View pending students
     public function getPendingStudents()
     {
-        // Check if registration fields exist in students table
-        $hasRegFields = $this->hasStudentColumn('registration_status');
-        
-        if ($hasRegFields) {
-            $stmt = $this->conn->prepare("
-                SELECT student_id, first_name, last_name, email, phone,
-                       registration_fee_amount, registration_status
-                FROM tbl_students
-                WHERE registration_status = 'Pending'
-            ");
-        } else {
-            // Use enrollments table (fas_db.sql structure)
-            $stmt = $this->conn->prepare("
-                SELECT DISTINCT s.student_id, s.first_name, s.last_name, s.email, s.phone,
-                       e.registration_fee_amount, e.registration_status
-                FROM tbl_students s
-                INNER JOIN tbl_enrollments e ON s.student_id = e.student_id
-                WHERE e.registration_status = 'Pending'
-            ");
-        }
+        $this->ensureStudentRegistrationFeesTable();
+        $stmt = $this->conn->prepare("
+            SELECT
+                s.student_id,
+                s.first_name,
+                s.last_name,
+                s.email,
+                s.phone,
+                COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                COALESCE(rf.registration_status, 'Pending') AS registration_status
+            FROM tbl_students s
+            LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+            WHERE COALESCE(rf.registration_status, 'Pending') = 'Pending'
+        ");
         $stmt->execute();
 
         $this->sendJSON([
@@ -123,72 +138,31 @@ class Admin
     // 🔍 Get pending registrations with guardian and branch info
     public function getPendingRegistrations()
     {
-        $hasRegFields = $this->hasStudentColumn('registration_status');
-        
-        if ($hasRegFields) {
-            $this->ensureStudentRegistrationProofColumn();
-            $proofSelect = $this->hasStudentColumn('registration_proof_path')
-                ? "s.registration_proof_path"
-                : "NULL AS registration_proof_path";
-
-            $stmt = $this->conn->prepare("
-                SELECT
-                    s.student_id,
-                    s.first_name,
-                    s.last_name,
-                    s.email,
-                    s.phone,
-                    s.registration_fee_amount,
-                    s.registration_fee_paid,
-                    {$proofSelect},
-                    s.registration_status,
-                    s.created_at,
-                    b.branch_name,
-                    g.first_name as guardian_first_name,
-                    g.last_name as guardian_last_name,
-                    g.phone as guardian_phone
-                FROM tbl_students s
-                LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
-                LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-                WHERE s.registration_status = 'Pending'
-                ORDER BY s.created_at DESC
-            ");
-        } else {
-            // Use latest enrollment table row per student (fas_db.sql structure)
-            $stmt = $this->conn->prepare("
-                SELECT
-                    s.student_id,
-                    s.first_name,
-                    s.last_name,
-                    s.email,
-                    s.phone,
-                    e.registration_fee_amount,
-                    e.registration_fee_paid,
-                    NULL AS registration_proof_path,
-                    e.registration_status,
-                    e.created_at,
-                    b.branch_name,
-                    g.first_name as guardian_first_name,
-                    g.last_name as guardian_last_name,
-                    g.phone as guardian_phone
-                FROM tbl_students s
-                INNER JOIN (
-                    SELECT e1.*
-                    FROM tbl_enrollments e1
-                    INNER JOIN (
-                        SELECT student_id, MAX(enrollment_id) AS max_enrollment_id
-                        FROM tbl_enrollments
-                        GROUP BY student_id
-                    ) latest ON latest.max_enrollment_id = e1.enrollment_id
-                ) e ON s.student_id = e.student_id
-                LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
-                LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-                WHERE e.registration_status = 'Pending'
-                ORDER BY e.created_at DESC
-            ");
-        }
+        $this->ensureStudentRegistrationFeesTable();
+        $stmt = $this->conn->prepare("
+            SELECT
+                s.student_id,
+                s.first_name,
+                s.last_name,
+                s.email,
+                s.phone,
+                COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
+                NULL AS registration_proof_path,
+                COALESCE(rf.registration_status, 'Pending') AS registration_status,
+                COALESCE(rf.created_at, s.created_at) AS created_at,
+                b.branch_name,
+                g.first_name as guardian_first_name,
+                g.last_name as guardian_last_name,
+                g.phone as guardian_phone
+            FROM tbl_students s
+            LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+            LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+            LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
+            LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
+            WHERE COALESCE(rf.registration_status, 'Pending') = 'Pending'
+            ORDER BY COALESCE(rf.created_at, s.created_at) DESC
+        ");
         $stmt->execute();
 
         $this->sendJSON([
@@ -200,72 +174,31 @@ class Admin
     // 🔍 Get all registrations with guardian and branch info (excludes Rejected - they are removed/counted separately)
     public function getAllRegistrations()
     {
-        $hasRegFields = $this->hasStudentColumn('registration_status');
-        
-        if ($hasRegFields) {
-            $this->ensureStudentRegistrationProofColumn();
-            $proofSelect = $this->hasStudentColumn('registration_proof_path')
-                ? "s.registration_proof_path"
-                : "NULL AS registration_proof_path";
-
-            $stmt = $this->conn->prepare("
-                SELECT
-                    s.student_id,
-                    s.first_name,
-                    s.last_name,
-                    s.email,
-                    s.phone,
-                    s.registration_fee_amount,
-                    s.registration_fee_paid,
-                    {$proofSelect},
-                    s.registration_status,
-                    s.created_at,
-                    b.branch_name,
-                    g.first_name as guardian_first_name,
-                    g.last_name as guardian_last_name,
-                    g.phone as guardian_phone
-                FROM tbl_students s
-                LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
-                LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-                WHERE s.registration_status != 'Rejected'
-                ORDER BY s.created_at DESC
-            ");
-        } else {
-            // Use latest enrollment table row per student (fas_db.sql structure)
-            $stmt = $this->conn->prepare("
-                SELECT
-                    s.student_id,
-                    s.first_name,
-                    s.last_name,
-                    s.email,
-                    s.phone,
-                    e.registration_fee_amount,
-                    e.registration_fee_paid,
-                    NULL AS registration_proof_path,
-                    e.registration_status,
-                    e.created_at,
-                    b.branch_name,
-                    g.first_name as guardian_first_name,
-                    g.last_name as guardian_last_name,
-                    g.phone as guardian_phone
-                FROM tbl_students s
-                INNER JOIN (
-                    SELECT e1.*
-                    FROM tbl_enrollments e1
-                    INNER JOIN (
-                        SELECT student_id, MAX(enrollment_id) AS max_enrollment_id
-                        FROM tbl_enrollments
-                        GROUP BY student_id
-                    ) latest ON latest.max_enrollment_id = e1.enrollment_id
-                ) e ON s.student_id = e.student_id
-                LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
-                LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-                WHERE e.registration_status != 'Rejected'
-                ORDER BY e.created_at DESC
-            ");
-        }
+        $this->ensureStudentRegistrationFeesTable();
+        $stmt = $this->conn->prepare("
+            SELECT
+                s.student_id,
+                s.first_name,
+                s.last_name,
+                s.email,
+                s.phone,
+                COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
+                NULL AS registration_proof_path,
+                COALESCE(rf.registration_status, 'Pending') AS registration_status,
+                COALESCE(rf.created_at, s.created_at) AS created_at,
+                b.branch_name,
+                g.first_name as guardian_first_name,
+                g.last_name as guardian_last_name,
+                g.phone as guardian_phone
+            FROM tbl_students s
+            LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+            LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+            LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
+            LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
+            WHERE COALESCE(rf.registration_status, 'Pending') != 'Rejected'
+            ORDER BY COALESCE(rf.created_at, s.created_at) DESC
+        ");
         $stmt->execute();
 
         $this->sendJSON([
@@ -343,32 +276,23 @@ class Admin
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
 
-            // Update student status
-            $hasRegFields = $this->hasStudentColumn('registration_status');
-            if ($hasRegFields) {
-                $stmt = $this->conn->prepare("
-                    UPDATE tbl_students
-                    SET registration_status = 'Approved',
-                        status = 'Active'
-                    WHERE student_id = ?
-                ");
-                $stmt->execute([$data['student_id']]);
-            } else {
-                // fas_db.sql structure - update enrollments
-                $stmt = $this->conn->prepare("
-                    UPDATE tbl_enrollments
-                    SET registration_status = 'Approved'
-                    WHERE student_id = ?
-                ");
-                $stmt->execute([$data['student_id']]);
-                
-                $stmt2 = $this->conn->prepare("
-                    UPDATE tbl_students
-                    SET status = 'Active'
-                    WHERE student_id = ?
-                ");
-                $stmt2->execute([$data['student_id']]);
-            }
+            $this->ensureStudentRegistrationFeesTable();
+            $stmtReg = $this->conn->prepare("
+                INSERT INTO tbl_student_registration_fees (
+                    student_id, registration_fee_amount, registration_fee_paid, registration_status
+                ) VALUES (?, 1000.00, 1000.00, 'Approved')
+                ON DUPLICATE KEY UPDATE
+                    registration_status = 'Approved',
+                    registration_fee_paid = GREATEST(registration_fee_paid, registration_fee_amount)
+            ");
+            $stmtReg->execute([$data['student_id']]);
+
+            $stmt = $this->conn->prepare("
+                UPDATE tbl_students
+                SET status = 'Active'
+                WHERE student_id = ?
+            ");
+            $stmt->execute([$data['student_id']]);
 
             // Activate user account if it exists (linked by email)
             if (!empty($student['email'])) {
@@ -451,32 +375,21 @@ class Admin
             ]);
         } catch (Exception $e) {
             $this->conn->rollBack();
-            // If delete fails (e.g. enrollments exist), fall back to marking as Rejected
-            $hasRegFields = $this->hasStudentColumn('registration_status');
-            if ($hasRegFields) {
-                $stmt = $this->conn->prepare("
-                    UPDATE tbl_students
-                    SET registration_status = 'Rejected',
-                        status = 'Inactive'
-                    WHERE student_id = ?
-                ");
-                $stmt->execute([$studentId]);
-            } else {
-                // fas_db.sql structure
-                $stmt = $this->conn->prepare("
-                    UPDATE tbl_enrollments
-                    SET registration_status = 'Rejected'
-                    WHERE student_id = ?
-                ");
-                $stmt->execute([$studentId]);
-                
-                $stmt2 = $this->conn->prepare("
-                    UPDATE tbl_students
-                    SET status = 'Inactive'
-                    WHERE student_id = ?
-                ");
-                $stmt2->execute([$studentId]);
-            }
+            // If hard delete fails, mark registration as rejected and deactivate.
+            $this->ensureStudentRegistrationFeesTable();
+            $stmt = $this->conn->prepare("
+                INSERT INTO tbl_student_registration_fees (
+                    student_id, registration_fee_amount, registration_fee_paid, registration_status
+                ) VALUES (?, 1000.00, 0.00, 'Rejected')
+                ON DUPLICATE KEY UPDATE registration_status = 'Rejected'
+            ");
+            $stmt->execute([$studentId]);
+            $stmt2 = $this->conn->prepare("
+                UPDATE tbl_students
+                SET status = 'Inactive'
+                WHERE student_id = ?
+            ");
+            $stmt2->execute([$studentId]);
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Registration rejected'
@@ -494,32 +407,30 @@ class Admin
         }
 
         try {
+            $this->ensureStudentRegistrationFeesTable();
             $this->conn->beginTransaction();
-
-            // Get current student payment info
-            $hasRegFields = $this->hasStudentColumn('registration_status');
-            if ($hasRegFields) {
-                $stmt = $this->conn->prepare("
-                    SELECT registration_fee_amount, registration_fee_paid, registration_status
-                    FROM tbl_students
-                    WHERE student_id = ?
-                ");
-                $targetEnrollmentId = 0;
-            } else {
-                // fas_db.sql structure - get from enrollments
-                $stmt = $this->conn->prepare("
-                    SELECT enrollment_id, registration_fee_amount, registration_fee_paid, registration_status
-                    FROM tbl_enrollments
-                    WHERE student_id = ? AND registration_status IN ('Pending', 'Fee Paid')
-                    ORDER BY created_at DESC LIMIT 1
-                ");
-            }
+            $stmt = $this->conn->prepare("
+                SELECT
+                    student_id,
+                    registration_fee_amount,
+                    registration_fee_paid,
+                    registration_status
+                FROM tbl_student_registration_fees
+                WHERE student_id = ?
+                LIMIT 1
+            ");
             $stmt->execute([$data['student_id']]);
             $student = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$student) {
-                $this->conn->rollBack();
-                $this->sendJSON(['error' => 'Student not found'], 404);
+                $seed = $this->conn->prepare("
+                    INSERT INTO tbl_student_registration_fees (
+                        student_id, registration_fee_amount, registration_fee_paid, registration_status
+                    ) VALUES (?, 1000.00, 0.00, 'Pending')
+                ");
+                $seed->execute([$data['student_id']]);
+                $stmt->execute([$data['student_id']]);
+                $student = $stmt->fetch(PDO::FETCH_ASSOC);
             }
 
             $newPaid = ($student['registration_fee_paid'] ?? 0) + $data['amount'];
@@ -562,32 +473,13 @@ class Admin
                 }
             }
 
-            // Update student payment info
-            // Registration confirmation by desk staff approves the request once fully paid.
             $newStatus = ($remaining <= 0) ? 'Approved' : 'Pending';
-            
-            $hasRegFields = $this->hasStudentColumn('registration_status');
-            if ($hasRegFields) {
-                $stmtUpdate = $this->conn->prepare("
-                    UPDATE tbl_students
-                    SET registration_fee_paid = ?, registration_status = ?
-                    WHERE student_id = ?
-                ");
-                $stmtUpdate->execute([$newPaid, $newStatus, $data['student_id']]);
-            } else {
-                // fas_db.sql structure - update enrollments
-                $targetEnrollmentId = (int)($student['enrollment_id'] ?? 0);
-                if ($targetEnrollmentId < 1) {
-                    $this->conn->rollBack();
-                    $this->sendJSON(['error' => 'Enrollment not found for this student'], 404);
-                }
-                $stmtUpdate = $this->conn->prepare("
-                    UPDATE tbl_enrollments
-                    SET registration_fee_paid = ?, registration_status = ?
-                    WHERE enrollment_id = ?
-                ");
-                $stmtUpdate->execute([$newPaid, $newStatus, $targetEnrollmentId]);
-            }
+            $stmtUpdate = $this->conn->prepare("
+                UPDATE tbl_student_registration_fees
+                SET registration_fee_paid = ?, registration_status = ?
+                WHERE student_id = ?
+            ");
+            $stmtUpdate->execute([$newPaid, $newStatus, $data['student_id']]);
 
             // When approved, activate both student profile and login account.
             if ($newStatus === 'Approved') {
@@ -621,7 +513,9 @@ class Admin
                 'registration_status' => $newStatus
             ]);
         } catch (Exception $e) {
-            $this->conn->rollBack();
+            if ($this->conn && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
             $this->sendJSON(['error' => 'Failed to record payment: ' . $e->getMessage()], 500);
         }
     }
@@ -634,39 +528,20 @@ class Admin
         }
 
         try {
-            $this->ensureStudentRegistrationProofColumn();
-            // Get student info
-            $hasRegFields = $this->hasStudentColumn('registration_status');
-            if ($hasRegFields) {
-                $stmt = $this->conn->prepare("
-                    SELECT s.*, b.branch_name
-                    FROM tbl_students s
-                    LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                    WHERE s.student_id = ?
-                ");
-            } else {
-                $stmt = $this->conn->prepare("
-                    SELECT
-                        s.*,
-                        b.branch_name,
-                        e.enrollment_id,
-                        e.registration_fee_amount,
-                        e.registration_fee_paid,
-                        e.registration_status
-                    FROM tbl_students s
-                    LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                    LEFT JOIN (
-                        SELECT e1.*
-                        FROM tbl_enrollments e1
-                        INNER JOIN (
-                            SELECT student_id, MAX(enrollment_id) AS max_enrollment_id
-                            FROM tbl_enrollments
-                            GROUP BY student_id
-                        ) latest ON latest.max_enrollment_id = e1.enrollment_id
-                    ) e ON s.student_id = e.student_id
-                    WHERE s.student_id = ?
-                ");
-            }
+            $this->ensureStudentRegistrationFeesTable();
+            $stmt = $this->conn->prepare("
+                SELECT
+                    s.*,
+                    b.branch_name,
+                    COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                    COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
+                    COALESCE(rf.registration_status, 'Pending') AS registration_status,
+                    NULL AS registration_proof_path
+                FROM tbl_students s
+                LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+                WHERE s.student_id = ?
+            ");
             $stmt->execute([$studentId]);
             $student = $stmt->fetch(PDO::FETCH_ASSOC);
 

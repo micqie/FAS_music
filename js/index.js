@@ -1349,6 +1349,21 @@ function formatDateLong(dateString) {
     });
 }
 
+function computeStudentRequestPayableNow(basePrice, sessions, paymentRaw) {
+    const price = Number(basePrice || 0);
+    const s = Number(sessions || 0);
+    const v = String(paymentRaw || '').toLowerCase();
+    if (price <= 0) return 0;
+    const ratio = s === 12 ? (3000 / 7450) : (s === 20 ? (5000 / 11800) : 0.42);
+    const partial = Math.round(price * ratio);
+    if (v === 'full' || v === 'full payment' || v === 'fullpayment') return price;
+    if (v === 'partial payment' || v === 'partial' || v === 'downpayment') return partial;
+    if (v === 'installment') {
+        return Math.max(1, Math.round(price / Math.max(1, s || 1)));
+    }
+    return partial;
+}
+
 function renderStudentRequestStatus(latestRequest) {
     if (!latestRequest) {
         return '<div class="text-sm text-zinc-500">No request submitted yet.</div>';
@@ -1362,6 +1377,10 @@ function renderStudentRequestStatus(latestRequest) {
     const createdAt = latestRequest.created_at ? new Date(latestRequest.created_at).toLocaleString() : '—';
     const packageName = escapeHtml(latestRequest.package_name || 'Package');
     const amount = formatCurrencyPHP(latestRequest.requested_amount || 0);
+    const paymentTypeRaw = String(latestRequest.payment_type || '').toLowerCase();
+    const paymentModeLabel = paymentTypeRaw.includes('full')
+        ? 'Full Payment'
+        : (paymentTypeRaw.includes('install') ? 'Installment' : 'Partial Payment');
     const notes = latestRequest.admin_notes ? `<div class="text-xs text-zinc-400 mt-1">Admin note: ${escapeHtml(latestRequest.admin_notes)}</div>` : '';
     const assignedTeacherName = `${latestRequest.assigned_teacher_first_name || ''} ${latestRequest.assigned_teacher_last_name || ''}`.trim();
     const assignedDate = latestRequest.assigned_date ? formatDateLong(latestRequest.assigned_date) : '';
@@ -1386,6 +1405,7 @@ function renderStudentRequestStatus(latestRequest) {
                 <span class="text-xs text-zinc-400">${createdAt}</span>
             </div>
             <div class="mt-2 text-sm text-zinc-200">${packageName} • ${amount}</div>
+            <div class="mt-1 text-xs text-zinc-400">Payment mode: <span class="text-zinc-200 font-semibold">${escapeHtml(paymentModeLabel)}</span></div>
             ${assignmentInfo}
             ${notes}
         </div>
@@ -1421,6 +1441,71 @@ function renderStudentAvailabilityCalendar(availabilities) {
                     </div>`;
                 }).join('')}
             </div>
+        </div>`;
+    }).join('');
+}
+
+function enrollmentStatusBadgeClass(status) {
+    const s = String(status || '');
+    if (s === 'Ongoing') return 'bg-green-500/15 text-green-300 border border-green-500/30';
+    if (s === 'Completed') return 'bg-blue-500/15 text-blue-300 border border-blue-500/30';
+    if (s === 'Pending Payment') return 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/30';
+    if (s === 'Dropped' || s === 'Cancelled') return 'bg-red-500/15 text-red-300 border border-red-500/30';
+    return 'bg-zinc-500/15 text-zinc-300 border border-zinc-500/30';
+}
+
+function renderCurrentEnrollmentSummary(enrollment, student, instruments) {
+    if (!enrollment) {
+        return '<div class="text-sm text-zinc-500">No enrollment record yet.</div>';
+    }
+    const teacherName = `${enrollment.teacher_first_name || ''} ${enrollment.teacher_last_name || ''}`.trim();
+    const startDate = formatDateLong(enrollment.first_session_date || enrollment.start_date || '');
+    const startTime = enrollment.first_start_time ? formatTime12Hour(enrollment.first_start_time) : '';
+    const endTime = enrollment.first_end_time ? formatTime12Hour(enrollment.first_end_time) : '';
+    const timeLabel = (startTime && endTime) ? `${startTime} - ${endTime}` : 'Not set';
+    const room = enrollment.first_room || 'Not set';
+    const branchName = student?.branch_name || 'Branch not set';
+    const instrumentNames = (Array.isArray(instruments) ? instruments : [])
+        .map(i => String(i.instrument_name || '').trim())
+        .filter(Boolean);
+    const instrumentsLabel = instrumentNames.length ? instrumentNames.join(', ') : 'Not set';
+    const totalAmount = Number(enrollment.total_amount || 0);
+    const paidAmount = Number(enrollment.paid_amount || 0);
+    const balance = Math.max(0, totalAmount - paidAmount);
+    const paymentState = totalAmount > 0 && paidAmount >= totalAmount ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Unpaid');
+    const status = enrollment.status || '—';
+    return `
+        <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+            <div class="flex items-center justify-between gap-2">
+                <div class="text-base font-bold text-white">ENROLLED: ${escapeHtml(enrollment.package_name || 'Package')}</div>
+                <span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold ${enrollmentStatusBadgeClass(status)}">${escapeHtml(status)}</span>
+            </div>
+            <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div><span class="text-zinc-400">Instruments to learn:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(instrumentsLabel)}</span></div>
+                <div><span class="text-zinc-400">Payment:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(paymentState)} (${escapeHtml(enrollment.payment_type || 'Partial Payment')})</span></div>
+                <div><span class="text-zinc-400">Current Balance:</span> <span class="text-zinc-100 font-semibold">${formatCurrencyPHP(balance)}</span></div>
+                <div><span class="text-zinc-400">Where:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(`${room} (${branchName})`)}</span></div>
+                <div><span class="text-zinc-400">Start Date:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(startDate || 'Not set')}</span></div>
+                <div><span class="text-zinc-400">Start Time:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(timeLabel)}</span></div>
+                <div><span class="text-zinc-400">Teacher:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(teacherName || 'Not set')}</span></div>
+                <div><span class="text-zinc-400">Amount:</span> <span class="text-zinc-100 font-semibold">${formatCurrencyPHP(enrollment.total_amount || 0)}</span></div>
+            </div>
+        </div>
+    `;
+}
+
+function renderEnrollmentHistoryList(history) {
+    if (!Array.isArray(history) || history.length === 0) {
+        return '<div class="text-sm text-zinc-500">No previous enrollments yet.</div>';
+    }
+    return history.map(row => {
+        const startDate = formatDateLong(row.first_session_date || row.start_date || row.enrollment_date || '');
+        return `<div class="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div class="flex items-center justify-between gap-2">
+                <div class="text-sm font-semibold text-white">${escapeHtml(row.package_name || 'Package')}</div>
+                <span class="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold ${enrollmentStatusBadgeClass(row.status)}">${escapeHtml(row.status || '—')}</span>
+            </div>
+            <div class="mt-1 text-xs text-zinc-400">Started: ${escapeHtml(startDate || 'Not set')} • ${escapeHtml(row.payment_type || 'Partial Payment')}</div>
         </div>`;
     }).join('');
 }
@@ -1540,13 +1625,14 @@ function initStudentRequestSection(student, requestMeta) {
     const amountEl = document.getElementById('studentRequestAmount');
     const instrumentsContainer = document.getElementById('studentRequestInstrumentContainer');
     const preferredDayEl = document.getElementById('studentRequestPreferredDay');
+    const paymentModeEl = document.getElementById('studentRequestPaymentMode');
     const availabilityCalendar = document.getElementById('studentAvailabilityCalendar');
     const form = document.getElementById('studentPackageRequestForm');
     const submitBtn = document.getElementById('studentSubmitRequestBtn');
     const preferredDateEl = document.getElementById('studentRequestPreferredDate');
     const paymentProofEl = document.getElementById('studentRequestPaymentProof');
 
-    if (!statusEl || !packageSelect || !amountEl || !instrumentsContainer || !preferredDayEl || !availabilityCalendar || !form || !submitBtn || !preferredDateEl) {
+    if (!statusEl || !packageSelect || !amountEl || !instrumentsContainer || !preferredDayEl || !paymentModeEl || !availabilityCalendar || !form || !submitBtn || !preferredDateEl) {
         return;
     }
 
@@ -1565,20 +1651,33 @@ function initStudentRequestSection(student, requestMeta) {
         const price = formatCurrencyPHP(pkg.price || 0);
         const branchLabel = String(pkg.branch_name || requestMeta?.student?.branch_name || '').trim();
         const branchText = branchLabel ? ` • ${escapeHtml(branchLabel)}` : '';
-        return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''})${branchText} - ${price}</option>`;
+        return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''})${branchText} - ${price}</option>`;
     }).join('');
+    if (packages.length === 0) {
+        statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">No session package is available for enrollment request right now. Please contact desk/admin.</div>';
+    }
 
     const updateRequestPackageUI = () => {
         const selected = packageSelect.options[packageSelect.selectedIndex];
         const maxInst = Number(selected?.getAttribute('data-max-instruments') || 0);
         const price = Number(selected?.getAttribute('data-price') || 0);
-        amountEl.textContent = `Estimated package amount: ${formatCurrencyPHP(price)}`;
+        const sessions = Number(selected?.getAttribute('data-sessions') || 0);
+        const paymentType = String(paymentModeEl.value || 'Partial Payment');
+        const partialAmount = computeStudentRequestPayableNow(price, sessions, 'Partial Payment');
+        const fullAmount = computeStudentRequestPayableNow(price, sessions, 'Full Payment');
+        const installmentAmount = computeStudentRequestPayableNow(price, sessions, 'Installment');
+        const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType);
+        const selectedLabel = paymentType === 'Full Payment'
+            ? 'Full Payment'
+            : (paymentType === 'Installment' ? 'Installment (est. per session)' : 'Partial Payment');
+        amountEl.innerHTML = `Estimated package amount: <span class="font-bold">${formatCurrencyPHP(price)}</span><br>Full Payment: <span class="font-bold">${formatCurrencyPHP(fullAmount)}</span> | Partial Payment: <span class="font-bold">${formatCurrencyPHP(partialAmount)}</span><br>Installment (est./session): <span class="font-bold">${formatCurrencyPHP(installmentAmount)}</span><br>Amount to pay now (${escapeHtml(selectedLabel)}): <span class="font-bold">${formatCurrencyPHP(payableNow)}</span>`;
         instrumentsContainer.innerHTML = maxInst > 0
             ? renderStudentRequestInstrumentSelectors(maxInst, instruments)
             : '<div class="text-sm text-zinc-500">Select a package first.</div>';
     };
 
     packageSelect.onchange = updateRequestPackageUI;
+    paymentModeEl.onchange = updateRequestPackageUI;
     updateRequestPackageUI();
 
     const today = new Date();
@@ -1588,6 +1687,9 @@ function initStudentRequestSection(student, requestMeta) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
         statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Your student account is not active yet. Please contact desk/admin.</div>';
+    } else if (packages.length === 0) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
     } else if (hasPendingRequest) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
@@ -1601,13 +1703,18 @@ function initStudentRequestSection(student, requestMeta) {
         const packageId = parseInt(packageSelect.value, 10);
         const preferredDate = preferredDateEl.value || '';
         const preferredDay = preferredDayEl.value || '';
+        const paymentType = String(paymentModeEl.value || '').trim();
         const instrumentIds = Array.from(document.querySelectorAll('.student-request-instrument'))
             .map(el => parseInt(el.value, 10))
             .filter(v => !Number.isNaN(v) && v > 0);
         const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
 
-        if (!packageId || !preferredDate || !preferredDay || uniqueInstrumentIds.length < 1) {
-            showMessage('Please complete package, instruments, preferred date, and preferred day.', 'error');
+        if (!packageId || !preferredDate || !preferredDay || !paymentType || uniqueInstrumentIds.length < 1) {
+            showMessage('Please complete package, instruments, preferred date/day, and payment mode.', 'error');
+            return;
+        }
+        if (!['Full Payment', 'Partial Payment', 'Installment'].includes(paymentType)) {
+            showMessage('Invalid payment mode selected.', 'error');
             return;
         }
         const paymentProofFile = paymentProofEl && paymentProofEl.files && paymentProofEl.files[0] ? paymentProofEl.files[0] : null;
@@ -1628,6 +1735,7 @@ function initStudentRequestSection(student, requestMeta) {
             requestFormData.append('action', 'submit-package-request');
             requestFormData.append('student_id', String(Number(student.student_id)));
             requestFormData.append('package_id', String(packageId));
+            requestFormData.append('payment_type', paymentType);
             requestFormData.append('preferred_date', preferredDate);
             requestFormData.append('preferred_day_of_week', preferredDay);
             requestFormData.append('instrument_ids_json', JSON.stringify(uniqueInstrumentIds));
@@ -1690,8 +1798,9 @@ async function initStudentDashboardPage() {
     setText('packageSessions', s.package_sessions ? `${s.package_sessions} sessions` : '—');
     setText('packageMaxInstruments', s.package_max_instruments ? `${s.package_max_instruments} instrument(s)` : '—');
 
-    // Instruments
-    setHtml('instrumentChips', renderInstrumentChips(portal.instruments));
+    // Enrollment focus cards
+    setHtml('currentEnrollmentSummary', renderCurrentEnrollmentSummary(portal.current_enrollment || null, portal.student || {}, portal.instruments || []));
+    setHtml('enrollmentHistoryList', renderEnrollmentHistoryList(portal.enrollment_history || []));
 
     // Attendance summary (optional)
     const summaryRes = await fetchAttendanceSummary(s.student_id);
@@ -1716,14 +1825,10 @@ async function initStudentDashboardPage() {
     // Enrollment request (same form as on Sessions page)
     try {
         const meta = await fetchStudentRequestMetaByEmail(user.email);
-        const packages = meta?.success ? (meta.packages || []) : [];
-        const instruments = meta?.success ? (meta.instruments || []) : [];
-        setHtml('availablePackagesList', renderAvailablePackagesAndInstruments(packages, instruments));
         if (meta?.success) {
             initStudentRequestSection(s, meta);
         }
     } catch (e) {
-        setHtml('availablePackagesList', '<div class="text-zinc-500">Unable to load available options right now.</div>');
         setHtml('studentAvailabilityCalendar', '<div class="text-zinc-500">Unable to load teacher availability right now.</div>');
     }
 }
@@ -2479,16 +2584,90 @@ async function loadAllRegistrations() {
     }
 }
 
-// Display Registrations
-function displayRegistrations(registrations) {
-    const tbody = document.getElementById('registrationsTable');
+const registrationsTableState = {
+    rows: [],
+    page: 1,
+    pageSize: 10
+};
 
-    if (!tbody) {
-        // Table doesn't exist on this page (e.g., dashboard page)
-        return;
+function getRegistrationsModeFromHash() {
+    const hash = (window.location.hash || '').replace('#', '').toLowerCase();
+    return hash === 'pending' ? 'pending' : 'all';
+}
+
+function reloadRegistrationsByActiveMode() {
+    if (getRegistrationsModeFromHash() === 'pending') {
+        loadPendingRegistrations();
+    } else {
+        loadAllRegistrations();
+    }
+}
+
+function initRegistrationsPaginationControls() {
+    const pageSizeEl = document.getElementById('registrationsPageSize');
+    const prevBtn = document.getElementById('registrationsPrevBtn');
+    const nextBtn = document.getElementById('registrationsNextBtn');
+
+    if (pageSizeEl && pageSizeEl.dataset.bound !== '1') {
+        pageSizeEl.addEventListener('change', () => {
+            const nextSize = parseInt(pageSizeEl.value, 10);
+            registrationsTableState.pageSize = Number.isFinite(nextSize) && nextSize > 0 ? nextSize : 10;
+            registrationsTableState.page = 1;
+            renderRegistrationsTable();
+        });
+        pageSizeEl.dataset.bound = '1';
     }
 
-    if (!registrations || registrations.length === 0) {
+    if (prevBtn && prevBtn.dataset.bound !== '1') {
+        prevBtn.addEventListener('click', () => {
+            registrationsTableState.page = Math.max(1, registrationsTableState.page - 1);
+            renderRegistrationsTable();
+        });
+        prevBtn.dataset.bound = '1';
+    }
+
+    if (nextBtn && nextBtn.dataset.bound !== '1') {
+        nextBtn.addEventListener('click', () => {
+            const totalPages = Math.max(1, Math.ceil(registrationsTableState.rows.length / registrationsTableState.pageSize));
+            registrationsTableState.page = Math.min(totalPages, registrationsTableState.page + 1);
+            renderRegistrationsTable();
+        });
+        nextBtn.dataset.bound = '1';
+    }
+}
+
+function renderRegistrationsTable() {
+    const tbody = document.getElementById('registrationsTable');
+    if (!tbody) return;
+
+    const infoEl = document.getElementById('registrationsPaginationInfo');
+    const prevBtn = document.getElementById('registrationsPrevBtn');
+    const nextBtn = document.getElementById('registrationsNextBtn');
+    const pageSizeEl = document.getElementById('registrationsPageSize');
+
+    if (pageSizeEl) {
+        pageSizeEl.value = String(registrationsTableState.pageSize);
+    }
+
+    const rows = Array.isArray(registrationsTableState.rows) ? registrationsTableState.rows : [];
+    const totalRows = rows.length;
+    const totalPages = Math.max(1, Math.ceil(totalRows / registrationsTableState.pageSize));
+    if (registrationsTableState.page > totalPages) registrationsTableState.page = totalPages;
+    if (registrationsTableState.page < 1) registrationsTableState.page = 1;
+
+    const startIndex = (registrationsTableState.page - 1) * registrationsTableState.pageSize;
+    const endIndex = Math.min(totalRows, startIndex + registrationsTableState.pageSize);
+    const pageRows = rows.slice(startIndex, endIndex);
+
+    if (infoEl) {
+        infoEl.textContent = totalRows === 0
+            ? 'No records'
+            : `Page ${registrationsTableState.page} of ${totalPages} • ${startIndex + 1}-${endIndex} of ${totalRows}`;
+    }
+    if (prevBtn) prevBtn.disabled = registrationsTableState.page <= 1;
+    if (nextBtn) nextBtn.disabled = registrationsTableState.page >= totalPages || totalRows === 0;
+
+    if (totalRows === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="7" class="px-6 py-8 text-center text-zinc-400">
@@ -2500,34 +2679,34 @@ function displayRegistrations(registrations) {
         return;
     }
 
-    tbody.innerHTML = registrations.map(reg => {
+    tbody.innerHTML = pageRows.map(reg => {
         const statusColors = {
-            'Pending': 'text-yellow-400 bg-yellow-400/10',
-            'Fee Paid': 'text-green-400 bg-green-400/10',
-            'Approved': 'text-blue-400 bg-blue-400/10',
-            'Rejected': 'text-red-400 bg-red-400/10'
+            'Pending': 'text-amber-700 bg-amber-100',
+            'Fee Paid': 'text-emerald-700 bg-emerald-100',
+            'Approved': 'text-blue-700 bg-blue-100',
+            'Rejected': 'text-red-700 bg-red-100'
         };
 
-        const statusClass = statusColors[reg.registration_status] || 'text-zinc-400 bg-zinc-400/10';
+        const statusClass = statusColors[reg.registration_status] || 'text-slate-700 bg-slate-100';
         const remaining = parseFloat(reg.registration_fee_amount) - parseFloat(reg.registration_fee_paid || 0);
         const registrationProofLink = reg.registration_proof_path
-            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gold-300 hover:text-gold-200 underline mt-1"><i class="fas fa-file-alt"></i>Proof</a>`
-            : '<div class="text-xs text-zinc-500 mt-1">No proof uploaded</div>';
+            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 underline mt-1"><i class="fas fa-file-alt"></i>Proof</a>`
+            : '<div class="text-xs text-slate-500 mt-1">No proof uploaded</div>';
 
         return `
             <tr class="hover:bg-gold-500/5 transition">
                 <td class="px-6 py-4">
-                    <div class="font-medium text-white">${reg.first_name} ${reg.last_name}</div>
-                    <div class="text-sm text-zinc-400">${reg.email || ''}</div>
+                    <div class="font-medium text-slate-900" style="color:#0f172a;">${reg.first_name} ${reg.last_name}</div>
+                    <div class="text-sm text-slate-500" style="color:#64748b;">${reg.email || ''}</div>
                 </td>
                 <td class="px-6 py-4">
-                    <div class="text-white">${reg.guardian_first_name || ''} ${reg.guardian_last_name || ''}</div>
-                    <div class="text-sm text-zinc-400">${reg.guardian_phone || ''}</div>
+                    <div class="text-slate-900" style="color:#0f172a;">${reg.guardian_first_name || ''} ${reg.guardian_last_name || ''}</div>
+                    <div class="text-sm text-slate-500" style="color:#64748b;">${reg.guardian_phone || ''}</div>
                 </td>
-                <td class="px-6 py-4 text-zinc-300">${reg.branch_name || ''}</td>
+                <td class="px-6 py-4 text-slate-700" style="color:#334155;">${reg.branch_name || ''}</td>
                 <td class="px-6 py-4">
-                    <div class="text-white">₱${parseFloat(reg.registration_fee_amount || 0).toFixed(2)}</div>
-                    ${remaining > 0 ? `<div class="text-sm text-red-400">Remaining: ₱${remaining.toFixed(2)}</div>` : ''}
+                    <div class="text-slate-900 font-medium" style="color:#0f172a;">₱${parseFloat(reg.registration_fee_amount || 0).toFixed(2)}</div>
+                    ${remaining > 0 ? `<div class="text-sm text-red-600">Remaining: ₱${remaining.toFixed(2)}</div>` : ''}
                     ${registrationProofLink}
                 </td>
                 <td class="px-6 py-4">
@@ -2535,22 +2714,22 @@ function displayRegistrations(registrations) {
                         ${reg.registration_status}
                     </span>
                 </td>
-                <td class="px-6 py-4 text-zinc-400 text-sm">
+                <td class="px-6 py-4 text-slate-600 text-sm" style="color:#475569;">
                     ${new Date(reg.created_at).toLocaleDateString()}
                 </td>
                 <td class="px-6 py-4">
                     <div class="flex gap-2">
                         <button onclick="viewDetails(${reg.student_id})"
-                            class="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded text-sm transition">
+                            class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-sm transition">
                             <i class="fas fa-eye"></i>
                         </button>
                         ${reg.registration_status === 'Pending' ? `
                             <button onclick="openPaymentModal(${reg.student_id})"
-                                class="px-3 py-1 bg-gold-500/20 hover:bg-gold-500/30 text-gold-400 rounded text-sm transition">
+                                class="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-sm transition">
                                 <i class="fas fa-money-bill-wave"></i>
                             </button>
                             <button onclick="rejectRegistration(${reg.student_id})"
-                                class="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-sm transition">
+                                class="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm transition">
                                 <i class="fas fa-times"></i>
                             </button>
                         ` : ''}
@@ -2559,6 +2738,17 @@ function displayRegistrations(registrations) {
             </tr>
         `;
     }).join('');
+}
+
+// Display Registrations
+function displayRegistrations(registrations) {
+    if (!document.getElementById('registrationsTable')) {
+        return;
+    }
+    registrationsTableState.rows = Array.isArray(registrations) ? registrations : [];
+    registrationsTableState.page = 1;
+    initRegistrationsPaginationControls();
+    renderRegistrationsTable();
 }
 
 // Update Stats
@@ -2744,7 +2934,7 @@ function initPaymentForm() {
             if (data.success) {
                 showMessage(data.message, 'success');
                 closePaymentModal();
-                loadPendingRegistrations();
+                reloadRegistrationsByActiveMode();
             }
         } catch (error) {
             showMessage('Failed to confirm payment: ' + (error.message || error), 'error');
@@ -2763,7 +2953,7 @@ async function rejectRegistration(studentId) {
         const data = await apiPost('admin.php?action=reject-registration', { student_id: studentId });
         if (data.success) {
             showMessage(data.message, 'success');
-            loadPendingRegistrations();
+            reloadRegistrationsByActiveMode();
         }
     } catch (error) {
         showMessage('Failed to reject registration: ' + (error.message || error), 'error');
@@ -2789,7 +2979,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (adminTable) {
         checkAuth();
         initPaymentForm();
-        loadPendingRegistrations();
+        reloadRegistrationsByActiveMode();
     } else if (studentDashboard) {
         initStudentDashboardPage();
     } else if (studentProfile) {

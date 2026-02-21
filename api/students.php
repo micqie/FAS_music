@@ -187,6 +187,12 @@ class StudentsApi
                 }
             } catch (PDOException $e) {}
             try {
+                $stmt = $this->conn->query("SHOW COLUMNS FROM tbl_student_package_requests LIKE 'payment_type'");
+                if ($stmt && $stmt->rowCount() === 0) {
+                    $this->conn->exec("ALTER TABLE tbl_student_package_requests ADD COLUMN payment_type ENUM('Full Payment','Partial Payment','Installment') NOT NULL DEFAULT 'Partial Payment' AFTER requested_amount");
+                }
+            } catch (PDOException $e) {}
+            try {
                 $stmt = $this->conn->query("SHOW COLUMNS FROM tbl_student_package_requests LIKE 'assigned_date'");
                 if ($stmt && $stmt->rowCount() === 0) {
                     $this->conn->exec("ALTER TABLE tbl_student_package_requests ADD COLUMN assigned_date DATE NULL AFTER assigned_teacher_id");
@@ -266,6 +272,39 @@ class StudentsApi
         } catch (PDOException $e) {
             // Do not break API. Trigger references can still fail if DB user lacks DDL permission.
         }
+    }
+
+    private function ensureEnrollmentPaymentTypeColumn()
+    {
+        try {
+            $stmt = $this->conn->query("SHOW COLUMNS FROM tbl_enrollments LIKE 'payment_type'");
+            if ($stmt && $stmt->rowCount() > 0) {
+                return;
+            }
+            $this->conn->exec("
+                ALTER TABLE tbl_enrollments
+                ADD COLUMN payment_type ENUM('Full Payment','Partial Payment','Installment') NOT NULL DEFAULT 'Partial Payment'
+                AFTER payment_deadline_session
+            ");
+        } catch (PDOException $e) {
+            // Do not break API.
+        }
+    }
+
+    private function normalizeEnrollmentPaymentType($raw)
+    {
+        $v = strtolower(trim((string)$raw));
+        if ($v === '') return '';
+        if (in_array($v, ['downpayment', 'partial', 'partialpayment', 'partial payment'], true)) {
+            return 'Partial Payment';
+        }
+        if (in_array($v, ['full', 'fullpayment', 'full payment'], true)) {
+            return 'Full Payment';
+        }
+        if (in_array($v, ['installment'], true)) {
+            return 'Installment';
+        }
+        return '';
     }
 
     /**
@@ -519,65 +558,27 @@ class StudentsApi
     {
         try {
             $this->ensureSessionPackageColumn();
-
-            $hasStudentRegistrationCols = false;
-            try {
-                $colCheck = $this->conn->query("SHOW COLUMNS FROM tbl_students LIKE 'registration_status'");
-                $hasStudentRegistrationCols = $colCheck && $colCheck->rowCount() > 0;
-            } catch (PDOException $e) {
-                $hasStudentRegistrationCols = false;
-            }
-
-            if ($hasStudentRegistrationCols) {
-                $stmt = $this->conn->prepare("
-                    SELECT
-                        s.student_id,
-                        s.first_name,
-                        s.last_name,
-                        s.email,
-                        s.phone,
-                        s.registration_fee_amount,
-                        s.registration_fee_paid,
-                        s.registration_status,
-                        s.status,
-                        s.created_at,
-                        s.branch_id,
-                        b.branch_name
-                    FROM tbl_students s
-                    LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                    WHERE s.registration_status != 'Rejected'
-                    ORDER BY s.created_at DESC
-                ");
-            } else {
-                $stmt = $this->conn->prepare("
-                    SELECT
-                        s.student_id,
-                        s.first_name,
-                        s.last_name,
-                        s.email,
-                        s.phone,
-                        COALESCE(e.registration_fee_amount, 0) AS registration_fee_amount,
-                        COALESCE(e.registration_fee_paid, 0) AS registration_fee_paid,
-                        COALESCE(e.registration_status, 'Pending') AS registration_status,
-                        s.status,
-                        s.created_at,
-                        s.branch_id,
-                        b.branch_name
-                    FROM tbl_students s
-                    LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                    LEFT JOIN (
-                        SELECT e1.*
-                        FROM tbl_enrollments e1
-                        INNER JOIN (
-                            SELECT student_id, MAX(enrollment_id) AS max_enrollment_id
-                            FROM tbl_enrollments
-                            GROUP BY student_id
-                        ) latest ON latest.max_enrollment_id = e1.enrollment_id
-                    ) e ON e.student_id = s.student_id
-                    WHERE COALESCE(e.registration_status, 'Pending') != 'Rejected'
-                    ORDER BY s.created_at DESC
-                ");
-            }
+            $this->ensureStudentRegistrationFeesTable();
+            $stmt = $this->conn->prepare("
+                SELECT
+                    s.student_id,
+                    s.first_name,
+                    s.last_name,
+                    s.email,
+                    s.phone,
+                    COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                    COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
+                    COALESCE(rf.registration_status, 'Pending') AS registration_status,
+                    s.status,
+                    s.created_at,
+                    s.branch_id,
+                    b.branch_name
+                FROM tbl_students s
+                LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+                WHERE COALESCE(rf.registration_status, 'Pending') != 'Rejected'
+                ORDER BY s.created_at DESC
+            ");
 
             $stmt->execute();
             $this->sendJSON([
@@ -651,21 +652,33 @@ class StudentsApi
         }
 
         try {
+            $this->ensureStudentRegistrationFeesTable();
             $stmt = $this->conn->prepare("
                 UPDATE tbl_students SET
                     first_name = ?, last_name = ?, middle_name = ?, email = ?, phone = ?, address = ?,
                     branch_id = ?, date_of_birth = ?, age = ?, school = ?, grade_year = ?,
-                    registration_fee_amount = COALESCE(?, registration_fee_amount),
-                    registration_fee_paid = COALESCE(?, registration_fee_paid),
-                    registration_status = COALESCE(?, registration_status),
                     status = COALESCE(?, status)
                 WHERE student_id = ?
             ");
             $stmt->execute([
                 $firstName, $lastName, $middleName ?: null, $email ?: null, $phone ?: null, $address ?: null,
                 $branchId, $dateOfBirth, $age ?: null, $school ?: null, $gradeYear ?: null,
-                $registrationFeeAmount, $registrationFeePaid, $registrationStatus, $status, $id
+                $status, $id
             ]);
+            if ($registrationFeeAmount !== null || $registrationFeePaid !== null || $registrationStatus !== null) {
+                $stmtReg = $this->conn->prepare("
+                    INSERT INTO tbl_student_registration_fees (
+                        student_id, registration_fee_amount, registration_fee_paid, registration_status
+                    ) VALUES (
+                        ?, COALESCE(?, 1000.00), COALESCE(?, 0.00), COALESCE(?, 'Pending')
+                    )
+                    ON DUPLICATE KEY UPDATE
+                        registration_fee_amount = COALESCE(VALUES(registration_fee_amount), registration_fee_amount),
+                        registration_fee_paid = COALESCE(VALUES(registration_fee_paid), registration_fee_paid),
+                        registration_status = COALESCE(VALUES(registration_status), registration_status)
+                ");
+                $stmtReg->execute([$id, $registrationFeeAmount, $registrationFeePaid, $registrationStatus]);
+            }
             if ($stmt->rowCount() === 0) {
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
@@ -704,6 +717,7 @@ class StudentsApi
     public function getActiveStudents()
     {
         $this->ensureSessionPackageColumn();
+        $this->ensureStudentRegistrationFeesTable();
         $branchId = $_GET['branch_id'] ?? null;
 
         // Check if session_package_id exists and tbl_session_packages exists (avoid SQL errors)
@@ -726,7 +740,7 @@ class StudentsApi
                     s.last_name,
                     s.email,
                     s.phone,
-                    s.registration_status,
+                    COALESCE(rf.registration_status, 'Pending') AS registration_status,
                     s.status,
                     s.branch_id,
                     s.session_package_id,
@@ -737,7 +751,8 @@ class StudentsApi
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
                 LEFT JOIN tbl_session_packages sp ON s.session_package_id = sp.package_id
-                WHERE s.status = 'Active' AND s.registration_status IN ('Fee Paid', 'Approved')
+                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+                WHERE s.status = 'Active' AND COALESCE(rf.registration_status, 'Pending') IN ('Fee Paid', 'Approved')
             ";
         } else {
             $sql = "
@@ -747,13 +762,14 @@ class StudentsApi
                     s.last_name,
                     s.email,
                     s.phone,
-                    s.registration_status,
+                    COALESCE(rf.registration_status, 'Pending') AS registration_status,
                     s.status,
                     s.branch_id,
                     b.branch_name
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                WHERE s.status = 'Active' AND s.registration_status IN ('Fee Paid', 'Approved')
+                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+                WHERE s.status = 'Active' AND COALESCE(rf.registration_status, 'Pending') IN ('Fee Paid', 'Approved')
             ";
         }
 
@@ -872,34 +888,22 @@ class StudentsApi
         if ($email === '') {
             $this->sendJSON(['error' => 'Email is required'], 400);
         }
+        $this->ensureStudentRegistrationFeesTable();
 
         $this->ensureStudentInstrumentsTable();
+        $this->ensureStudentRegistrationFeesTable();
 
         try {
             $stmtStudent = $this->conn->prepare("
                 SELECT
                     s.*,
-                    b.branch_name,
-                    e.enrollment_id,
-                    e.registration_fee_amount,
-                    e.registration_fee_paid,
-                    e.registration_status,
-                    lp.package_name,
-                    lp.total_sessions AS package_sessions,
-                    1 AS package_max_instruments,
-                    COALESCE(lp.price, e.total_amount, 0) AS package_price
+                    COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                    COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
+                    COALESCE(rf.registration_status, 'Pending') AS registration_status,
+                    b.branch_name
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN (
-                    SELECT e1.*
-                    FROM tbl_enrollments e1
-                    INNER JOIN (
-                        SELECT student_id, MAX(enrollment_id) AS max_enrollment_id
-                        FROM tbl_enrollments
-                        GROUP BY student_id
-                    ) latest ON latest.max_enrollment_id = e1.enrollment_id
-                ) e ON s.student_id = e.student_id
-                LEFT JOIN tbl_lesson_packages lp ON e.package_id = lp.package_id
+                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
                 WHERE s.email = ?
                 LIMIT 1
             ");
@@ -910,14 +914,14 @@ class StudentsApi
                 $this->sendJSON(['error' => 'Student not found for this email'], 404);
             }
 
-            if (!isset($student['registration_fee_amount'])) $student['registration_fee_amount'] = 0;
+            if (!isset($student['registration_fee_amount'])) $student['registration_fee_amount'] = 1000;
             if (!isset($student['registration_fee_paid'])) $student['registration_fee_paid'] = 0;
             if (!isset($student['registration_status'])) $student['registration_status'] = 'Pending';
-
-            // Balance calculation (amount due)
-            $amount = (float) ($student['registration_fee_amount'] ?? 0);
-            $paid = (float) ($student['registration_fee_paid'] ?? 0);
-            $student['balance_due'] = max(0, $amount - $paid);
+            $student['balance_due'] = 0;
+            $student['package_name'] = null;
+            $student['package_sessions'] = null;
+            $student['package_max_instruments'] = null;
+            $student['package_price'] = 0;
 
             // Instruments currently associated with student
             $instruments = [];
@@ -966,12 +970,133 @@ class StudentsApi
                 $primaryGuardian = null;
             }
 
+            // Enrollment timeline (current + history)
+            $currentEnrollment = null;
+            $enrollmentHistory = [];
+            try {
+                $packageNameExpr = "CONCAT('Package #', e.package_id)";
+                $packageSessionsExpr = "e.total_sessions";
+                $packagePriceExpr = "0";
+                $packageJoin = "";
+                if ($this->tableExists('tbl_session_packages')) {
+                    $packageNameExpr = "COALESCE(sp.package_name, CONCAT('Package #', e.package_id))";
+                    $packageSessionsExpr = "COALESCE(sp.sessions, e.total_sessions, 0)";
+                    $packagePriceExpr = "COALESCE(sp.price, 0)";
+                    $packageJoin = "LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id";
+                }
+
+                $sessionJoin = "";
+                $firstDateExpr = "e.start_date";
+                $firstStartExpr = "NULL";
+                $firstEndExpr = "NULL";
+                $firstRoomExpr = "NULL";
+                $teacherIdExpr = "NULL";
+                if ($this->tableExists('tbl_sessions')) {
+                    $sessionJoin = "
+                        LEFT JOIN (
+                            SELECT
+                                s.enrollment_id,
+                                s.session_date,
+                                s.start_time,
+                                s.end_time,
+                                s.room_id,
+                                s.notes,
+                                s.teacher_id
+                            FROM tbl_sessions s
+                            INNER JOIN (
+                                SELECT enrollment_id, MIN(session_number) AS first_session_number
+                                FROM tbl_sessions
+                                GROUP BY enrollment_id
+                            ) sf ON sf.enrollment_id = s.enrollment_id
+                                AND sf.first_session_number = s.session_number
+                        ) fs ON fs.enrollment_id = e.enrollment_id
+                    ";
+                    $firstDateExpr = "COALESCE(fs.session_date, e.start_date)";
+                    $firstStartExpr = "fs.start_time";
+                    $firstEndExpr = "fs.end_time";
+                    $teacherIdExpr = "fs.teacher_id";
+                    if ($this->tableExists('tbl_rooms')) {
+                        $sessionJoin .= " LEFT JOIN tbl_rooms rm ON fs.room_id = rm.room_id ";
+                        $firstRoomExpr = "COALESCE(NULLIF(TRIM(rm.room_name), ''), NULLIF(TRIM(fs.notes), ''))";
+                    } else {
+                        $firstRoomExpr = "NULLIF(TRIM(fs.notes), '')";
+                    }
+                }
+
+                $stmtEnrollments = $this->conn->prepare("
+                    SELECT
+                        e.enrollment_id,
+                        {$packageNameExpr} AS package_name,
+                        e.start_date,
+                        e.end_date,
+                        {$firstDateExpr} AS first_session_date,
+                        {$firstStartExpr} AS first_start_time,
+                        {$firstEndExpr} AS first_end_time,
+                        {$firstRoomExpr} AS first_room,
+                        COALESCE(pay.payment_type, 'Partial Payment') AS payment_type,
+                        {$packagePriceExpr} AS total_amount,
+                        COALESCE(pay.paid_amount, 0) AS paid_amount,
+                        e.status,
+                        {$packageSessionsExpr} AS package_sessions,
+                        1 AS package_max_instruments,
+                        t.first_name AS teacher_first_name,
+                        t.last_name AS teacher_last_name
+                    FROM tbl_enrollments e
+                    {$packageJoin}
+                    {$sessionJoin}
+                    LEFT JOIN (
+                        SELECT
+                            p.enrollment_id,
+                            SUM(CASE WHEN p.status = 'Paid' THEN p.amount ELSE 0 END) AS paid_amount,
+                            SUBSTRING_INDEX(
+                                GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC),
+                                ',',
+                                1
+                            ) AS payment_type
+                        FROM tbl_payments p
+                        GROUP BY p.enrollment_id
+                    ) pay ON pay.enrollment_id = e.enrollment_id
+                    LEFT JOIN tbl_teachers t ON t.teacher_id = {$teacherIdExpr}
+                    WHERE e.student_id = ?
+                    ORDER BY e.enrollment_id DESC
+                ");
+                $stmtEnrollments->execute([(int)$student['student_id']]);
+                $allEnrollments = $stmtEnrollments->fetchAll(PDO::FETCH_ASSOC);
+
+                if (!empty($allEnrollments)) {
+                    $currentIndex = null;
+                    foreach ($allEnrollments as $idx => $row) {
+                        $st = (string)($row['status'] ?? '');
+                        if ($st === 'Active' || $st === 'Pending') {
+                            $currentIndex = $idx;
+                            break;
+                        }
+                    }
+                    if ($currentIndex === null) $currentIndex = 0;
+                    $currentEnrollment = $allEnrollments[$currentIndex];
+                    $student['package_name'] = $currentEnrollment['package_name'] ?? null;
+                    $student['package_sessions'] = $currentEnrollment['package_sessions'] ?? null;
+                    $student['package_max_instruments'] = $currentEnrollment['package_max_instruments'] ?? null;
+                    $student['package_price'] = (float)($currentEnrollment['total_amount'] ?? 0);
+                    $student['balance_due'] = max(0, (float)$student['package_price'] - (float)($currentEnrollment['paid_amount'] ?? 0));
+                    foreach ($allEnrollments as $idx => $row) {
+                        if ($idx === $currentIndex) continue;
+                        $enrollmentHistory[] = $row;
+                    }
+                }
+            } catch (PDOException $e) {
+                $currentEnrollment = null;
+                $enrollmentHistory = [];
+            }
+
             $this->sendJSON([
                 'success' => true,
                 'student' => $student,
                 'guardians' => $guardians,
                 'primary_guardian' => $primaryGuardian,
-                'instruments' => $instruments
+                'instruments' => $instruments,
+                'current_enrollment' => $currentEnrollment,
+                'enrollment_history' => $enrollmentHistory
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
@@ -1027,9 +1152,10 @@ class StudentsApi
                     s.status,
                     s.first_name,
                     s.last_name,
-                    COALESCE(s.registration_status, 'Pending') AS registration_status
+                    COALESCE(rf.registration_status, 'Pending') AS registration_status
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
                 WHERE s.email = ?
                 LIMIT 1
             ");
@@ -1066,6 +1192,23 @@ class StudentsApi
                             ORDER BY sp.sessions ASC, sp.package_id ASC
                         ");
                         $stmtPackages->execute([$studentBranchId]);
+                        $packages = $stmtPackages->fetchAll(PDO::FETCH_ASSOC);
+                        if (empty($packages)) {
+                            $stmtPackages = $this->conn->prepare("
+                                SELECT
+                                    package_id,
+                                    package_name,
+                                    sessions,
+                                    max_instruments,
+                                    COALESCE(price, 0) AS price,
+                                    ? AS branch_id,
+                                    ? AS branch_name
+                                FROM tbl_session_packages
+                                ORDER BY sessions ASC, package_id ASC
+                            ");
+                            $stmtPackages->execute([$studentBranchId, $studentBranchName]);
+                            $packages = $stmtPackages->fetchAll(PDO::FETCH_ASSOC);
+                        }
                     } else {
                         $stmtPackages = $this->conn->prepare("
                             SELECT
@@ -1080,8 +1223,8 @@ class StudentsApi
                             ORDER BY sessions ASC, package_id ASC
                         ");
                         $stmtPackages->execute([$studentBranchId, $studentBranchName]);
+                        $packages = $stmtPackages->fetchAll(PDO::FETCH_ASSOC);
                     }
-                    $packages = $stmtPackages->fetchAll(PDO::FETCH_ASSOC);
                 }
 
                 if (empty($packages) && $this->tableExists('tbl_lesson_packages')) {
@@ -1146,7 +1289,7 @@ class StudentsApi
                     FROM tbl_instruments i
                     LEFT JOIN tbl_instrument_types it ON i.type_id = it.type_id
                     WHERE i.branch_id = ?
-                      AND i.status IN ('Active','Available')
+                      AND i.status IN ('Available','In Use')
                     ORDER BY it.type_name ASC, i.instrument_name ASC
                 ");
                 $stmtInstruments->execute([(int) $student['branch_id']]);
@@ -1179,97 +1322,38 @@ class StudentsApi
 
             // Latest enrollment request (for status display)
             try {
-                $packageNameExpr = "COALESCE(lp.package_name, CONCAT('Package #', e.package_id))";
-                $packageJoin = "LEFT JOIN tbl_lesson_packages lp ON e.package_id = lp.package_id";
-                if ($this->tableExists('tbl_session_packages')) {
-                    $packageNameExpr = "COALESCE(sp.package_name, lp.package_name, CONCAT('Package #', e.package_id))";
-                    $packageJoin = "LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id LEFT JOIN tbl_lesson_packages lp ON e.package_id = lp.package_id";
-                } else if (!$this->tableExists('tbl_lesson_packages')) {
-                    $packageNameExpr = "CONCAT('Package #', e.package_id)";
-                    $packageJoin = "";
-                }
-
-                $sessionJoin = "";
-                $assignedDateExpr = "e.start_date";
-                $assignedDayExpr = "CASE WHEN e.start_date IS NULL THEN NULL ELSE DAYNAME(e.start_date) END";
-                $assignedStartExpr = "NULL";
-                $assignedEndExpr = "NULL";
-                $assignedRoomExpr = "NULL";
-                if ($this->tableExists('tbl_sessions')) {
-                    $sessionJoin = "
-                        LEFT JOIN (
-                            SELECT
-                                s.enrollment_id,
-                                s.session_date,
-                                s.start_time,
-                                s.end_time,
-                                s.room_id,
-                                s.notes
-                            FROM tbl_sessions s
-                            INNER JOIN (
-                                SELECT enrollment_id, MIN(session_number) AS first_session_number
-                                FROM tbl_sessions
-                                GROUP BY enrollment_id
-                            ) sf ON sf.enrollment_id = s.enrollment_id
-                                AND sf.first_session_number = s.session_number
-                        ) fs ON fs.enrollment_id = e.enrollment_id
-                    ";
-                    $assignedDateExpr = "COALESCE(fs.session_date, e.start_date)";
-                    $assignedDayExpr = "CASE WHEN COALESCE(fs.session_date, e.start_date) IS NULL THEN NULL ELSE DAYNAME(COALESCE(fs.session_date, e.start_date)) END";
-                    $assignedStartExpr = "fs.start_time";
-                    $assignedEndExpr = "fs.end_time";
-                    if ($this->tableExists('tbl_rooms')) {
-                        $sessionJoin .= " LEFT JOIN tbl_rooms rm ON fs.room_id = rm.room_id ";
-                        $assignedRoomExpr = "COALESCE(NULLIF(TRIM(rm.room_name), ''), NULLIF(TRIM(fs.notes), ''))";
-                    } else {
-                        $assignedRoomExpr = "NULLIF(TRIM(fs.notes), '')";
-                    }
-                }
-
                 $stmtLatestRequest = $this->conn->prepare("
                     SELECT
                         e.enrollment_id AS request_id,
                         e.package_id,
-                        CONCAT('[', e.instrument_id, ']') AS instrument_ids_json,
-                        e.start_date AS preferred_date,
-                        CASE
-                            WHEN e.start_date IS NULL THEN NULL
-                            ELSE DAYNAME(e.start_date)
-                        END AS preferred_day_of_week,
-                        NULL AS preferred_start_time,
-                        NULL AS preferred_end_time,
-                        e.teacher_id AS assigned_teacher_id,
-                        NULL AS payment_proof_path,
-                        {$assignedDateExpr} AS assigned_date,
-                        {$assignedDayExpr} AS assigned_day_of_week,
-                        {$assignedStartExpr} AS assigned_start_time,
-                        {$assignedEndExpr} AS assigned_end_time,
-                        {$assignedRoomExpr} AS assigned_room,
-                        COALESCE(e.total_amount, 0) AS requested_amount,
-                        CASE
-                            WHEN e.status = 'Pending Payment' THEN 'Pending'
-                            ELSE 'Approved'
-                        END AS status,
-                        NULL AS admin_notes,
+                        e.preferred_schedule,
+                        e.request_notes,
+                        COALESCE(sp.price, 0) AS requested_amount,
+                        e.status,
                         e.created_at,
-                        {$packageNameExpr} AS package_name,
-                        t.first_name AS assigned_teacher_first_name,
-                        t.last_name AS assigned_teacher_last_name
+                        COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name
                     FROM tbl_enrollments e
-                    {$packageJoin}
-                    {$sessionJoin}
-                    LEFT JOIN tbl_teachers t ON e.teacher_id = t.teacher_id
+                    LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id
                     WHERE e.student_id = ?
                     ORDER BY e.enrollment_id DESC
                     LIMIT 1
                 ");
                 $stmtLatestRequest->execute([(int) $student['student_id']]);
                 $latestRequest = $stmtLatestRequest->fetch(PDO::FETCH_ASSOC) ?: null;
-                if ($latestRequest && !empty($latestRequest['instrument_ids_json'])) {
-                    $decoded = json_decode($latestRequest['instrument_ids_json'], true);
-                    $latestRequest['instrument_ids'] = is_array($decoded) ? $decoded : [];
-                } else if ($latestRequest) {
-                    $latestRequest['instrument_ids'] = [];
+                if ($latestRequest) {
+                    $meta = [];
+                    if (!empty($latestRequest['request_notes'])) {
+                        $decoded = json_decode((string)$latestRequest['request_notes'], true);
+                        if (is_array($decoded)) $meta = $decoded;
+                    }
+                    $preferred = (string)($latestRequest['preferred_schedule'] ?? '');
+                    $parts = explode('|', $preferred, 2);
+                    $latestRequest['preferred_day_of_week'] = trim($parts[0] ?? '');
+                    $latestRequest['preferred_date'] = trim($parts[1] ?? '');
+                    $latestRequest['payment_type'] = (string)($meta['payment_type'] ?? 'Partial Payment');
+                    $latestRequest['payment_proof_path'] = $meta['payment_proof_path'] ?? null;
+                    $latestRequest['admin_notes'] = $meta['admin_notes'] ?? null;
+                    $latestRequest['instrument_ids'] = is_array($meta['instrument_ids'] ?? null) ? $meta['instrument_ids'] : [];
                 }
             } catch (PDOException $e) {
                 $latestRequest = null;
@@ -1299,6 +1383,8 @@ class StudentsApi
         $data = $isMultipart ? ($_POST ?: []) : (json_decode(file_get_contents('php://input'), true) ?: []);
         $studentId = (int) ($data['student_id'] ?? 0);
         $packageId = (int) ($data['package_id'] ?? 0);
+        $paymentRaw = $data['payment_type'] ?? ($data['payment_mode'] ?? '');
+        $paymentType = $this->normalizeEnrollmentPaymentType($paymentRaw);
         $preferredDate = !empty($data['preferred_date']) ? $data['preferred_date'] : null;
         $preferredDay = trim($data['preferred_day_of_week'] ?? '');
         if (!empty($data['instrument_ids_json'])) {
@@ -1317,9 +1403,13 @@ class StudentsApi
         if (!$preferredDate || !in_array($preferredDay, $validDays, true)) {
             $this->sendJSON(['error' => 'preferred_date and preferred_day_of_week are required'], 400);
         }
+        if ($paymentType === '') {
+            // Backward-compatible fallback for cached clients/forms.
+            $paymentType = 'Partial Payment';
+        }
 
         $this->ensureStudentInstrumentsTable();
-        $this->ensureLegacyEnrollmentTables();
+        $this->ensureStudentRegistrationFeesTable();
 
         $paymentProofPath = null;
         if ($isMultipart && !empty($_FILES['package_payment_proof_file']['name']) && ($_FILES['package_payment_proof_file']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
@@ -1336,8 +1426,9 @@ class StudentsApi
                     s.student_id,
                     s.branch_id,
                     s.status,
-                    COALESCE(s.registration_status, 'Pending') AS registration_status
+                    COALESCE(rf.registration_status, 'Pending') AS registration_status
                 FROM tbl_students s
+                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
                 WHERE s.student_id = ?
                 LIMIT 1
             ");
@@ -1353,7 +1444,7 @@ class StudentsApi
             $stmtExisting = $this->conn->prepare("
                 SELECT enrollment_id
                 FROM tbl_enrollments
-                WHERE student_id = ? AND status = 'Pending Payment'
+                WHERE student_id = ? AND status = 'Pending'
                 ORDER BY enrollment_id DESC
                 LIMIT 1
             ");
@@ -1362,11 +1453,11 @@ class StudentsApi
                 $this->sendJSON(['error' => 'You already have a pending request. Please wait for desk/admin approval.'], 400);
             }
 
-            $lessonPackagesHasBranch = $this->tableHasColumn('tbl_lesson_packages', 'branch_id');
-            if ($lessonPackagesHasBranch) {
+            $sessionPackagesHasBranch = $this->tableHasColumn('tbl_session_packages', 'branch_id');
+            if ($sessionPackagesHasBranch) {
                 $stmtPackage = $this->conn->prepare("
-                    SELECT package_id, 1 AS max_instruments, COALESCE(price, 0) AS price
-                    FROM tbl_lesson_packages
+                    SELECT package_id, package_name, sessions, max_instruments, COALESCE(price, 0) AS price
+                    FROM tbl_session_packages
                     WHERE package_id = ?
                       AND branch_id = ?
                     LIMIT 1
@@ -1374,70 +1465,16 @@ class StudentsApi
                 $stmtPackage->execute([$packageId, (int) $student['branch_id']]);
             } else {
                 $stmtPackage = $this->conn->prepare("
-                    SELECT package_id, 1 AS max_instruments, COALESCE(price, 0) AS price
-                    FROM tbl_lesson_packages
+                    SELECT package_id, package_name, sessions, max_instruments, COALESCE(price, 0) AS price
+                    FROM tbl_session_packages
                     WHERE package_id = ?
                     LIMIT 1
                 ");
                 $stmtPackage->execute([$packageId]);
             }
             $package = $stmtPackage->fetch(PDO::FETCH_ASSOC);
-            if (!$package && $this->tableExists('tbl_session_packages')) {
-                $sessionPackagesHasBranch = $this->tableHasColumn('tbl_session_packages', 'branch_id');
-                if ($sessionPackagesHasBranch) {
-                    $stmtPackage = $this->conn->prepare("
-                        SELECT package_id, package_name, sessions, max_instruments, COALESCE(price, 0) AS price
-                        FROM tbl_session_packages
-                        WHERE package_id = ?
-                          AND branch_id = ?
-                        LIMIT 1
-                    ");
-                    $stmtPackage->execute([$packageId, (int) $student['branch_id']]);
-                } else {
-                    $stmtPackage = $this->conn->prepare("
-                        SELECT package_id, package_name, sessions, max_instruments, COALESCE(price, 0) AS price
-                        FROM tbl_session_packages
-                        WHERE package_id = ?
-                        LIMIT 1
-                    ");
-                    $stmtPackage->execute([$packageId]);
-                }
-                $package = $stmtPackage->fetch(PDO::FETCH_ASSOC);
-            }
             if (!$package) {
                 $this->sendJSON(['error' => 'Selected package was not found'], 404);
-            }
-
-            // tbl_enrollments.package_id FK points to tbl_lesson_packages.package_id.
-            // If request selected a package from tbl_session_packages, make sure it exists in tbl_lesson_packages.
-            if ($this->tableExists('tbl_lesson_packages')) {
-                $stmtLessonPackage = $this->conn->prepare("
-                    SELECT package_id
-                    FROM tbl_lesson_packages
-                    WHERE package_id = ?
-                    LIMIT 1
-                ");
-                $stmtLessonPackage->execute([$packageId]);
-                $hasLessonPackage = (bool) $stmtLessonPackage->fetch(PDO::FETCH_ASSOC);
-                if (!$hasLessonPackage) {
-                    $fallbackName = trim((string)($package['package_name'] ?? 'Session Package'));
-                    $fallbackSessions = (int)($package['sessions'] ?? 1);
-                    if ($fallbackSessions < 1) $fallbackSessions = 1;
-                    $fallbackPrice = (float)($package['price'] ?? 0);
-
-                    $stmtCreateLessonPackage = $this->conn->prepare("
-                        INSERT INTO tbl_lesson_packages (
-                            package_id, package_name, total_sessions, price, description, status
-                        ) VALUES (?, ?, ?, ?, ?, 'Active')
-                    ");
-                    $stmtCreateLessonPackage->execute([
-                        $packageId,
-                        $fallbackName !== '' ? $fallbackName : 'Session Package',
-                        $fallbackSessions,
-                        $fallbackPrice,
-                        'Auto-created from session package for enrollment request'
-                    ]);
-                }
             }
 
             $maxInstruments = (int) ($package['max_instruments'] ?? 1);
@@ -1454,7 +1491,7 @@ class StudentsApi
                 SELECT instrument_id
                 FROM tbl_instruments
                 WHERE branch_id = ?
-                  AND status IN ('Active','Available')
+                  AND status IN ('Available','In Use')
                   AND instrument_id IN ({$placeholders})
             ");
             $stmtInstrumentCheck->execute($params);
@@ -1463,53 +1500,46 @@ class StudentsApi
                 $this->sendJSON(['error' => 'One or more selected instruments are not available in your branch'], 400);
             }
 
-            $stmtFallbackTeacher = $this->conn->prepare("
-                SELECT teacher_id
-                FROM tbl_teachers
-                WHERE branch_id = ?
-                  AND status = 'Active'
-                ORDER BY teacher_id ASC
-                LIMIT 1
-            ");
-            $stmtFallbackTeacher->execute([(int)$student['branch_id']]);
-            $fallbackTeacherId = (int)$stmtFallbackTeacher->fetchColumn();
-            if ($fallbackTeacherId < 1) {
-                $this->sendJSON(['error' => 'No active teacher found in your branch. Please contact admin.'], 400);
+            if (!$this->tableExists('tbl_enrollments')) {
+                $this->sendJSON(['error' => 'tbl_enrollments table not found'], 500);
             }
-
-            $primaryInstrumentId = (int)reset($instrumentIds);
-            if ($primaryInstrumentId < 1) {
-                $this->sendJSON(['error' => 'Select at least one instrument'], 400);
-            }
-
-            $stmtInsert = $this->conn->prepare("
+            $primaryInstrumentId = !empty($instrumentIds) ? (int)$instrumentIds[0] : null;
+            $packageSessions = max(1, (int)($package['sessions'] ?? 1));
+            $preferredSchedule = trim($preferredDay . '|' . $preferredDate);
+            $requestMeta = json_encode([
+                'payment_type' => $paymentType,
+                'instrument_ids' => array_values($instrumentIds),
+                'payment_proof_path' => $paymentProofPath
+            ]);
+            $stmtPendingEnrollment = $this->conn->prepare("
                 INSERT INTO tbl_enrollments (
                     student_id,
                     package_id,
                     instrument_id,
-                    teacher_id,
-                    enrollment_date,
+                    preferred_schedule,
+                    request_notes,
+                    enrolled_by_type,
                     start_date,
                     end_date,
-                    total_amount,
-                    paid_amount,
-                    payment_deadline_session,
+                    total_sessions,
+                    completed_sessions,
                     status
-                ) VALUES (?, ?, ?, ?, CURRENT_DATE, ?, NULL, ?, 0, 7, 'Pending Payment')
+                ) VALUES (?, ?, ?, ?, ?, 'Self', NULL, NULL, ?, 0, 'Pending')
             ");
-            $stmtInsert->execute([
+            $stmtPendingEnrollment->execute([
                 $studentId,
                 $packageId,
                 $primaryInstrumentId,
-                $fallbackTeacherId,
-                $preferredDate,
-                (float) $package['price']
+                ($preferredSchedule !== '' ? $preferredSchedule : null),
+                $requestMeta,
+                $packageSessions
             ]);
+            $requestId = (int)$this->conn->lastInsertId();
 
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Request submitted. Desk/Admin will review and confirm your package payment.',
-                'request_id' => (int) $this->conn->lastInsertId()
+                'request_id' => $requestId
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
@@ -1525,83 +1555,64 @@ class StudentsApi
 
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
         $this->ensureSessionPackagesTable();
-
         try {
-            $lessonSessionsCol = $this->tableHasColumn('tbl_lesson_packages', 'total_sessions') ? 'total_sessions' : 'sessions';
-            $packageNameExpr = "COALESCE(sp.package_name, lp.package_name, CONCAT('Package #', e.package_id))";
-            $packageSessionsExpr = "COALESCE(sp.sessions, lp.{$lessonSessionsCol}, 0)";
-            $packageMaxInstExpr = "COALESCE(sp.max_instruments, 1)";
-            $packageJoin = "LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id LEFT JOIN tbl_lesson_packages lp ON e.package_id = lp.package_id";
-            if (!$this->tableExists('tbl_session_packages') && $this->tableExists('tbl_lesson_packages')) {
-                $packageNameExpr = "COALESCE(lp.package_name, CONCAT('Package #', e.package_id))";
-                $packageSessionsExpr = "COALESCE(lp.{$lessonSessionsCol}, 0)";
-                $packageMaxInstExpr = "1";
-                $packageJoin = "LEFT JOIN tbl_lesson_packages lp ON e.package_id = lp.package_id";
-            } else if (!$this->tableExists('tbl_session_packages') && !$this->tableExists('tbl_lesson_packages')) {
-                $packageNameExpr = "CONCAT('Package #', e.package_id)";
-                $packageSessionsExpr = "0";
-                $packageMaxInstExpr = "1";
-                $packageJoin = "";
-            }
-
             $sql = "
                 SELECT
                     e.enrollment_id AS request_id,
                     e.student_id,
                     s.branch_id,
                     e.package_id,
-                    CONCAT('[', e.instrument_id, ']') AS instrument_ids_json,
-                    e.start_date AS preferred_date,
-                    CASE WHEN e.start_date IS NULL THEN NULL ELSE DAYNAME(e.start_date) END AS preferred_day_of_week,
-                    NULL AS preferred_start_time,
-                    NULL AS preferred_end_time,
-                    e.teacher_id AS assigned_teacher_id,
-                    NULL AS payment_proof_path,
-                    COALESCE(e.total_amount, 0) AS requested_amount,
-                    'Pending' AS status,
+                    e.instrument_id,
+                    e.preferred_schedule,
+                    e.request_notes,
+                    e.status,
                     e.created_at,
                     s.first_name,
                     s.last_name,
                     s.email,
                     b.branch_name,
-                    {$packageNameExpr} AS package_name,
-                    {$packageSessionsExpr} AS sessions,
-                    {$packageMaxInstExpr} AS max_instruments
-            ";
-            $sql .= ",
-                NULL AS day_of_week,
-                NULL AS start_time,
-                NULL AS end_time,
-                NULL AS teacher_first_name,
-                NULL AS teacher_last_name
-            ";
-            $sql .= "
+                    COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
+                    COALESCE(sp.sessions, e.total_sessions, 0) AS sessions,
+                    COALESCE(sp.max_instruments, 1) AS max_instruments,
+                    COALESCE(sp.price, 0) AS requested_amount
                 FROM tbl_enrollments e
                 INNER JOIN tbl_students s ON e.student_id = s.student_id
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                {$packageJoin}
-            ";
-            $sql .= "
-                WHERE e.status = 'Pending Payment'
+                LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id
+                WHERE e.status = 'Pending'
             ";
             $params = [];
             if ($branchId > 0) {
                 $sql .= " AND s.branch_id = ?";
                 $params[] = $branchId;
             }
-            $sql .= " ORDER BY e.created_at DESC";
+            $sql .= " ORDER BY e.enrollment_id DESC";
 
             $stmt = $this->conn->prepare($sql);
             $stmt->execute($params);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($rows as &$row) {
-                $ids = [];
-                if (!empty($row['instrument_ids_json'])) {
-                    $decoded = json_decode($row['instrument_ids_json'], true);
-                    if (is_array($decoded)) $ids = array_values(array_map('intval', $decoded));
+                $meta = [];
+                if (!empty($row['request_notes'])) {
+                    $decoded = json_decode((string)$row['request_notes'], true);
+                    if (is_array($decoded)) $meta = $decoded;
                 }
+                $ids = is_array($meta['instrument_ids'] ?? null) ? array_values(array_map('intval', $meta['instrument_ids'])) : [];
+                if (empty($ids) && !empty($row['instrument_id'])) $ids = [(int)$row['instrument_id']];
                 $row['instrument_ids'] = $ids;
+                $row['payment_type'] = (string)($meta['payment_type'] ?? 'Partial Payment');
+                $row['payment_proof_path'] = $meta['payment_proof_path'] ?? null;
+                $row['admin_notes'] = $meta['admin_notes'] ?? null;
+                $row['assigned_teacher_id'] = null;
+                $row['preferred_start_time'] = null;
+                $row['preferred_end_time'] = null;
+
+                $preferred = (string)($row['preferred_schedule'] ?? '');
+                $parts = explode('|', $preferred, 2);
+                $row['preferred_day_of_week'] = trim($parts[0] ?? '');
+                $row['preferred_date'] = trim($parts[1] ?? '');
+
                 $row['instruments'] = [];
                 $instrumentKeywords = [];
                 if (!empty($ids)) {
@@ -1631,6 +1642,123 @@ class StudentsApi
             unset($row);
 
             $this->sendJSON(['success' => true, 'requests' => $rows]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // Admin/desk view of all active enrolled students
+    public function getActiveEnrollments()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
+        $this->ensureSessionPackagesTable();
+
+        try {
+            $sql = "
+                SELECT
+                    e.enrollment_id,
+                    e.student_id,
+                    s.first_name,
+                    s.last_name,
+                    s.email,
+                    s.branch_id,
+                    b.branch_name,
+                    e.package_id,
+                    COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
+                    COALESCE(sp.sessions, e.total_sessions, 0) AS sessions,
+                    e.status,
+                    e.start_date,
+                    e.end_date,
+                    e.created_at,
+                    fs.session_date AS first_session_date,
+                    fs.start_time AS first_start_time,
+                    fs.end_time AS first_end_time,
+                    t.first_name AS teacher_first_name,
+                    t.last_name AS teacher_last_name,
+                    COALESCE(rm.room_name, NULLIF(TRIM(fs.notes), '')) AS assigned_room
+                FROM tbl_enrollments e
+                INNER JOIN tbl_students s ON e.student_id = s.student_id
+                LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+                LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id
+                LEFT JOIN (
+                    SELECT
+                        s1.enrollment_id,
+                        s1.session_date,
+                        s1.start_time,
+                        s1.end_time,
+                        s1.room_id,
+                        s1.teacher_id,
+                        s1.notes
+                    FROM tbl_sessions s1
+                    INNER JOIN (
+                        SELECT enrollment_id, MIN(session_number) AS min_session_number
+                        FROM tbl_sessions
+                        GROUP BY enrollment_id
+                    ) x ON x.enrollment_id = s1.enrollment_id
+                       AND x.min_session_number = s1.session_number
+                ) fs ON fs.enrollment_id = e.enrollment_id
+                LEFT JOIN tbl_teachers t ON t.teacher_id = fs.teacher_id
+                LEFT JOIN tbl_rooms rm ON rm.room_id = fs.room_id
+                WHERE e.status = 'Active'
+            ";
+            $params = [];
+            if ($branchId > 0) {
+                $sql .= " AND s.branch_id = ? ";
+                $params[] = $branchId;
+            }
+            $sql .= " ORDER BY e.enrollment_id DESC ";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $this->sendJSON(['success' => true, 'enrollments' => $rows]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // Available rooms for assignment modal dropdowns
+    public function getAvailableRooms()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
+
+        if (!$this->tableExists('tbl_rooms')) {
+            $this->sendJSON(['success' => true, 'rooms' => []]);
+        }
+
+        try {
+            $sql = "
+                SELECT
+                    room_id,
+                    branch_id,
+                    room_name,
+                    capacity,
+                    room_type,
+                    status
+                FROM tbl_rooms
+                WHERE status = 'Available'
+            ";
+            $params = [];
+            if ($branchId > 0) {
+                $sql .= " AND branch_id = ? ";
+                $params[] = $branchId;
+            }
+            $sql .= " ORDER BY room_name ASC, room_id ASC ";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            $rooms = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $this->sendJSON(['success' => true, 'rooms' => $rooms]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
@@ -1685,13 +1813,21 @@ class StudentsApi
 
         $this->ensureSessionPackageColumn();
         $this->ensureStudentInstrumentsTable();
-        $this->ensureLegacyEnrollmentTables();
+        $this->ensureStudentRegistrationFeesTable();
 
         try {
             $this->conn->beginTransaction();
 
             $stmtReq = $this->conn->prepare("
-                SELECT e.enrollment_id AS request_id, e.student_id, s.branch_id, e.package_id, JSON_ARRAY(e.instrument_id) AS instrument_ids_json, e.status
+                SELECT
+                    e.enrollment_id AS request_id,
+                    e.student_id,
+                    s.branch_id,
+                    e.package_id,
+                    e.instrument_id,
+                    e.preferred_schedule,
+                    e.request_notes,
+                    e.status
                 FROM tbl_enrollments e
                 INNER JOIN tbl_students s ON e.student_id = s.student_id
                 WHERE e.enrollment_id = ?
@@ -1704,18 +1840,21 @@ class StudentsApi
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Request not found'], 404);
             }
-            if ($req['status'] !== 'Pending Payment') {
+            if ($req['status'] !== 'Pending') {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Only pending requests can be approved'], 400);
             }
 
             $instrumentIds = [];
-            if (!empty($req['instrument_ids_json'])) {
-                $decoded = json_decode($req['instrument_ids_json'], true);
-                if (is_array($decoded)) {
-                    $instrumentIds = array_values(array_unique(array_map('intval', $decoded)));
+            if (!empty($req['request_notes'])) {
+                $decoded = json_decode((string)$req['request_notes'], true);
+                if (is_array($decoded) && !empty($decoded['instrument_ids']) && is_array($decoded['instrument_ids'])) {
+                    $instrumentIds = array_values(array_unique(array_map('intval', $decoded['instrument_ids'])));
                     $instrumentIds = array_filter($instrumentIds, function ($v) { return $v > 0; });
                 }
+            }
+            if (empty($instrumentIds) && !empty($req['instrument_id'])) {
+                $instrumentIds = [(int)$req['instrument_id']];
             }
 
             $instrumentKeywords = [];
@@ -1793,107 +1932,51 @@ class StudentsApi
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'tbl_enrollments table not found'], 500);
             }
-            if ($this->tableExists('tbl_lesson_packages')) {
-                $stmtLessonPkg = $this->conn->prepare("
-                    SELECT package_id
-                    FROM tbl_lesson_packages
-                    WHERE package_id = ?
-                    LIMIT 1
-                ");
-                $stmtLessonPkg->execute([(int)$req['package_id']]);
-                if (!$stmtLessonPkg->fetch(PDO::FETCH_ASSOC)) {
-                    $stmtCreateLessonPkg = $this->conn->prepare("
-                        INSERT INTO tbl_lesson_packages (
-                            package_id, package_name, total_sessions, price, description, status
-                        ) VALUES (?, ?, ?, ?, ?, 'Active')
-                    ");
-                    $stmtCreateLessonPkg->execute([
-                        (int)$req['package_id'],
-                        $packageName,
-                        max(1, $packageSessions),
-                        $packagePrice,
-                        'Auto-created from approved student request'
-                    ]);
-                }
-            }
 
-            $stmtExistingEnrollment = $this->conn->prepare("
-                SELECT enrollment_id
-                FROM tbl_enrollments
-                WHERE student_id = ?
-                  AND package_id = ?
-                  AND instrument_id = ?
-                  AND teacher_id = ?
-                  AND status IN ('Ongoing', 'Pending Payment')
-                ORDER BY enrollment_id DESC
-                LIMIT 1
-            ");
-            $stmtExistingEnrollment->execute([
-                (int)$req['student_id'],
-                (int)$req['package_id'],
-                $primaryInstrumentId,
-                $teacherId
-            ]);
-            $existingEnrollment = $stmtExistingEnrollment->fetch(PDO::FETCH_ASSOC);
-
-            if (!$existingEnrollment) {
-                $startDate = $assignedDate;
-                $endDate = null;
-                if ($packageSessions > 0) {
-                    $endDate = date('Y-m-d', strtotime($startDate . ' +' . max(0, ($packageSessions - 1) * 7) . ' days'));
-                }
-
-                $stmtInsertEnrollment = $this->conn->prepare("
-                    INSERT INTO tbl_enrollments (
-                        student_id,
-                        package_id,
-                        instrument_id,
-                        teacher_id,
-                        enrollment_date,
-                        start_date,
-                        end_date,
-                        total_amount,
-                        paid_amount,
-                        payment_deadline_session,
-                        status
-                    ) VALUES (?, ?, ?, ?, CURRENT_DATE, ?, ?, ?, 0, 7, 'Ongoing')
-                ");
-                $stmtInsertEnrollment->execute([
-                    (int)$req['student_id'],
-                    (int)$req['package_id'],
-                    $primaryInstrumentId,
-                    $teacherId,
-                    $startDate,
-                    $endDate,
-                    $packagePrice
-                ]);
-            }
-
-            $endDate = null;
+            $endDate = $assignedDate;
             if ($packageSessions > 0) {
                 $endDate = date('Y-m-d', strtotime($assignedDate . ' +' . max(0, ($packageSessions - 1) * 7) . ' days'));
             }
 
-            $stmtApprove = $this->conn->prepare("
+            $requestMeta = [];
+            if (!empty($req['request_notes'])) {
+                $decoded = json_decode((string)$req['request_notes'], true);
+                if (is_array($decoded)) $requestMeta = $decoded;
+            }
+            if ($adminNotes !== '') {
+                $requestMeta['admin_notes'] = $adminNotes;
+            }
+            $stmtUpdateEnrollment = $this->conn->prepare("
                 UPDATE tbl_enrollments
-                SET teacher_id = ?,
+                SET instrument_id = ?,
+                    preferred_schedule = ?,
+                    request_notes = ?,
                     start_date = ?,
                     end_date = ?,
-                    total_amount = ?,
-                    status = 'Ongoing'
+                    total_sessions = ?,
+                    completed_sessions = 0,
+                    status = 'Active'
                 WHERE enrollment_id = ?
+                  AND status = 'Pending'
             ");
-            $stmtApprove->execute([
-                $teacherId,
+            $stmtUpdateEnrollment->execute([
+                $primaryInstrumentId,
+                trim($assignedDay . ' ' . $assignedStart . '-' . $assignedEnd),
+                json_encode($requestMeta),
                 $assignedDate,
                 $endDate,
-                $packagePrice,
-                $requestId
+                max(1, (int)$packageSessions),
+                (int)$requestId
             ]);
+            if ($stmtUpdateEnrollment->rowCount() === 0) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Pending enrollment request not found'], 404);
+            }
+            $newEnrollmentId = (int)$requestId;
 
             // Keep the assigned first schedule visible to students after approval.
             $this->upsertFirstSessionSchedule(
-                (int)$requestId,
+                $newEnrollmentId,
                 (int)$teacherId,
                 (int)$primaryInstrumentId,
                 $assignedDate,
@@ -1930,18 +2013,55 @@ class StudentsApi
         }
 
         try {
-            $stmt = $this->conn->prepare("
-                DELETE FROM tbl_enrollments
+            $meta = [];
+            $stmtGet = $this->conn->prepare("
+                SELECT request_notes
+                FROM tbl_enrollments
                 WHERE enrollment_id = ?
-                  AND status = 'Pending Payment'
+                LIMIT 1
             ");
-            $stmt->execute([$requestId]);
+            $stmtGet->execute([$requestId]);
+            $existingNotes = $stmtGet->fetchColumn();
+            if ($existingNotes) {
+                $decoded = json_decode((string)$existingNotes, true);
+                if (is_array($decoded)) $meta = $decoded;
+            }
+            if ($adminNotes !== '') $meta['admin_notes'] = $adminNotes;
+            $stmt = $this->conn->prepare("
+                UPDATE tbl_enrollments
+                SET status = 'Cancelled',
+                    request_notes = ?
+                WHERE enrollment_id = ?
+                  AND status = 'Pending'
+            ");
+            $stmt->execute([json_encode($meta), $requestId]);
             if ($stmt->rowCount() === 0) {
                 $this->sendJSON(['error' => 'Pending request not found'], 404);
             }
-            $this->sendJSON(['success' => true, 'message' => 'Request rejected and removed']);
+            $this->sendJSON(['success' => true, 'message' => 'Request rejected']);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    private function ensureStudentRegistrationFeesTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_registration_fees (
+                    registration_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    registration_fee_amount DECIMAL(10,2) NOT NULL DEFAULT 1000.00,
+                    registration_fee_paid DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    registration_status ENUM('Pending','Fee Paid','Approved','Rejected') NOT NULL DEFAULT 'Pending',
+                    notes TEXT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_registration_fee_student (student_id)
+                )
+            ");
+        } catch (PDOException $e) {
+            // Keep API working without hard-failing
         }
     }
 }
@@ -1985,6 +2105,12 @@ switch ($action) {
     case 'get-pending-package-requests':
         $studentsApi->getPendingPackageRequests();
         break;
+    case 'get-active-enrollments':
+        $studentsApi->getActiveEnrollments();
+        break;
+    case 'get-available-rooms':
+        $studentsApi->getAvailableRooms();
+        break;
     case 'approve-package-request':
         $studentsApi->approvePackageRequest();
         break;
@@ -1994,5 +2120,8 @@ switch ($action) {
     default:
         $studentsApi->sendJSON(['error' => 'Invalid action'], 400);
 }
+
+
+
 
 

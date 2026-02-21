@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Feb 20, 2026 at 06:44 PM
+-- Generation Time: Feb 21, 2026 at 03:53 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -42,7 +42,9 @@ CREATE TABLE `tbl_branches` (
 --
 
 INSERT INTO `tbl_branches` (`branch_id`, `branch_name`, `address`, `phone`, `email`, `status`, `created_at`) VALUES
-(1, 'asd', 'asd', '1231', 'asd@gmaol.com', 'Active', '2026-02-20 16:23:23');
+(1, 'asd', 'asd', '1231', 'asd@gmaol.com', 'Active', '2026-02-20 16:23:23'),
+(5, 'SM Downtown', 'CDO', '0909090909', 'smdt@gmail.com', 'Active', '2026-02-21 00:18:58'),
+(6, 'SM Uptown', 'CDO', '0192092019', 'smupt@gmail.com', 'Active', '2026-02-21 00:19:18');
 
 -- --------------------------------------------------------
 
@@ -54,186 +56,29 @@ CREATE TABLE `tbl_enrollments` (
   `enrollment_id` int(11) NOT NULL,
   `student_id` int(11) NOT NULL,
   `package_id` int(11) NOT NULL,
-  `instrument_id` int(11) NOT NULL,
-  `teacher_id` int(11) NOT NULL,
-  `registration_fee_amount` decimal(10,2) DEFAULT 0.00,
-  `registration_fee_paid` decimal(10,2) DEFAULT 0.00,
-  `registration_status` enum('Pending','Fee Paid','Approved','Rejected') DEFAULT 'Pending',
+  `instrument_id` int(11) DEFAULT NULL,
+  `preferred_schedule` text DEFAULT NULL,
+  `request_notes` text DEFAULT NULL,
   `enrollment_date` date DEFAULT curdate(),
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
-  `total_amount` decimal(10,2) NOT NULL,
-  `paid_amount` decimal(10,2) DEFAULT 0.00,
-  `payment_deadline_session` int(11) DEFAULT 7,
-  `status` enum('Ongoing','Completed','Dropped','Pending Payment') DEFAULT 'Ongoing',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Triggers `tbl_enrollments`
---
-DELIMITER $$
-CREATE TRIGGER `trg_enroll_legacy_ad` AFTER DELETE ON `tbl_enrollments` FOR EACH ROW BEGIN
-    DELETE FROM tbl_enrollment_core
-    WHERE enrollment_id = OLD.enrollment_id;
-    -- child rows cascade-delete
-END
-$$
-DELIMITER ;
-DELIMITER $$
-CREATE TRIGGER `trg_enroll_legacy_ai` AFTER INSERT ON `tbl_enrollments` FOR EACH ROW BEGIN
-    INSERT INTO tbl_enrollment_core (
-        enrollment_id, student_id, package_id, instrument_id, teacher_id,
-        enrollment_date, start_date, end_date, status, created_at
-    ) VALUES (
-        NEW.enrollment_id, NEW.student_id, NEW.package_id, NEW.instrument_id, NEW.teacher_id,
-        NEW.enrollment_date, NEW.start_date, NEW.end_date, NEW.status, NEW.created_at
-    )
-    ON DUPLICATE KEY UPDATE
-        student_id = VALUES(student_id),
-        package_id = VALUES(package_id),
-        instrument_id = VALUES(instrument_id),
-        teacher_id = VALUES(teacher_id),
-        enrollment_date = VALUES(enrollment_date),
-        start_date = VALUES(start_date),
-        end_date = VALUES(end_date),
-        status = VALUES(status),
-        created_at = VALUES(created_at);
-
-    INSERT INTO tbl_enrollment_registration (
-        enrollment_id, registration_fee_amount, registration_fee_paid, registration_status
-    ) VALUES (
-        NEW.enrollment_id, NEW.registration_fee_amount, NEW.registration_fee_paid, NEW.registration_status
-    )
-    ON DUPLICATE KEY UPDATE
-        registration_fee_amount = VALUES(registration_fee_amount),
-        registration_fee_paid = VALUES(registration_fee_paid),
-        registration_status = VALUES(registration_status);
-
-    INSERT INTO tbl_enrollment_financials (
-        enrollment_id, total_amount, paid_amount, payment_deadline_session
-    ) VALUES (
-        NEW.enrollment_id, NEW.total_amount, NEW.paid_amount, NEW.payment_deadline_session
-    )
-    ON DUPLICATE KEY UPDATE
-        total_amount = VALUES(total_amount),
-        paid_amount = VALUES(paid_amount),
-        payment_deadline_session = VALUES(payment_deadline_session);
-END
-$$
-DELIMITER ;
-DELIMITER $$
-CREATE TRIGGER `trg_enroll_legacy_au` AFTER UPDATE ON `tbl_enrollments` FOR EACH ROW BEGIN
-    UPDATE tbl_enrollment_core
-    SET student_id = NEW.student_id,
-        package_id = NEW.package_id,
-        instrument_id = NEW.instrument_id,
-        teacher_id = NEW.teacher_id,
-        enrollment_date = NEW.enrollment_date,
-        start_date = NEW.start_date,
-        end_date = NEW.end_date,
-        status = NEW.status,
-        created_at = NEW.created_at
-    WHERE enrollment_id = NEW.enrollment_id;
-
-    UPDATE tbl_enrollment_registration
-    SET registration_fee_amount = NEW.registration_fee_amount,
-        registration_fee_paid = NEW.registration_fee_paid,
-        registration_status = NEW.registration_status
-    WHERE enrollment_id = NEW.enrollment_id;
-
-    UPDATE tbl_enrollment_financials
-    SET total_amount = NEW.total_amount,
-        paid_amount = NEW.paid_amount,
-        payment_deadline_session = NEW.payment_deadline_session
-    WHERE enrollment_id = NEW.enrollment_id;
-END
-$$
-DELIMITER ;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `tbl_enrollments_v2`
---
-
-CREATE TABLE `tbl_enrollments_v2` (
-  `enrollment_id` int(11) NOT NULL,
-  `student_id` int(11) NOT NULL,
-  `package_id` int(11) NOT NULL,
+  `status` enum('Pending','Active','Completed','Cancelled','Expired') DEFAULT 'Pending',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `enrolled_by_type` enum('Self','Guardian') NOT NULL DEFAULT 'Self',
   `student_guardian_id` int(11) DEFAULT NULL,
-  `start_date` date NOT NULL,
-  `end_date` date NOT NULL,
   `total_sessions` int(11) NOT NULL,
-  `completed_sessions` int(11) NOT NULL DEFAULT 0,
-  `status` enum('Pending','Active','Completed','Cancelled','Expired') NOT NULL DEFAULT 'Pending',
-  `notes` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `completed_sessions` int(11) NOT NULL DEFAULT 0
 ) ;
 
 --
--- Triggers `tbl_enrollments_v2`
+-- Dumping data for table `tbl_enrollments`
 --
-DELIMITER $$
-CREATE TRIGGER `trg_enroll_v2_no_overlap_bi` BEFORE INSERT ON `tbl_enrollments_v2` FOR EACH ROW BEGIN
-    DECLARE v_overlap INT DEFAULT 0;
 
-    IF NEW.status IN ('Pending','Active') THEN
-        SELECT COUNT(*)
-        INTO v_overlap
-        FROM tbl_enrollments_v2 e
-        WHERE e.student_id = NEW.student_id
-          AND e.status IN ('Pending','Active')
-          AND NEW.start_date <= e.end_date
-          AND NEW.end_date >= e.start_date;
-
-        IF v_overlap > 0 THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Student already has overlapping pending/active enrollment';
-        END IF;
-    END IF;
-END
-$$
-DELIMITER ;
-DELIMITER $$
-CREATE TRIGGER `trg_enroll_v2_set_sessions_bi` BEFORE INSERT ON `tbl_enrollments_v2` FOR EACH ROW BEGIN
-    DECLARE v_sessions INT;
-    SELECT total_sessions INTO v_sessions
-    FROM tbl_lesson_packages
-    WHERE package_id = NEW.package_id
-    LIMIT 1;
-
-    IF v_sessions IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid package_id';
-    END IF;
-
-    IF NEW.total_sessions IS NULL OR NEW.total_sessions <= 0 THEN
-        SET NEW.total_sessions = v_sessions;
-    END IF;
-END
-$$
-DELIMITER ;
-DELIMITER $$
-CREATE TRIGGER `trg_enroll_v2_validate_guardian_bi` BEFORE INSERT ON `tbl_enrollments_v2` FOR EACH ROW BEGIN
-    DECLARE v_count INT DEFAULT 0;
-
-    IF NEW.enrolled_by_type = 'Guardian' THEN
-        SELECT COUNT(*)
-        INTO v_count
-        FROM tbl_student_guardians sg
-        WHERE sg.student_guardian_id = NEW.student_guardian_id
-          AND sg.student_id = NEW.student_id
-          AND sg.can_enroll = 'Y';
-
-        IF v_count = 0 THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Guardian is not linked to student or has no enroll permission';
-        END IF;
-    END IF;
-END
-$$
-DELIMITER ;
+INSERT INTO `tbl_enrollments` (`enrollment_id`, `student_id`, `package_id`, `instrument_id`, `preferred_schedule`, `request_notes`, `enrollment_date`, `start_date`, `end_date`, `status`, `created_at`, `enrolled_by_type`, `student_guardian_id`, `total_sessions`, `completed_sessions`) VALUES
+(8, 2, 1, NULL, NULL, NULL, '2026-02-21', '2026-02-23', '2026-05-11', 'Active', '2026-02-20 18:27:03', 'Self', NULL, 12, 0),
+(9, 2, 1, NULL, NULL, NULL, '2026-02-21', '2026-02-22', '2026-05-10', 'Active', '2026-02-21 00:35:03', 'Self', NULL, 12, 0),
+(10, 3, 6, 10, 'Tuesday|2026-02-24', '{"payment_type":"Partial Payment","instrument_ids":[10,11],"payment_proof_path":null}', '2026-02-21', NULL, NULL, 'Pending', '2026-02-21 04:10:00', 'Self', NULL, 8, 0),
+(11, 4, 10, 13, 'Thursday|2026-02-26', '{"payment_type":"Full Payment","instrument_ids":[13],"payment_proof_path":null}', '2026-02-21', NULL, NULL, 'Pending', '2026-02-21 04:20:00', 'Self', NULL, 16, 0);
 
 -- --------------------------------------------------------
 
@@ -266,8 +111,8 @@ CREATE TABLE `tbl_instruments` (
   `instrument_name` varchar(100) NOT NULL,
   `type_id` int(11) NOT NULL,
   `serial_number` varchar(50) DEFAULT NULL,
-  `condition` varchar(50) DEFAULT NULL,
-  `status` enum('Active','Available','In Use','Under Repair','Inactive') DEFAULT 'Active'
+  `condition` enum('Excellent','Good','Fair','Poor') DEFAULT 'Good',
+  `status` enum('Available','In Use','Under Repair','Inactive') DEFAULT 'Available'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -275,7 +120,17 @@ CREATE TABLE `tbl_instruments` (
 --
 
 INSERT INTO `tbl_instruments` (`instrument_id`, `branch_id`, `instrument_name`, `type_id`, `serial_number`, `condition`, `status`) VALUES
-(4, 1, 'Yamaha na piano', 23, '23232', 'Available', 'Active');
+(4, 1, 'Yamaha na piano', 23, '23232', 'Good', 'Available'),
+(5, 1, 'Yamaha U1 Piano', 23, 'P-1001', 'Excellent', 'Available'),
+(6, 1, 'Fender Stratocaster', 24, 'G-1001', 'Good', 'Available'),
+(7, 1, 'Pearl Export Drum Kit', 29, 'D-1001', 'Good', 'In Use'),
+(8, 1, 'Suzuki Violin 4/4', 28, 'V-1001', 'Excellent', 'Available'),
+(9, 5, 'Kawai K-200 Piano', 23, 'P-5001', 'Good', 'Available'),
+(10, 5, 'Taylor Acoustic Guitar', 24, 'G-5001', 'Good', 'Available'),
+(11, 5, 'Yamaha Violin V5', 28, 'V-5001', 'Good', 'Available'),
+(12, 6, 'Roland FP-30X', 23, 'P-6001', 'Excellent', 'Available'),
+(13, 6, 'Ibanez RG421', 24, 'G-6001', 'Good', 'Available'),
+(14, 6, 'Mapex Drum Kit', 29, 'D-6001', 'Good', 'Available');
 
 -- --------------------------------------------------------
 
@@ -295,24 +150,12 @@ CREATE TABLE `tbl_instrument_types` (
 
 INSERT INTO `tbl_instrument_types` (`type_id`, `type_name`, `description`) VALUES
 (1, 'Other', 'General/uncategorized instrument type'),
-(23, 'Piano', 'keyboard');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `tbl_lesson_packages`
---
-
-CREATE TABLE `tbl_lesson_packages` (
-  `package_id` int(11) NOT NULL,
-  `package_name` varchar(100) NOT NULL,
-  `total_sessions` int(11) NOT NULL,
-  `price` decimal(10,2) NOT NULL,
-  `validity_period` int(11) DEFAULT NULL,
-  `description` text DEFAULT NULL,
-  `status` enum('Active','Inactive') DEFAULT 'Active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+(23, 'Piano', 'keyboard'),
+(24, 'Guitar', 'Acoustic and electric guitar'),
+(28, 'Violin', 'Bow string instrument'),
+(29, 'Drums', 'Drum set and percussion'),
+(30, 'Voice', 'Vocal training'),
+(31, 'Ukulele', 'Four-string instrument');
 
 -- --------------------------------------------------------
 
@@ -342,7 +185,7 @@ CREATE TABLE `tbl_payments` (
   `amount` decimal(10,2) NOT NULL,
   `payment_method` enum('Cash','Card','Bank Transfer','GCash','Check','Other') NOT NULL,
   `payment_type` enum('Full Payment','Partial Payment','Installment') DEFAULT 'Partial Payment',
-  `status` enum('Paid','Pending','Failed','Refunded') DEFAULT 'Paid',
+  `status` enum('Pending','Paid','Failed','Refunded') DEFAULT 'Pending',
   `receipt_number` varchar(50) DEFAULT NULL,
   `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -448,11 +291,11 @@ CREATE TABLE `tbl_recurring_schedule` (
 
 CREATE TABLE `tbl_registration_payments` (
   `registration_payment_id` int(11) NOT NULL,
-  `enrollment_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
   `payment_date` date DEFAULT curdate(),
   `amount` decimal(10,2) NOT NULL,
   `payment_method` enum('Cash','Card','Bank Transfer','GCash','Check','Other') NOT NULL,
-  `status` enum('Paid','Pending','Failed','Refunded') DEFAULT 'Paid',
+  `status` enum('Paid','Pending','Failed','Refunded') DEFAULT 'Pending',
   `receipt_number` varchar(50) DEFAULT NULL,
   `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -516,6 +359,19 @@ CREATE TABLE `tbl_rooms` (
   `status` enum('Available','Under Maintenance','Inactive') DEFAULT 'Available',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_rooms`
+--
+
+INSERT INTO `tbl_rooms` (`room_id`, `branch_id`, `room_name`, `capacity`, `room_type`, `status`, `created_at`) VALUES
+(1, 1, 'Studio A', 2, 'Private Lesson', 'Available', '2026-02-21 03:00:00'),
+(2, 1, 'Studio B', 2, 'Private Lesson', 'Available', '2026-02-21 03:00:00'),
+(3, 1, 'Recital Hall A', 30, 'Recital Hall', 'Available', '2026-02-21 03:00:00'),
+(4, 5, 'Downtown Room 1', 2, 'Private Lesson', 'Available', '2026-02-21 03:00:00'),
+(5, 5, 'Downtown Group Room', 5, 'Group Room', 'Available', '2026-02-21 03:00:00'),
+(6, 6, 'Uptown Studio 1', 2, 'Private Lesson', 'Available', '2026-02-21 03:00:00'),
+(7, 6, 'Uptown Hall', 20, 'Recital Hall', 'Available', '2026-02-21 03:00:00');
 
 -- --------------------------------------------------------
 
@@ -600,6 +456,14 @@ CREATE TABLE `tbl_sessions` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_sessions`
+--
+
+INSERT INTO `tbl_sessions` (`session_id`, `enrollment_id`, `teacher_id`, `session_number`, `session_date`, `start_time`, `end_time`, `session_type`, `instrument_id`, `school_instrument_id`, `room_id`, `status`, `attendance_notes`, `notes`, `created_at`) VALUES
+(1, 8, 1, 1, '2026-02-23', '14:00:00', '15:00:00', 'Regular', 4, NULL, NULL, 'Scheduled', NULL, 'room 2', '2026-02-20 18:27:31'),
+(2, 9, 1, 1, '2026-02-22', '14:00:00', '15:00:00', 'Regular', 4, NULL, NULL, 'Scheduled', NULL, 'room 2', '2026-02-21 00:40:44');
+
 -- --------------------------------------------------------
 
 --
@@ -625,7 +489,13 @@ INSERT INTO `tbl_session_packages` (`package_id`, `branch_id`, `package_name`, `
 (1, 1, 'Basic (12 Sessions)', 12, 1, 7450.00, '1 instrument only', '2026-02-20 16:00:25'),
 (2, 1, 'Standard (20 Sessions)', 20, 2, 11800.00, '2 instruments', '2026-02-20 16:00:25'),
 (4, 1, 'PACKAGE TEST', 100, 3, 2000.00, 'test', '2026-02-20 17:09:25'),
-(5, 1, 'PACKAGE TEST2', 2, 2, 2233.00, NULL, '2026-02-20 17:17:34');
+(5, 1, 'PACKAGE TEST2', 2, 2, 2233.00, NULL, '2026-02-20 17:17:34'),
+(6, 5, 'Starter (8 Sessions)', 8, 1, 5200.00, 'Entry package for one instrument', '2026-02-21 03:10:00'),
+(7, 5, 'Standard (16 Sessions)', 16, 2, 9800.00, 'Balanced package for two instruments', '2026-02-21 03:10:00'),
+(8, 5, 'Performance Track (24 Sessions)', 24, 3, 14500.00, 'Intensive package for performance prep', '2026-02-21 03:10:00'),
+(9, 6, 'Starter (8 Sessions)', 8, 1, 5400.00, 'Entry package for one instrument', '2026-02-21 03:11:00'),
+(10, 6, 'Standard (16 Sessions)', 16, 2, 10200.00, 'Balanced package for two instruments', '2026-02-21 03:11:00'),
+(11, 6, 'Intensive (24 Sessions)', 24, 3, 15000.00, 'High-frequency training package', '2026-02-21 03:11:00');
 
 -- --------------------------------------------------------
 
@@ -672,20 +542,18 @@ CREATE TABLE `tbl_students` (
   `health_diagnosis` text DEFAULT NULL,
   `status` enum('Active','Inactive','Graduated') DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `session_package_id` int(11) DEFAULT NULL,
-  `registration_proof_path` varchar(255) DEFAULT NULL,
-  `registration_fee_amount` decimal(10,2) DEFAULT 0.00,
-  `registration_fee_paid` decimal(10,2) DEFAULT 0.00,
-  `registration_status` enum('Pending','Fee Paid','Approved','Rejected') DEFAULT 'Pending'
+  `session_package_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_students`
 --
 
-INSERT INTO `tbl_students` (`student_id`, `branch_id`, `first_name`, `last_name`, `middle_name`, `date_of_birth`, `age`, `phone`, `email`, `address`, `school`, `grade_year`, `health_diagnosis`, `status`, `created_at`, `session_package_id`, `registration_proof_path`, `registration_fee_amount`, `registration_fee_paid`, `registration_status`) VALUES
-(1, 1, 'Lenard', 'Laurente', 'James Tingas', '2000-02-02', 26, '123123', 'enti@phinmaed.com', 'phinma cagayan de oro college, max suiniel street, carmen, 9000 cagayan de oro city misamis oriental', NULL, '12', 'none ', 'Active', '2026-02-20 16:34:46', NULL, 'uploads/payment_proofs/registration/20260220173446_b5dffc41d2e4a0db.jpg', 0.00, 1000.00, 'Approved'),
-(2, 1, 'Lenard', 'Laurente', 'James Tingas', '2000-02-02', 26, '123123', 'lenard@phinmaed.com', 'phinma cagayan de oro college, max suiniel street, carmen, 9000 cagayan de oro city misamis oriental', NULL, '12', 'none ', 'Active', '2026-02-20 16:39:13', NULL, 'uploads/payment_proofs/registration/20260220173912_a3281115fe0219d1.jpg', 1000.00, 1000.00, 'Approved');
+INSERT INTO `tbl_students` (`student_id`, `branch_id`, `first_name`, `last_name`, `middle_name`, `date_of_birth`, `age`, `phone`, `email`, `address`, `school`, `grade_year`, `health_diagnosis`, `status`, `created_at`, `session_package_id`) VALUES
+(1, 1, 'Lenard', 'Laurente', 'James Tingas', '2000-02-02', 26, '123123', 'enti@phinmaed.com', 'phinma cagayan de oro college, max suiniel street, carmen, 9000 cagayan de oro city misamis oriental', NULL, '12', 'none ', 'Active', '2026-02-20 16:34:46', NULL),
+(2, 1, 'Lenard', 'Laurente', 'James Tingas', '2000-02-02', 26, '123123', 'lenard@phinmaed.com', 'phinma cagayan de oro college, max suiniel street, carmen, 9000 cagayan de oro city misamis oriental', NULL, '12', 'none ', 'Active', '2026-02-20 16:39:13', 1),
+(3, 5, 'Anna', 'Dela Cruz', NULL, '2010-04-15', 15, '09171234567', 'anna.delacruz@fas.local', 'Carmen, Cagayan de Oro', 'St. Mary School', 'Grade 9', NULL, 'Active', '2026-02-21 03:20:00', NULL),
+(4, 6, 'Miguel', 'Santos', NULL, '2008-09-10', 17, '09179876543', 'miguel.santos@fas.local', 'Uptown, Cagayan de Oro', 'Xavier Academy', 'Grade 11', NULL, 'Active', '2026-02-21 03:22:00', NULL);
 
 -- --------------------------------------------------------
 
@@ -717,36 +585,12 @@ CREATE TABLE `tbl_student_instruments` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
-
 --
--- Table structure for table `tbl_student_package_requests`
+-- Dumping data for table `tbl_student_instruments`
 --
 
-CREATE TABLE `tbl_student_package_requests` (
-  `request_id` int(11) NOT NULL,
-  `student_id` int(11) NOT NULL,
-  `branch_id` int(11) NOT NULL,
-  `package_id` int(11) NOT NULL,
-  `instrument_ids_json` text DEFAULT NULL,
-  `selected_availability_id` int(11) DEFAULT NULL,
-  `preferred_date` date DEFAULT NULL,
-  `preferred_day_of_week` enum('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') DEFAULT NULL,
-  `preferred_start_time` time DEFAULT NULL,
-  `preferred_end_time` time DEFAULT NULL,
-  `assigned_teacher_id` int(11) DEFAULT NULL,
-  `payment_proof_path` varchar(255) DEFAULT NULL,
-  `assigned_date` date DEFAULT NULL,
-  `assigned_day_of_week` enum('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') DEFAULT NULL,
-  `assigned_start_time` time DEFAULT NULL,
-  `assigned_end_time` time DEFAULT NULL,
-  `assigned_room` varchar(100) DEFAULT NULL,
-  `requested_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
-  `admin_notes` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+INSERT INTO `tbl_student_instruments` (`student_instrument_id`, `student_id`, `instrument_id`, `priority_order`, `created_at`) VALUES
+(3, 2, 4, 1, '2026-02-21 00:40:44');
 
 -- --------------------------------------------------------
 
@@ -768,6 +612,33 @@ CREATE TABLE `tbl_student_progress` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_student_registration_fees`
+--
+
+CREATE TABLE `tbl_student_registration_fees` (
+  `registration_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `registration_fee_amount` decimal(10,2) NOT NULL DEFAULT 1000.00,
+  `registration_fee_paid` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `registration_status` enum('Pending','Fee Paid','Approved','Rejected') NOT NULL DEFAULT 'Pending',
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_student_registration_fees`
+--
+
+INSERT INTO `tbl_student_registration_fees` (`registration_id`, `student_id`, `registration_fee_amount`, `registration_fee_paid`, `registration_status`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 1, 1000.00, 1000.00, 'Approved', 'Backfilled from tbl_students', '2026-02-21 02:03:36', '2026-02-21 02:03:36'),
+(2, 2, 1000.00, 1000.00, 'Approved', 'Backfilled from tbl_students', '2026-02-21 02:03:36', '2026-02-21 02:03:36'),
+(3, 3, 1000.00, 1000.00, 'Approved', 'Seeded approved fee', '2026-02-21 03:25:00', '2026-02-21 03:25:00'),
+(4, 4, 1000.00, 1000.00, 'Approved', 'Seeded approved fee', '2026-02-21 03:25:00', '2026-02-21 03:25:00');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_teachers`
 --
 
@@ -784,6 +655,18 @@ CREATE TABLE `tbl_teachers` (
   `status` enum('Active','Inactive') DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_teachers`
+--
+
+INSERT INTO `tbl_teachers` (`teacher_id`, `user_id`, `branch_id`, `first_name`, `last_name`, `specialization`, `email`, `phone`, `employment_type`, `status`, `created_at`) VALUES
+(1, NULL, 1, 'Test', 'Piano', 'Piano', 'test.piano@fas.local', '09170000001', 'Full-time', 'Active', '2026-02-20 18:14:00'),
+(2, NULL, 1, 'Test', 'Guitar', 'Guitar', 'test.guitar@fas.local', '09170000002', 'Part-time', 'Active', '2026-02-20 18:14:00'),
+(3, NULL, 5, 'Aira', 'Santos', 'Piano, Violin', 'aira.santos@fas.local', '09170000003', 'Full-time', 'Active', '2026-02-21 03:30:00'),
+(4, NULL, 5, 'Marco', 'Reyes', 'Guitar, Voice', 'marco.reyes@fas.local', '09170000004', 'Part-time', 'Active', '2026-02-21 03:30:00'),
+(5, NULL, 6, 'Nina', 'Uy', 'Piano, Voice', 'nina.uy@fas.local', '09170000005', 'Full-time', 'Active', '2026-02-21 03:31:00'),
+(6, NULL, 6, 'John', 'Tan', 'Drums, Guitar', 'john.tan@fas.local', '09170000006', 'Part-time', 'Active', '2026-02-21 03:31:00');
 
 -- --------------------------------------------------------
 
@@ -802,6 +685,30 @@ CREATE TABLE `tbl_teacher_availability` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_teacher_availability`
+--
+
+INSERT INTO `tbl_teacher_availability` (`availability_id`, `teacher_id`, `branch_id`, `day_of_week`, `start_time`, `end_time`, `status`, `created_at`) VALUES
+(1, 1, 1, 'Monday', '09:00:00', '17:00:00', 'Available', '2026-02-20 18:14:00'),
+(2, 2, 1, 'Monday', '09:00:00', '17:00:00', 'Available', '2026-02-20 18:14:00'),
+(3, 1, 1, 'Wednesday', '09:00:00', '17:00:00', 'Available', '2026-02-20 18:14:00'),
+(4, 2, 1, 'Wednesday', '09:00:00', '17:00:00', 'Available', '2026-02-20 18:14:00'),
+(5, 1, 1, 'Friday', '09:00:00', '17:00:00', 'Available', '2026-02-20 18:14:00'),
+(6, 2, 1, 'Friday', '09:00:00', '17:00:00', 'Available', '2026-02-20 18:14:00'),
+(7, 3, 5, 'Tuesday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:32:00'),
+(8, 4, 5, 'Tuesday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:32:00'),
+(9, 3, 5, 'Thursday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:32:00'),
+(10, 4, 5, 'Thursday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:32:00'),
+(11, 3, 5, 'Saturday', '09:00:00', '17:00:00', 'Available', '2026-02-21 03:32:00'),
+(12, 4, 5, 'Saturday', '09:00:00', '17:00:00', 'Available', '2026-02-21 03:32:00'),
+(13, 5, 6, 'Monday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:33:00'),
+(14, 6, 6, 'Monday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:33:00'),
+(15, 5, 6, 'Wednesday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:33:00'),
+(16, 6, 6, 'Wednesday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:33:00'),
+(17, 5, 6, 'Friday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:33:00'),
+(18, 6, 6, 'Friday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:33:00');
+
 -- --------------------------------------------------------
 
 --
@@ -814,6 +721,22 @@ CREATE TABLE `tbl_teacher_instruments` (
   `instrument_id` int(11) NOT NULL,
   `proficiency_level` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_teacher_instruments`
+--
+
+INSERT INTO `tbl_teacher_instruments` (`teacher_instrument_id`, `teacher_id`, `instrument_id`, `proficiency_level`) VALUES
+(1, 1, 4, 'Advanced'),
+(2, 1, 5, 'Advanced'),
+(3, 2, 6, 'Advanced'),
+(4, 3, 9, 'Advanced'),
+(5, 3, 11, 'Intermediate'),
+(6, 4, 10, 'Advanced'),
+(7, 5, 12, 'Advanced'),
+(8, 6, 13, 'Advanced'),
+(9, 6, 14, 'Intermediate');
+
 
 -- --------------------------------------------------------
 
@@ -858,22 +781,10 @@ ALTER TABLE `tbl_branches`
 ALTER TABLE `tbl_enrollments`
   ADD PRIMARY KEY (`enrollment_id`),
   ADD KEY `package_id` (`package_id`),
-  ADD KEY `instrument_id` (`instrument_id`),
-  ADD KEY `teacher_id` (`teacher_id`),
   ADD KEY `idx_enrollments_student` (`student_id`),
   ADD KEY `idx_enrollments_status` (`status`),
-  ADD KEY `idx_enrollments_registration_status` (`registration_status`);
-
---
--- Indexes for table `tbl_enrollments_v2`
---
-ALTER TABLE `tbl_enrollments_v2`
-  ADD PRIMARY KEY (`enrollment_id`),
-  ADD KEY `fk_enroll_v2_package` (`package_id`),
-  ADD KEY `fk_enroll_v2_student_guardian` (`student_guardian_id`),
-  ADD KEY `idx_enroll_v2_student` (`student_id`),
-  ADD KEY `idx_enroll_v2_status` (`status`),
-  ADD KEY `idx_enroll_v2_start_end` (`start_date`,`end_date`);
+  ADD KEY `fk_enroll_student_guardian` (`student_guardian_id`),
+  ADD KEY `fk_enroll_instrument` (`instrument_id`);
 
 --
 -- Indexes for table `tbl_guardians`
@@ -895,12 +806,6 @@ ALTER TABLE `tbl_instruments`
 ALTER TABLE `tbl_instrument_types`
   ADD PRIMARY KEY (`type_id`),
   ADD UNIQUE KEY `type_name` (`type_name`);
-
---
--- Indexes for table `tbl_lesson_packages`
---
-ALTER TABLE `tbl_lesson_packages`
-  ADD PRIMARY KEY (`package_id`);
 
 --
 -- Indexes for table `tbl_makeup_sessions`
@@ -967,7 +872,7 @@ ALTER TABLE `tbl_recurring_schedule`
 --
 ALTER TABLE `tbl_registration_payments`
   ADD PRIMARY KEY (`registration_payment_id`),
-  ADD KEY `idx_registration_payments_enrollment` (`enrollment_id`);
+  ADD KEY `fk_registration_student` (`student_id`);
 
 --
 -- Indexes for table `tbl_repairs`
@@ -1021,9 +926,11 @@ ALTER TABLE `tbl_service_providers`
 --
 ALTER TABLE `tbl_sessions`
   ADD PRIMARY KEY (`session_id`),
+  ADD UNIQUE KEY `unique_session_per_enrollment` (`enrollment_id`,`session_number`),
   ADD KEY `teacher_id` (`teacher_id`),
   ADD KEY `instrument_id` (`instrument_id`),
   ADD KEY `school_instrument_id` (`school_instrument_id`),
+  ADD KEY `room_id` (`room_id`),
   ADD KEY `idx_sessions_enrollment` (`enrollment_id`),
   ADD KEY `idx_sessions_date` (`session_date`),
   ADD KEY `idx_sessions_status` (`status`);
@@ -1051,7 +958,7 @@ ALTER TABLE `tbl_students`
   ADD UNIQUE KEY `email` (`email`),
   ADD KEY `idx_students_branch` (`branch_id`),
   ADD KEY `idx_students_status` (`status`),
-  ADD KEY `idx_students_email` (`email`);
+  ADD KEY `idx_students_session_package` (`session_package_id`);
 
 --
 -- Indexes for table `tbl_student_guardians`
@@ -1066,19 +973,10 @@ ALTER TABLE `tbl_student_guardians`
 --
 ALTER TABLE `tbl_student_instruments`
   ADD PRIMARY KEY (`student_instrument_id`),
+  ADD UNIQUE KEY `unique_student_instrument` (`student_id`,`instrument_id`),
+  ADD UNIQUE KEY `unique_student_priority` (`student_id`,`priority_order`),
   ADD KEY `idx_student_instruments_student` (`student_id`),
   ADD KEY `idx_student_instruments_instrument` (`instrument_id`);
-
---
--- Indexes for table `tbl_student_package_requests`
---
-ALTER TABLE `tbl_student_package_requests`
-  ADD PRIMARY KEY (`request_id`),
-  ADD KEY `idx_student_package_requests_student` (`student_id`),
-  ADD KEY `idx_student_package_requests_status` (`status`),
-  ADD KEY `idx_student_package_requests_created` (`created_at`),
-  ADD KEY `idx_student_package_requests_teacher` (`assigned_teacher_id`),
-  ADD KEY `idx_student_package_requests_assigned_date` (`assigned_date`);
 
 --
 -- Indexes for table `tbl_student_progress`
@@ -1088,6 +986,14 @@ ALTER TABLE `tbl_student_progress`
   ADD KEY `student_id` (`student_id`),
   ADD KEY `session_id` (`session_id`),
   ADD KEY `instrument_id` (`instrument_id`);
+
+--
+-- Indexes for table `tbl_student_registration_fees`
+--
+ALTER TABLE `tbl_student_registration_fees`
+  ADD PRIMARY KEY (`registration_id`),
+  ADD UNIQUE KEY `unique_registration_fee_student` (`student_id`),
+  ADD KEY `fk_registration_fees_student` (`student_id`);
 
 --
 -- Indexes for table `tbl_teachers`
@@ -1102,6 +1008,7 @@ ALTER TABLE `tbl_teachers`
 --
 ALTER TABLE `tbl_teacher_availability`
   ADD PRIMARY KEY (`availability_id`),
+  ADD UNIQUE KEY `unique_teacher_day_timeslot` (`teacher_id`,`day_of_week`,`start_time`,`end_time`),
   ADD KEY `branch_id` (`branch_id`),
   ADD KEY `idx_teacher_availability` (`teacher_id`,`day_of_week`);
 
@@ -1129,19 +1036,13 @@ ALTER TABLE `tbl_users`
 -- AUTO_INCREMENT for table `tbl_branches`
 --
 ALTER TABLE `tbl_branches`
-  MODIFY `branch_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `branch_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `tbl_enrollments`
 --
 ALTER TABLE `tbl_enrollments`
-  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `tbl_enrollments_v2`
---
-ALTER TABLE `tbl_enrollments_v2`
-  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `tbl_guardians`
@@ -1153,19 +1054,13 @@ ALTER TABLE `tbl_guardians`
 -- AUTO_INCREMENT for table `tbl_instruments`
 --
 ALTER TABLE `tbl_instruments`
-  MODIFY `instrument_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `instrument_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `tbl_instrument_types`
 --
 ALTER TABLE `tbl_instrument_types`
-  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
-
---
--- AUTO_INCREMENT for table `tbl_lesson_packages`
---
-ALTER TABLE `tbl_lesson_packages`
-  MODIFY `package_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
 
 --
 -- AUTO_INCREMENT for table `tbl_makeup_sessions`
@@ -1231,7 +1126,7 @@ ALTER TABLE `tbl_roles`
 -- AUTO_INCREMENT for table `tbl_rooms`
 --
 ALTER TABLE `tbl_rooms`
-  MODIFY `room_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `room_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `tbl_schedule`
@@ -1255,13 +1150,13 @@ ALTER TABLE `tbl_service_providers`
 -- AUTO_INCREMENT for table `tbl_sessions`
 --
 ALTER TABLE `tbl_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `tbl_session_packages`
 --
 ALTER TABLE `tbl_session_packages`
-  MODIFY `package_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `package_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `tbl_settings`
@@ -1273,7 +1168,7 @@ ALTER TABLE `tbl_settings`
 -- AUTO_INCREMENT for table `tbl_students`
 --
 ALTER TABLE `tbl_students`
-  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `tbl_student_guardians`
@@ -1285,13 +1180,7 @@ ALTER TABLE `tbl_student_guardians`
 -- AUTO_INCREMENT for table `tbl_student_instruments`
 --
 ALTER TABLE `tbl_student_instruments`
-  MODIFY `student_instrument_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `tbl_student_package_requests`
---
-ALTER TABLE `tbl_student_package_requests`
-  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `student_instrument_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `tbl_student_progress`
@@ -1300,22 +1189,28 @@ ALTER TABLE `tbl_student_progress`
   MODIFY `progress_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `tbl_student_registration_fees`
+--
+ALTER TABLE `tbl_student_registration_fees`
+  MODIFY `registration_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
 -- AUTO_INCREMENT for table `tbl_teachers`
 --
 ALTER TABLE `tbl_teachers`
-  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `tbl_teacher_availability`
 --
 ALTER TABLE `tbl_teacher_availability`
-  MODIFY `availability_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `availability_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `tbl_teacher_instruments`
 --
 ALTER TABLE `tbl_teacher_instruments`
-  MODIFY `teacher_instrument_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `teacher_instrument_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `tbl_users`
@@ -1331,18 +1226,10 @@ ALTER TABLE `tbl_users`
 -- Constraints for table `tbl_enrollments`
 --
 ALTER TABLE `tbl_enrollments`
-  ADD CONSTRAINT `tbl_enrollments_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`),
-  ADD CONSTRAINT `tbl_enrollments_ibfk_2` FOREIGN KEY (`package_id`) REFERENCES `tbl_lesson_packages` (`package_id`),
-  ADD CONSTRAINT `tbl_enrollments_ibfk_3` FOREIGN KEY (`instrument_id`) REFERENCES `tbl_instruments` (`instrument_id`),
-  ADD CONSTRAINT `tbl_enrollments_ibfk_4` FOREIGN KEY (`teacher_id`) REFERENCES `tbl_teachers` (`teacher_id`);
-
---
--- Constraints for table `tbl_enrollments_v2`
---
-ALTER TABLE `tbl_enrollments_v2`
-  ADD CONSTRAINT `fk_enroll_v2_package` FOREIGN KEY (`package_id`) REFERENCES `tbl_lesson_packages` (`package_id`),
-  ADD CONSTRAINT `fk_enroll_v2_student` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`),
-  ADD CONSTRAINT `fk_enroll_v2_student_guardian` FOREIGN KEY (`student_guardian_id`) REFERENCES `tbl_student_guardians` (`student_guardian_id`);
+  ADD CONSTRAINT `fk_enroll_instrument` FOREIGN KEY (`instrument_id`) REFERENCES `tbl_instruments` (`instrument_id`),
+  ADD CONSTRAINT `fk_enroll_student_guardian` FOREIGN KEY (`student_guardian_id`) REFERENCES `tbl_student_guardians` (`student_guardian_id`),
+  ADD CONSTRAINT `fk_enrollment_session_package` FOREIGN KEY (`package_id`) REFERENCES `tbl_session_packages` (`package_id`),
+  ADD CONSTRAINT `tbl_enrollments_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`);
 
 --
 -- Constraints for table `tbl_instruments`
@@ -1363,13 +1250,13 @@ ALTER TABLE `tbl_makeup_sessions`
 -- Constraints for table `tbl_payments`
 --
 ALTER TABLE `tbl_payments`
-  ADD CONSTRAINT `tbl_payments_ibfk_1` FOREIGN KEY (`enrollment_id`) REFERENCES `tbl_enrollments` (`enrollment_id`);
+  ADD CONSTRAINT `fk_payments_enrollment` FOREIGN KEY (`enrollment_id`) REFERENCES `tbl_enrollments` (`enrollment_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `tbl_payment_schedule`
 --
 ALTER TABLE `tbl_payment_schedule`
-  ADD CONSTRAINT `tbl_payment_schedule_ibfk_1` FOREIGN KEY (`enrollment_id`) REFERENCES `tbl_enrollments` (`enrollment_id`);
+  ADD CONSTRAINT `fk_payment_schedule_enrollment` FOREIGN KEY (`enrollment_id`) REFERENCES `tbl_enrollments` (`enrollment_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `tbl_recitals`
@@ -1406,7 +1293,7 @@ ALTER TABLE `tbl_recurring_schedule`
 -- Constraints for table `tbl_registration_payments`
 --
 ALTER TABLE `tbl_registration_payments`
-  ADD CONSTRAINT `tbl_registration_payments_ibfk_1` FOREIGN KEY (`enrollment_id`) REFERENCES `tbl_enrollments` (`enrollment_id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `fk_registration_student` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `tbl_repairs`
@@ -1442,7 +1329,8 @@ ALTER TABLE `tbl_school_instruments`
 -- Constraints for table `tbl_sessions`
 --
 ALTER TABLE `tbl_sessions`
-  ADD CONSTRAINT `tbl_sessions_ibfk_1` FOREIGN KEY (`enrollment_id`) REFERENCES `tbl_enrollments` (`enrollment_id`),
+  ADD CONSTRAINT `fk_sessions_enrollment` FOREIGN KEY (`enrollment_id`) REFERENCES `tbl_enrollments` (`enrollment_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_sessions_room` FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`) ON DELETE SET NULL,
   ADD CONSTRAINT `tbl_sessions_ibfk_2` FOREIGN KEY (`teacher_id`) REFERENCES `tbl_teachers` (`teacher_id`),
   ADD CONSTRAINT `tbl_sessions_ibfk_3` FOREIGN KEY (`instrument_id`) REFERENCES `tbl_instruments` (`instrument_id`),
   ADD CONSTRAINT `tbl_sessions_ibfk_4` FOREIGN KEY (`school_instrument_id`) REFERENCES `tbl_school_instruments` (`school_instrument_id`);
@@ -1457,6 +1345,7 @@ ALTER TABLE `tbl_settings`
 -- Constraints for table `tbl_students`
 --
 ALTER TABLE `tbl_students`
+  ADD CONSTRAINT `fk_students_session_package` FOREIGN KEY (`session_package_id`) REFERENCES `tbl_session_packages` (`package_id`) ON DELETE SET NULL,
   ADD CONSTRAINT `tbl_students_ibfk_1` FOREIGN KEY (`branch_id`) REFERENCES `tbl_branches` (`branch_id`);
 
 --
@@ -1467,12 +1356,25 @@ ALTER TABLE `tbl_student_guardians`
   ADD CONSTRAINT `tbl_student_guardians_ibfk_2` FOREIGN KEY (`guardian_id`) REFERENCES `tbl_guardians` (`guardian_id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `tbl_student_instruments`
+--
+ALTER TABLE `tbl_student_instruments`
+  ADD CONSTRAINT `fk_student_instruments_instrument` FOREIGN KEY (`instrument_id`) REFERENCES `tbl_instruments` (`instrument_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_student_instruments_student` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `tbl_student_progress`
 --
 ALTER TABLE `tbl_student_progress`
   ADD CONSTRAINT `tbl_student_progress_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`),
   ADD CONSTRAINT `tbl_student_progress_ibfk_2` FOREIGN KEY (`session_id`) REFERENCES `tbl_sessions` (`session_id`),
   ADD CONSTRAINT `tbl_student_progress_ibfk_3` FOREIGN KEY (`instrument_id`) REFERENCES `tbl_instruments` (`instrument_id`);
+
+--
+-- Constraints for table `tbl_student_registration_fees`
+--
+ALTER TABLE `tbl_student_registration_fees`
+  ADD CONSTRAINT `fk_registration_fees_student` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `tbl_teachers`

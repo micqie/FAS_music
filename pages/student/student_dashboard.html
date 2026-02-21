@@ -172,35 +172,32 @@
                     </div>
                 </div>
 
-                <!-- Instruments -->
+                <!-- Current Enrollment -->
                 <div class="lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Instruments</div>
-                            <div class="text-lg font-extrabold mt-2">Your current instruments</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Current Enrollment</div>
+                            <div class="text-lg font-extrabold mt-2">Approved status and start schedule</div>
                         </div>
                         <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
-                            <i class="fas fa-guitar text-gold-400"></i>
+                            <i class="fas fa-calendar-check text-gold-400"></i>
                         </div>
                     </div>
-                    <div id="instrumentChips" class="mt-5 flex flex-wrap gap-2"></div>
+                    <div id="currentEnrollmentSummary" class="mt-5 text-sm text-zinc-300"></div>
                 </div>
 
-                <!-- Available Options -->
-                <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <!-- Enrollment History -->
+                <div class="lg:col-span-3 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Available Options</div>
-                            <div class="text-lg font-extrabold mt-2">Packages & Instruments</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Enrollment History</div>
+                            <div class="text-lg font-extrabold mt-2">Previous enrollments</div>
                         </div>
                         <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
-                            <i class="fas fa-list-check text-gold-400"></i>
+                            <i class="fas fa-clock-rotate-left text-gold-400"></i>
                         </div>
                     </div>
-                    <div id="availablePackagesList" class="mt-4 space-y-2 text-sm text-zinc-200"></div>
-                    <div class="mt-4 text-xs text-zinc-500">
-                        After selecting your preferred package and instruments, upload payment proof. Desk/admin will confirm and officially enroll you.
-                    </div>
+                    <div id="enrollmentHistoryList" class="mt-4 space-y-2 text-sm text-zinc-200"></div>
                 </div>
 
                 <!-- Request Enrollment -->
@@ -224,6 +221,12 @@
                                 <option value="">Select package...</option>
                             </select>
                             <div id="studentRequestAmount" class="mt-2 text-xs text-gold-300 font-semibold">Estimated package amount: ₱0.00</div>
+                            <label class="block text-sm font-semibold text-zinc-200 mt-4 mb-2">Payment Mode *</label>
+                            <select id="studentRequestPaymentMode" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                                <option value="Partial Payment" selected>Partial Payment</option>
+                                <option value="Full Payment">Full Payment</option>
+                                <option value="Installment">Installment</option>
+                            </select>
                             <label class="block text-sm font-semibold text-zinc-200 mt-4 mb-2">Preferred Date *</label>
                             <input type="date" id="studentRequestPreferredDate" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400">
                         </div>
