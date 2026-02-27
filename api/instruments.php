@@ -72,22 +72,19 @@ class Instruments
 
             $stmt = $this->conn->query("DESCRIBE tbl_instruments");
             $columns = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
-            if (in_array('status', $columns)) {
-                try {
-                    $this->conn->exec("ALTER TABLE tbl_instruments MODIFY COLUMN status ENUM('Active','Available','In Use','Under Repair','Inactive') DEFAULT 'Active'");
-                    $this->conn->exec("UPDATE tbl_instruments SET status = 'Active' WHERE status IS NULL OR status = ''");
-                } catch (PDOException $e) { /* ignore */ }
-            } else {
-                $this->conn->exec("ALTER TABLE tbl_instruments ADD COLUMN status ENUM('Active','Available','In Use','Under Repair','Inactive') DEFAULT 'Active'");
+            if (!in_array('status', $columns)) {
+                $this->conn->exec("ALTER TABLE tbl_instruments ADD COLUMN status ENUM('Available','In Use','Under Repair','Inactive') DEFAULT 'Available'");
             }
 
-            $this->conn->exec("UPDATE tbl_instruments SET `condition` = 'Available' WHERE `condition` IS NULL OR `condition` = ''");
+            // Keep values aligned with music-db.sql enums.
+            $this->conn->exec("UPDATE tbl_instruments SET status = 'Available' WHERE status IS NULL OR status = ''");
+            $this->conn->exec("UPDATE tbl_instruments SET `condition` = 'Good' WHERE `condition` IS NULL OR `condition` = ''");
         } catch (PDOException $e) {
             // Schema may already be up to date; do not break API
         }
     }
 
-    private function sendJSON($data, $statusCode = 200)
+    public function sendJSON($data, $statusCode = 200)
     {
         http_response_code($statusCode);
         echo json_encode($data);
@@ -395,11 +392,15 @@ class Instruments
             $this->sendJSON(['error' => 'Branch, instrument name, and type are required'], 400);
         }
 
-        // Default for new instruments: status=Active, condition=Available
-        $validStatuses = ['Active', 'Available', 'In Use', 'Under Repair', 'Inactive'];
-        $status = $data['status'] ?? 'Active';
+        $validStatuses = ['Available', 'In Use', 'Under Repair', 'Inactive'];
+        $status = $data['status'] ?? 'Available';
         if (!in_array($status, $validStatuses)) {
             $this->sendJSON(['error' => 'Invalid status. Must be one of: ' . implode(', ', $validStatuses)], 400);
+        }
+        $validConditions = ['Excellent', 'Good', 'Fair', 'Poor'];
+        $condition = $data['condition'] ?? 'Good';
+        if (!in_array($condition, $validConditions)) {
+            $this->sendJSON(['error' => 'Invalid condition. Must be one of: ' . implode(', ', $validConditions)], 400);
         }
 
         try {
@@ -429,7 +430,7 @@ class Instruments
                 $data['instrument_name'],
                 $data['type_id'],
                 $data['serial_number'] ?? null,
-                $data['condition'] ?? 'Available',
+                $condition,
                 $status
             ]);
 
@@ -460,9 +461,15 @@ class Instruments
 
         // Validate status if provided
         if (isset($data['status'])) {
-            $validStatuses = ['Active', 'Available', 'In Use', 'Under Repair', 'Inactive'];
+            $validStatuses = ['Available', 'In Use', 'Under Repair', 'Inactive'];
             if (!in_array($data['status'], $validStatuses)) {
                 $this->sendJSON(['error' => 'Invalid status. Must be one of: ' . implode(', ', $validStatuses)], 400);
+            }
+        }
+        if (isset($data['condition'])) {
+            $validConditions = ['Excellent', 'Good', 'Fair', 'Poor'];
+            if (!in_array($data['condition'], $validConditions)) {
+                $this->sendJSON(['error' => 'Invalid condition. Must be one of: ' . implode(', ', $validConditions)], 400);
             }
         }
 
@@ -583,17 +590,6 @@ class Instruments
                 ], 400);
             }
 
-            // Check if instrument is being used by teachers
-            $teacherCheck = $this->conn->prepare("SELECT COUNT(*) as count FROM tbl_teacher_instruments WHERE instrument_id = ?");
-            $teacherCheck->execute([$instrumentId]);
-            $teacherUsage = $teacherCheck->fetch(PDO::FETCH_ASSOC);
-            
-            if ($teacherUsage['count'] > 0) {
-                $this->sendJSON([
-                    'error' => 'Cannot delete instrument. It is taught by ' . $teacherUsage['count'] . ' teacher(s)'
-                ], 400);
-            }
-
             $stmt = $this->conn->prepare("DELETE FROM tbl_instruments WHERE instrument_id = ?");
             $stmt->execute([$instrumentId]);
 
@@ -650,4 +646,5 @@ switch ($action) {
         $instruments->sendJSON(['error' => 'Invalid action'], 400);
 }
 ?>
+
 

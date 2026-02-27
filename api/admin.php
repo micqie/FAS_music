@@ -55,23 +55,20 @@ class Admin
 
     private function ensureStudentRegistrationFeesTable()
     {
-        try {
-            $this->conn->exec("
-                CREATE TABLE IF NOT EXISTS tbl_student_registration_fees (
-                    registration_id INT AUTO_INCREMENT PRIMARY KEY,
-                    student_id INT NOT NULL,
-                    registration_fee_amount DECIMAL(10,2) NOT NULL DEFAULT 1000.00,
-                    registration_fee_paid DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-                    registration_status ENUM('Pending','Fee Paid','Approved','Rejected') NOT NULL DEFAULT 'Pending',
-                    notes TEXT NULL,
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    UNIQUE KEY unique_registration_fee_student (student_id)
-                )
-            ");
-        } catch (PDOException $e) {
-            // Keep API alive
-        }
+        // Registration fee state now comes from tbl_registration_payments.
+        return;
+    }
+
+    private function getRegistrationPaidAmount($studentId)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT COALESCE(SUM(amount), 0)
+            FROM tbl_registration_payments
+            WHERE student_id = ?
+              AND status = 'Paid'
+        ");
+        $stmt->execute([(int)$studentId]);
+        return (float)($stmt->fetchColumn() ?: 0);
     }
 
     private function getLatestEnrollmentIdByStudent($studentId, $statuses = [])
@@ -88,7 +85,7 @@ class Admin
         ";
         if (!empty($statuses)) {
             $placeholders = implode(',', array_fill(0, count($statuses), '?'));
-            $sql .= " AND e.registration_status IN ({$placeholders})";
+            $sql .= " AND e.status IN ({$placeholders})";
             foreach ($statuses as $status) {
                 $params[] = $status;
             }
@@ -110,10 +107,27 @@ class Admin
         }
     }
 
+    private function extractRegistrationProofPathFromNotes($notes)
+    {
+        $raw = trim((string)($notes ?? ''));
+        if ($raw === '') return null;
+
+        $prefix = 'Payment proof:';
+        if (stripos($raw, $prefix) === 0) {
+            $path = trim(substr($raw, strlen($prefix)));
+            return $path !== '' ? $path : null;
+        }
+
+        if (preg_match('/uploads\/payment_proofs\/registration\/[^\s]+/i', $raw, $m)) {
+            return $m[0];
+        }
+
+        return null;
+    }
+
     // 🔍 View pending students
     public function getPendingStudents()
     {
-        $this->ensureStudentRegistrationFeesTable();
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
@@ -121,11 +135,16 @@ class Admin
                 s.last_name,
                 s.email,
                 s.phone,
-                COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
-                COALESCE(rf.registration_status, 'Pending') AS registration_status
+                1000.00 AS registration_fee_amount,
+                COALESCE((
+                    SELECT SUM(rp.amount)
+                    FROM tbl_registration_payments rp
+                    WHERE rp.student_id = s.student_id
+                      AND rp.status = 'Paid'
+                ), 0.00) AS registration_fee_paid,
+                'Pending' AS registration_status
             FROM tbl_students s
-            LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
-            WHERE COALESCE(rf.registration_status, 'Pending') = 'Pending'
+            WHERE s.status = 'Inactive'
         ");
         $stmt->execute();
 
@@ -138,7 +157,6 @@ class Admin
     // 🔍 Get pending registrations with guardian and branch info
     public function getPendingRegistrations()
     {
-        $this->ensureStudentRegistrationFeesTable();
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
@@ -146,35 +164,45 @@ class Admin
                 s.last_name,
                 s.email,
                 s.phone,
-                COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
-                COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
-                NULL AS registration_proof_path,
-                COALESCE(rf.registration_status, 'Pending') AS registration_status,
-                COALESCE(rf.created_at, s.created_at) AS created_at,
+                1000.00 AS registration_fee_amount,
+                COALESCE((
+                    SELECT SUM(rp.amount)
+                    FROM tbl_registration_payments rp
+                    WHERE rp.student_id = s.student_id
+                      AND rp.status = 'Paid'
+                ), 0.00) AS registration_fee_paid,
+                '' AS registration_notes,
+                'Pending' AS registration_status,
+                s.created_at AS created_at,
                 b.branch_name,
                 g.first_name as guardian_first_name,
                 g.last_name as guardian_last_name,
                 g.phone as guardian_phone
             FROM tbl_students s
-            LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-            WHERE COALESCE(rf.registration_status, 'Pending') = 'Pending'
-            ORDER BY COALESCE(rf.created_at, s.created_at) DESC
+            WHERE s.status = 'Inactive'
+            ORDER BY s.created_at DESC
         ");
         $stmt->execute();
 
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['registration_proof_path'] = $this->extractRegistrationProofPathFromNotes($row['registration_notes'] ?? '');
+            unset($row['registration_notes']);
+        }
+        unset($row);
+
         $this->sendJSON([
             'success' => true,
-            'registrations' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+            'registrations' => $rows
         ]);
     }
 
     // 🔍 Get all registrations with guardian and branch info (excludes Rejected - they are removed/counted separately)
     public function getAllRegistrations()
     {
-        $this->ensureStudentRegistrationFeesTable();
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
@@ -182,28 +210,47 @@ class Admin
                 s.last_name,
                 s.email,
                 s.phone,
-                COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
-                COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
-                NULL AS registration_proof_path,
-                COALESCE(rf.registration_status, 'Pending') AS registration_status,
-                COALESCE(rf.created_at, s.created_at) AS created_at,
+                1000.00 AS registration_fee_amount,
+                COALESCE((
+                    SELECT SUM(rp.amount)
+                    FROM tbl_registration_payments rp
+                    WHERE rp.student_id = s.student_id
+                      AND rp.status = 'Paid'
+                ), 0.00) AS registration_fee_paid,
+                '' AS registration_notes,
+                CASE
+                    WHEN s.status = 'Active' THEN 'Approved'
+                    WHEN COALESCE((
+                        SELECT SUM(rp3.amount)
+                        FROM tbl_registration_payments rp3
+                        WHERE rp3.student_id = s.student_id
+                          AND rp3.status = 'Paid'
+                    ), 0.00) >= 1000 THEN 'Fee Paid'
+                    ELSE 'Pending'
+                END AS registration_status,
+                s.created_at AS created_at,
                 b.branch_name,
                 g.first_name as guardian_first_name,
                 g.last_name as guardian_last_name,
                 g.phone as guardian_phone
             FROM tbl_students s
-            LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-            WHERE COALESCE(rf.registration_status, 'Pending') != 'Rejected'
-            ORDER BY COALESCE(rf.created_at, s.created_at) DESC
+            ORDER BY s.created_at DESC
         ");
         $stmt->execute();
 
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['registration_proof_path'] = $this->extractRegistrationProofPathFromNotes($row['registration_notes'] ?? '');
+            unset($row['registration_notes']);
+        }
+        unset($row);
+
         $this->sendJSON([
             'success' => true,
-            'registrations' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+            'registrations' => $rows
         ]);
     }
 
@@ -214,7 +261,7 @@ class Admin
             // Check if registration_payments uses student_id or enrollment_id
             $checkCol = $this->conn->query("SHOW COLUMNS FROM tbl_registration_payments LIKE 'student_id'");
             $hasStudentId = $checkCol && $checkCol->rowCount() > 0;
-            
+
             if ($hasStudentId) {
                 $stmtRegistration = $this->conn->prepare("
                     SELECT COALESCE(SUM(amount), 0) AS total
@@ -276,16 +323,19 @@ class Admin
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
 
-            $this->ensureStudentRegistrationFeesTable();
-            $stmtReg = $this->conn->prepare("
-                INSERT INTO tbl_student_registration_fees (
-                    student_id, registration_fee_amount, registration_fee_paid, registration_status
-                ) VALUES (?, 1000.00, 1000.00, 'Approved')
-                ON DUPLICATE KEY UPDATE
-                    registration_status = 'Approved',
-                    registration_fee_paid = GREATEST(registration_fee_paid, registration_fee_amount)
-            ");
-            $stmtReg->execute([$data['student_id']]);
+            $paid = $this->getRegistrationPaidAmount((int)$data['student_id']);
+            if ($paid < 1000.0) {
+                $stmtReg = $this->conn->prepare("
+                    INSERT INTO tbl_registration_payments (
+                        student_id, payment_date, amount, payment_method, status, receipt_number
+                    ) VALUES (?, CURRENT_DATE, ?, 'Other', 'Paid', ?)
+                ");
+                $stmtReg->execute([
+                    (int)$data['student_id'],
+                    1000.0 - $paid,
+                    'REG-APPROVE-' . time()
+                ]);
+            }
 
             $stmt = $this->conn->prepare("
                 UPDATE tbl_students
@@ -357,13 +407,13 @@ class Admin
             // Note: In fas_db.sql, registration_payments links to enrollments, so delete enrollments first
             $checkCol = $this->conn->query("SHOW COLUMNS FROM tbl_registration_payments LIKE 'student_id'");
             $hasStudentId = $checkCol && $checkCol->rowCount() > 0;
-            
+
             if (!$hasStudentId) {
                 // fas_db.sql structure - delete enrollments first (which will cascade delete registration_payments)
                 $stmtDelEnroll = $this->conn->prepare("DELETE FROM tbl_enrollments WHERE student_id = ?");
                 $stmtDelEnroll->execute([$studentId]);
             }
-            
+
             $stmtDelete = $this->conn->prepare("DELETE FROM tbl_students WHERE student_id = ?");
             $stmtDelete->execute([$studentId]);
 
@@ -375,15 +425,7 @@ class Admin
             ]);
         } catch (Exception $e) {
             $this->conn->rollBack();
-            // If hard delete fails, mark registration as rejected and deactivate.
-            $this->ensureStudentRegistrationFeesTable();
-            $stmt = $this->conn->prepare("
-                INSERT INTO tbl_student_registration_fees (
-                    student_id, registration_fee_amount, registration_fee_paid, registration_status
-                ) VALUES (?, 1000.00, 0.00, 'Rejected')
-                ON DUPLICATE KEY UPDATE registration_status = 'Rejected'
-            ");
-            $stmt->execute([$studentId]);
+            // If hard delete fails, deactivate instead.
             $stmt2 = $this->conn->prepare("
                 UPDATE tbl_students
                 SET status = 'Inactive'
@@ -407,52 +449,35 @@ class Admin
         }
 
         try {
-            $this->ensureStudentRegistrationFeesTable();
             $this->conn->beginTransaction();
-            $stmt = $this->conn->prepare("
-                SELECT
-                    student_id,
-                    registration_fee_amount,
-                    registration_fee_paid,
-                    registration_status
-                FROM tbl_student_registration_fees
-                WHERE student_id = ?
-                LIMIT 1
-            ");
-            $stmt->execute([$data['student_id']]);
-            $student = $stmt->fetch(PDO::FETCH_ASSOC);
-
+            $stmtStudent = $this->conn->prepare("SELECT student_id, email FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmtStudent->execute([(int)$data['student_id']]);
+            $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
             if (!$student) {
-                $seed = $this->conn->prepare("
-                    INSERT INTO tbl_student_registration_fees (
-                        student_id, registration_fee_amount, registration_fee_paid, registration_status
-                    ) VALUES (?, 1000.00, 0.00, 'Pending')
-                ");
-                $seed->execute([$data['student_id']]);
-                $stmt->execute([$data['student_id']]);
-                $student = $stmt->fetch(PDO::FETCH_ASSOC);
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Student not found'], 404);
             }
 
-            $newPaid = ($student['registration_fee_paid'] ?? 0) + $data['amount'];
-            $remaining = $student['registration_fee_amount'] - $newPaid;
+            $currentPaid = $this->getRegistrationPaidAmount((int)$data['student_id']);
+            $newPaid = $currentPaid + (float)$data['amount'];
+            $remaining = 1000.0 - $newPaid;
             $receipt = $data['receipt_number'] ?? 'REG-' . time();
 
             // Insert payment record - check if table uses student_id or enrollment_id
             $checkCol = $this->conn->query("SHOW COLUMNS FROM tbl_registration_payments LIKE 'student_id'");
             $hasStudentId = $checkCol && $checkCol->rowCount() > 0;
-            
+
             if ($hasStudentId) {
                 $stmtPayment = $this->conn->prepare("
                     INSERT INTO tbl_registration_payments (
-                        student_id, amount, payment_method, receipt_number, notes, status, payment_date
-                    ) VALUES (?, ?, ?, ?, ?, 'Paid', CURRENT_DATE)
+                        student_id, amount, payment_method, receipt_number, status, payment_date
+                    ) VALUES (?, ?, ?, ?, 'Paid', CURRENT_DATE)
                 ");
                 $stmtPayment->execute([
                     $data['student_id'],
                     $data['amount'],
                     $data['payment_method'],
-                    $receipt,
-                    $data['notes'] ?? null
+                    $receipt
                 ]);
             } else {
                 // fas_db.sql structure - record against target enrollment row
@@ -460,26 +485,19 @@ class Admin
                 if ($targetEnrollmentId > 0) {
                     $stmtPayment = $this->conn->prepare("
                         INSERT INTO tbl_registration_payments (
-                            enrollment_id, amount, payment_method, receipt_number, notes, status, payment_date
-                        ) VALUES (?, ?, ?, ?, ?, 'Paid', CURRENT_DATE)
+                            enrollment_id, amount, payment_method, receipt_number, status, payment_date
+                        ) VALUES (?, ?, ?, ?, 'Paid', CURRENT_DATE)
                     ");
                     $stmtPayment->execute([
                         $targetEnrollmentId,
                         $data['amount'],
                         $data['payment_method'],
-                        $receipt,
-                        $data['notes'] ?? null
+                        $receipt
                     ]);
                 }
             }
 
             $newStatus = ($remaining <= 0) ? 'Approved' : 'Pending';
-            $stmtUpdate = $this->conn->prepare("
-                UPDATE tbl_student_registration_fees
-                SET registration_fee_paid = ?, registration_status = ?
-                WHERE student_id = ?
-            ");
-            $stmtUpdate->execute([$newPaid, $newStatus, $data['student_id']]);
 
             // When approved, activate both student profile and login account.
             if ($newStatus === 'Approved') {
@@ -490,16 +508,13 @@ class Admin
                 ");
                 $stmtActivateStudent->execute([$data['student_id']]);
 
-                $stmtEmail = $this->conn->prepare("SELECT email FROM tbl_students WHERE student_id = ?");
-                $stmtEmail->execute([$data['student_id']]);
-                $studentRow = $stmtEmail->fetch(PDO::FETCH_ASSOC);
-                if (!empty($studentRow['email'])) {
+                if (!empty($student['email'])) {
                     $stmtActivateUser = $this->conn->prepare("
                         UPDATE tbl_users
                         SET status = 'Active'
                         WHERE email = ?
                     ");
-                    $stmtActivateUser->execute([$studentRow['email']]);
+                    $stmtActivateUser->execute([$student['email']]);
                 }
             }
 
@@ -528,18 +543,30 @@ class Admin
         }
 
         try {
-            $this->ensureStudentRegistrationFeesTable();
             $stmt = $this->conn->prepare("
                 SELECT
                     s.*,
                     b.branch_name,
-                    COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
-                    COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
-                    COALESCE(rf.registration_status, 'Pending') AS registration_status,
-                    NULL AS registration_proof_path
+                    1000.00 AS registration_fee_amount,
+                    COALESCE((
+                        SELECT SUM(rp.amount)
+                        FROM tbl_registration_payments rp
+                        WHERE rp.student_id = s.student_id
+                          AND rp.status = 'Paid'
+                    ), 0.00) AS registration_fee_paid,
+                    CASE
+                        WHEN s.status = 'Active' THEN 'Approved'
+                        WHEN COALESCE((
+                            SELECT SUM(rp2.amount)
+                            FROM tbl_registration_payments rp2
+                            WHERE rp2.student_id = s.student_id
+                              AND rp2.status = 'Paid'
+                        ), 0.00) >= 1000 THEN 'Fee Paid'
+                        ELSE 'Pending'
+                    END AS registration_status,
+                    '' AS registration_notes
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
                 WHERE s.student_id = ?
             ");
             $stmt->execute([$studentId]);
@@ -548,9 +575,8 @@ class Admin
             if (!$student) {
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
-            if (!array_key_exists('registration_proof_path', $student)) {
-                $student['registration_proof_path'] = null;
-            }
+            $student['registration_proof_path'] = $this->extractRegistrationProofPathFromNotes($student['registration_notes'] ?? '');
+            unset($student['registration_notes']);
 
             // Get guardians
             $stmtGuardians = $this->conn->prepare("
@@ -565,7 +591,7 @@ class Admin
             // Get payments
             $checkCol = $this->conn->query("SHOW COLUMNS FROM tbl_registration_payments LIKE 'student_id'");
             $hasStudentId = $checkCol && $checkCol->rowCount() > 0;
-            
+
             if ($hasStudentId) {
                 $stmtPayments = $this->conn->prepare("
                     SELECT * FROM tbl_registration_payments

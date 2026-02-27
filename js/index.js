@@ -2796,7 +2796,6 @@ async function viewDetails(studentId) {
                             <p><span class="text-zinc-400">Email:</span> <span class="text-white">${student.email || 'N/A'}</span></p>
                             <p><span class="text-zinc-400">Phone:</span> <span class="text-white">${student.phone || 'N/A'}</span></p>
                             <p><span class="text-zinc-400">Date of Birth:</span> <span class="text-white">${student.date_of_birth || 'N/A'}</span></p>
-                            <p><span class="text-zinc-400">School:</span> <span class="text-white">${student.school || 'N/A'}</span></p>
                             <p><span class="text-zinc-400">Branch:</span> <span class="text-white">${student.branch_name || 'N/A'}</span></p>
                         </div>
                     </div>
@@ -2836,22 +2835,22 @@ async function viewDetails(studentId) {
                     <div>
                         <h4 class="text-lg font-bold text-gold-400 mb-4">Payment History</h4>
                         <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
+                            <table class="w-full text-sm text-white">
                                 <thead class="bg-zinc-900/50">
                                     <tr>
-                                        <th class="px-4 py-2 text-left">Date</th>
-                                        <th class="px-4 py-2 text-left">Amount</th>
-                                        <th class="px-4 py-2 text-left">Method</th>
-                                        <th class="px-4 py-2 text-left">Receipt</th>
+                                        <th class="px-4 py-2 text-left text-zinc-200">Date</th>
+                                        <th class="px-4 py-2 text-left text-zinc-200">Amount</th>
+                                        <th class="px-4 py-2 text-left text-zinc-200">Method</th>
+                                        <th class="px-4 py-2 text-left text-zinc-200">Receipt</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     ${payments.map(p => `
                                         <tr class="border-t border-zinc-800">
-                                            <td class="px-4 py-2">${new Date(p.payment_date).toLocaleDateString()}</td>
-                                            <td class="px-4 py-2">₱${parseFloat(p.amount).toFixed(2)}</td>
-                                            <td class="px-4 py-2">${p.payment_method}</td>
-                                            <td class="px-4 py-2">${p.receipt_number || 'N/A'}</td>
+                                            <td class="px-4 py-2 text-white">${new Date(p.payment_date).toLocaleDateString()}</td>
+                                            <td class="px-4 py-2 text-white">₱${parseFloat(p.amount).toFixed(2)}</td>
+                                            <td class="px-4 py-2 text-white">${p.payment_method}</td>
+                                            <td class="px-4 py-2 text-white">${p.receipt_number || 'N/A'}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>

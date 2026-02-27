@@ -123,7 +123,7 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
             </div>
             <div>
                 <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold mb-2 block">Est. 2004</span>
-                <h2 class="text-4xl md:text-5xl font-serif text-zinc-900 dark:text-white mb-8">
+                <h2 class="text-4xl md:text-5xl font-serif text-zinc-900 text-white mb-8">
                     Our Heritage
                 </h2>
                 <p class="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed text-lg">
@@ -195,11 +195,11 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
             <form id="loginForm" class="space-y-6">
                 <div>
                     <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-widest">
-                        Username
+                        Username or Email
                     </label>
                     <input type="text" id="loginUsername" required
                         class="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition"
-                        placeholder="Enter your username">
+                        placeholder="Enter your username or email">
                 </div>
 
                 <div>
@@ -311,6 +311,11 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
                                 class="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                         </div>
                         <div>
+                            <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">School</label>
+                            <input type="text" name="student_school"
+                                class="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                        </div>
+                        <div>
                             <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">
                                 Branch *
                             </label>
@@ -381,17 +386,7 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
                             class="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500"></textarea>
                     </div>
                 </div>
-
-                <!-- Package Selection Notice -->
-                <div>
-                    <h4 class="text-sm font-bold text-zinc-900 dark:text-gold-400 mb-4 flex items-center uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                        Package Selection
-                    </h4>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                        Package sessions, instruments, and lesson fees are selected after your registration is approved.
-                        You can review and avail packages inside your student dashboard.
-                    </p>
-                </div>
+                                                
 
                 <!-- Registration Fee Summary -->
                 <div class="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-sm p-6">

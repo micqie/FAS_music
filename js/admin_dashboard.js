@@ -346,5 +346,3 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
     loadPendingRegistrations();
 });
-
-

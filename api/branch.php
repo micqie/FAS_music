@@ -17,7 +17,7 @@ class Branch
         $this->conn = $pdo;
     }
 
-    private function sendJSON($data, $statusCode = 200)
+    public function sendJSON($data, $statusCode = 200)
     {
         http_response_code($statusCode);
         echo json_encode($data);
@@ -263,4 +263,5 @@ switch ($action) {
         $branch->sendJSON(['error' => 'Invalid action'], 400);
 }
 ?>
+
 

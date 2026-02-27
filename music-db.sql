@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Feb 21, 2026 at 03:53 AM
+-- Generation Time: Feb 22, 2026 at 06:58 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `fas_music`
+-- Database: `music-db`
 --
 
 -- --------------------------------------------------------
@@ -68,7 +68,7 @@ CREATE TABLE `tbl_enrollments` (
   `student_guardian_id` int(11) DEFAULT NULL,
   `total_sessions` int(11) NOT NULL,
   `completed_sessions` int(11) NOT NULL DEFAULT 0
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_enrollments`
@@ -77,8 +77,8 @@ CREATE TABLE `tbl_enrollments` (
 INSERT INTO `tbl_enrollments` (`enrollment_id`, `student_id`, `package_id`, `instrument_id`, `preferred_schedule`, `request_notes`, `enrollment_date`, `start_date`, `end_date`, `status`, `created_at`, `enrolled_by_type`, `student_guardian_id`, `total_sessions`, `completed_sessions`) VALUES
 (8, 2, 1, NULL, NULL, NULL, '2026-02-21', '2026-02-23', '2026-05-11', 'Active', '2026-02-20 18:27:03', 'Self', NULL, 12, 0),
 (9, 2, 1, NULL, NULL, NULL, '2026-02-21', '2026-02-22', '2026-05-10', 'Active', '2026-02-21 00:35:03', 'Self', NULL, 12, 0),
-(10, 3, 6, 10, 'Tuesday|2026-02-24', '{"payment_type":"Partial Payment","instrument_ids":[10,11],"payment_proof_path":null}', '2026-02-21', NULL, NULL, 'Pending', '2026-02-21 04:10:00', 'Self', NULL, 8, 0),
-(11, 4, 10, 13, 'Thursday|2026-02-26', '{"payment_type":"Full Payment","instrument_ids":[13],"payment_proof_path":null}', '2026-02-21', NULL, NULL, 'Pending', '2026-02-21 04:20:00', 'Self', NULL, 16, 0);
+(10, 3, 6, 10, 'Tuesday|2026-02-24', '{\"payment_type\":\"Partial Payment\",\"instrument_ids\":[10,11],\"payment_proof_path\":null}', '2026-02-21', NULL, NULL, 'Pending', '2026-02-21 04:10:00', 'Self', NULL, 8, 0),
+(11, 4, 10, 13, 'Thursday|2026-02-26', '{\"payment_type\":\"Full Payment\",\"instrument_ids\":[13],\"payment_proof_path\":null}', '2026-02-21', NULL, NULL, 'Pending', '2026-02-21 04:20:00', 'Self', NULL, 16, 0);
 
 -- --------------------------------------------------------
 
@@ -231,35 +231,25 @@ CREATE TABLE `tbl_recitals` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_recital_audience`
---
-
-CREATE TABLE `tbl_recital_audience` (
-  `audience_id` int(11) NOT NULL,
-  `recital_id` int(11) NOT NULL,
-  `guardian_id` int(11) NOT NULL,
-  `student_id` int(11) DEFAULT NULL,
-  `number_of_guests` int(11) DEFAULT 1,
-  `confirmed` enum('Y','N') DEFAULT 'N',
-  `confirmed_at` timestamp NULL DEFAULT NULL,
-  `notes` text DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `tbl_recital_participants`
 --
 
 CREATE TABLE `tbl_recital_participants` (
   `participant_id` int(11) NOT NULL,
   `recital_id` int(11) NOT NULL,
-  `student_id` int(11) NOT NULL,
-  `instrument_id` int(11) NOT NULL,
+  `participant_type` enum('Performer','Audience','Other') NOT NULL DEFAULT 'Performer',
+  `student_id` int(11) DEFAULT NULL,
+  `guardian_id` int(11) DEFAULT NULL,
+  `participant_name` varchar(120) DEFAULT NULL,
+  `instrument_id` int(11) DEFAULT NULL,
+  `number_of_guests` int(11) DEFAULT 1,
   `performance_order` int(11) DEFAULT NULL,
   `performance_time` time DEFAULT NULL,
   `piece_name` varchar(200) DEFAULT NULL,
+  `confirmed` enum('Y','N') DEFAULT 'N',
+  `confirmed_at` timestamp NULL DEFAULT NULL,
   `evaluation_notes` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
   `status` enum('Confirmed','Cancelled') DEFAULT 'Confirmed'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -622,19 +612,42 @@ CREATE TABLE `tbl_student_registration_fees` (
   `registration_fee_paid` decimal(10,2) NOT NULL DEFAULT 0.00,
   `registration_status` enum('Pending','Fee Paid','Approved','Rejected') NOT NULL DEFAULT 'Pending',
   `notes` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_student_registration_fees`
 --
 
-INSERT INTO `tbl_student_registration_fees` (`registration_id`, `student_id`, `registration_fee_amount`, `registration_fee_paid`, `registration_status`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 1000.00, 1000.00, 'Approved', 'Backfilled from tbl_students', '2026-02-21 02:03:36', '2026-02-21 02:03:36'),
-(2, 2, 1000.00, 1000.00, 'Approved', 'Backfilled from tbl_students', '2026-02-21 02:03:36', '2026-02-21 02:03:36'),
-(3, 3, 1000.00, 1000.00, 'Approved', 'Seeded approved fee', '2026-02-21 03:25:00', '2026-02-21 03:25:00'),
-(4, 4, 1000.00, 1000.00, 'Approved', 'Seeded approved fee', '2026-02-21 03:25:00', '2026-02-21 03:25:00');
+INSERT INTO `tbl_student_registration_fees` (`registration_id`, `student_id`, `registration_fee_amount`, `registration_fee_paid`, `registration_status`, `notes`, `created_at`) VALUES
+(1, 1, 1000.00, 1000.00, 'Approved', 'Backfilled from tbl_students', '2026-02-21 02:03:36'),
+(2, 2, 1000.00, 1000.00, 'Approved', 'Backfilled from tbl_students', '2026-02-21 02:03:36'),
+(3, 3, 1000.00, 1000.00, 'Approved', 'Seeded approved fee', '2026-02-21 03:25:00'),
+(4, 4, 1000.00, 1000.00, 'Approved', 'Seeded approved fee', '2026-02-21 03:25:00');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_specialization`
+--
+
+CREATE TABLE `tbl_specialization` (
+  `specialization_id` int(11) NOT NULL,
+  `specialization_name` varchar(100) NOT NULL,
+  `status` enum('Active','Inactive') DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_specialization`
+--
+
+INSERT INTO `tbl_specialization` (`specialization_id`, `specialization_name`, `status`, `created_at`) VALUES
+(1, 'Piano', 'Active', '2026-02-20 18:10:00'),
+(2, 'Guitar', 'Active', '2026-02-20 18:10:00'),
+(3, 'Violin', 'Active', '2026-02-20 18:10:00'),
+(4, 'Voice', 'Active', '2026-02-20 18:10:00'),
+(5, 'Drums', 'Active', '2026-02-20 18:10:00');
 
 -- --------------------------------------------------------
 
@@ -648,7 +661,6 @@ CREATE TABLE `tbl_teachers` (
   `branch_id` int(11) NOT NULL,
   `first_name` varchar(50) NOT NULL,
   `last_name` varchar(50) NOT NULL,
-  `specialization` varchar(100) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
   `employment_type` enum('Full-time','Part-time','Contract') DEFAULT 'Full-time',
@@ -660,13 +672,40 @@ CREATE TABLE `tbl_teachers` (
 -- Dumping data for table `tbl_teachers`
 --
 
-INSERT INTO `tbl_teachers` (`teacher_id`, `user_id`, `branch_id`, `first_name`, `last_name`, `specialization`, `email`, `phone`, `employment_type`, `status`, `created_at`) VALUES
-(1, NULL, 1, 'Test', 'Piano', 'Piano', 'test.piano@fas.local', '09170000001', 'Full-time', 'Active', '2026-02-20 18:14:00'),
-(2, NULL, 1, 'Test', 'Guitar', 'Guitar', 'test.guitar@fas.local', '09170000002', 'Part-time', 'Active', '2026-02-20 18:14:00'),
-(3, NULL, 5, 'Aira', 'Santos', 'Piano, Violin', 'aira.santos@fas.local', '09170000003', 'Full-time', 'Active', '2026-02-21 03:30:00'),
-(4, NULL, 5, 'Marco', 'Reyes', 'Guitar, Voice', 'marco.reyes@fas.local', '09170000004', 'Part-time', 'Active', '2026-02-21 03:30:00'),
-(5, NULL, 6, 'Nina', 'Uy', 'Piano, Voice', 'nina.uy@fas.local', '09170000005', 'Full-time', 'Active', '2026-02-21 03:31:00'),
-(6, NULL, 6, 'John', 'Tan', 'Drums, Guitar', 'john.tan@fas.local', '09170000006', 'Part-time', 'Active', '2026-02-21 03:31:00');
+INSERT INTO `tbl_teachers` (`teacher_id`, `user_id`, `branch_id`, `first_name`, `last_name`, `email`, `phone`, `employment_type`, `status`, `created_at`) VALUES
+(1, NULL, 1, 'Test', 'Piano', 'test.piano@fas.local', '09170000001', 'Full-time', 'Active', '2026-02-20 18:14:00'),
+(2, NULL, 1, 'Test', 'Guitar', 'test.guitar@fas.local', '09170000002', 'Part-time', 'Active', '2026-02-20 18:14:00'),
+(3, NULL, 5, 'Aira', 'Santos', 'aira.santos@fas.local', '09170000003', 'Full-time', 'Active', '2026-02-21 03:30:00'),
+(4, NULL, 5, 'Marco', 'Reyes', 'marco.reyes@fas.local', '09170000004', 'Part-time', 'Active', '2026-02-21 03:30:00'),
+(5, NULL, 6, 'Nina', 'Uy', 'nina.uy@fas.local', '09170000005', 'Full-time', 'Active', '2026-02-21 03:31:00'),
+(6, NULL, 6, 'John', 'Tan', 'john.tan@fas.local', '09170000006', 'Part-time', 'Active', '2026-02-21 03:31:00');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_teacher_specializations`
+--
+
+CREATE TABLE `tbl_teacher_specializations` (
+  `teacher_id` int(11) NOT NULL,
+  `specialization_id` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_teacher_specializations`
+--
+
+INSERT INTO `tbl_teacher_specializations` (`teacher_id`, `specialization_id`) VALUES
+(1, 1),
+(2, 2),
+(3, 1),
+(3, 3),
+(4, 2),
+(4, 4),
+(5, 1),
+(5, 4),
+(6, 2),
+(6, 5);
 
 -- --------------------------------------------------------
 
@@ -708,35 +747,6 @@ INSERT INTO `tbl_teacher_availability` (`availability_id`, `teacher_id`, `branch
 (16, 6, 6, 'Wednesday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:33:00'),
 (17, 5, 6, 'Friday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:33:00'),
 (18, 6, 6, 'Friday', '10:00:00', '18:00:00', 'Available', '2026-02-21 03:33:00');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `tbl_teacher_instruments`
---
-
-CREATE TABLE `tbl_teacher_instruments` (
-  `teacher_instrument_id` int(11) NOT NULL,
-  `teacher_id` int(11) NOT NULL,
-  `instrument_id` int(11) NOT NULL,
-  `proficiency_level` varchar(50) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tbl_teacher_instruments`
---
-
-INSERT INTO `tbl_teacher_instruments` (`teacher_instrument_id`, `teacher_id`, `instrument_id`, `proficiency_level`) VALUES
-(1, 1, 4, 'Advanced'),
-(2, 1, 5, 'Advanced'),
-(3, 2, 6, 'Advanced'),
-(4, 3, 9, 'Advanced'),
-(5, 3, 11, 'Intermediate'),
-(6, 4, 10, 'Advanced'),
-(7, 5, 12, 'Advanced'),
-(8, 6, 13, 'Advanced'),
-(9, 6, 14, 'Intermediate');
-
 
 -- --------------------------------------------------------
 
@@ -841,21 +851,14 @@ ALTER TABLE `tbl_recitals`
   ADD KEY `idx_recitals_date` (`recital_date`);
 
 --
--- Indexes for table `tbl_recital_audience`
---
-ALTER TABLE `tbl_recital_audience`
-  ADD PRIMARY KEY (`audience_id`),
-  ADD UNIQUE KEY `unique_recital_guardian` (`recital_id`,`guardian_id`),
-  ADD KEY `guardian_id` (`guardian_id`),
-  ADD KEY `student_id` (`student_id`);
-
---
 -- Indexes for table `tbl_recital_participants`
 --
 ALTER TABLE `tbl_recital_participants`
   ADD PRIMARY KEY (`participant_id`),
   ADD KEY `recital_id` (`recital_id`),
+  ADD KEY `idx_recital_participant_type` (`participant_type`),
   ADD KEY `student_id` (`student_id`),
+  ADD KEY `guardian_id` (`guardian_id`),
   ADD KEY `instrument_id` (`instrument_id`);
 
 --
@@ -1013,12 +1016,17 @@ ALTER TABLE `tbl_teacher_availability`
   ADD KEY `idx_teacher_availability` (`teacher_id`,`day_of_week`);
 
 --
--- Indexes for table `tbl_teacher_instruments`
+-- Indexes for table `tbl_teacher_specializations`
 --
-ALTER TABLE `tbl_teacher_instruments`
-  ADD PRIMARY KEY (`teacher_instrument_id`),
-  ADD UNIQUE KEY `unique_teacher_instrument` (`teacher_id`,`instrument_id`),
-  ADD KEY `instrument_id` (`instrument_id`);
+ALTER TABLE `tbl_teacher_specializations`
+  ADD PRIMARY KEY (`teacher_id`,`specialization_id`),
+  ADD KEY `idx_tts_specialization` (`specialization_id`);
+
+-- Indexes for table `tbl_specialization`
+--
+ALTER TABLE `tbl_specialization`
+  ADD PRIMARY KEY (`specialization_id`),
+  ADD UNIQUE KEY `uniq_specialization_name` (`specialization_name`);
 
 --
 -- Indexes for table `tbl_users`
@@ -1085,12 +1093,6 @@ ALTER TABLE `tbl_payment_schedule`
 --
 ALTER TABLE `tbl_recitals`
   MODIFY `recital_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `tbl_recital_audience`
---
-ALTER TABLE `tbl_recital_audience`
-  MODIFY `audience_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tbl_recital_participants`
@@ -1207,10 +1209,10 @@ ALTER TABLE `tbl_teacher_availability`
   MODIFY `availability_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
--- AUTO_INCREMENT for table `tbl_teacher_instruments`
+-- AUTO_INCREMENT for table `tbl_specialization`
 --
-ALTER TABLE `tbl_teacher_instruments`
-  MODIFY `teacher_instrument_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+ALTER TABLE `tbl_specialization`
+  MODIFY `specialization_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `tbl_users`
@@ -1266,20 +1268,13 @@ ALTER TABLE `tbl_recitals`
   ADD CONSTRAINT `tbl_recitals_ibfk_2` FOREIGN KEY (`teacher_id`) REFERENCES `tbl_teachers` (`teacher_id`) ON DELETE SET NULL;
 
 --
--- Constraints for table `tbl_recital_audience`
---
-ALTER TABLE `tbl_recital_audience`
-  ADD CONSTRAINT `tbl_recital_audience_ibfk_1` FOREIGN KEY (`recital_id`) REFERENCES `tbl_recitals` (`recital_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `tbl_recital_audience_ibfk_2` FOREIGN KEY (`guardian_id`) REFERENCES `tbl_guardians` (`guardian_id`),
-  ADD CONSTRAINT `tbl_recital_audience_ibfk_3` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`) ON DELETE SET NULL;
-
---
 -- Constraints for table `tbl_recital_participants`
 --
 ALTER TABLE `tbl_recital_participants`
   ADD CONSTRAINT `tbl_recital_participants_ibfk_1` FOREIGN KEY (`recital_id`) REFERENCES `tbl_recitals` (`recital_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `tbl_recital_participants_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`),
-  ADD CONSTRAINT `tbl_recital_participants_ibfk_3` FOREIGN KEY (`instrument_id`) REFERENCES `tbl_instruments` (`instrument_id`);
+  ADD CONSTRAINT `tbl_recital_participants_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `tbl_recital_participants_ibfk_3` FOREIGN KEY (`guardian_id`) REFERENCES `tbl_guardians` (`guardian_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `tbl_recital_participants_ibfk_4` FOREIGN KEY (`instrument_id`) REFERENCES `tbl_instruments` (`instrument_id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `tbl_recurring_schedule`
@@ -1391,11 +1386,11 @@ ALTER TABLE `tbl_teacher_availability`
   ADD CONSTRAINT `tbl_teacher_availability_ibfk_2` FOREIGN KEY (`branch_id`) REFERENCES `tbl_branches` (`branch_id`);
 
 --
--- Constraints for table `tbl_teacher_instruments`
+-- Constraints for table `tbl_teacher_specializations`
 --
-ALTER TABLE `tbl_teacher_instruments`
-  ADD CONSTRAINT `tbl_teacher_instruments_ibfk_1` FOREIGN KEY (`teacher_id`) REFERENCES `tbl_teachers` (`teacher_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `tbl_teacher_instruments_ibfk_2` FOREIGN KEY (`instrument_id`) REFERENCES `tbl_instruments` (`instrument_id`);
+ALTER TABLE `tbl_teacher_specializations`
+  ADD CONSTRAINT `tbl_teacher_specializations_ibfk_1` FOREIGN KEY (`teacher_id`) REFERENCES `tbl_teachers` (`teacher_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `tbl_teacher_specializations_ibfk_2` FOREIGN KEY (`specialization_id`) REFERENCES `tbl_specialization` (`specialization_id`);
 
 --
 -- Constraints for table `tbl_users`

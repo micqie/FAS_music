@@ -434,10 +434,20 @@ class StudentsApi
 
         try {
             $teacherSql = "
-                SELECT t.teacher_id, t.first_name, t.last_name, t.specialization
+                SELECT
+                    t.teacher_id,
+                    t.first_name,
+                    t.last_name,
+                    COALESCE(
+                        GROUP_CONCAT(DISTINCT s.specialization_name ORDER BY s.specialization_name SEPARATOR ', '),
+                        ''
+                    ) AS specialization
                 FROM tbl_teachers t
+                LEFT JOIN tbl_teacher_specializations ts ON ts.teacher_id = t.teacher_id
+                LEFT JOIN tbl_specialization s ON s.specialization_id = ts.specialization_id
                 WHERE t.branch_id = ?
                   AND t.status = 'Active'
+                GROUP BY t.teacher_id
                 ORDER BY t.first_name ASC, t.last_name ASC
             ";
             $stmtTeachers = $this->conn->prepare($teacherSql);
@@ -451,19 +461,6 @@ class StudentsApi
                 if ($w !== '') $keywordList[] = $w;
             }
             $keywordList = array_values(array_unique($keywordList));
-
-            $mappedTeacherIds = [];
-            if (!empty($instrumentIds) && $this->tableExists('tbl_teacher_instruments')) {
-                $placeholders = implode(',', array_fill(0, count($instrumentIds), '?'));
-                $stmtMap = $this->conn->prepare("
-                    SELECT DISTINCT teacher_id
-                    FROM tbl_teacher_instruments
-                    WHERE instrument_id IN ({$placeholders})
-                ");
-                $stmtMap->execute($instrumentIds);
-                $mappedTeacherIds = array_map('intval', $stmtMap->fetchAll(PDO::FETCH_COLUMN));
-            }
-            $mappedSet = array_flip($mappedTeacherIds);
 
             foreach ($teachers as $t) {
                 $teacherId = (int)($t['teacher_id'] ?? 0);
@@ -488,8 +485,7 @@ class StudentsApi
                     }
                 }
 
-                $matchedByMapping = isset($mappedSet[$teacherId]);
-                $eligible = empty($instrumentIds) || $matchedByMapping || $matchedByKeyword || $isAllAround;
+                $eligible = empty($instrumentIds) || $matchedByKeyword || $isAllAround;
                 if (!$eligible) continue;
 
                 $candidates[] = [
@@ -575,8 +571,19 @@ class StudentsApi
                     b.branch_name
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
-                WHERE COALESCE(rf.registration_status, 'Pending') != 'Rejected'
+                LEFT JOIN (
+                    SELECT
+                        rp.student_id,
+                        1000.00 AS registration_fee_amount,
+                        COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
+                        CASE
+                            WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
+                            ELSE 'Pending'
+                        END AS registration_status
+                    FROM tbl_registration_payments rp
+                    GROUP BY rp.student_id
+                ) rf ON rf.student_id = s.student_id
+                WHERE 1=1
                 ORDER BY s.created_at DESC
             ");
 
@@ -666,18 +673,7 @@ class StudentsApi
                 $status, $id
             ]);
             if ($registrationFeeAmount !== null || $registrationFeePaid !== null || $registrationStatus !== null) {
-                $stmtReg = $this->conn->prepare("
-                    INSERT INTO tbl_student_registration_fees (
-                        student_id, registration_fee_amount, registration_fee_paid, registration_status
-                    ) VALUES (
-                        ?, COALESCE(?, 1000.00), COALESCE(?, 0.00), COALESCE(?, 'Pending')
-                    )
-                    ON DUPLICATE KEY UPDATE
-                        registration_fee_amount = COALESCE(VALUES(registration_fee_amount), registration_fee_amount),
-                        registration_fee_paid = COALESCE(VALUES(registration_fee_paid), registration_fee_paid),
-                        registration_status = COALESCE(VALUES(registration_status), registration_status)
-                ");
-                $stmtReg->execute([$id, $registrationFeeAmount, $registrationFeePaid, $registrationStatus]);
+                // Registration fee table was removed; values now come from tbl_registration_payments.
             }
             if ($stmt->rowCount() === 0) {
                 $this->sendJSON(['error' => 'Student not found'], 404);
@@ -751,8 +747,19 @@ class StudentsApi
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
                 LEFT JOIN tbl_session_packages sp ON s.session_package_id = sp.package_id
-                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
-                WHERE s.status = 'Active' AND COALESCE(rf.registration_status, 'Pending') IN ('Fee Paid', 'Approved')
+                LEFT JOIN (
+                    SELECT
+                        rp.student_id,
+                        1000.00 AS registration_fee_amount,
+                        COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
+                        CASE
+                            WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
+                            ELSE 'Pending'
+                        END AS registration_status
+                    FROM tbl_registration_payments rp
+                    GROUP BY rp.student_id
+                ) rf ON rf.student_id = s.student_id
+                WHERE s.status = 'Active'
             ";
         } else {
             $sql = "
@@ -768,8 +775,19 @@ class StudentsApi
                     b.branch_name
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
-                WHERE s.status = 'Active' AND COALESCE(rf.registration_status, 'Pending') IN ('Fee Paid', 'Approved')
+                LEFT JOIN (
+                    SELECT
+                        rp.student_id,
+                        1000.00 AS registration_fee_amount,
+                        COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
+                        CASE
+                            WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
+                            ELSE 'Pending'
+                        END AS registration_status
+                    FROM tbl_registration_payments rp
+                    GROUP BY rp.student_id
+                ) rf ON rf.student_id = s.student_id
+                WHERE s.status = 'Active'
             ";
         }
 
@@ -903,7 +921,18 @@ class StudentsApi
                     b.branch_name
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+                LEFT JOIN (
+                    SELECT
+                        rp.student_id,
+                        1000.00 AS registration_fee_amount,
+                        COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
+                        CASE
+                            WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
+                            ELSE 'Pending'
+                        END AS registration_status
+                    FROM tbl_registration_payments rp
+                    GROUP BY rp.student_id
+                ) rf ON rf.student_id = s.student_id
                 WHERE s.email = ?
                 LIMIT 1
             ");
@@ -1155,7 +1184,18 @@ class StudentsApi
                     COALESCE(rf.registration_status, 'Pending') AS registration_status
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+                LEFT JOIN (
+                    SELECT
+                        rp.student_id,
+                        1000.00 AS registration_fee_amount,
+                        COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
+                        CASE
+                            WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
+                            ELSE 'Pending'
+                        END AS registration_status
+                    FROM tbl_registration_payments rp
+                    GROUP BY rp.student_id
+                ) rf ON rf.student_id = s.student_id
                 WHERE s.email = ?
                 LIMIT 1
             ");
@@ -1428,7 +1468,18 @@ class StudentsApi
                     s.status,
                     COALESCE(rf.registration_status, 'Pending') AS registration_status
                 FROM tbl_students s
-                LEFT JOIN tbl_student_registration_fees rf ON rf.student_id = s.student_id
+                LEFT JOIN (
+                    SELECT
+                        rp.student_id,
+                        1000.00 AS registration_fee_amount,
+                        COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
+                        CASE
+                            WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
+                            ELSE 'Pending'
+                        END AS registration_status
+                    FROM tbl_registration_payments rp
+                    GROUP BY rp.student_id
+                ) rf ON rf.student_id = s.student_id
                 WHERE s.student_id = ?
                 LIMIT 1
             ");
@@ -2046,23 +2097,8 @@ class StudentsApi
 
     private function ensureStudentRegistrationFeesTable()
     {
-        try {
-            $this->conn->exec("
-                CREATE TABLE IF NOT EXISTS tbl_student_registration_fees (
-                    registration_id INT AUTO_INCREMENT PRIMARY KEY,
-                    student_id INT NOT NULL,
-                    registration_fee_amount DECIMAL(10,2) NOT NULL DEFAULT 1000.00,
-                    registration_fee_paid DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-                    registration_status ENUM('Pending','Fee Paid','Approved','Rejected') NOT NULL DEFAULT 'Pending',
-                    notes TEXT NULL,
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    UNIQUE KEY unique_registration_fee_student (student_id)
-                )
-            ");
-        } catch (PDOException $e) {
-            // Keep API working without hard-failing
-        }
+        // Registration fee state now comes from tbl_registration_payments.
+        return;
     }
 }
 
