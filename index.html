@@ -86,26 +86,26 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
     </nav>
 
     <!-- Header: Minimalist Split Tone -->
-  <header id="home"class="relative h-screen flex items-center justify-start pl-16 pt-25 bg-white dark:bg-obsidian">
+  <header id="home" class="relative min-h-screen flex items-center justify-start px-6 sm:px-8 md:px-12 lg:px-16 pt-24 md:pt-28 bg-white dark:bg-obsidian">
         <!-- Background Image with White Wash -->
         <div class="absolute inset-0 bg-[url('assets/piano_bg.avif')] bg-cover bg-center opacity-45 dark:opacity-10"></div>
 
         <!-- Minimal Gradient Overlay for Text Readability -->
         <div class="absolute inset-0 bg-gradient-to-r from-white via-white/95 to-transparent dark:from-obsidian dark:via-obsidian/95 dark:to-transparent"></div>
 
-        <div class="relative z-10 text-left px-6 md:px-12 max-w-3xl">
+        <div class="relative z-10 text-left max-w-3xl">
             <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold mb-4 block">Welcome to the Academy</span>
-            <h1 class="text-5xl md:text-7xl font-serif mb-6 text-zinc-900 dark:text-white leading-tight">
+            <h1 class="text-4xl sm:text-5xl md:text-7xl font-serif mb-6 text-zinc-900 dark:text-white leading-tight">
                 The Legacy <br>of <span class="italic text-gold-500">Sound</span>
             </h1>
-            <p class="text-zinc-600 dark:text-zinc-400 max-w-xl mb-10 text-lg leading-relaxed">
+            <p class="text-zinc-600 dark:text-zinc-400 max-w-xl mb-8 md:mb-10 text-base sm:text-lg leading-relaxed">
                 Empowering families through music. Join a tradition of excellence, mentorship, and artistic mastery.
             </p>
-            <div class="flex gap-4">
-                <button onclick="toggleLoginModal(true)" class="border-2 border-zinc-900 dark:border-white text-zinc-900 dark:text-white hover:bg-zinc-900 hover:text-white dark:hover:bg-white dark:hover:text-black font-bold px-8 py-4 transition uppercase tracking-widest text-xs">
+            <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <button onclick="toggleLoginModal(true)" class="w-full sm:w-auto border-2 border-zinc-900 dark:border-white text-zinc-900 dark:text-white hover:bg-zinc-900 hover:text-white dark:hover:bg-white dark:hover:text-black font-bold px-6 sm:px-8 py-3.5 sm:py-4 transition uppercase tracking-widest text-xs">
                     Student Login
                 </button>
-                <button onclick="toggleRegisterModal(true)" class="bg-gold-500 text-white hover:bg-gold-600 font-bold px-12 py-4 transition uppercase tracking-widest text-xs shadow-lg shadow-gold-500/20">
+                <button onclick="toggleRegisterModal(true)" class="w-full sm:w-auto bg-gold-500 text-white hover:bg-gold-600 font-bold px-8 sm:px-12 py-3.5 sm:py-4 transition uppercase tracking-widest text-xs shadow-lg shadow-gold-500/20">
                     Register Now
                 </button>
             </div>
@@ -113,17 +113,17 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
     </header>
 
     <!-- About Section: Clean White Space -->
-    <section id="about" class="py-32 px-8 max-w-7xl mx-auto bg-zinc-50 dark:bg-obsidian">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
-            <div class="relative">
+    <section id="about" class="py-20 md:py-28 px-6 md:px-8 max-w-7xl mx-auto bg-white dark:bg-obsidian">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 lg:gap-20 items-center">
+            <div class="relative scroll-animate">
                 <!-- Minimal Frame Accent -->
-                <div class="absolute -top-6 -left-6 w-full h-full border-2 border-gold-400 rounded-sm z-0"></div>
+                <div class="hidden sm:block absolute -top-6 -left-6 w-full h-full border-2 border-gold-400 rounded-sm z-0"></div>
                 <img src="https://images.unsplash.com/photo-1514119412350-e174d90d280e?q=80&w=1000" alt="About Music"
-                class="rounded-sm shadow-2xl relative z-10 w-full object-cover h-[500px] brightness-90 hover:brightness-100 transition duration-700">
+                class="rounded-sm shadow-2xl relative z-10 w-full object-cover h-[320px] sm:h-[420px] md:h-[500px] brightness-90 hover:brightness-100 transition duration-700">
             </div>
-            <div>
+            <div class="scroll-animate">
                 <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold mb-2 block">Est. 2004</span>
-                <h2 class="text-4xl md:text-5xl font-serif text-zinc-900 text-white mb-8">
+                <h2 class="text-3xl sm:text-4xl md:text-5xl font-serif text-zinc-900 dark:text-white mb-6 md:mb-8">
                     Our Heritage
                 </h2>
                 <p class="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed text-lg">
@@ -142,8 +142,8 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
     </section>
 
     <!-- Footer: High Contrast -->
-    <footer class="bg-zinc-900 text-white pt-20 pb-8 px-8">
-        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+    <footer class="bg-zinc-900 text-white pt-16 md:pt-20 pb-8 px-6 md:px-8">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-12 mb-12">
             <div class="col-span-1 md:col-span-1">
                 <div class="text-gold-400 font-serif font-bold text-2xl mb-4 tracking-wide">FATHER & SONS</div>
                 <p class="text-zinc-500 text-sm leading-relaxed">Cultivating talent, building legacy, and creating harmony since 2004.</p>
@@ -180,7 +180,7 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
 
     <!-- Login Modal: Clean Minimal Card -->
     <div id="loginModal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/20 backdrop-blur-sm dark:bg-black/80">
-        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl w-full max-w-md p-6 sm:p-8 relative">
             <button onclick="toggleLoginModal(false)" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
@@ -235,7 +235,7 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
 
     <!-- Registration Modal: Clean Light UI -->
     <div id="registerModal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/20 backdrop-blur-sm dark:bg-black/80 overflow-y-auto">
-        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl w-full max-w-4xl p-8 relative my-8">
+        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl w-full max-w-4xl p-5 sm:p-8 relative my-4 sm:my-8">
             <button onclick="toggleRegisterModal(false)" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white z-10">
                 <i class="fas fa-times text-xl"></i>
             </button>
@@ -486,7 +486,7 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
 
     <!-- Theme Toggle Button: Minimal White/Black -->
     <button id="themeToggle"
-        class="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-white border border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 text-zinc-900 dark:text-gold-400 shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group"
+        class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-12 h-12 rounded-full bg-white border border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 text-zinc-900 dark:text-gold-400 shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group"
         aria-label="Toggle theme">
         <div class="relative w-5 h-5">
             <i id="sunIcon" class="fas fa-sun absolute inset-0 transition-opacity duration-300 text-gold-500"></i>

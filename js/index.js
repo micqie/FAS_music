@@ -39,6 +39,7 @@ let baseApiUrl;
 
 let currentStudentId = null;
 let currentRegistration = null;
+let pendingRequestsById = {};
 
 // Authentication Utility (integrated) - with storage access protection
 const Auth = {
@@ -93,29 +94,19 @@ const Auth = {
 
 // Helper functions for API requests
 async function apiGet(endpoint) {
-    if (typeof axios !== 'undefined') {
-        const res = await axios.get(`/${endpoint}`);
-        return res.data;
+    if (typeof axios === 'undefined') {
+        throw new Error('Axios is required for API requests.');
     }
-    const res = await fetch(`${baseApiUrl}/${endpoint}`, {
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-    });
-    return res.json();
+    const res = await axios.get(`/${endpoint}`);
+    return res.data;
 }
 
 async function apiPost(endpoint, data) {
-    if (typeof axios !== 'undefined') {
-        const res = await axios.post(`/${endpoint}`, data);
-        return res.data;
+    if (typeof axios === 'undefined') {
+        throw new Error('Axios is required for API requests.');
     }
-    const res = await fetch(`${baseApiUrl}/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data)
-    });
-    return res.json();
+    const res = await axios.post(`/${endpoint}`, data);
+    return res.data;
 }
 
 // ========== INDEX.HTML FUNCTIONS ==========
@@ -315,15 +306,8 @@ function initLoginForm() {
         }
 
         try {
-            const response = await fetch(`${baseApiUrl}/users.php?action=login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-
-            const data = await response.json();
+            const response = await axios.post(`${baseApiUrl}/users.php?action=login`, { username, password });
+            const data = response.data;
 
             if (data.success && data.user) {
                 // If student is using default password, force change on first login
@@ -371,6 +355,8 @@ function initLoginForm() {
                 setTimeout(() => {
                     if (data.user.role_name === 'Admin' || data.user.role_name === 'SuperAdmin') {
                         window.location.href = 'pages/admin/admin_dashboard.html';
+                    } else if (data.user.role_name === 'Staff') {
+                        window.location.href = 'pages/desk/desk_scanner.html';
                     } else if (data.user.role_name === 'Student') {
                         window.location.href = 'pages/student/student_dashboard.html';
                     } else {
@@ -526,15 +512,14 @@ function initRegisterForm() {
         }
 
         try {
-            const response = await fetch(`${baseApiUrl}/users.php?action=register`, {
-                method: 'POST',
-                body: formData
+            const response = await axios.post(`${baseApiUrl}/users.php?action=register`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            const responseText = await response.text();
+            const responseText = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
             let result;
             try {
-                result = JSON.parse(responseText);
+                result = typeof response.data === 'string' ? JSON.parse(responseText) : response.data;
             } catch (parseErr) {
                 console.error('Registration 400 - Response was not JSON:', responseText);
                 showRegisterMessage('Registration failed. The server returned an invalid response. Check the browser console (F12) for details.', 'error');
@@ -603,8 +588,8 @@ async function loadSessionPackages() {
     if (!select) return;
 
     try {
-        const response = await fetch(`${baseApiUrl}/sessions.php?action=get-packages`);
-        const data = await response.json();
+        const response = await axios.get(`${baseApiUrl}/sessions.php?action=get-packages`);
+        const data = response.data;
 
         if (data.success && data.packages) {
             sessionPackages = data.packages;
@@ -644,8 +629,8 @@ async function loadInstrumentsForRegistration(branchId) {
     }
 
     try {
-        const response = await fetch(`${baseApiUrl}/instruments.php?action=get-instruments&branch_id=${branchId}`);
-        const data = await response.json();
+        const response = await axios.get(`${baseApiUrl}/instruments.php?action=get-instruments&branch_id=${branchId}`);
+        const data = response.data;
 
         if (data.success && data.instruments) {
             availableInstruments = data.instruments;
@@ -1030,8 +1015,8 @@ async function loadBranches() {
     if (!branchSelect) return;
 
     try {
-        const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
-        const data = await response.json();
+        const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
+        const data = response.data;
 
         if (data.success && data.branches) {
             // Clear existing options
@@ -1054,22 +1039,174 @@ async function loadBranches() {
     }
 }
 
+// Load pending package/enrollment requests (used by admin enrollments/sessions views)
+async function loadPendingRequests() {
+    const tableBody = document.getElementById('pendingRequestsTable');
+    const countEl = document.getElementById('pendingRequestCount');
+    if (!tableBody) return;
+
+    try {
+        const branchFilter = document.getElementById('branchFilter');
+        let url = `${baseApiUrl}/students.php?action=get-pending-package-requests`;
+        if (branchFilter && branchFilter.value) {
+            url += `&branch_id=${branchFilter.value}`;
+        }
+
+        const response = await axios.get(url);
+        const data = response.data;
+        const requests = data.success && Array.isArray(data.requests) ? data.requests : [];
+
+        if (countEl) countEl.textContent = `${requests.length} pending`;
+
+        if (!requests.length) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                        <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
+                        <p>No pending student requests.</p>
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        pendingRequestsById = {};
+        tableBody.innerHTML = requests.map(r => {
+            pendingRequestsById[String(r.request_id)] = r;
+            const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
+            const pkg = escapeHtml(r.package_name || '—');
+            const instruments = Array.isArray(r.instruments) && r.instruments.length
+                ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
+                : '—';
+            const schedule = r.preferred_day_of_week
+                ? `${escapeHtml(r.preferred_day_of_week)}`
+                : '—';
+            const prefDate = r.preferred_date ? new Date(r.preferred_date).toLocaleDateString() : '—';
+            const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
+            const paymentProofHtml = r.payment_proof_path
+                ? `<a href="${escapeHtml(buildPublicFileUrl(r.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">View payment proof</a>`
+                : '<span class="text-xs text-slate-500">No payment proof</span>';
+            return `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="px-6 py-4">
+                        <div class="font-medium text-slate-900">${studentName || 'Student'}</div>
+                        <div class="text-sm text-slate-500">${escapeHtml(r.email || '')}</div>
+                        <div class="text-xs text-slate-400">${escapeHtml(r.branch_name || '')}</div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-700">${pkg}</td>
+                    <td class="px-6 py-4 text-sm text-slate-700">${instruments}</td>
+                    <td class="px-6 py-4 text-sm text-slate-700">
+                        <div>${schedule}</div>
+                        <div class="text-xs text-slate-500 mt-1">Date: ${prefDate}</div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-700">
+                        <div class="font-semibold text-slate-800">${paymentType}</div>
+                        <div class="text-xs text-slate-500 mt-1">${formatCurrencyPHP(r.requested_amount || 0)}</div>
+                        <div class="mt-1">${paymentProofHtml}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <button onclick="(window.onPendingRequestAssignClick || openAssignRequestModal)(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-xs font-bold">
+                                ${window.pendingRequestActionLabel || 'Assign & Approve'}
+                            </button>
+                            <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold">
+                                Reject
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+        }).join('');
+    } catch (error) {
+        console.error('Failed to load pending package requests:', error);
+        if (countEl) countEl.textContent = 'Error';
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="px-6 py-8 text-center text-red-500">
+                    <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                    <p>Failed to load pending requests.</p>
+                </td>
+            </tr>`;
+    }
+}
+
+async function rejectStudentRequest(requestId) {
+    if (!requestId) return;
+    const input = await Swal.fire({
+        icon: 'warning',
+        title: 'Reject request?',
+        text: 'You can add an optional reason for the student.',
+        input: 'text',
+        inputPlaceholder: 'Reason (optional)',
+        showCancelButton: true,
+        confirmButtonText: 'Reject',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#dc2626'
+    });
+    if (!input.isConfirmed) return;
+
+    try {
+        const response = await axios.post(`${baseApiUrl}/students.php`, {
+            action: 'reject-package-request',
+            request_id: Number(requestId),
+            admin_notes: input.value || ''
+        });
+        const data = response.data;
+        if (data.success) {
+            showMessage(data.message || 'Request rejected.', 'success');
+            loadPendingRequests();
+        } else {
+            showMessage(data.error || 'Failed to reject request.', 'error');
+        }
+    } catch (error) {
+        showMessage('Network error while rejecting request.', 'error');
+    }
+}
+
 // Initialize index.html functions
 function initIndexPage() {
     initLoginForm();
     initRegisterForm();
     initDatePicker();
     loadBranches();
+    initScrollAnimations();
 }
 
-// Prompt student to change password on first login (when using default "123")
+// Initialize scroll animations for About section
+function initScrollAnimations() {
+    const animateElements = document.querySelectorAll('.scroll-animate');
+    
+    if (animateElements.length === 0) return;
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // Add staggered animation for multiple elements
+                const elements = Array.from(entry.target.parentElement?.querySelectorAll('.scroll-animate') || [entry.target]);
+                elements.forEach((el, index) => {
+                    setTimeout(() => {
+                        el.classList.add('visible');
+                    }, index * 150); // 150ms delay between each element
+                });
+                
+                // Stop observing once animated
+                observer.unobserve(entry.target);
+            }
+        });
+    }, {
+        threshold: 0.3, // Trigger when 30% of element is visible
+        rootMargin: '0px 0px -50px 0px' // Trigger slightly before element comes into full view
+    });
+
+    animateElements.forEach(el => observer.observe(el));
+}
+
+// Prompt student to change password on first login (when using default "fasmusic2020")
 async function promptPasswordChange(user, currentPassword) {
     try {
         const { value: formValues } = await Swal.fire({
             title: 'Change Your Password',
             html:
                 '<div class="text-left text-sm mb-3">' +
-                    '<p class="mb-1">For security, please change your default password <strong>123</strong>.</p>' +
+                    '<p class="mb-1">For security, please change your default password <strong>fasmusic2020</strong>.</p>' +
                     '<ul class="list-disc list-inside text-xs text-zinc-300">' +
                         '<li>At least 8 characters</li>' +
                         '<li>Include uppercase, lowercase, number and special character (!@#$%^&*)</li>' +
@@ -1108,17 +1245,13 @@ async function promptPasswordChange(user, currentPassword) {
             return;
         }
 
-        const response = await fetch(`${baseApiUrl}/users.php?action=change-password`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: user.user_id,
-                old_password: currentPassword,
-                new_password: formValues.newPassword
-            })
+        const response = await axios.post(`${baseApiUrl}/users.php?action=change-password`, {
+            user_id: user.user_id,
+            old_password: currentPassword,
+            new_password: formValues.newPassword
         });
 
-        const result = await response.json();
+        const result = response.data;
 
         if (!result.success) {
             await Swal.fire({
@@ -1192,20 +1325,20 @@ function checkStudentAuth() {
 
 async function fetchStudentPortalDataByEmail(email) {
     const url = `${baseApiUrl}/students.php?action=get-student-portal&email=${encodeURIComponent(email)}`;
-    const res = await fetch(url);
-    return res.json();
+    const res = await axios.get(url);
+    return res.data;
 }
 
 async function fetchAttendanceSummary(studentId) {
     const url = `${baseApiUrl}/attendance.php?action=get-summary&student_id=${encodeURIComponent(studentId)}`;
-    const res = await fetch(url);
-    return res.json();
+    const res = await axios.get(url);
+    return res.data;
 }
 
 async function fetchAttendanceList(studentId, limit = 50) {
     const url = `${baseApiUrl}/attendance.php?action=get-student-attendance&student_id=${encodeURIComponent(studentId)}&limit=${encodeURIComponent(limit)}`;
-    const res = await fetch(url);
-    return res.json();
+    const res = await axios.get(url);
+    return res.data;
 }
 
 function formatCurrencyPHP(amount) {
@@ -1605,18 +1738,18 @@ function onStudentRequestInstrumentDropdownChange() {
 
 async function fetchStudentRequestMetaByEmail(email) {
     const url = `${baseApiUrl}/students.php?action=get-student-request-meta&email=${encodeURIComponent(email)}`;
-    const res = await fetch(url);
-    return res.json();
+    const res = await axios.get(url);
+    return res.data;
 }
 
 async function postStudentPackageRequest(payload) {
     const isFormData = (typeof FormData !== 'undefined') && (payload instanceof FormData);
-    const res = await fetch(`${baseApiUrl}/students.php`, {
-        method: 'POST',
-        headers: isFormData ? undefined : { 'Content-Type': 'application/json' },
-        body: isFormData ? payload : JSON.stringify(payload)
-    });
-    return res.json();
+    const res = await axios.post(
+        `${baseApiUrl}/students.php`,
+        isFormData ? payload : payload,
+        isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+    );
+    return res.data;
 }
 
 function initStudentRequestSection(student, requestMeta) {
@@ -1982,12 +2115,8 @@ async function initStudentProfilePage() {
         };
 
         try {
-            const res = await fetch(`${baseApiUrl}/students.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
+            const res = await axios.post(`${baseApiUrl}/students.php`, payload);
+            const data = res.data;
             if (data.success) {
                 showMessage('Profile updated successfully.', 'success');
             } else {
@@ -2011,8 +2140,8 @@ async function loadWalkinBranches() {
     if (!branchSelect) return;
 
     try {
-        const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
-        const data = await response.json();
+        const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
+        const data = response.data;
 
         if (data.success && data.branches) {
             branchSelect.innerHTML = '<option value=\"\">Select Branch</option>';
@@ -2042,8 +2171,8 @@ async function loadWalkinSessionPackages() {
     if (!select) return;
 
     try {
-        const response = await fetch(`${baseApiUrl}/sessions.php?action=get-packages`);
-        const data = await response.json();
+        const response = await axios.get(`${baseApiUrl}/sessions.php?action=get-packages`);
+        const data = response.data;
 
         if (data.success && data.packages) {
             walkinSessionPackages = data.packages;
@@ -2085,8 +2214,8 @@ async function loadWalkinInstruments(branchId) {
     }
 
     try {
-        const response = await fetch(`${baseApiUrl}/instruments.php?action=get-instruments&branch_id=${branchId}`);
-        const data = await response.json();
+        const response = await axios.get(`${baseApiUrl}/instruments.php?action=get-instruments&branch_id=${branchId}`);
+        const data = response.data;
 
         if (data.success && data.instruments) {
             walkinAvailableInstruments = data.instruments;
@@ -2352,6 +2481,53 @@ function updateWalkinAgeAndGuardianRequired() {
     });
 }
 
+let walkinPackages = [];
+
+async function loadWalkinPackages(branchId = 0) {
+    const select = document.getElementById('walkinSessionPackageId');
+    if (!select) return;
+
+    try {
+        let url = `${baseApiUrl}/sessions.php?action=get-packages`;
+        if (branchId) {
+            url += `&branch_id=${branchId}`;
+        }
+        const response = await axios.get(url);
+        const data = response.data;
+        const packages = data.success && Array.isArray(data.packages) ? data.packages : [];
+        walkinPackages = packages;
+
+        select.innerHTML = '<option value="">Select package</option>' + packages.map(pkg => {
+            return `<option value="${pkg.package_id}">${pkg.package_name} (${pkg.sessions} sessions)</option>`;
+        }).join('');
+    } catch (error) {
+        console.error('Failed to load packages for walk-in registration:', error);
+        if (select) {
+            select.innerHTML = '<option value="">Unable to load packages</option>';
+        }
+    }
+}
+
+function updateWalkinPackageDetails() {
+    const select = document.getElementById('walkinSessionPackageId');
+    const details = document.getElementById('walkinPackageDetails');
+    if (!select || !details) return;
+
+    const pkgId = select.value;
+    const pkg = walkinPackages.find(p => String(p.package_id) === String(pkgId));
+    if (!pkg) {
+        details.textContent = 'Select a package to view details.';
+        return;
+    }
+
+    details.innerHTML = `
+        <div class="text-sm font-semibold text-white">${pkg.package_name}</div>
+        <div class="mt-1 text-xs text-zinc-300">${pkg.sessions} sessions</div>
+        <div class="mt-1 text-xs text-zinc-300">${pkg.description ? pkg.description : ''}</div>
+        <div class="mt-2 text-xs text-gold-200">Amount: ₱${Number(pkg.price || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+    `;
+}
+
 // Initialize walk-in admin page (used on admin_registration.html)
 function initWalkinPage() {
     const form = document.getElementById('walkinForm');
@@ -2396,26 +2572,19 @@ function initWalkinPage() {
             data[key] = value;
         }
 
-        // Initial registration is fixed at 1,000 and package is selected later.
-        data['registration_fee_amount'] = 1000;
+        // Registration fee & package selection are provided by the form.
 
         // mark as walk-in so backend uses simple default password
         data['is_walkin'] = true;
         data['registration_source'] = 'admin';
 
         try {
-            const response = await fetch(`${baseApiUrl}/users.php?action=register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
+            const response = await axios.post(`${baseApiUrl}/users.php?action=register`, data);
 
-            const responseText = await response.text();
+            const responseText = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
             let result;
             try {
-                result = JSON.parse(responseText);
+                result = typeof response.data === 'string' ? JSON.parse(responseText) : response.data;
             } catch (parseErr) {
                 console.error('Walk-in registration 400 - Response was not JSON:', responseText);
                 showMessage('Registration failed. The server returned an invalid response. Check the browser console (F12) for details.', 'error');
@@ -2423,14 +2592,24 @@ function initWalkinPage() {
             }
 
             if (result.success) {
+                const selectedPackageId = data['session_package_id'];
+                const selectedPackage = walkinPackages.find(p => String(p.package_id) === String(selectedPackageId));
+                const packageLabel = selectedPackage ? `\n                           <strong>Package:</strong> ${escapeHtml(selectedPackage.package_name)}<br>` : '';
+                const paymentMethodLabel = data['registration_payment_method'] ? `\n                           <strong>Payment Method:</strong> ${escapeHtml(data['registration_payment_method'])}<br>` : '';
+                const paymentAmountLabel = data['registration_fee_amount'] ? `\n                           <strong>Paid Amount:</strong> ₱${Number(data['registration_fee_amount']).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<br>` : '';
+
+                const assignUrl = `admin_sessions.html?view=active&assign_student_id=${encodeURIComponent(result.student_id)}&assign_student_name=${encodeURIComponent(result.username || data['student_email'])}&assign_package_id=${encodeURIComponent(data['session_package_id'] || '')}`;
+
                 Swal.fire({
                     icon: 'success',
                     title: 'Student Registered',
                     html: `Student has been registered and can log in immediately.<br><br>
-                           <strong>Username:</strong> ${result.username || data['student_email']}<br>
-                           <strong>Default Password:</strong> 123<br><br>
+                           <strong>Username:</strong> ${result.username || data['student_email']}<br>${packageLabel}${paymentMethodLabel}${paymentAmountLabel}<br>
+                           <strong>Default Password:</strong> fasmusic2020<br><br>
                            On first login, they will be required to change this to a strong password.`,
                     confirmButtonColor: '#b8860b'
+                }).then(() => {
+                    window.location.href = assignUrl;
                 });
 
                 // Reset form and hide modal if present

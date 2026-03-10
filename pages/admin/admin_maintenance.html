@@ -93,22 +93,21 @@
                     </details>
                     <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-clipboard-list mr-3"></i> Enrollments</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a href="admin_enrollments.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Enrollments</a>
-                            <a href="admin_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Enrollments</a>
-                        </div>
-                    </details>
-                    <details class="group/dropdown">
-                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
                             <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
                         </summary>
                         <div class="mt-2 space-y-1">
                             <a href="admin_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
                             <a href="admin_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
+                        </div>
+                    </details>                    <details class="group/dropdown">
+                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
+                            <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
+                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
+                        </summary>
+                        <div class="mt-2 space-y-1">
+                            <a href="admin_enrollments.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Enrollments</a>
+                            <a href="admin_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Enrollments</a>
                         </div>
                     </details>
                 </nav>
@@ -235,7 +234,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/mode.js"></script>
-    <script src="../../js/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="../../js/index.js"></script>
     <script>
         let allInstruments = [];
         let filteredInstruments = [];
@@ -270,8 +270,8 @@
             const branchFilter = document.getElementById('branchFilter');
             if (!branchFilter) return;
             try {
-                const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
-                const data = await response.json();
+                const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
+                const data = response.data;
                 if (data.success && Array.isArray(data.branches)) {
                     allBranches = data.branches;
                     const options = allBranches.map(b => `<option value="${b.branch_id}">${escapeHtml(b.branch_name)}</option>`).join('');
@@ -286,8 +286,8 @@
             const table = document.getElementById('maintenanceTable');
             if (!table) return;
             try {
-                const response = await fetch(`${baseApiUrl}/instruments.php?action=get-instruments`);
-                const data = await response.json();
+                const response = await axios.get(`${baseApiUrl}/instruments.php?action=get-instruments`);
+                const data = response.data;
                 allInstruments = data.success && Array.isArray(data.instruments) ? data.instruments : [];
                 applyFilters();
             } catch (error) {
@@ -384,12 +384,8 @@
                 instrument_id: Number(instrumentId),
                 status: String(status || 'Available')
             };
-            const response = await fetch(`${baseApiUrl}/instruments.php?action=update-instrument`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            return response.json();
+            const response = await axios.post(`${baseApiUrl}/instruments.php?action=update-instrument`, payload);
+            return response.data;
         }
 
         async function quickSetRepair(instrumentId) {
@@ -452,3 +448,5 @@
     </script>
 </body>
 </html>
+
+

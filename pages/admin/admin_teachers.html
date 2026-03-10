@@ -91,22 +91,21 @@
                     </details>
                     <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-clipboard-list mr-3"></i> Enrollments</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a href="admin_enrollments.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Enrollments</a>
-                            <a href="admin_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Enrollments</a>
-                        </div>
-                    </details>
-                    <details class="group/dropdown">
-                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
                             <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
                         </summary>
                         <div class="mt-2 space-y-1">
                             <a href="admin_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
                             <a href="admin_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
+                        </div>
+                    </details>                    <details class="group/dropdown">
+                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
+                            <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
+                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
+                        </summary>
+                        <div class="mt-2 space-y-1">
+                            <a href="admin_enrollments.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Enrollments</a>
+                            <a href="admin_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Enrollments</a>
                         </div>
                     </details>
                 </nav>
@@ -260,7 +259,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/mode.js"></script>
-    <script src="../../js/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="../../js/index.js"></script>
     <script>
         let allTeachers = [];
         let filteredTeachers = [];
@@ -289,8 +289,8 @@
         }
 
         async function loadBranches() {
-            const res = await fetch(`${baseApiUrl}/branch.php?action=get-branches-all`);
-            const data = await res.json();
+            const res = await axios.get(`${baseApiUrl}/branch.php?action=get-branches-all`);
+            const data = res.data;
             allBranches = (data.success && Array.isArray(data.branches)) ? data.branches : [];
             const filter = document.getElementById('branchFilter');
             const formSel = document.getElementById('branchId');
@@ -303,8 +303,8 @@
         }
 
         async function loadSpecializations(selectedId = '') {
-            const res = await fetch(`${baseApiUrl}/teachers.php?action=get-specializations`);
-            const data = await res.json();
+            const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-specializations`);
+            const data = res.data;
             allSpecializations = (data.success && Array.isArray(data.specializations)) ? data.specializations : [];
             const sel = document.getElementById('specializationIds');
             if (!sel) return;
@@ -334,8 +334,8 @@
         }
 
         async function loadTeachers() {
-            const res = await fetch(`${baseApiUrl}/teachers.php?action=get-teachers`);
-            const data = await res.json();
+            const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-teachers`);
+            const data = res.data;
             allTeachers = (data.success && Array.isArray(data.teachers)) ? data.teachers : [];
             applyFilters();
         }
@@ -439,12 +439,8 @@
                 status: document.getElementById('status').value
             };
             const endpoint = teacherId > 0 ? 'update-teacher' : 'add-teacher';
-            const res = await fetch(`${baseApiUrl}/teachers.php?action=${endpoint}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
+            const res = await axios.post(`${baseApiUrl}/teachers.php?action=${endpoint}`, payload);
+            const data = res.data;
             if (!data.success) {
                 showMessage(data.error || 'Failed to save teacher', 'error');
                 return;
@@ -470,16 +466,12 @@
             });
             if (!result.isConfirmed) return;
 
-            const res = await fetch(`${baseApiUrl}/teachers.php?action=add-specialization`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'add-specialization',
-                    specialization_name: String(result.value || '').trim(),
-                    status: 'Active'
-                })
+            const res = await axios.post(`${baseApiUrl}/teachers.php?action=add-specialization`, {
+                action: 'add-specialization',
+                specialization_name: String(result.value || '').trim(),
+                status: 'Active'
             });
-            const data = await res.json();
+            const data = res.data;
             if (!data.success) {
                 showMessage(data.error || 'Failed to add specialization', 'error');
                 return;
@@ -490,12 +482,12 @@
         }
 
         async function toggleTeacherStatus(teacherId, nextStatus) {
-            const res = await fetch(`${baseApiUrl}/teachers.php?action=set-teacher-status`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'set-teacher-status', teacher_id: Number(teacherId), status: nextStatus })
+            const res = await axios.post(`${baseApiUrl}/teachers.php?action=set-teacher-status`, {
+                action: 'set-teacher-status',
+                teacher_id: Number(teacherId),
+                status: nextStatus
             });
-            const data = await res.json();
+            const data = res.data;
             if (!data.success) {
                 showMessage(data.error || 'Failed to update status', 'error');
                 return;
@@ -527,3 +519,5 @@
     </script>
 </body>
 </html>
+
+

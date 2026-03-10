@@ -18,20 +18,18 @@ let currentRegistration = null;
 
 // Helper functions for API requests
 async function apiGet(endpoint) {
-    const res = await fetch(`${baseApiUrl}/${endpoint}`, {
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-    });
-    return res.json();
+    if (typeof axios === 'undefined') {
+        throw new Error('Axios is required for API requests.');
+    }
+    const res = await axios.get(`/${endpoint}`);
+    return res.data;
 }
 async function apiPost(endpoint, data) {
-    const res = await fetch(`${baseApiUrl}/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data)
-    });
-    return res.json();
+    if (typeof axios === 'undefined') {
+        throw new Error('Axios is required for API requests.');
+    }
+    const res = await axios.post(`/${endpoint}`, data);
+    return res.data;
 }
 
 // Check authentication

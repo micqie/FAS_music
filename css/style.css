@@ -12,9 +12,25 @@ h1, h2, h3, .font-serif {
     font-family: 'Playfair Display', serif;
 }
 
-/* Background gradient for specific sections */
-#about {
-    background: radial-gradient(circle at top right, #121212, #0a0a0a);
+/* Scroll Animation for About Section */
+#about .scroll-animate {
+    opacity: 0;
+    transform: translateY(30px);
+}
+
+#about .scroll-animate.visible {
+    animation: scrollFadeInUp 0.8s ease forwards;
+}
+
+@keyframes scrollFadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Gold Button Hover Glow */

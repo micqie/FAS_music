@@ -188,11 +188,11 @@ class User
                 $this->sendJSON(['error' => 'Your account is pending admin approval. Please wait for approval before logging in.'], 403);
             }
 
-            // Detect default password "123" for students (first-login change requirement)
+            // Detect default password "fasmusic2020" for students (first-login change requirement)
             $mustChangePassword = false;
             if (
                 $user['role_name'] === 'Student'
-                && (password_verify('123', $storedPassword) || hash_equals($storedPassword, '123'))
+                && (password_verify('fasmusic2020', $storedPassword) || hash_equals($storedPassword, 'fasmusic2020'))
             ) {
                 $mustChangePassword = true;
             }
@@ -386,10 +386,10 @@ class User
         }
 
         // Determine password:
-        // - Admin-added (walk-in): default simple password "123" (no strict validation)
+        // - Admin-added (walk-in): default simple password "fasmusic2020" (no strict validation)
         // - Self-registration: strong password policy
         if ($isAdminRegistration) {
-            $password = '123';
+            $password = 'fasmusic2020';
         } else {
             if (empty($data['password'])) {
                 $this->sendJSON(['error' => 'Password is required'], 400);
@@ -486,14 +486,16 @@ class User
 
             $registrationNotes = $registrationProofPath ? ('Payment proof: ' . $registrationProofPath) : null;
             if ($isAdminRegistration) {
+                $paymentMethod = trim((string)($data['registration_payment_method'] ?? '')) ?: 'Other';
                 $stmtRegPayment = $this->conn->prepare("
                     INSERT INTO tbl_registration_payments (
                         student_id, payment_date, amount, payment_method, status, receipt_number
-                    ) VALUES (?, CURRENT_DATE, ?, 'Other', 'Paid', ?)
+                    ) VALUES (?, CURRENT_DATE, ?, ?, 'Paid', ?)
                 ");
                 $stmtRegPayment->execute([
                     $studentId,
                     (float)$data['registration_fee_amount'],
+                    $paymentMethod,
                     'REG-AUTO-' . time()
                 ]);
             } elseif ($registrationNotes) {

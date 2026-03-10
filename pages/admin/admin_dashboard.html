@@ -97,22 +97,21 @@
                     </details>
                     <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-clipboard-list mr-3"></i> Enrollments</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a href="admin_enrollments.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Enrollments</a>
-                            <a href="admin_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Enrollments</a>
-                        </div>
-                    </details>
-                    <details class="group/dropdown">
-                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
                             <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
                         </summary>
                         <div class="mt-2 space-y-1">
                             <a href="admin_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
                             <a href="admin_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
+                        </div>
+                    </details>                    <details class="group/dropdown">
+                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
+                            <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
+                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
+                        </summary>
+                        <div class="mt-2 space-y-1">
+                            <a href="admin_enrollments.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Enrollments</a>
+                            <a href="admin_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Enrollments</a>
                         </div>
                     </details>
                 </nav>
@@ -355,8 +354,8 @@
             if (!branchesDiv) return;
 
             try {
-                const response = await fetch(`${baseApiUrl}/branch.php?action=get-branches`);
-                const data = await response.json();
+                const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
+                const data = response.data;
 
                 if (data.success && data.branches && data.branches.length > 0) {
                     branchesDiv.innerHTML = data.branches.map(branch => `
@@ -416,3 +415,4 @@
     </script>
 </body>
 </html>
+

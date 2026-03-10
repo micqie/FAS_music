@@ -522,6 +522,73 @@ class StudentsApi
         return date('l', $ts);
     }
 
+    private function resolveRoomIdByName($branchId, $roomName)
+    {
+        $roomName = trim((string)$roomName);
+        if ($roomName === '' || !$this->tableExists('tbl_rooms')) {
+            return null;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT room_id
+                FROM tbl_rooms
+                WHERE branch_id = ?
+                  AND room_name = ?
+                LIMIT 1
+            ");
+            $stmt->execute([(int)$branchId, $roomName]);
+            $roomId = $stmt->fetchColumn();
+            return ($roomId !== false) ? (int)$roomId : null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+
+    private function hasTeacherScheduleConflict($teacherId, $sessionDate, $startTime, $endTime)
+    {
+        if ($teacherId < 1 || !$this->tableExists('tbl_sessions')) {
+            return false;
+        }
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT COUNT(*) AS conflict_count
+                FROM tbl_sessions
+                WHERE teacher_id = ?
+                  AND session_date = ?
+                  AND status NOT IN ('Cancelled', 'No Show')
+                  AND start_time < ?
+                  AND end_time > ?
+            ");
+            $stmt->execute([(int)$teacherId, $sessionDate, $endTime, $startTime]);
+            return ((int)$stmt->fetchColumn()) > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function hasRoomScheduleConflict($roomId, $sessionDate, $startTime, $endTime)
+    {
+        if ($roomId === null || $roomId < 1 || !$this->tableExists('tbl_sessions')) {
+            return false;
+        }
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT COUNT(*) AS conflict_count
+                FROM tbl_sessions
+                WHERE room_id = ?
+                  AND session_date = ?
+                  AND status NOT IN ('Cancelled', 'No Show')
+                  AND start_time < ?
+                  AND end_time > ?
+            ");
+            $stmt->execute([(int)$roomId, $sessionDate, $endTime, $startTime]);
+            return ((int)$stmt->fetchColumn()) > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     /** Check whether a table exists in current DB */
     private function tableExists($tableName)
     {
@@ -1894,6 +1961,24 @@ class StudentsApi
             if ($req['status'] !== 'Pending') {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Only pending requests can be approved'], 400);
+            }
+
+            $resolvedRoomId = null;
+            if ($assignedRoom !== '') {
+                $resolvedRoomId = $this->resolveRoomIdByName((int)$req['branch_id'], $assignedRoom);
+                if ($resolvedRoomId === null) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'Selected room is not available in this branch'], 400);
+                }
+            }
+
+            if ($this->hasTeacherScheduleConflict($teacherId, $assignedDate, $assignedStart, $assignedEnd)) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Selected teacher is not available at this time'], 400);
+            }
+            if ($resolvedRoomId !== null && $this->hasRoomScheduleConflict($resolvedRoomId, $assignedDate, $assignedStart, $assignedEnd)) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Selected room is not available at this time'], 400);
             }
 
             $instrumentIds = [];

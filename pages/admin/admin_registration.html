@@ -94,22 +94,21 @@
                     </details>
                     <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-clipboard-list mr-3"></i> Enrollments</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a href="admin_enrollments.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Enrollments</a>
-                            <a href="admin_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Enrollments</a>
-                        </div>
-                    </details>
-                    <details class="group/dropdown">
-                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
                             <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
                         </summary>
                         <div class="mt-2 space-y-1">
                             <a href="admin_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
                             <a href="admin_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
+                        </div>
+                    </details>                    <details class="group/dropdown">
+                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
+                            <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
+                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
+                        </summary>
+                        <div class="mt-2 space-y-1">
+                            <a href="admin_enrollments.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Enrollments</a>
+                            <a href="admin_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Enrollments</a>
                         </div>
                     </details>
                 </nav>
@@ -285,7 +284,7 @@
             <h3 class="text-2xl font-bold text-white mb-2">Register Student (Admin)</h3>
             <p class="text-zinc-400 text-xs mb-4">
                 This will create a student account using the student's email as username and a
-                <span class="font-mono font-semibold">simple default password</span> (currently <span class="font-mono">123</span>).
+                <span class="font-mono font-semibold">simple default password</span> (currently <span class="font-mono">fasmusic2020</span>).
                 On first login, the student will be <span class="font-semibold text-gold-400">required to change this password</span>
                 to a strong one for security.
             </p>
@@ -410,33 +409,6 @@
                     </div>
                 </div>
 
-                <!-- Package Selection Notice -->
-                <div>
-                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
-                        Package Selection
-                    </h4>
-                    <p class="text-sm text-zinc-300 leading-relaxed">
-                        Package sessions, instruments, and lesson fees are selected by the student after account approval.
-                        Use this form for initial student and guardian registration only.
-                    </p>
-                </div>
-
-                <!-- Registration Fee -->
-                <div class="bg-zinc-900/70 border border-zinc-700 rounded-sm p-6">
-                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest">
-                        Registration Fee
-                    </h4>
-                    <div class="space-y-3 text-sm text-zinc-300">
-                        <div class="flex justify-between">
-                            <span>Registration Fee:</span>
-                            <span class="font-semibold text-white">₱1,000.00</span>
-                        </div>
-                        <p class="text-xs text-zinc-400">
-                            Desk staff verifies this registration payment and approval request.
-                        </p>
-                        <input type="hidden" id="walkin_registration_fee_amount" name="registration_fee_amount" value="1000">
-                    </div>
-                </div>
 
                 <!-- Actions -->
                 <div class="pt-4 flex items-center justify-end gap-3">
@@ -547,3 +519,4 @@
     </script>
 </body>
 </html>
+

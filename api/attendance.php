@@ -185,6 +185,168 @@ class AttendanceApi
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }
+
+    private function parseQrPayload($payload)
+    {
+        $raw = trim((string) $payload);
+        if ($raw === '') return null;
+        $parts = explode('|', $raw);
+        if (count($parts) < 4) return null;
+        if ($parts[0] !== 'FAS_ATTENDANCE' || $parts[1] !== 'STUDENT') return null;
+        $studentId = (int) ($parts[2] ?? 0);
+        $email = trim((string) ($parts[3] ?? ''));
+        if ($studentId < 1 || $email === '') return null;
+        return ['student_id' => $studentId, 'email' => $email];
+    }
+
+    public function scanQr()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $payload = $data['payload'] ?? $data['qr_payload'] ?? '';
+        $parsed = $this->parseQrPayload($payload);
+        if (!$parsed) {
+            $this->sendJSON(['error' => 'Invalid QR payload'], 400);
+        }
+
+        $studentId = (int) $parsed['student_id'];
+        $email = $parsed['email'];
+
+        try {
+            $stmt = $this->conn->prepare("SELECT student_id, first_name, last_name, email FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmt->execute([$studentId]);
+            $student = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$student || strcasecmp(trim($student['email'] ?? ''), $email) !== 0) {
+                $this->sendJSON(['error' => 'Student not found for this QR'], 404);
+            }
+
+            if (!$this->tableExists('tbl_attendance')) {
+                $this->sendJSON(['error' => 'Attendance write endpoint is unavailable on this schema'], 400);
+            }
+
+            $dupStmt = $this->conn->prepare("
+                SELECT attendance_id, attended_at, status
+                FROM tbl_attendance
+                WHERE student_id = ? AND DATE(attended_at) = CURDATE()
+                ORDER BY attended_at DESC, attendance_id DESC
+                LIMIT 1
+            ");
+            $dupStmt->execute([$studentId]);
+            $existing = $dupStmt->fetch(PDO::FETCH_ASSOC);
+            if ($existing) {
+                $this->sendJSON([
+                    'success' => true,
+                    'already_checked_in' => true,
+                    'attendance' => $existing,
+                    'student' => [
+                        'student_id' => (int) $student['student_id'],
+                        'first_name' => $student['first_name'],
+                        'last_name' => $student['last_name'],
+                        'email' => $student['email']
+                    ]
+                ]);
+            }
+
+            $status = 'Present';
+            $source = 'QR';
+            $stmt = $this->conn->prepare("
+                INSERT INTO tbl_attendance (student_id, status, source, notes)
+                VALUES (?, ?, ?, ?)
+            ");
+            $stmt->execute([$studentId, $status, $source, null]);
+
+            $id = (int) $this->conn->lastInsertId();
+            $fetch = $this->conn->prepare("SELECT attendance_id, attended_at, status FROM tbl_attendance WHERE attendance_id = ? LIMIT 1");
+            $fetch->execute([$id]);
+            $attendance = $fetch->fetch(PDO::FETCH_ASSOC);
+
+            $this->sendJSON([
+                'success' => true,
+                'already_checked_in' => false,
+                'attendance' => $attendance,
+                'student' => [
+                    'student_id' => (int) $student['student_id'],
+                    'first_name' => $student['first_name'],
+                    'last_name' => $student['last_name'],
+                    'email' => $student['email']
+                ]
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getDeskSummary()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        try {
+            if (!$this->tableExists('tbl_attendance')) {
+                $this->sendJSON(['error' => 'Attendance data is unavailable on this schema'], 400);
+            }
+
+            $stmt = $this->conn->prepare("
+                SELECT
+                    COUNT(*) AS total_count,
+                    SUM(status = 'Present') AS present_count,
+                    SUM(status = 'Late') AS late_count
+                FROM tbl_attendance
+                WHERE DATE(attended_at) = CURDATE()
+            ");
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $this->sendJSON([
+                'success' => true,
+                'summary' => [
+                    'total' => (int) ($row['total_count'] ?? 0),
+                    'present' => (int) ($row['present_count'] ?? 0),
+                    'late' => (int) ($row['late_count'] ?? 0)
+                ]
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getDeskRecent()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $limit = (int) ($_GET['limit'] ?? 8);
+        if ($limit < 1) $limit = 8;
+        if ($limit > 50) $limit = 50;
+
+        try {
+            if (!$this->tableExists('tbl_attendance')) {
+                $this->sendJSON(['error' => 'Attendance data is unavailable on this schema'], 400);
+            }
+            $stmt = $this->conn->prepare("
+                SELECT
+                    a.attendance_id,
+                    a.attended_at,
+                    a.status,
+                    s.first_name,
+                    s.last_name
+                FROM tbl_attendance a
+                INNER JOIN tbl_students s ON s.student_id = a.student_id
+                WHERE DATE(a.attended_at) = CURDATE()
+                ORDER BY a.attended_at DESC, a.attendance_id DESC
+                LIMIT $limit
+            ");
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $this->sendJSON(['success' => true, 'scans' => $rows]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
 }
 
 $api = new AttendanceApi($conn);
@@ -199,6 +361,15 @@ switch ($action) {
         break;
     case 'record':
         $api->record();
+        break;
+    case 'scan-qr':
+        $api->scanQr();
+        break;
+    case 'desk-summary':
+        $api->getDeskSummary();
+        break;
+    case 'desk-recent':
+        $api->getDeskRecent();
         break;
     default:
         $api->sendJSON(['error' => 'Invalid action'], 400);
