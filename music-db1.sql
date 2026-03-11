@@ -93,7 +93,7 @@ CREATE TABLE `tbl_enrollments` (
   `instrument_id` int(11) DEFAULT NULL,
   `preferred_schedule` text DEFAULT NULL,
   `request_notes` text DEFAULT NULL,
-  `enrollment_date` date DEFAULT curdate(),
+  `enrollment_date` date DEFAULT NULL,
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
   `status` enum('Pending','Active','Completed','Cancelled','Expired') DEFAULT 'Pending',
@@ -215,7 +215,7 @@ CREATE TABLE `tbl_makeup_sessions` (
 CREATE TABLE `tbl_payments` (
   `payment_id` int(11) NOT NULL,
   `enrollment_id` int(11) NOT NULL,
-  `payment_date` date DEFAULT curdate(),
+  `payment_date` date DEFAULT NULL,
   `amount` decimal(10,2) NOT NULL,
   `payment_method` enum('Cash','Card','Bank Transfer','GCash','Check','Other') NOT NULL,
   `payment_type` enum('Full Payment','Partial Payment','Installment') DEFAULT 'Partial Payment',
@@ -316,7 +316,7 @@ CREATE TABLE `tbl_recurring_schedule` (
 CREATE TABLE `tbl_registration_payments` (
   `registration_payment_id` int(11) NOT NULL,
   `student_id` int(11) NOT NULL,
-  `payment_date` date DEFAULT curdate(),
+  `payment_date` date DEFAULT NULL,
   `amount` decimal(10,2) NOT NULL,
   `payment_method` enum('Cash','Card','Bank Transfer','GCash','Check','Other') NOT NULL,
   `status` enum('Paid','Pending','Failed','Refunded') DEFAULT 'Pending',
@@ -350,7 +350,7 @@ CREATE TABLE `tbl_repairs` (
   `school_instrument_id` int(11) NOT NULL,
   `service_provider_id` int(11) NOT NULL,
   `issue_description` text NOT NULL,
-  `reported_date` date DEFAULT curdate(),
+  `reported_date` date DEFAULT NULL,
   `repair_date` date DEFAULT NULL,
   `expected_completion_date` date DEFAULT NULL,
   `actual_completion_date` date DEFAULT NULL,
@@ -668,7 +668,7 @@ CREATE TABLE `tbl_student_progress` (
   `instrument_id` int(11) NOT NULL,
   `skill_level` varchar(50) DEFAULT NULL,
   `remarks` text DEFAULT NULL,
-  `assessment_date` date DEFAULT curdate(),
+  `assessment_date` date DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

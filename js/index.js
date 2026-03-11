@@ -34,6 +34,7 @@ let baseApiUrl;
         axios.defaults.baseURL = baseApiUrl;
         axios.defaults.withCredentials = true;
         axios.defaults.headers.common['Content-Type'] = 'application/json';
+        axios.defaults.validateStatus = () => true;
     }
 })();
 
@@ -91,23 +92,6 @@ const Auth = {
         return user.role_name === role || user.role_name === 'SuperAdmin';
     }
 };
-
-// Helper functions for API requests
-async function apiGet(endpoint) {
-    if (typeof axios === 'undefined') {
-        throw new Error('Axios is required for API requests.');
-    }
-    const res = await axios.get(`/${endpoint}`);
-    return res.data;
-}
-
-async function apiPost(endpoint, data) {
-    if (typeof axios === 'undefined') {
-        throw new Error('Axios is required for API requests.');
-    }
-    const res = await axios.post(`/${endpoint}`, data);
-    return res.data;
-}
 
 // ========== INDEX.HTML FUNCTIONS ==========
 
@@ -306,10 +290,14 @@ function initLoginForm() {
         }
 
         try {
-            const response = await axios.post(`${baseApiUrl}/users.php?action=login`, { username, password });
-            const data = response.data;
+            const response = await axios.post(
+                `${baseApiUrl}/users.php?action=login`,
+                { username, password },
+                { validateStatus: () => true }
+            );
+            const data = response.data || {};
 
-            if (data.success && data.user) {
+            if (response.status === 200 && data.success && data.user) {
                 // If student is using default password, force change on first login
                 if (data.must_change_password) {
                     await Swal.fire({
@@ -364,28 +352,46 @@ function initLoginForm() {
                     }
                 }, 1500);
             } else {
-                // Show error message with SweetAlert
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Login Failed',
-                    text: data.error || 'Invalid username or password. Please check your credentials.',
-                    confirmButtonColor: '#b8860b'
-                });
+                const apiMessage = data && typeof data === 'object' ? data.error : '';
+                const status = response.status;
+                const message = apiMessage
+                    ? apiMessage
+                    : status === 401
+                        ? 'Invalid username or password.'
+                        : status === 403
+                            ? 'Your account is pending admin approval.'
+                            : 'An error occurred. Please try again.';
 
-                if (loginBtn) loginBtn.disabled = false;
-                if (loginBtnText) loginBtnText.textContent = 'Sign In';
-                if (loginBtnIcon) {
-                    loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
-                    loginBtnIcon.classList.add('fa-sign-in-alt');
-                }
+            // Show error message with SweetAlert
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: message,
+                confirmButtonColor: '#b8860b'
+            });
+            if (loginBtn) loginBtn.disabled = false;
+            if (loginBtnText) loginBtnText.textContent = 'Sign In';
+            if (loginBtnIcon) {
+                loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
+                loginBtnIcon.classList.add('fa-sign-in-alt');
+            }
             }
         } catch (error) {
+            const status = error?.response?.status;
+            const apiMessage = error?.response?.data?.error;
+            const message = apiMessage
+                ? apiMessage
+                : status === 401
+                    ? 'Invalid username or password.'
+                    : status === 403
+                        ? 'Your account is pending admin approval.'
+                        : 'An error occurred. Please try again.';
             console.error('Login error:', error);
             // Show error message with SweetAlert
             Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: 'An error occurred. Please try again.',
+                text: message,
                 confirmButtonColor: '#b8860b'
             });
             if (loginBtn) loginBtn.disabled = false;
@@ -2641,7 +2647,8 @@ async function loadStudentsForAdmin() {
     if (!tableBody) return;
 
     try {
-        const data = await apiGet('students.php?action=get-all-students');
+        const res = await axios.get(`${baseApiUrl}/students.php?action=get-all-students`);
+        const data = res.data;
         const students = data.success ? data.students : [];
 
         if (!students || students.length === 0) {
@@ -2733,7 +2740,8 @@ async function loadPendingRegistrations() {
     }
 
     try {
-        const data = await apiGet('admin.php?action=get-pending-registrations');
+        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-pending-registrations`);
+        const data = res.data;
 
         if (data.success) {
             displayRegistrations(data.registrations);
@@ -2752,7 +2760,8 @@ async function loadAllRegistrations() {
     }
 
     try {
-        const data = await apiGet('admin.php?action=get-all-registrations');
+        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-all-registrations`);
+        const data = res.data;
 
         if (data.success) {
             displayRegistrations(data.registrations);
@@ -2961,7 +2970,8 @@ function updateStats(registrations) {
 // View Details
 async function viewDetails(studentId) {
     try {
-        const data = await apiGet(`admin.php?action=get-registration-details&student_id=${studentId}`);
+        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-registration-details&student_id=${studentId}`);
+        const data = res.data;
 
         if (data.success) {
             const { student, guardians, payments, user_account } = data;
@@ -3060,7 +3070,8 @@ async function openPaymentModal(studentId) {
     currentStudentId = studentId;
 
     try {
-        const data = await apiGet(`admin.php?action=get-registration-details&student_id=${studentId}`);
+        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-registration-details&student_id=${studentId}`);
+        const data = res.data;
         if (data.success) {
             const student = data.student;
             const remaining = parseFloat(student.registration_fee_amount || 0) - parseFloat(student.registration_fee_paid || 0);
@@ -3108,7 +3119,8 @@ function initPaymentForm() {
         };
 
         try {
-            const data = await apiPost('admin.php?action=confirm-payment', paymentData);
+            const res = await axios.post(`${baseApiUrl}/admin.php?action=confirm-payment`, paymentData);
+            const data = res.data;
             if (data.success) {
                 showMessage(data.message, 'success');
                 closePaymentModal();
@@ -3128,7 +3140,8 @@ async function rejectRegistration(studentId) {
     if (!confirm('Are you sure you want to reject this registration?')) return;
 
     try {
-        const data = await apiPost('admin.php?action=reject-registration', { student_id: studentId });
+        const res = await axios.post(`${baseApiUrl}/admin.php?action=reject-registration`, { student_id: studentId });
+        const data = res.data;
         if (data.success) {
             showMessage(data.message, 'success');
             reloadRegistrationsByActiveMode();
