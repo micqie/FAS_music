@@ -66,8 +66,12 @@ class User
 
     private function ensureStudentRegistrationProofColumn()
     {
-        // Proof path is not stored in tbl_students in current schema.
-        return;
+        if ($this->hasStudentColumn('registration_proof_path')) return;
+        try {
+            $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL AFTER registration_fee_paid");
+        } catch (PDOException $e) {
+            // Keep API working even if alter fails
+        }
     }
 
     private function ensureStudentRegistrationColumns()
@@ -430,6 +434,7 @@ class User
         }
 
         try {
+            $this->ensureStudentRegistrationProofColumn();
             $this->ensureStudentRegistrationColumns();
             $this->conn->beginTransaction();
 
@@ -485,6 +490,14 @@ class User
             $studentId = (int)$this->conn->lastInsertId();
 
             $registrationNotes = $registrationProofPath ? ('Payment proof: ' . $registrationProofPath) : null;
+            if ($registrationProofPath && $this->hasStudentColumn('registration_proof_path')) {
+                $stmtProof = $this->conn->prepare("
+                    UPDATE tbl_students
+                    SET registration_proof_path = ?
+                    WHERE student_id = ?
+                ");
+                $stmtProof->execute([$registrationProofPath, $studentId]);
+            }
             if ($isAdminRegistration) {
                 $paymentMethod = trim((string)($data['registration_payment_method'] ?? '')) ?: 'Other';
                 $stmtRegPayment = $this->conn->prepare("

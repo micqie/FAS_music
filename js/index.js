@@ -364,8 +364,8 @@ function initLoginForm() {
 
             // Show error message with SweetAlert
             Swal.fire({
-                icon: 'error',
-                title: 'Error',
+                icon: 'info',
+                title: 'Pending Account',
                 text: message,
                 confirmButtonColor: '#b8860b'
             });
@@ -1179,7 +1179,7 @@ function initIndexPage() {
 // Initialize scroll animations for About section
 function initScrollAnimations() {
     const animateElements = document.querySelectorAll('.scroll-animate');
-    
+
     if (animateElements.length === 0) return;
 
     const observer = new IntersectionObserver((entries) => {
@@ -1192,7 +1192,7 @@ function initScrollAnimations() {
                         el.classList.add('visible');
                     }, index * 150); // 150ms delay between each element
                 });
-                
+
                 // Stop observing once animated
                 observer.unobserve(entry.target);
             }

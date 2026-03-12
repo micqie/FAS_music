@@ -157,6 +157,8 @@ class Admin
     // 🔍 Get pending registrations with guardian and branch info
     public function getPendingRegistrations()
     {
+        $this->ensureStudentRegistrationProofColumn();
+        $hasProofCol = $this->hasStudentColumn('registration_proof_path');
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
@@ -171,7 +173,7 @@ class Admin
                     WHERE rp.student_id = s.student_id
                       AND rp.status = 'Paid'
                 ), 0.00) AS registration_fee_paid,
-                '' AS registration_notes,
+                " . ($hasProofCol ? "s.registration_proof_path" : "NULL") . " AS registration_proof_path,
                 'Pending' AS registration_status,
                 s.created_at AS created_at,
                 b.branch_name,
@@ -188,11 +190,6 @@ class Admin
         $stmt->execute();
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($rows as &$row) {
-            $row['registration_proof_path'] = $this->extractRegistrationProofPathFromNotes($row['registration_notes'] ?? '');
-            unset($row['registration_notes']);
-        }
-        unset($row);
 
         $this->sendJSON([
             'success' => true,
@@ -203,6 +200,8 @@ class Admin
     // 🔍 Get all registrations with guardian and branch info (excludes Rejected - they are removed/counted separately)
     public function getAllRegistrations()
     {
+        $this->ensureStudentRegistrationProofColumn();
+        $hasProofCol = $this->hasStudentColumn('registration_proof_path');
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
@@ -217,7 +216,7 @@ class Admin
                     WHERE rp.student_id = s.student_id
                       AND rp.status = 'Paid'
                 ), 0.00) AS registration_fee_paid,
-                '' AS registration_notes,
+                " . ($hasProofCol ? "s.registration_proof_path" : "NULL") . " AS registration_proof_path,
                 CASE
                     WHEN s.status = 'Active' THEN 'Approved'
                     WHEN COALESCE((
@@ -242,11 +241,6 @@ class Admin
         $stmt->execute();
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($rows as &$row) {
-            $row['registration_proof_path'] = $this->extractRegistrationProofPathFromNotes($row['registration_notes'] ?? '');
-            unset($row['registration_notes']);
-        }
-        unset($row);
 
         $this->sendJSON([
             'success' => true,
@@ -543,6 +537,8 @@ class Admin
         }
 
         try {
+            $this->ensureStudentRegistrationProofColumn();
+            $hasProofCol = $this->hasStudentColumn('registration_proof_path');
             $stmt = $this->conn->prepare("
                 SELECT
                     s.*,
@@ -563,8 +559,7 @@ class Admin
                               AND rp2.status = 'Paid'
                         ), 0.00) >= 1000 THEN 'Fee Paid'
                         ELSE 'Pending'
-                    END AS registration_status,
-                    '' AS registration_notes
+                    END AS registration_status
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
                 WHERE s.student_id = ?
@@ -575,8 +570,7 @@ class Admin
             if (!$student) {
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
-            $student['registration_proof_path'] = $this->extractRegistrationProofPathFromNotes($student['registration_notes'] ?? '');
-            unset($student['registration_notes']);
+            if (!$hasProofCol) $student['registration_proof_path'] = null;
 
             // Get guardians
             $stmtGuardians = $this->conn->prepare("

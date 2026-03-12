@@ -312,8 +312,9 @@
             if (!tableBody) return;
 
             try {
-                const data = await apiGet('students.php?action=get-all-students');
-                if (data.success && data.students) {
+                const res = await axios.get(`${baseApiUrl}/students.php?action=get-all-students`);
+                const data = res.data;
+                if (data && data.success && data.students) {
                     allStudents = data.students;
                     // Apply current filter if one is selected
                     const branchFilter = document.getElementById('branchFilter');

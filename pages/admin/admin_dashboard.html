@@ -178,7 +178,7 @@
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total</p>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Registrations</p>
                             <h2 id="statTotal" class="text-3xl font-bold text-slate-800">0</h2>
                         </div>
                         <div class="p-2 bg-slate-100 rounded-lg"><i class="fas fa-database text-slate-500"></i></div>
@@ -272,11 +272,11 @@
         async function loadDashboardStats() {
             try {
                 const [registrationsResult, revenueResult] = await Promise.allSettled([
-                    apiGet('admin.php?action=get-all-registrations'),
-                    apiGet('admin.php?action=get-revenue-summary')
+                    axios.get(`${baseApiUrl}/admin.php?action=get-all-registrations`),
+                    axios.get(`${baseApiUrl}/admin.php?action=get-revenue-summary`)
                 ]);
-                const registrationsData = registrationsResult.status === 'fulfilled' ? registrationsResult.value : null;
-                const revenueData = revenueResult.status === 'fulfilled' ? revenueResult.value : null;
+                const registrationsData = registrationsResult.status === 'fulfilled' ? registrationsResult.value.data : null;
+                const revenueData = revenueResult.status === 'fulfilled' ? revenueResult.value.data : null;
 
                 if (registrationsData && registrationsData.success && registrationsData.registrations) {
                     updateStats(registrationsData.registrations);
