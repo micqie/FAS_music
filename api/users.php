@@ -155,10 +155,10 @@ class User
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
         $data = json_decode($json, true);
-        $username = $data['username'] ?? '';
+        $username = trim((string) ($data['username'] ?? ''));
         $password = $data['password'] ?? '';
 
-        if (empty($username) || empty($password)) {
+        if ($username === '' || $password === '' || $password === null) {
             $this->sendJSON(['error' => 'Username and password are required'], 400);
         }
         try {
