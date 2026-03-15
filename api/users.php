@@ -192,12 +192,12 @@ class User
                 $this->sendJSON(['error' => 'Your account is pending admin approval. Please wait for approval before logging in.'], 403);
             }
 
-            // Detect default password "fasmusic2020" for students (first-login change requirement)
+            // Detect default password "fasmusic2020" for non-admin roles (first-login change requirement)
             $mustChangePassword = false;
-            if (
-                $user['role_name'] === 'Student'
-                && (password_verify('fasmusic2020', $storedPassword) || hash_equals($storedPassword, 'fasmusic2020'))
-            ) {
+            $roleName = (string)($user['role_name'] ?? '');
+            $isDefaultPassword = password_verify('fasmusic2020', $storedPassword)
+                || hash_equals($storedPassword, 'fasmusic2020');
+            if ($isDefaultPassword && strcasecmp($roleName, 'Admin') !== 0) {
                 $mustChangePassword = true;
             }
 

@@ -626,6 +626,129 @@ class Admin
             $this->sendJSON(['error' => 'Failed to load details: ' . $e->getMessage()], 500);
         }
     }
+
+    // 👥 List all user accounts with roles (and optional branch if linked)
+    public function getUsers()
+    {
+        try {
+            $sql = "
+                SELECT
+                    u.user_id,
+                    u.username,
+                    u.first_name,
+                    u.last_name,
+                    u.email,
+                    u.phone,
+                    u.status,
+                    CASE
+                        WHEN r.role_name = 'Manager' THEN 'Branch Manager'
+                        WHEN r.role_name = 'Staff' THEN 'Staff'
+                        ELSE r.role_name
+                    END AS role_name,
+                    COALESCE(b.branch_name, '') AS branch_name
+                FROM tbl_users u
+                INNER JOIN tbl_roles r ON u.role_id = r.role_id
+                LEFT JOIN tbl_teachers t ON t.user_id = u.user_id
+                LEFT JOIN tbl_branches b ON t.branch_id = b.branch_id
+                ORDER BY r.role_name, u.first_name, u.last_name, u.user_id
+            ";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $this->sendJSON([
+                'success' => true,
+                'users' => $rows
+            ]);
+        } catch (Exception $e) {
+            $this->sendJSON(['error' => 'Failed to load users: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ➕ Create a new user account (admin-created staff / branch manager / student)
+    public function createUser($json)
+    {
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid payload'], 400);
+        }
+
+        $firstName = trim((string)($data['first_name'] ?? ''));
+        $lastName  = trim((string)($data['last_name'] ?? ''));
+        $email     = trim((string)($data['email'] ?? ''));
+        $phone     = trim((string)($data['phone'] ?? ''));
+        $roleName  = trim((string)($data['role'] ?? ''));
+        $password  = (string)($data['password'] ?? '');
+
+        if ($firstName === '' || $lastName === '' || $email === '' || $roleName === '' || $password === '') {
+            $this->sendJSON(['error' => 'first_name, last_name, email, role and password are required'], 400);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->sendJSON(['error' => 'Invalid email address'], 400);
+        }
+
+        try {
+            // Normalize UI role labels to database role_name values
+            $lookupRoleName = $roleName;
+            if (strcasecmp($roleName, 'Branch Manager') === 0) {
+                $lookupRoleName = 'Manager';
+            } elseif (strcasecmp($roleName, 'Staff') === 0) {
+                $lookupRoleName = 'Staff';
+            }
+
+            // Find role_id by role_name
+            $stmtRole = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = ? LIMIT 1");
+            $stmtRole->execute([$lookupRoleName]);
+            $role = $stmtRole->fetch(PDO::FETCH_ASSOC);
+            if (!$role) {
+                $this->sendJSON(['error' => 'Role not found: ' . $roleName], 400);
+            }
+            $roleId = (int)$role['role_id'];
+
+            // Prevent duplicate username/email
+            $dupCheck = $this->conn->prepare("
+                SELECT user_id FROM tbl_users
+                WHERE username = ? OR email = ?
+                LIMIT 1
+            ");
+            $dupCheck->execute([$email, $email]);
+            if ($dupCheck->fetch()) {
+                $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
+            }
+
+            $hashed = password_hash($password, PASSWORD_DEFAULT);
+
+            $stmt = $this->conn->prepare("
+                INSERT INTO tbl_users (
+                    username, password, role_id, first_name, last_name,
+                    email, phone, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
+            ");
+            $stmt->execute([
+                $email,
+                $hashed,
+                $roleId,
+                $firstName,
+                $lastName,
+                $email,
+                $phone
+            ]);
+
+            $userId = (int)$this->conn->lastInsertId();
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'User created successfully.',
+                'user_id' => $userId
+            ]);
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23000') {
+                $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
+            }
+            $this->sendJSON(['error' => 'Failed to create user: ' . $e->getMessage()], 500);
+        }
+    }
 }
 
 // Router
@@ -657,6 +780,12 @@ switch ($action) {
         break;
     case 'confirm-payment':
         $admin->confirmPayment(file_get_contents('php://input'));
+        break;
+    case 'get-users':
+        $admin->getUsers();
+        break;
+    case 'create-user':
+        $admin->createUser(file_get_contents('php://input'));
         break;
     default:
         $admin->sendJSON(['error' => 'Invalid action'], 400);

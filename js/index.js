@@ -386,11 +386,14 @@ function initLoginForm() {
 
                 // Redirect based on role
                 setTimeout(() => {
-                    if (data.user.role_name === 'Admin' || data.user.role_name === 'SuperAdmin') {
+                    const role = String(data.user.role_name || '').trim();
+                    if (role === 'Admin' || role === 'SuperAdmin') {
                         window.location.href = 'pages/admin/admin_dashboard.html';
-                    } else if (data.user.role_name === 'Staff') {
+                    } else if (role === 'Manager' || role === 'Branch Manager') {
+                        window.location.href = 'pages/manager/manager_dashboard.html';
+                    } else if (role === 'Staff') {
                         window.location.href = 'pages/desk/desk_scanner.html';
-                    } else if (data.user.role_name === 'Student') {
+                    } else if (role === 'Student') {
                         window.location.href = 'pages/student/student_dashboard.html';
                     } else {
                         window.location.href = 'index.html';
@@ -3201,6 +3204,21 @@ async function rejectRegistration(studentId) {
         }
     } catch (error) {
         showMessage('Failed to reject registration: ' + (error.message || error), 'error');
+    }
+}
+
+// Admin Users - load all users into admin_users.html table
+async function loadAdminUsers() {
+    try {
+        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-users`);
+        const data = res.data;
+        if (data && data.success && Array.isArray(data.users)) {
+            if (typeof setAdminUsersRows === 'function') {
+                setAdminUsersRows(data.users);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load admin users', error);
     }
 }
 
