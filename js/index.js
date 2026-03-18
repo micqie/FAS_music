@@ -347,6 +347,8 @@ function initLoginForm() {
                         window.location.href = 'pages/desk/desk_scanner.html';
                     } else if (data.user.role_name === 'Student') {
                         window.location.href = 'pages/student/student_dashboard.html';
+                    } else if (data.user.role_name === 'Guardians') {
+                        window.location.href = 'pages/guardian/guardian_students.html';
                     } else {
                         window.location.href = 'index.html';
                     }
@@ -362,19 +364,19 @@ function initLoginForm() {
                             ? 'Your account is pending admin approval.'
                             : 'An error occurred. Please try again.';
 
-            // Show error message with SweetAlert
-            Swal.fire({
-                icon: 'info',
-                title: 'Pending Account',
-                text: message,
-                confirmButtonColor: '#b8860b'
-            });
-            if (loginBtn) loginBtn.disabled = false;
-            if (loginBtnText) loginBtnText.textContent = 'Sign In';
-            if (loginBtnIcon) {
-                loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
-                loginBtnIcon.classList.add('fa-sign-in-alt');
-            }
+                const isPending = status === 403 || /pending/i.test(message);
+                Swal.fire({
+                    icon: isPending ? 'info' : 'error',
+                    title: isPending ? 'Pending Account' : 'Login Failed',
+                    text: message,
+                    confirmButtonColor: '#b8860b'
+                });
+                if (loginBtn) loginBtn.disabled = false;
+                if (loginBtnText) loginBtnText.textContent = 'Sign In';
+                if (loginBtnIcon) {
+                    loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
+                    loginBtnIcon.classList.add('fa-sign-in-alt');
+                }
             }
         } catch (error) {
             const status = error?.response?.status;
@@ -387,10 +389,10 @@ function initLoginForm() {
                         ? 'Your account is pending admin approval.'
                         : 'An error occurred. Please try again.';
             console.error('Login error:', error);
-            // Show error message with SweetAlert
+            const isPending = status === 403 || /pending/i.test(message);
             Swal.fire({
-                icon: 'error',
-                title: 'Error',
+                icon: isPending ? 'info' : 'error',
+                title: isPending ? 'Pending Account' : 'Login Failed',
                 text: message,
                 confirmButtonColor: '#b8860b'
             });
@@ -1329,8 +1331,34 @@ function checkStudentAuth() {
     return true;
 }
 
+function checkGuardianAuth() {
+    const user = Auth.getUser();
+    if (!user || user.role_name !== 'Guardians') {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Access Denied',
+            text: 'You must be logged in as a Guardian to access this page.',
+            confirmButtonColor: '#b8860b',
+            confirmButtonText: 'Go to Login'
+        }).then(() => {
+            const appBase = (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+                ? baseApiUrl.slice(0, -4)
+                : `${window.location.origin}/FAS_music`;
+            window.location.href = `${appBase}/index.html`;
+        });
+        return false;
+    }
+    return true;
+}
+
 async function fetchStudentPortalDataByEmail(email) {
     const url = `${baseApiUrl}/students.php?action=get-student-portal&email=${encodeURIComponent(email)}`;
+    const res = await axios.get(url);
+    return res.data;
+}
+
+async function fetchGuardianPortalDataByEmail(email) {
+    const url = `${baseApiUrl}/students.php?action=get-guardian-portal&email=${encodeURIComponent(email)}`;
     const res = await axios.get(url);
     return res.data;
 }
@@ -1647,6 +1675,172 @@ function renderEnrollmentHistoryList(history) {
             <div class="mt-1 text-xs text-zinc-400">Started: ${escapeHtml(startDate || 'Not set')} • ${escapeHtml(row.payment_type || 'Partial Payment')}</div>
         </div>`;
     }).join('');
+}
+
+function renderGuardianStudentCard(item, index) {
+    const s = item?.student || {};
+    const enrollment = item?.current_enrollment || null;
+    const studentId = s.student_id ?? `g-${index}`;
+    const studentName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Student';
+    const branch = s.branch_name || '—';
+    const regStatus = s.registration_status || 'Pending';
+    const regPaid = Number(s.registration_fee_paid || 0);
+    const regTotal = Number(s.registration_fee_amount || 0);
+    const regRemaining = Math.max(0, regTotal - regPaid);
+
+    const pkgName = enrollment?.package_name || s.package_name || 'Not assigned yet';
+    const pkgSessions = enrollment?.package_sessions || s.package_sessions || 0;
+    const pkgTotal = Number(enrollment?.total_amount || s.package_price || 0);
+    const pkgPaid = Number(enrollment?.paid_amount || 0);
+    const pkgBalance = Math.max(0, pkgTotal - pkgPaid);
+
+    const teacherName = `${enrollment?.teacher_first_name || ''} ${enrollment?.teacher_last_name || ''}`.trim() || 'Not set';
+    const scheduleDate = formatDateLong(enrollment?.first_session_date || enrollment?.start_date || '');
+    const scheduleStart = enrollment?.first_start_time ? formatTime12Hour(enrollment.first_start_time) : '';
+    const scheduleEnd = enrollment?.first_end_time ? formatTime12Hour(enrollment.first_end_time) : '';
+    const scheduleTime = scheduleStart && scheduleEnd ? `${scheduleStart} - ${scheduleEnd}` : 'Not set';
+    const scheduleRoom = enrollment?.first_room || 'Not set';
+
+    return `
+        <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Student</div>
+                    <div class="text-xl font-extrabold mt-2">${escapeHtml(studentName)}</div>
+                    <div class="text-sm text-zinc-400 mt-1">Branch: <span class="text-zinc-200 font-semibold">${escapeHtml(branch)}</span></div>
+                </div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(regStatus)}">${escapeHtml(regStatus)}</span>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Registration</div>
+                    <div class="mt-3 text-sm text-zinc-300">Paid: <span class="text-white font-semibold">${formatCurrencyPHP(regPaid)}</span></div>
+                    <div class="text-sm text-zinc-300">Total: <span class="text-white font-semibold">${formatCurrencyPHP(regTotal)}</span></div>
+                    <div class="text-sm text-zinc-300">Remaining: <span class="text-gold-400 font-semibold">${formatCurrencyPHP(regRemaining)}</span></div>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Package & Payments</div>
+                    <div class="mt-3 text-sm text-zinc-300">Package: <span class="text-white font-semibold">${escapeHtml(pkgName)}</span></div>
+                    <div class="text-sm text-zinc-300">Sessions: <span class="text-white font-semibold">${pkgSessions ? `${pkgSessions} sessions` : '—'}</span></div>
+                    <div class="text-sm text-zinc-300">Paid: <span class="text-white font-semibold">${formatCurrencyPHP(pkgPaid)}</span></div>
+                    <div class="text-sm text-zinc-300">Balance: <span class="text-gold-400 font-semibold">${formatCurrencyPHP(pkgBalance)}</span></div>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Progress</div>
+                    <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+                        <div class="rounded-xl bg-white/5 border border-white/10 p-2">
+                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Attended</div>
+                            <div id="guardianProgressAttended-${studentId}" class="text-lg font-black text-white mt-1">—</div>
+                        </div>
+                        <div class="rounded-xl bg-white/5 border border-white/10 p-2">
+                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Remaining</div>
+                            <div id="guardianProgressRemaining-${studentId}" class="text-lg font-black text-white mt-1">—</div>
+                        </div>
+                        <div class="rounded-xl bg-white/5 border border-white/10 p-2">
+                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Last</div>
+                            <div id="guardianProgressLast-${studentId}" class="text-xs font-semibold text-zinc-200 mt-2">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Current Schedule</div>
+                <div class="mt-2 text-sm text-zinc-300">Teacher: <span class="text-white font-semibold">${escapeHtml(teacherName)}</span></div>
+                <div class="text-sm text-zinc-300">When: <span class="text-white font-semibold">${escapeHtml(scheduleDate || 'Not set')}</span> • <span class="text-white font-semibold">${escapeHtml(scheduleTime)}</span></div>
+                <div class="text-sm text-zinc-300">Room: <span class="text-white font-semibold">${escapeHtml(scheduleRoom)}</span></div>
+            </div>
+        </div>
+    `;
+}
+
+function renderGuardianStudentsList(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return `
+            <div class="rounded-3xl border border-white/10 bg-white/5 p-10 text-center text-zinc-400">
+                <i class="fas fa-user-slash text-3xl mb-3"></i>
+                <div class="font-semibold">No linked students found.</div>
+                <div class="text-xs text-zinc-500 mt-2">Ask the admin to link your guardian account to a student profile.</div>
+            </div>
+        `;
+    }
+    return items.map((item, index) => renderGuardianStudentCard(item, index)).join('');
+}
+
+function updateGuardianTotals(items) {
+    const rows = Array.isArray(items) ? items : [];
+    let totalBalance = 0;
+    let totalPaid = 0;
+
+    rows.forEach(item => {
+        const s = item?.student || {};
+        const enrollment = item?.current_enrollment || null;
+        const regPaid = Number(s.registration_fee_paid || 0);
+        const regTotal = Number(s.registration_fee_amount || 0);
+        const regRemaining = Math.max(0, regTotal - regPaid);
+        const pkgTotal = Number(enrollment?.total_amount || s.package_price || 0);
+        const pkgPaid = Number(enrollment?.paid_amount || 0);
+        const pkgRemaining = Math.max(0, pkgTotal - pkgPaid);
+
+        totalBalance += regRemaining + pkgRemaining;
+        totalPaid += regPaid + pkgPaid;
+    });
+
+    setText('guardianStudentCount', String(rows.length));
+    setText('guardianTotalBalance', formatCurrencyPHP(totalBalance));
+    setText('guardianTotalPaid', formatCurrencyPHP(totalPaid));
+}
+
+async function hydrateGuardianAttendance(items) {
+    const rows = Array.isArray(items) ? items : [];
+    await Promise.all(rows.map(async (item) => {
+        const student = item?.student || {};
+        const studentId = student.student_id;
+        if (!studentId) return;
+
+        try {
+            const summaryRes = await fetchAttendanceSummary(studentId);
+            const attended = summaryRes?.success ? (summaryRes.summary?.present_count ?? 0) : 0;
+            const total = Number(item?.current_enrollment?.package_sessions || student.package_sessions || 0);
+            const remaining = total > 0 ? Math.max(0, total - attended) : 0;
+            const lastAttended = summaryRes?.success && summaryRes.summary?.last_attended_at
+                ? new Date(summaryRes.summary.last_attended_at).toLocaleString()
+                : '—';
+
+            setText(`guardianProgressAttended-${studentId}`, String(attended));
+            setText(`guardianProgressRemaining-${studentId}`, total > 0 ? String(remaining) : '—');
+            setText(`guardianProgressLast-${studentId}`, lastAttended);
+        } catch (e) {
+            setText(`guardianProgressAttended-${studentId}`, '—');
+            setText(`guardianProgressRemaining-${studentId}`, '—');
+            setText(`guardianProgressLast-${studentId}`, '—');
+        }
+    }));
+}
+
+async function initGuardianStudentsPage() {
+    if (!checkGuardianAuth()) return;
+
+    const user = Auth.getUser();
+    setText('guardianNavName', user?.username || user?.email || 'Guardian');
+
+    const portal = await fetchGuardianPortalDataByEmail(user?.email || '');
+    if (!portal?.success) {
+        showMessage(portal?.error || 'Failed to load guardian portal.', 'error');
+        return;
+    }
+
+    const guardians = Array.isArray(portal.guardians) ? portal.guardians : [];
+    const primaryGuardian = guardians[0] || {};
+    setText('guardianName', `${primaryGuardian.first_name || ''} ${primaryGuardian.last_name || ''}`.trim() || (user?.username || 'Guardian'));
+    setText('guardianEmail', primaryGuardian.email || user?.email || '—');
+    setText('guardianPhone', primaryGuardian.phone || '—');
+
+    const students = Array.isArray(portal.students) ? portal.students : [];
+    updateGuardianTotals(students);
+    setHtml('guardianStudentsList', renderGuardianStudentsList(students));
+    await hydrateGuardianAttendance(students);
 }
 
 let studentRequestAvailableInstruments = [];
@@ -3161,6 +3355,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentProfile = document.getElementById('studentProfileRoot');
     const studentSessions = document.getElementById('studentSessionsRoot');
     const studentQr = document.getElementById('studentQrRoot');
+    const guardianStudentsRoot = document.getElementById('guardianStudentsRoot');
 
     if (loginForm) {
         initIndexPage();
@@ -3179,5 +3374,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initStudentSessionsPage();
     } else if (studentQr) {
         initStudentQrPage();
+    } else if (guardianStudentsRoot) {
+        initGuardianStudentsPage();
     }
 });

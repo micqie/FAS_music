@@ -803,6 +803,8 @@ class StudentsApi
                     s.last_name,
                     s.email,
                     s.phone,
+                    COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                    COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
                     COALESCE(rf.registration_status, 'Pending') AS registration_status,
                     s.status,
                     s.branch_id,
@@ -810,7 +812,8 @@ class StudentsApi
                     b.branch_name,
                     sp.package_name,
                     sp.sessions,
-                    sp.max_instruments
+                    sp.max_instruments,
+                    s.created_at
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
                 LEFT JOIN tbl_session_packages sp ON s.session_package_id = sp.package_id
@@ -826,7 +829,6 @@ class StudentsApi
                     FROM tbl_registration_payments rp
                     GROUP BY rp.student_id
                 ) rf ON rf.student_id = s.student_id
-                WHERE s.status = 'Active'
             ";
         } else {
             $sql = "
@@ -836,10 +838,13 @@ class StudentsApi
                     s.last_name,
                     s.email,
                     s.phone,
+                    COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                    COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
                     COALESCE(rf.registration_status, 'Pending') AS registration_status,
                     s.status,
                     s.branch_id,
-                    b.branch_name
+                    b.branch_name,
+                    s.created_at
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
                 LEFT JOIN (
@@ -854,7 +859,6 @@ class StudentsApi
                     FROM tbl_registration_payments rp
                     GROUP BY rp.student_id
                 ) rf ON rf.student_id = s.student_id
-                WHERE s.status = 'Active'
             ";
         }
 
@@ -963,6 +967,272 @@ class StudentsApi
      * - guardians (primary + all)
      * - computed balance (registration_fee_amount - registration_fee_paid)
      */
+    private function buildStudentPortalById($studentId)
+    {
+        $this->ensureStudentRegistrationFeesTable();
+        $this->ensureStudentInstrumentsTable();
+        $this->ensureStudentRegistrationFeesTable();
+
+        $stmtStudent = $this->conn->prepare("
+            SELECT
+                s.*,
+                COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
+                COALESCE(rf.registration_status, 'Pending') AS registration_status,
+                b.branch_name
+            FROM tbl_students s
+            LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+            LEFT JOIN (
+                SELECT
+                    rp.student_id,
+                    1000.00 AS registration_fee_amount,
+                    COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
+                    CASE
+                        WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
+                        ELSE 'Pending'
+                    END AS registration_status
+                FROM tbl_registration_payments rp
+                GROUP BY rp.student_id
+            ) rf ON rf.student_id = s.student_id
+            WHERE s.student_id = ?
+            LIMIT 1
+        ");
+        $stmtStudent->execute([(int)$studentId]);
+        $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+
+        if (!$student) {
+            return null;
+        }
+
+        if (!isset($student['registration_fee_amount'])) $student['registration_fee_amount'] = 1000;
+        if (!isset($student['registration_fee_paid'])) $student['registration_fee_paid'] = 0;
+        if (!isset($student['registration_status'])) $student['registration_status'] = 'Pending';
+        $student['balance_due'] = 0;
+        $student['package_name'] = null;
+        $student['package_sessions'] = null;
+        $student['package_max_instruments'] = null;
+        $student['package_price'] = 0;
+
+        // Instruments currently associated with student
+        $instruments = [];
+        try {
+            $stmtInstruments = $this->conn->prepare("
+                SELECT
+                    si.instrument_id,
+                    si.priority_order,
+                    i.instrument_name,
+                    i.serial_number,
+                    i.`condition`,
+                    i.status,
+                    it.type_name
+                FROM tbl_student_instruments si
+                INNER JOIN tbl_instruments i ON si.instrument_id = i.instrument_id
+                LEFT JOIN tbl_instrument_types it ON i.type_id = it.type_id
+                WHERE si.student_id = ?
+                ORDER BY si.priority_order ASC, si.student_instrument_id ASC
+            ");
+            $stmtInstruments->execute([(int) $student['student_id']]);
+            $instruments = $stmtInstruments->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            $instruments = [];
+        }
+
+        // Guardians
+        $guardians = [];
+        $primaryGuardian = null;
+        try {
+            $stmtGuardians = $this->conn->prepare("
+                SELECT
+                    g.*,
+                    sg.is_primary_guardian
+                FROM tbl_guardians g
+                INNER JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
+                WHERE sg.student_id = ?
+                ORDER BY (sg.is_primary_guardian = 'Y') DESC, g.guardian_id ASC
+            ");
+            $stmtGuardians->execute([(int) $student['student_id']]);
+            $guardians = $stmtGuardians->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($guardians)) {
+                $primaryGuardian = $guardians[0];
+            }
+        } catch (PDOException $e) {
+            $guardians = [];
+            $primaryGuardian = null;
+        }
+
+        // Enrollment timeline (current + history)
+        $currentEnrollment = null;
+        $enrollmentHistory = [];
+        try {
+            $packageNameExpr = "CONCAT('Package #', e.package_id)";
+            $packageSessionsExpr = "e.total_sessions";
+            $packagePriceExpr = "0";
+            $packageJoin = "";
+            if ($this->tableExists('tbl_session_packages')) {
+                $packageNameExpr = "COALESCE(sp.package_name, CONCAT('Package #', e.package_id))";
+                $packageSessionsExpr = "COALESCE(sp.sessions, e.total_sessions, 0)";
+                $packagePriceExpr = "COALESCE(sp.price, 0)";
+                $packageJoin = "LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id";
+            }
+
+            $sessionJoin = "";
+            $firstDateExpr = "e.start_date";
+            $firstStartExpr = "NULL";
+            $firstEndExpr = "NULL";
+            $firstRoomExpr = "NULL";
+            $teacherIdExpr = "NULL";
+            if ($this->tableExists('tbl_sessions')) {
+                $sessionJoin = "
+                    LEFT JOIN (
+                        SELECT
+                            s.enrollment_id,
+                            s.session_date,
+                            s.start_time,
+                            s.end_time,
+                            s.room_id,
+                            s.notes,
+                            s.teacher_id
+                        FROM tbl_sessions s
+                        INNER JOIN (
+                            SELECT enrollment_id, MIN(session_number) AS first_session_number
+                            FROM tbl_sessions
+                            GROUP BY enrollment_id
+                        ) sf ON sf.enrollment_id = s.enrollment_id
+                            AND sf.first_session_number = s.session_number
+                    ) fs ON fs.enrollment_id = e.enrollment_id
+                ";
+                $firstDateExpr = "COALESCE(fs.session_date, e.start_date)";
+                $firstStartExpr = "fs.start_time";
+                $firstEndExpr = "fs.end_time";
+                $teacherIdExpr = "fs.teacher_id";
+                if ($this->tableExists('tbl_rooms')) {
+                    $sessionJoin .= " LEFT JOIN tbl_rooms rm ON fs.room_id = rm.room_id ";
+                    $firstRoomExpr = "COALESCE(NULLIF(TRIM(rm.room_name), ''), NULLIF(TRIM(fs.notes), ''))";
+                } else {
+                    $firstRoomExpr = "NULLIF(TRIM(fs.notes), '')";
+                }
+            }
+
+            $stmtEnrollments = $this->conn->prepare("
+                SELECT
+                    e.enrollment_id,
+                    {$packageNameExpr} AS package_name,
+                    e.start_date,
+                    e.end_date,
+                    {$firstDateExpr} AS first_session_date,
+                    {$firstStartExpr} AS first_start_time,
+                    {$firstEndExpr} AS first_end_time,
+                    {$firstRoomExpr} AS first_room,
+                    COALESCE(pay.payment_type, 'Partial Payment') AS payment_type,
+                    {$packagePriceExpr} AS total_amount,
+                    COALESCE(pay.paid_amount, 0) AS paid_amount,
+                    e.status,
+                    {$packageSessionsExpr} AS package_sessions,
+                    1 AS package_max_instruments,
+                    t.first_name AS teacher_first_name,
+                    t.last_name AS teacher_last_name
+                FROM tbl_enrollments e
+                {$packageJoin}
+                {$sessionJoin}
+                LEFT JOIN (
+                    SELECT
+                        p.enrollment_id,
+                        SUM(CASE WHEN p.status = 'Paid' THEN p.amount ELSE 0 END) AS paid_amount,
+                        SUBSTRING_INDEX(
+                            GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC),
+                            ',',
+                            1
+                        ) AS payment_type
+                    FROM tbl_payments p
+                    GROUP BY p.enrollment_id
+                ) pay ON pay.enrollment_id = e.enrollment_id
+                LEFT JOIN tbl_teachers t ON t.teacher_id = {$teacherIdExpr}
+                WHERE e.student_id = ?
+                ORDER BY e.enrollment_id DESC
+            ");
+            $stmtEnrollments->execute([(int)$student['student_id']]);
+            $allEnrollments = $stmtEnrollments->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($allEnrollments)) {
+                $currentIndex = null;
+                foreach ($allEnrollments as $idx => $row) {
+                    $st = (string)($row['status'] ?? '');
+                    if ($st === 'Active' || $st === 'Pending') {
+                        $currentIndex = $idx;
+                        break;
+                    }
+                }
+                if ($currentIndex === null) $currentIndex = 0;
+                $currentEnrollment = $allEnrollments[$currentIndex];
+                $student['package_name'] = $currentEnrollment['package_name'] ?? null;
+                $student['package_sessions'] = $currentEnrollment['package_sessions'] ?? null;
+                $student['package_max_instruments'] = $currentEnrollment['package_max_instruments'] ?? null;
+                $student['package_price'] = (float)($currentEnrollment['total_amount'] ?? 0);
+                $student['balance_due'] = max(0, (float)$student['package_price'] - (float)($currentEnrollment['paid_amount'] ?? 0));
+                foreach ($allEnrollments as $idx => $row) {
+                    if ($idx === $currentIndex) continue;
+                    $enrollmentHistory[] = $row;
+                }
+            }
+        } catch (PDOException $e) {
+            $currentEnrollment = null;
+            $enrollmentHistory = [];
+        }
+
+        return [
+            'student' => $student,
+            'guardians' => $guardians,
+            'primary_guardian' => $primaryGuardian,
+            'instruments' => $instruments,
+            'current_enrollment' => $currentEnrollment,
+            'enrollment_history' => $enrollmentHistory
+        ];
+    }
+
+    // Set student status (Active/Inactive) and sync login account
+    public function setStudentStatus()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $studentId = (int) ($data['student_id'] ?? 0);
+        $status = isset($data['status']) ? trim((string)$data['status']) : '';
+
+        if ($studentId < 1) {
+            $this->sendJSON(['error' => 'Student ID is required'], 400);
+        }
+        if (!in_array($status, ['Active', 'Inactive'], true)) {
+            $this->sendJSON(['error' => 'Invalid status'], 400);
+        }
+
+        try {
+            $stmtStudent = $this->conn->prepare("SELECT email FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmtStudent->execute([$studentId]);
+            $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+            if (!$student) {
+                $this->sendJSON(['error' => 'Student not found'], 404);
+            }
+
+            $stmt = $this->conn->prepare("UPDATE tbl_students SET status = ? WHERE student_id = ?");
+            $stmt->execute([$status, $studentId]);
+
+            if (!empty($student['email'])) {
+                $stmtUser = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET status = ?
+                    WHERE email = ?
+                ");
+                $stmtUser->execute([$status, $student['email']]);
+            }
+
+            $this->sendJSON(['success' => true, 'message' => "Student status updated to {$status}"]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function getStudentPortal()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -973,226 +1243,79 @@ class StudentsApi
         if ($email === '') {
             $this->sendJSON(['error' => 'Email is required'], 400);
         }
-        $this->ensureStudentRegistrationFeesTable();
-
-        $this->ensureStudentInstrumentsTable();
-        $this->ensureStudentRegistrationFeesTable();
 
         try {
-            $stmtStudent = $this->conn->prepare("
-                SELECT
-                    s.*,
-                    COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
-                    COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
-                    COALESCE(rf.registration_status, 'Pending') AS registration_status,
-                    b.branch_name
-                FROM tbl_students s
-                LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                LEFT JOIN (
-                    SELECT
-                        rp.student_id,
-                        1000.00 AS registration_fee_amount,
-                        COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
-                        CASE
-                            WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
-                            ELSE 'Pending'
-                        END AS registration_status
-                    FROM tbl_registration_payments rp
-                    GROUP BY rp.student_id
-                ) rf ON rf.student_id = s.student_id
-                WHERE s.email = ?
-                LIMIT 1
-            ");
-            $stmtStudent->execute([$email]);
-            $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
-
-            if (!$student) {
+            $stmt = $this->conn->prepare("SELECT student_id FROM tbl_students WHERE email = ? LIMIT 1");
+            $stmt->execute([$email]);
+            $studentId = (int) $stmt->fetchColumn();
+            if ($studentId < 1) {
                 $this->sendJSON(['error' => 'Student not found for this email'], 404);
             }
 
-            if (!isset($student['registration_fee_amount'])) $student['registration_fee_amount'] = 1000;
-            if (!isset($student['registration_fee_paid'])) $student['registration_fee_paid'] = 0;
-            if (!isset($student['registration_status'])) $student['registration_status'] = 'Pending';
-            $student['balance_due'] = 0;
-            $student['package_name'] = null;
-            $student['package_sessions'] = null;
-            $student['package_max_instruments'] = null;
-            $student['package_price'] = 0;
-
-            // Instruments currently associated with student
-            $instruments = [];
-            try {
-                $stmtInstruments = $this->conn->prepare("
-                    SELECT
-                        si.instrument_id,
-                        si.priority_order,
-                        i.instrument_name,
-                        i.serial_number,
-                        i.`condition`,
-                        i.status,
-                        it.type_name
-                    FROM tbl_student_instruments si
-                    INNER JOIN tbl_instruments i ON si.instrument_id = i.instrument_id
-                    LEFT JOIN tbl_instrument_types it ON i.type_id = it.type_id
-                    WHERE si.student_id = ?
-                    ORDER BY si.priority_order ASC, si.student_instrument_id ASC
-                ");
-                $stmtInstruments->execute([(int) $student['student_id']]);
-                $instruments = $stmtInstruments->fetchAll(PDO::FETCH_ASSOC);
-            } catch (PDOException $e) {
-                $instruments = [];
+            $payload = $this->buildStudentPortalById($studentId);
+            if (!$payload) {
+                $this->sendJSON(['error' => 'Student not found for this email'], 404);
             }
 
-            // Guardians
-            $guardians = [];
-            $primaryGuardian = null;
-            try {
-                $stmtGuardians = $this->conn->prepare("
-                    SELECT
-                        g.*,
-                        sg.is_primary_guardian
-                    FROM tbl_guardians g
-                    INNER JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
-                    WHERE sg.student_id = ?
-                    ORDER BY (sg.is_primary_guardian = 'Y') DESC, g.guardian_id ASC
-                ");
-                $stmtGuardians->execute([(int) $student['student_id']]);
-                $guardians = $stmtGuardians->fetchAll(PDO::FETCH_ASSOC);
-                if (!empty($guardians)) {
-                    $primaryGuardian = $guardians[0];
-                }
-            } catch (PDOException $e) {
-                $guardians = [];
-                $primaryGuardian = null;
+            $this->sendJSON(array_merge(['success' => true], $payload));
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getGuardianPortal()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $email = trim($_GET['email'] ?? '');
+        if ($email === '') {
+            $this->sendJSON(['error' => 'Email is required'], 400);
+        }
+
+        try {
+            $stmtGuardians = $this->conn->prepare("
+                SELECT guardian_id, first_name, last_name, email, phone, relationship_type, status
+                FROM tbl_guardians
+                WHERE email = ?
+            ");
+            $stmtGuardians->execute([$email]);
+            $guardians = $stmtGuardians->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($guardians)) {
+                $this->sendJSON(['error' => 'Guardian not found for this email'], 404);
             }
 
-            // Enrollment timeline (current + history)
-            $currentEnrollment = null;
-            $enrollmentHistory = [];
-            try {
-                $packageNameExpr = "CONCAT('Package #', e.package_id)";
-                $packageSessionsExpr = "e.total_sessions";
-                $packagePriceExpr = "0";
-                $packageJoin = "";
-                if ($this->tableExists('tbl_session_packages')) {
-                    $packageNameExpr = "COALESCE(sp.package_name, CONCAT('Package #', e.package_id))";
-                    $packageSessionsExpr = "COALESCE(sp.sessions, e.total_sessions, 0)";
-                    $packagePriceExpr = "COALESCE(sp.price, 0)";
-                    $packageJoin = "LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id";
-                }
+            $guardianIds = array_values(array_filter(array_map(function ($g) {
+                return (int)($g['guardian_id'] ?? 0);
+            }, $guardians)));
 
-                $sessionJoin = "";
-                $firstDateExpr = "e.start_date";
-                $firstStartExpr = "NULL";
-                $firstEndExpr = "NULL";
-                $firstRoomExpr = "NULL";
-                $teacherIdExpr = "NULL";
-                if ($this->tableExists('tbl_sessions')) {
-                    $sessionJoin = "
-                        LEFT JOIN (
-                            SELECT
-                                s.enrollment_id,
-                                s.session_date,
-                                s.start_time,
-                                s.end_time,
-                                s.room_id,
-                                s.notes,
-                                s.teacher_id
-                            FROM tbl_sessions s
-                            INNER JOIN (
-                                SELECT enrollment_id, MIN(session_number) AS first_session_number
-                                FROM tbl_sessions
-                                GROUP BY enrollment_id
-                            ) sf ON sf.enrollment_id = s.enrollment_id
-                                AND sf.first_session_number = s.session_number
-                        ) fs ON fs.enrollment_id = e.enrollment_id
-                    ";
-                    $firstDateExpr = "COALESCE(fs.session_date, e.start_date)";
-                    $firstStartExpr = "fs.start_time";
-                    $firstEndExpr = "fs.end_time";
-                    $teacherIdExpr = "fs.teacher_id";
-                    if ($this->tableExists('tbl_rooms')) {
-                        $sessionJoin .= " LEFT JOIN tbl_rooms rm ON fs.room_id = rm.room_id ";
-                        $firstRoomExpr = "COALESCE(NULLIF(TRIM(rm.room_name), ''), NULLIF(TRIM(fs.notes), ''))";
-                    } else {
-                        $firstRoomExpr = "NULLIF(TRIM(fs.notes), '')";
-                    }
-                }
+            if (empty($guardianIds)) {
+                $this->sendJSON(['success' => true, 'guardians' => $guardians, 'students' => []]);
+            }
 
-                $stmtEnrollments = $this->conn->prepare("
-                    SELECT
-                        e.enrollment_id,
-                        {$packageNameExpr} AS package_name,
-                        e.start_date,
-                        e.end_date,
-                        {$firstDateExpr} AS first_session_date,
-                        {$firstStartExpr} AS first_start_time,
-                        {$firstEndExpr} AS first_end_time,
-                        {$firstRoomExpr} AS first_room,
-                        COALESCE(pay.payment_type, 'Partial Payment') AS payment_type,
-                        {$packagePriceExpr} AS total_amount,
-                        COALESCE(pay.paid_amount, 0) AS paid_amount,
-                        e.status,
-                        {$packageSessionsExpr} AS package_sessions,
-                        1 AS package_max_instruments,
-                        t.first_name AS teacher_first_name,
-                        t.last_name AS teacher_last_name
-                    FROM tbl_enrollments e
-                    {$packageJoin}
-                    {$sessionJoin}
-                    LEFT JOIN (
-                        SELECT
-                            p.enrollment_id,
-                            SUM(CASE WHEN p.status = 'Paid' THEN p.amount ELSE 0 END) AS paid_amount,
-                            SUBSTRING_INDEX(
-                                GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC),
-                                ',',
-                                1
-                            ) AS payment_type
-                        FROM tbl_payments p
-                        GROUP BY p.enrollment_id
-                    ) pay ON pay.enrollment_id = e.enrollment_id
-                    LEFT JOIN tbl_teachers t ON t.teacher_id = {$teacherIdExpr}
-                    WHERE e.student_id = ?
-                    ORDER BY e.enrollment_id DESC
-                ");
-                $stmtEnrollments->execute([(int)$student['student_id']]);
-                $allEnrollments = $stmtEnrollments->fetchAll(PDO::FETCH_ASSOC);
+            $placeholders = implode(',', array_fill(0, count($guardianIds), '?'));
+            $stmtStudents = $this->conn->prepare("
+                SELECT DISTINCT sg.student_id
+                FROM tbl_student_guardians sg
+                WHERE sg.guardian_id IN ({$placeholders})
+            ");
+            $stmtStudents->execute($guardianIds);
+            $studentIds = $stmtStudents->fetchAll(PDO::FETCH_COLUMN);
 
-                if (!empty($allEnrollments)) {
-                    $currentIndex = null;
-                    foreach ($allEnrollments as $idx => $row) {
-                        $st = (string)($row['status'] ?? '');
-                        if ($st === 'Active' || $st === 'Pending') {
-                            $currentIndex = $idx;
-                            break;
-                        }
-                    }
-                    if ($currentIndex === null) $currentIndex = 0;
-                    $currentEnrollment = $allEnrollments[$currentIndex];
-                    $student['package_name'] = $currentEnrollment['package_name'] ?? null;
-                    $student['package_sessions'] = $currentEnrollment['package_sessions'] ?? null;
-                    $student['package_max_instruments'] = $currentEnrollment['package_max_instruments'] ?? null;
-                    $student['package_price'] = (float)($currentEnrollment['total_amount'] ?? 0);
-                    $student['balance_due'] = max(0, (float)$student['package_price'] - (float)($currentEnrollment['paid_amount'] ?? 0));
-                    foreach ($allEnrollments as $idx => $row) {
-                        if ($idx === $currentIndex) continue;
-                        $enrollmentHistory[] = $row;
-                    }
+            $students = [];
+            foreach ($studentIds as $sid) {
+                $payload = $this->buildStudentPortalById((int)$sid);
+                if ($payload) {
+                    $students[] = $payload;
                 }
-            } catch (PDOException $e) {
-                $currentEnrollment = null;
-                $enrollmentHistory = [];
             }
 
             $this->sendJSON([
                 'success' => true,
-                'student' => $student,
                 'guardians' => $guardians,
-                'primary_guardian' => $primaryGuardian,
-                'instruments' => $instruments,
-                'current_enrollment' => $currentEnrollment,
-                'enrollment_history' => $enrollmentHistory
+                'students' => $students
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
@@ -2208,6 +2331,9 @@ switch ($action) {
     case 'delete-student':
         $studentsApi->deleteStudent();
         break;
+    case 'set-student-status':
+        $studentsApi->setStudentStatus();
+        break;
     case 'get-active-students':
         $studentsApi->getActiveStudents();
         break;
@@ -2216,6 +2342,9 @@ switch ($action) {
         break;
     case 'get-student-portal':
         $studentsApi->getStudentPortal();
+        break;
+    case 'get-guardian-portal':
+        $studentsApi->getGuardianPortal();
         break;
     case 'get-student-request-meta':
         $studentsApi->getStudentRequestMeta();

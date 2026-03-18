@@ -101,7 +101,11 @@ class Admin
     {
         if ($this->hasStudentColumn('registration_proof_path')) return;
         try {
-            $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL AFTER registration_fee_paid");
+            if ($this->hasStudentColumn('registration_fee_paid')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL AFTER registration_fee_paid");
+            } else {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL");
+            }
         } catch (PDOException $e) {
             // Keep API working even if alter fails
         }
@@ -348,6 +352,27 @@ class Admin
                 $stmtUser->execute([$student['email']]);
             }
 
+            // Activate guardian user accounts linked to this student (by guardian email)
+            $stmtGuardianEmails = $this->conn->prepare("
+                SELECT g.email
+                FROM tbl_guardians g
+                INNER JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
+                WHERE sg.student_id = ?
+                  AND g.email IS NOT NULL
+                  AND TRIM(g.email) <> ''
+            ");
+            $stmtGuardianEmails->execute([(int)$data['student_id']]);
+            $guardianEmails = $stmtGuardianEmails->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($guardianEmails)) {
+                $placeholders = implode(',', array_fill(0, count($guardianEmails), '?'));
+                $stmtGuardianUsers = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET status = 'Active'
+                    WHERE email IN ({$placeholders}) AND status = 'Inactive'
+                ");
+                $stmtGuardianUsers->execute($guardianEmails);
+            }
+
             $this->conn->commit();
 
             $this->sendJSON([
@@ -509,6 +534,27 @@ class Admin
                         WHERE email = ?
                     ");
                     $stmtActivateUser->execute([$student['email']]);
+                }
+
+                // Activate guardian user accounts linked to this student (by guardian email)
+                $stmtGuardianEmails = $this->conn->prepare("
+                    SELECT g.email
+                    FROM tbl_guardians g
+                    INNER JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
+                    WHERE sg.student_id = ?
+                      AND g.email IS NOT NULL
+                      AND TRIM(g.email) <> ''
+                ");
+                $stmtGuardianEmails->execute([(int)$data['student_id']]);
+                $guardianEmails = $stmtGuardianEmails->fetchAll(PDO::FETCH_COLUMN);
+                if (!empty($guardianEmails)) {
+                    $placeholders = implode(',', array_fill(0, count($guardianEmails), '?'));
+                    $stmtGuardianUsers = $this->conn->prepare("
+                        UPDATE tbl_users
+                        SET status = 'Active'
+                        WHERE email IN ({$placeholders})
+                    ");
+                    $stmtGuardianUsers->execute($guardianEmails);
                 }
             }
 

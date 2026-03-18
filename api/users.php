@@ -68,7 +68,11 @@ class User
     {
         if ($this->hasStudentColumn('registration_proof_path')) return;
         try {
-            $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL AFTER registration_fee_paid");
+            if ($this->hasStudentColumn('registration_fee_paid')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL AFTER registration_fee_paid");
+            } else {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL");
+            }
         } catch (PDOException $e) {
             // Keep API working even if alter fails
         }
@@ -446,6 +450,13 @@ class User
             if (!$role) throw new Exception("Student role not found");
 
             $roleId = $role['role_id'];
+            $guardianRoleId = null;
+            $guardianRoleStmt = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = 'Guardians' LIMIT 1");
+            $guardianRoleStmt->execute();
+            $guardianRole = $guardianRoleStmt->fetch(PDO::FETCH_ASSOC);
+            if ($guardianRole && isset($guardianRole['role_id'])) {
+                $guardianRoleId = (int) $guardianRole['role_id'];
+            }
 
             // Insert Student (schema-aware)
             $hasSessionPackageCol = $this->hasStudentColumn('session_package_id');
@@ -579,6 +590,33 @@ class User
             ]);
 
             $userId = $this->conn->lastInsertId();
+
+            // Create guardian login (shares the student's password) when guardian email is provided
+            $guardianEmail = trim((string)($data['guardian_email'] ?? ''));
+            if ($guardianId && $guardianEmail !== '' && $guardianRoleId) {
+                $guardianExistsStmt = $this->conn->prepare("SELECT user_id, role_id FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
+                $guardianExistsStmt->execute([$guardianEmail, $guardianEmail]);
+                $existingGuardianUser = $guardianExistsStmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$existingGuardianUser) {
+                    $stmtGuardianUser = $this->conn->prepare("
+                        INSERT INTO tbl_users (
+                            username, password, role_id, first_name, last_name,
+                            email, phone, status
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmtGuardianUser->execute([
+                        $guardianEmail,
+                        $hashedPassword,
+                        $guardianRoleId,
+                        $data['guardian_first_name'] ?? 'Guardian',
+                        $data['guardian_last_name'] ?? '',
+                        $guardianEmail,
+                        $data['guardian_phone'] ?? null,
+                        $userStatus
+                    ]);
+                }
+            }
 
             // Add instruments if provided
             if (!empty($data['instruments']) && is_array($data['instruments'])) {
@@ -714,6 +752,27 @@ class User
                         WHERE email = ?
                     ");
                     $stmtActivateUser->execute([$student['email']]);
+                }
+
+                // Activate guardian user accounts linked to this student (by guardian email)
+                $stmtGuardianEmails = $this->conn->prepare("
+                    SELECT g.email
+                    FROM tbl_guardians g
+                    INNER JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
+                    WHERE sg.student_id = ?
+                      AND g.email IS NOT NULL
+                      AND TRIM(g.email) <> ''
+                ");
+                $stmtGuardianEmails->execute([(int)$data['student_id']]);
+                $guardianEmails = $stmtGuardianEmails->fetchAll(PDO::FETCH_COLUMN);
+                if (!empty($guardianEmails)) {
+                    $placeholders = implode(',', array_fill(0, count($guardianEmails), '?'));
+                    $stmtGuardianUsers = $this->conn->prepare("
+                        UPDATE tbl_users
+                        SET status = 'Active'
+                        WHERE email IN ({$placeholders})
+                    ");
+                    $stmtGuardianUsers->execute($guardianEmails);
                 }
             }
 

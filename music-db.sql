@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Feb 22, 2026 at 06:58 PM
+-- Generation Time: Mar 15, 2026 at 10:08 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `music-db1`
+-- Database: `music-db`
 --
 
 -- --------------------------------------------------------
@@ -42,7 +42,7 @@ CREATE TABLE `tbl_branches` (
 --
 
 INSERT INTO `tbl_branches` (`branch_id`, `branch_name`, `address`, `phone`, `email`, `status`, `created_at`) VALUES
-(1, 'asd', 'asd', '1231', 'asd@gmaol.com', 'Active', '2026-02-20 16:23:23'),
+(1, 'TEST BRANCH', 'Test', '1231', 'asd@gmaol.com', 'Inactive', '2026-02-20 16:23:23'),
 (5, 'SM Downtown', 'CDO', '0909090909', 'smdt@gmail.com', 'Active', '2026-02-21 00:18:58'),
 (6, 'SM Uptown', 'CDO', '0192092019', 'smupt@gmail.com', 'Active', '2026-02-21 00:19:18');
 
@@ -78,7 +78,8 @@ INSERT INTO `tbl_enrollments` (`enrollment_id`, `student_id`, `package_id`, `ins
 (8, 2, 1, NULL, NULL, NULL, '2026-02-21', '2026-02-23', '2026-05-11', 'Active', '2026-02-20 18:27:03', 'Self', NULL, 12, 0),
 (9, 2, 1, NULL, NULL, NULL, '2026-02-21', '2026-02-22', '2026-05-10', 'Active', '2026-02-21 00:35:03', 'Self', NULL, 12, 0),
 (10, 3, 6, 10, 'Tuesday|2026-02-24', '{\"payment_type\":\"Partial Payment\",\"instrument_ids\":[10,11],\"payment_proof_path\":null}', '2026-02-21', NULL, NULL, 'Pending', '2026-02-21 04:10:00', 'Self', NULL, 8, 0),
-(11, 4, 10, 13, 'Thursday|2026-02-26', '{\"payment_type\":\"Full Payment\",\"instrument_ids\":[13],\"payment_proof_path\":null}', '2026-02-21', NULL, NULL, 'Pending', '2026-02-21 04:20:00', 'Self', NULL, 16, 0);
+(11, 4, 10, 13, 'Thursday|2026-02-26', '{\"payment_type\":\"Full Payment\",\"instrument_ids\":[13],\"payment_proof_path\":null,\"admin_notes\":\"hays\"}', '2026-02-21', NULL, NULL, 'Cancelled', '2026-02-21 04:20:00', 'Self', NULL, 16, 0),
+(12, 9, 6, 10, 'Friday|2026-03-13', '{\"payment_type\":\"Full Payment\",\"instrument_ids\":[10],\"payment_proof_path\":null}', '2026-03-13', NULL, NULL, 'Pending', '2026-03-13 05:34:15', 'Self', NULL, 8, 0);
 
 -- --------------------------------------------------------
 
@@ -98,6 +99,15 @@ CREATE TABLE `tbl_guardians` (
   `status` enum('Active','Inactive') DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_guardians`
+--
+
+INSERT INTO `tbl_guardians` (`guardian_id`, `first_name`, `last_name`, `relationship_type`, `phone`, `occupation`, `email`, `address`, `status`, `created_at`) VALUES
+(1, 'jonah', 'lago', 'Mother', '09090909', 'manager ', 'jon@gmail.com', 'tablon cdo', 'Active', '2026-03-11 22:32:19'),
+(2, 'guardian', 'test', 'Legal Guardian', '09659153090', 'none ', 'guardian@gmail.com', 'zone 3 upper, Brgy. Bulua, Cagayan de Oro City, Misamis Oriental', 'Active', '2026-03-13 02:22:18'),
+(3, 'Kim', 'Seokjin', 'Legal Guardian', '09102390123', 'none ', 'jin@gmail.com', 'tablon ', 'Active', '2026-03-13 02:30:51');
 
 -- --------------------------------------------------------
 
@@ -122,7 +132,7 @@ CREATE TABLE `tbl_instruments` (
 INSERT INTO `tbl_instruments` (`instrument_id`, `branch_id`, `instrument_name`, `type_id`, `serial_number`, `condition`, `status`) VALUES
 (4, 1, 'Yamaha na piano', 23, '23232', 'Good', 'Available'),
 (5, 1, 'Yamaha U1 Piano', 23, 'P-1001', 'Excellent', 'Available'),
-(6, 1, 'Fender Stratocaster', 24, 'G-1001', 'Good', 'Available'),
+(6, 1, 'Fender Stratocaster', 24, 'G-1001', 'Good', 'Inactive'),
 (7, 1, 'Pearl Export Drum Kit', 29, 'D-1001', 'Good', 'In Use'),
 (8, 1, 'Suzuki Violin 4/4', 28, 'V-1001', 'Excellent', 'Available'),
 (9, 5, 'Kawai K-200 Piano', 23, 'P-5001', 'Good', 'Available'),
@@ -286,10 +296,30 @@ CREATE TABLE `tbl_registration_payments` (
   `amount` decimal(10,2) NOT NULL,
   `payment_method` enum('Cash','Card','Bank Transfer','GCash','Check','Other') NOT NULL,
   `status` enum('Paid','Pending','Failed','Refunded') DEFAULT 'Pending',
-  `receipt_number` varchar(50) DEFAULT NULL,
-  `notes` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `receipt_number` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_registration_payments`
+--
+
+INSERT INTO `tbl_registration_payments` (`registration_payment_id`, `student_id`, `payment_date`, `amount`, `payment_method`, `status`, `receipt_number`) VALUES
+(1, 1, '2026-02-21', 1000.00, 'Other', 'Paid', 'MIG-REG-1'),
+(2, 2, '2026-02-21', 1000.00, 'Other', 'Paid', 'MIG-REG-2'),
+(3, 3, '2026-02-21', 1000.00, 'Other', 'Paid', 'MIG-REG-3'),
+(4, 4, '2026-02-21', 1000.00, 'Other', 'Paid', 'MIG-REG-4'),
+(8, 1, '2026-02-23', 100.00, 'Cash', 'Paid', 'REG-1771836808'),
+(9, 5, '2026-02-23', 0.00, 'Other', 'Pending', 'REG-PROOF-1771838177'),
+(10, 6, '2026-02-26', 0.00, 'Other', 'Pending', 'REG-PROOF-1772065922'),
+(11, 6, '2026-02-26', 1000.00, 'Cash', 'Paid', 'REG-1772065983'),
+(14, 9, '2026-03-10', 1000.00, 'Other', 'Paid', 'REG-AUTO-1773122863'),
+(15, 10, '2026-03-10', 1000.00, 'Other', 'Paid', 'REG-AUTO-1773124692'),
+(16, 11, '2026-03-12', 0.00, 'Other', 'Pending', 'REG-PROOF-1773268339'),
+(17, 12, '2026-03-13', 0.00, 'Other', 'Pending', 'REG-PROOF-1773368538'),
+(18, 12, '2026-03-13', 1000.00, 'Cash', 'Paid', 'REG-1773368742'),
+(19, 13, '2026-03-13', 0.00, 'Other', 'Pending', 'REG-PROOF-1773369051'),
+(20, 13, '2026-03-13', 1000.00, 'GCash', 'Paid', 'REG-1773369063'),
+(21, 11, '2026-03-13', 1000.00, 'GCash', 'Paid', 'REG-1773379783');
 
 -- --------------------------------------------------------
 
@@ -477,9 +507,6 @@ CREATE TABLE `tbl_session_packages` (
 
 INSERT INTO `tbl_session_packages` (`package_id`, `branch_id`, `package_name`, `sessions`, `max_instruments`, `price`, `description`, `created_at`) VALUES
 (1, 1, 'Basic (12 Sessions)', 12, 1, 7450.00, '1 instrument only', '2026-02-20 16:00:25'),
-(2, 1, 'Standard (20 Sessions)', 20, 2, 11800.00, '2 instruments', '2026-02-20 16:00:25'),
-(4, 1, 'PACKAGE TEST', 100, 3, 2000.00, 'test', '2026-02-20 17:09:25'),
-(5, 1, 'PACKAGE TEST2', 2, 2, 2233.00, NULL, '2026-02-20 17:17:34'),
 (6, 5, 'Starter (8 Sessions)', 8, 1, 5200.00, 'Entry package for one instrument', '2026-02-21 03:10:00'),
 (7, 5, 'Standard (16 Sessions)', 16, 2, 9800.00, 'Balanced package for two instruments', '2026-02-21 03:10:00'),
 (8, 5, 'Performance Track (24 Sessions)', 24, 3, 14500.00, 'Intensive package for performance prep', '2026-02-21 03:10:00'),
@@ -513,6 +540,30 @@ INSERT INTO `tbl_settings` (`setting_id`, `setting_key`, `setting_value`, `setti
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_specialization`
+--
+
+CREATE TABLE `tbl_specialization` (
+  `specialization_id` int(11) NOT NULL,
+  `specialization_name` varchar(100) NOT NULL,
+  `status` enum('Active','Inactive') DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_specialization`
+--
+
+INSERT INTO `tbl_specialization` (`specialization_id`, `specialization_name`, `status`, `created_at`) VALUES
+(1, 'Piano', 'Active', '2026-02-23 09:45:38'),
+(2, 'Guitar', 'Active', '2026-02-23 09:45:38'),
+(3, 'Drums', 'Active', '2026-02-23 09:45:38'),
+(4, 'Violin', 'Active', '2026-02-23 09:45:38'),
+(5, 'General', 'Active', '2026-02-23 09:45:38');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_students`
 --
 
@@ -532,18 +583,26 @@ CREATE TABLE `tbl_students` (
   `health_diagnosis` text DEFAULT NULL,
   `status` enum('Active','Inactive','Graduated') DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `session_package_id` int(11) DEFAULT NULL
+  `session_package_id` int(11) DEFAULT NULL,
+  `registration_proof_path` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_students`
 --
 
-INSERT INTO `tbl_students` (`student_id`, `branch_id`, `first_name`, `last_name`, `middle_name`, `date_of_birth`, `age`, `phone`, `email`, `address`, `school`, `grade_year`, `health_diagnosis`, `status`, `created_at`, `session_package_id`) VALUES
-(1, 1, 'Lenard', 'Laurente', 'James Tingas', '2000-02-02', 26, '123123', 'enti@phinmaed.com', 'phinma cagayan de oro college, max suiniel street, carmen, 9000 cagayan de oro city misamis oriental', NULL, '12', 'none ', 'Active', '2026-02-20 16:34:46', NULL),
-(2, 1, 'Lenard', 'Laurente', 'James Tingas', '2000-02-02', 26, '123123', 'lenard@phinmaed.com', 'phinma cagayan de oro college, max suiniel street, carmen, 9000 cagayan de oro city misamis oriental', NULL, '12', 'none ', 'Active', '2026-02-20 16:39:13', 1),
-(3, 5, 'Anna', 'Dela Cruz', NULL, '2010-04-15', 15, '09171234567', 'anna.delacruz@fas.local', 'Carmen, Cagayan de Oro', 'St. Mary School', 'Grade 9', NULL, 'Active', '2026-02-21 03:20:00', NULL),
-(4, 6, 'Miguel', 'Santos', NULL, '2008-09-10', 17, '09179876543', 'miguel.santos@fas.local', 'Uptown, Cagayan de Oro', 'Xavier Academy', 'Grade 11', NULL, 'Active', '2026-02-21 03:22:00', NULL);
+INSERT INTO `tbl_students` (`student_id`, `branch_id`, `first_name`, `last_name`, `middle_name`, `date_of_birth`, `age`, `phone`, `email`, `address`, `school`, `grade_year`, `health_diagnosis`, `status`, `created_at`, `session_package_id`, `registration_proof_path`) VALUES
+(1, 1, 'Lenard', 'Laurente', 'James Tingas', '2000-02-02', 26, '123123', 'enti@phinmaed.com', 'phinma cagayan de oro college, max suiniel street, carmen, 9000 cagayan de oro city misamis oriental', NULL, '12', 'none ', 'Active', '2026-02-20 16:34:46', NULL, NULL),
+(2, 1, 'Lenard', 'Laurente', 'James Tingas', '2000-02-02', 26, '123123', 'lenard@phinmaed.com', 'phinma cagayan de oro college, max suiniel street, carmen, 9000 cagayan de oro city misamis oriental', NULL, '12', 'none ', 'Active', '2026-02-20 16:39:13', 1, NULL),
+(3, 5, 'Anna', 'Dela Cruz', NULL, '2010-04-15', 15, '09171234567', 'anna.delacruz@fas.local', 'Carmen, Cagayan de Oro', 'St. Mary School', 'Grade 9', NULL, 'Active', '2026-02-21 03:20:00', NULL, NULL),
+(4, 6, 'Miguel', 'Santos', NULL, '2008-09-10', 17, '09179876543', 'miguel.santos@fas.local', 'Uptown, Cagayan de Oro', 'Xavier Academy', 'Grade 11', NULL, 'Active', '2026-02-21 03:22:00', NULL, NULL),
+(5, 5, 'Micah', 'Lago', 'Dusil', '2000-02-16', 26, '09659153090', 'midu.lago.coc@phinmaed.com', 'zone 3 upper, Brgy. Bulua, Cagayan de Oro City, Misamis Oriental', 'COC', '3rd year ', 'none', 'Inactive', '2026-02-23 09:16:17', NULL, NULL),
+(6, 5, 'Micah', 'Lago', '', '2000-02-02', 26, '09659153090', 'micah@gmail.com', 'zone 3 upper, Brgy. Bulua, Cagayan de Oro City, Misamis Oriental', 'COC', '3rd year ', '', 'Active', '2026-02-26 00:32:02', NULL, NULL),
+(9, 5, 'arman', 'salon', '', '2003-02-10', 23, '0129391023123', 'arman@gmail.com', 'asdasdasd', NULL, '3rd year ', 'asdasd', 'Active', '2026-03-10 06:07:43', NULL, NULL),
+(10, 5, 'test', 'test', '', '2003-02-09', 23, 'none', 'test3@gmail.com', 'asd', NULL, 'asd', 'none ', 'Active', '2026-03-10 06:38:12', 8, NULL),
+(11, 5, 'inz', 'lago', '', '2015-03-11', 11, 'n/a', 'inz@gmail.com', 'tablon CDO', 'tablon ', 'grade 5', 'none', 'Active', '2026-03-11 22:32:19', NULL, NULL),
+(12, 6, 'Student', 'test', '', '2015-03-17', 10, 'n/a', 'studenttest@gmail.com', 'tablon phasco', 'tablon', 'grade 2', 'none ', 'Active', '2026-03-13 02:22:18', NULL, NULL),
+(13, 6, 'jeon', 'jungkook', '', '2012-06-13', 13, 'none', 'jeon@gmail.com', 'tablon ', 'Tablon ', 'grade 6 ', 'none ', 'Active', '2026-03-13 02:30:51', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -560,6 +619,15 @@ CREATE TABLE `tbl_student_guardians` (
   `can_pay` enum('Y','N') DEFAULT 'Y',
   `emergency_contact` enum('Y','N') DEFAULT 'N'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_student_guardians`
+--
+
+INSERT INTO `tbl_student_guardians` (`student_guardian_id`, `student_id`, `guardian_id`, `is_primary_guardian`, `can_enroll`, `can_pay`, `emergency_contact`) VALUES
+(1, 11, 1, 'Y', 'Y', 'Y', 'Y'),
+(2, 12, 2, 'Y', 'Y', 'Y', 'Y'),
+(3, 13, 3, 'Y', 'Y', 'Y', 'Y');
 
 -- --------------------------------------------------------
 
@@ -602,56 +670,6 @@ CREATE TABLE `tbl_student_progress` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_student_registration_fees`
---
-
-CREATE TABLE `tbl_student_registration_fees` (
-  `registration_id` int(11) NOT NULL,
-  `student_id` int(11) NOT NULL,
-  `registration_fee_amount` decimal(10,2) NOT NULL DEFAULT 1000.00,
-  `registration_fee_paid` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `registration_status` enum('Pending','Fee Paid','Approved','Rejected') NOT NULL DEFAULT 'Pending',
-  `notes` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tbl_student_registration_fees`
---
-
-INSERT INTO `tbl_student_registration_fees` (`registration_id`, `student_id`, `registration_fee_amount`, `registration_fee_paid`, `registration_status`, `notes`, `created_at`) VALUES
-(1, 1, 1000.00, 1000.00, 'Approved', 'Backfilled from tbl_students', '2026-02-21 02:03:36'),
-(2, 2, 1000.00, 1000.00, 'Approved', 'Backfilled from tbl_students', '2026-02-21 02:03:36'),
-(3, 3, 1000.00, 1000.00, 'Approved', 'Seeded approved fee', '2026-02-21 03:25:00'),
-(4, 4, 1000.00, 1000.00, 'Approved', 'Seeded approved fee', '2026-02-21 03:25:00');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `tbl_specialization`
---
-
-CREATE TABLE `tbl_specialization` (
-  `specialization_id` int(11) NOT NULL,
-  `specialization_name` varchar(100) NOT NULL,
-  `status` enum('Active','Inactive') DEFAULT 'Active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tbl_specialization`
---
-
-INSERT INTO `tbl_specialization` (`specialization_id`, `specialization_name`, `status`, `created_at`) VALUES
-(1, 'Piano', 'Active', '2026-02-20 18:10:00'),
-(2, 'Guitar', 'Active', '2026-02-20 18:10:00'),
-(3, 'Violin', 'Active', '2026-02-20 18:10:00'),
-(4, 'Voice', 'Active', '2026-02-20 18:10:00'),
-(5, 'Drums', 'Active', '2026-02-20 18:10:00');
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `tbl_teachers`
 --
 
@@ -679,33 +697,6 @@ INSERT INTO `tbl_teachers` (`teacher_id`, `user_id`, `branch_id`, `first_name`, 
 (4, NULL, 5, 'Marco', 'Reyes', 'marco.reyes@fas.local', '09170000004', 'Part-time', 'Active', '2026-02-21 03:30:00'),
 (5, NULL, 6, 'Nina', 'Uy', 'nina.uy@fas.local', '09170000005', 'Full-time', 'Active', '2026-02-21 03:31:00'),
 (6, NULL, 6, 'John', 'Tan', 'john.tan@fas.local', '09170000006', 'Part-time', 'Active', '2026-02-21 03:31:00');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `tbl_teacher_specializations`
---
-
-CREATE TABLE `tbl_teacher_specializations` (
-  `teacher_id` int(11) NOT NULL,
-  `specialization_id` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tbl_teacher_specializations`
---
-
-INSERT INTO `tbl_teacher_specializations` (`teacher_id`, `specialization_id`) VALUES
-(1, 1),
-(2, 2),
-(3, 1),
-(3, 3),
-(4, 2),
-(4, 4),
-(5, 1),
-(5, 4),
-(6, 2),
-(6, 5);
 
 -- --------------------------------------------------------
 
@@ -751,6 +742,29 @@ INSERT INTO `tbl_teacher_availability` (`availability_id`, `teacher_id`, `branch
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_teacher_specializations`
+--
+
+CREATE TABLE `tbl_teacher_specializations` (
+  `teacher_id` int(11) NOT NULL,
+  `specialization_id` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_teacher_specializations`
+--
+
+INSERT INTO `tbl_teacher_specializations` (`teacher_id`, `specialization_id`) VALUES
+(1, 1),
+(2, 2),
+(3, 1),
+(4, 2),
+(5, 1),
+(6, 3);
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_users`
 --
 
@@ -772,8 +786,17 @@ CREATE TABLE `tbl_users` (
 --
 
 INSERT INTO `tbl_users` (`user_id`, `username`, `password`, `role_id`, `first_name`, `last_name`, `email`, `phone`, `status`, `created_at`) VALUES
-(1, 'fasadmin@music.com', '$2y$10$rioDBIW6MNarnd6ZRJF9g.Dma59mDAHCdRiploZMYWYfnwvXJC1j2', 1, 'FAS', 'Administrator', 'fasadmin@music.com', NULL, 'Active', '2026-02-20 15:52:18'),
-(2, 'lenard@phinmaed.com', '$2y$10$.7Y6DvwGEmc.AB/4an0jxufAwRIbZv5A3QJr.Z8yPdPgfF2zecRMe', 4, 'Lenard', 'Laurente', 'lenard@phinmaed.com', '123123', 'Active', '2026-02-20 16:39:13');
+(1, 'fasadmin@music.com', '$2y$10$.FZqFS/PLmwEinoUEAWfh.70K3ibcQcTrC0qMyh3kjtNqZGZ8UB6W', 1, 'FAS', 'Administrator', 'fasadmin@music.com', NULL, 'Active', '2026-02-20 15:52:18'),
+(2, 'lenard@phinmaed.com', '$2y$10$kQjaOc66Iv6pTykUtGOouu.6O1K2O3I7L88hpgR/ce5EBS8I5eA/K', 4, 'Lenard', 'Laurente', 'lenard@phinmaed.com', '123123', 'Active', '2026-02-20 16:39:13'),
+(3, 'midu.lago.coc@phinmaed.com', '$2y$10$1pkBXU7RsVKgs9lp8tegkeN6s3Oy8zPU0.jnKVyDasOIWPk7GXLje', 4, 'Micah', 'Lago', 'midu.lago.coc@phinmaed.com', '09659153090', 'Inactive', '2026-02-23 09:16:17'),
+(4, 'micah@gmail.com', '$2y$10$p7GUBbweXBx0juGbXX5FJOZOVq2RpAgQHuWkNdtd/0CFJQ9E9NZzC', 4, 'Micah', 'Lago', 'micah@gmail.com', '09659153090', 'Active', '2026-02-26 00:32:02'),
+(7, 'arman@gmail.com', '$2y$10$qwlDMuqkXNEO7cnbYIPn1ORtYw4cwnbtQ1z7WNUP5qAp/2txTLSf2', 4, 'arman', 'salon', 'arman@gmail.com', '0129391023123', 'Active', '2026-03-10 06:07:43'),
+(8, 'test3@gmail.com', '$2y$10$wBrwYQ9eLTqqDXuYG.CYhel/F/RWgv4y9FGxRqlkiY8zRM2Nf5DRy', 4, 'test', 'test', 'test3@gmail.com', 'none', 'Active', '2026-03-10 06:38:12'),
+(9, 'inz@gmail.com', '$2y$10$QmC1ilip.zSZ/XYn0OUkOeJN1xZcqUKkb0Xp4kgz3SYwkLXwxXzna', 4, 'inz', 'lago', 'inz@gmail.com', 'n/a', 'Active', '2026-03-11 22:32:19'),
+(10, 'studenttest@gmail.com', '$2y$10$PgTyhodnq5Zp94f8nXTnS.YBSWFaQL5EpEH1iYs/bXitMNQ16XSQa', 4, 'Student', 'test', 'studenttest@gmail.com', 'n/a', 'Active', '2026-03-13 02:22:18'),
+(11, 'guardian@gmail.com', '$2y$10$PgTyhodnq5Zp94f8nXTnS.YBSWFaQL5EpEH1iYs/bXitMNQ16XSQa', 5, 'guardian', 'test', 'guardian@gmail.com', '09659153090', 'Inactive', '2026-03-13 02:22:18'),
+(12, 'jeon@gmail.com', '$2y$10$s/Lqq7GQyszoETKJfBeZGuxV6wCuO6imEaOYHAtf9HaLWDGcuuWlq', 4, 'jeon', 'jungkook', 'jeon@gmail.com', 'none', 'Active', '2026-03-13 02:30:51'),
+(13, 'jin@gmail.com', '$2y$10$s/Lqq7GQyszoETKJfBeZGuxV6wCuO6imEaOYHAtf9HaLWDGcuuWlq', 5, 'Kim', 'Seokjin', 'jin@gmail.com', '09102390123', 'Active', '2026-03-13 02:30:51');
 
 --
 -- Indexes for dumped tables
@@ -954,6 +977,13 @@ ALTER TABLE `tbl_settings`
   ADD KEY `updated_by` (`updated_by`);
 
 --
+-- Indexes for table `tbl_specialization`
+--
+ALTER TABLE `tbl_specialization`
+  ADD PRIMARY KEY (`specialization_id`),
+  ADD UNIQUE KEY `uniq_specialization_name` (`specialization_name`);
+
+--
 -- Indexes for table `tbl_students`
 --
 ALTER TABLE `tbl_students`
@@ -991,14 +1021,6 @@ ALTER TABLE `tbl_student_progress`
   ADD KEY `instrument_id` (`instrument_id`);
 
 --
--- Indexes for table `tbl_student_registration_fees`
---
-ALTER TABLE `tbl_student_registration_fees`
-  ADD PRIMARY KEY (`registration_id`),
-  ADD UNIQUE KEY `unique_registration_fee_student` (`student_id`),
-  ADD KEY `fk_registration_fees_student` (`student_id`);
-
---
 -- Indexes for table `tbl_teachers`
 --
 ALTER TABLE `tbl_teachers`
@@ -1022,12 +1044,6 @@ ALTER TABLE `tbl_teacher_specializations`
   ADD PRIMARY KEY (`teacher_id`,`specialization_id`),
   ADD KEY `idx_tts_specialization` (`specialization_id`);
 
--- Indexes for table `tbl_specialization`
---
-ALTER TABLE `tbl_specialization`
-  ADD PRIMARY KEY (`specialization_id`),
-  ADD UNIQUE KEY `uniq_specialization_name` (`specialization_name`);
-
 --
 -- Indexes for table `tbl_users`
 --
@@ -1050,13 +1066,13 @@ ALTER TABLE `tbl_branches`
 -- AUTO_INCREMENT for table `tbl_enrollments`
 --
 ALTER TABLE `tbl_enrollments`
-  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `tbl_guardians`
 --
 ALTER TABLE `tbl_guardians`
-  MODIFY `guardian_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `guardian_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `tbl_instruments`
@@ -1068,7 +1084,7 @@ ALTER TABLE `tbl_instruments`
 -- AUTO_INCREMENT for table `tbl_instrument_types`
 --
 ALTER TABLE `tbl_instrument_types`
-  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
+  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=52;
 
 --
 -- AUTO_INCREMENT for table `tbl_makeup_sessions`
@@ -1110,7 +1126,7 @@ ALTER TABLE `tbl_recurring_schedule`
 -- AUTO_INCREMENT for table `tbl_registration_payments`
 --
 ALTER TABLE `tbl_registration_payments`
-  MODIFY `registration_payment_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `registration_payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `tbl_repairs`
@@ -1167,16 +1183,22 @@ ALTER TABLE `tbl_settings`
   MODIFY `setting_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `tbl_specialization`
+--
+ALTER TABLE `tbl_specialization`
+  MODIFY `specialization_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
 -- AUTO_INCREMENT for table `tbl_students`
 --
 ALTER TABLE `tbl_students`
-  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `tbl_student_guardians`
 --
 ALTER TABLE `tbl_student_guardians`
-  MODIFY `student_guardian_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `student_guardian_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `tbl_student_instruments`
@@ -1191,16 +1213,10 @@ ALTER TABLE `tbl_student_progress`
   MODIFY `progress_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `tbl_student_registration_fees`
---
-ALTER TABLE `tbl_student_registration_fees`
-  MODIFY `registration_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
-
---
 -- AUTO_INCREMENT for table `tbl_teachers`
 --
 ALTER TABLE `tbl_teachers`
-  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `tbl_teacher_availability`
@@ -1209,16 +1225,10 @@ ALTER TABLE `tbl_teacher_availability`
   MODIFY `availability_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
--- AUTO_INCREMENT for table `tbl_specialization`
---
-ALTER TABLE `tbl_specialization`
-  MODIFY `specialization_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
-
---
 -- AUTO_INCREMENT for table `tbl_users`
 --
 ALTER TABLE `tbl_users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- Constraints for dumped tables
@@ -1364,12 +1374,6 @@ ALTER TABLE `tbl_student_progress`
   ADD CONSTRAINT `tbl_student_progress_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`),
   ADD CONSTRAINT `tbl_student_progress_ibfk_2` FOREIGN KEY (`session_id`) REFERENCES `tbl_sessions` (`session_id`),
   ADD CONSTRAINT `tbl_student_progress_ibfk_3` FOREIGN KEY (`instrument_id`) REFERENCES `tbl_instruments` (`instrument_id`);
-
---
--- Constraints for table `tbl_student_registration_fees`
---
-ALTER TABLE `tbl_student_registration_fees`
-  ADD CONSTRAINT `fk_registration_fees_student` FOREIGN KEY (`student_id`) REFERENCES `tbl_students` (`student_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `tbl_teachers`

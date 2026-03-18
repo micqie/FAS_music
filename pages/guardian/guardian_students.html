@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Guardian Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .dark-glass { background: rgba(15, 17, 21, 0.88); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="bg-obsidian text-white antialiased">
+    <div id="guardianStudentsRoot"></div>
+
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-6">
+            <a href="../../index.html" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
+            <div class="hidden md:block">
+                <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Guardian Portal</div>
+                <div class="text-sm text-zinc-300">Students & Payments</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="guardianNavName" class="text-sm font-semibold text-white">Guardian</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Account</span>
+            </div>
+            <button onclick="logout()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
+                <i class="fas fa-sign-out-alt mr-2 text-gold-400"></i>Logout
+            </button>
+        </div>
+    </nav>
+
+    <main class="pt-28 p-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                <div class="lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                    <div class="flex items-center gap-4">
+                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div id="guardianName" class="text-xl font-extrabold truncate">—</div>
+                            <div class="text-sm text-zinc-400">Email: <span id="guardianEmail" class="text-zinc-200 font-semibold">—</span></div>
+                            <div class="text-sm text-zinc-400">Phone: <span id="guardianPhone" class="text-zinc-200 font-semibold">—</span></div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-zinc-400 mt-4">This portal shows your linked students, session progress, and payment status.</p>
+                </div>
+                <div class="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-6 shadow-2xl shadow-black/40">
+                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Overview</div>
+                    <div class="mt-4 space-y-4">
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+                            <div class="text-xs text-zinc-400">Students</div>
+                            <div id="guardianStudentCount" class="text-2xl font-black text-white mt-1">0</div>
+                        </div>
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+                            <div class="text-xs text-zinc-400">Total Balance Due</div>
+                            <div id="guardianTotalBalance" class="text-2xl font-black text-gold-400 mt-1">₱0.00</div>
+                        </div>
+                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+                            <div class="text-xs text-zinc-400">Total Paid</div>
+                            <div id="guardianTotalPaid" class="text-2xl font-black text-white mt-1">₱0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h1 class="text-3xl md:text-4xl font-black tracking-tight">Your Students</h1>
+                <p class="text-zinc-400 mt-2">Track attendance progress, schedules, and payments in one place.</p>
+            </div>
+
+            <div id="guardianStudentsList" class="grid grid-cols-1 gap-6"></div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="../../js/mode.js"></script>
+    <script src="../../js/index.js"></script>
+</body>
+</html>
