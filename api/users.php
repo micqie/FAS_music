@@ -159,10 +159,10 @@ class User
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
         $data = json_decode($json, true);
-        $username = $data['username'] ?? '';
+        $username = trim((string) ($data['username'] ?? ''));
         $password = $data['password'] ?? '';
 
-        if (empty($username) || empty($password)) {
+        if ($username === '' || $password === '' || $password === null) {
             $this->sendJSON(['error' => 'Username and password are required'], 400);
         }
         try {
@@ -196,12 +196,12 @@ class User
                 $this->sendJSON(['error' => 'Your account is pending admin approval. Please wait for approval before logging in.'], 403);
             }
 
-            // Detect default password "fasmusic2020" for students (first-login change requirement)
+            // Detect default password "fasmusic2020" for non-admin roles (first-login change requirement)
             $mustChangePassword = false;
-            if (
-                $user['role_name'] === 'Student'
-                && (password_verify('fasmusic2020', $storedPassword) || hash_equals($storedPassword, 'fasmusic2020'))
-            ) {
+            $roleName = (string)($user['role_name'] ?? '');
+            $isDefaultPassword = password_verify('fasmusic2020', $storedPassword)
+                || hash_equals($storedPassword, 'fasmusic2020');
+            if ($isDefaultPassword && strcasecmp($roleName, 'Admin') !== 0) {
                 $mustChangePassword = true;
             }
 

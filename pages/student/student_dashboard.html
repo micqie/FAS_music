@@ -31,8 +31,8 @@
 <body class="bg-obsidian text-white antialiased">
     <div id="studentDashboardRoot"></div>
 
-    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
-        <div class="flex items-center gap-6">
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-3 sm:gap-6">
             <a href="../../index.html" class="h-10 flex items-center">
                 <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
             </a>
@@ -41,17 +41,23 @@
                 <div class="text-sm text-zinc-300">Dashboard</div>
             </div>
         </div>
-        <div class="flex items-center gap-4">
-            <div class="hidden md:flex flex-col text-right">
-                <span id="studentNavName" class="text-sm font-semibold text-white">Student</span>
-                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Account</span>
-            </div>
-            <button onclick="logout()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
-                <i class="fas fa-sign-out-alt mr-2 text-gold-400"></i>Logout
+        <div class="flex items-center gap-3">
+            <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-white/15 flex items-center justify-center text-zinc-200">
+                <i class="fas fa-bars text-lg"></i>
             </button>
+            <div class="hidden md:flex items-center gap-4">
+                <div class="flex flex-col text-right">
+                    <span id="studentNavName" class="text-sm font-semibold text-white">Student</span>
+                    <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Account</span>
+                </div>
+                <button onclick="logout()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
+                    <i class="fas fa-sign-out-alt mr-2 text-gold-400"></i>Logout
+                </button>
+            </div>
         </div>
     </nav>
 
+    <!-- Desktop sidebar -->
     <aside class="fixed inset-y-0 left-0 w-72 bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-white/5">
         <div class="px-6 space-y-8 flex-1 mt-4">
             <div>
@@ -80,14 +86,45 @@
         </div>
     </aside>
 
-    <main class="lg:ml-72 pt-28 p-8">
+    <!-- Mobile nav drawer -->
+    <div id="studentMobileMenu" class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden hidden">
+        <div class="absolute inset-y-0 left-0 w-72 max-w-[80%] bg-obsidian border-r border-white/10 pt-20 pb-6 flex flex-col">
+            <div class="px-6 space-y-6 flex-1 overflow-y-auto">
+                <div>
+                    <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Navigation</h3>
+                    <nav class="space-y-2">
+                        <a href="student_dashboard.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
+                            <i class="fas fa-grid-2 mr-3"></i> Dashboard
+                        </a>
+                        <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                            <i class="fas fa-calendar-check mr-3 text-zinc-500"></i> Sessions
+                        </a>
+                        <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                            <i class="fas fa-user mr-3 text-zinc-500"></i> Profile
+                        </a>
+                        <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                            <i class="fas fa-qrcode mr-3 text-zinc-500"></i> My QR Code
+                        </a>
+                    </nav>
+                </div>
+            </div>
+            <div class="px-6 border-t border-white/10 pt-4 flex items-center justify-between">
+                <div class="text-xs text-zinc-400" id="studentMobileMenuName">Signed in</div>
+                <button onclick="logout()" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold transition">
+                    <i class="fas fa-sign-out-alt mr-1 text-gold-400"></i>Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="lg:ml-72 pt-24 pb-8 px-4 sm:px-6 lg:px-8">
         <div class="max-w-7xl mx-auto">
-            <div class="mb-10">
-                <h1 class="text-3xl md:text-4xl font-black tracking-tight">Welcome back</h1>
-                <p class="text-zinc-400 mt-2">Here’s your account overview and attendance QR.</p>
+            <div class="mb-8 sm:mb-10">
+                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">Welcome back</h1>
+                <p class="text-sm sm:text-base text-zinc-400 mt-2">Quick view of your account and QR. For full details, open Sessions or Profile.</p>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                 <!-- Profile Card -->
                 <div class="lg:col-span-1 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
                     <div class="flex items-center gap-4">
@@ -112,7 +149,7 @@
                 </div>
 
                 <!-- Balance Card -->
-                <div class="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-6 shadow-2xl shadow-black/40">
+                <div class="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-5 sm:p-6 shadow-2xl shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Current Balance Due</div>
@@ -135,8 +172,8 @@
                     <p class="text-xs text-zinc-500 mt-4">Balance is computed from your registration + package fee minus recorded payments.</p>
                 </div>
 
-                <!-- Sessions Card -->
-                <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <!-- Sessions Card (summary only) -->
+                <div class="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6 shadow-2xl shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Sessions</div>
@@ -172,8 +209,8 @@
                     </div>
                 </div>
 
-                <!-- Current Enrollment -->
-                <div class="lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <!-- Current Enrollment (desktop / tablet; keep off small screens to reduce clutter) -->
+                <div class="hidden md:block lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Current Enrollment</div>
@@ -186,8 +223,8 @@
                     <div id="currentEnrollmentSummary" class="mt-5 text-sm text-zinc-300"></div>
                 </div>
 
-                <!-- Enrollment History -->
-                <div class="lg:col-span-3 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <!-- Enrollment History (desktop / tablet only) -->
+                <div class="hidden md:block lg:col-span-3 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Enrollment History</div>
@@ -200,8 +237,21 @@
                     <div id="enrollmentHistoryList" class="mt-4 space-y-2 text-sm text-zinc-200"></div>
                 </div>
 
-                <!-- Request Enrollment -->
-                <div class="lg:col-span-3 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <!-- Simple Request Enrollment shortcut for mobile -->
+                <div class="md:hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/40">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Request Enrollment</div>
+                            <div class="text-sm font-semibold mt-1">Choose package, instruments, and schedule.</div>
+                        </div>
+                        <a href="student_sessions.html" class="px-4 py-2 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-xs font-extrabold transition whitespace-nowrap">
+                            Open Sessions
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Full Request Enrollment form (desktop / tablet only) -->
+                <div class="hidden md:block lg:col-span-3 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Request Enrollment</div>
@@ -300,7 +350,24 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="../../js/mode.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../../js/index.js"></script>
+    <script src="../../js/index.js"></script>
+    <script>
+        // Mobile nav toggle for student portal
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleBtn = document.getElementById('studentMobileMenuToggle');
+            const mobileMenu = document.getElementById('studentMobileMenu');
+            if (toggleBtn && mobileMenu) {
+                toggleBtn.addEventListener('click', () => {
+                    mobileMenu.classList.toggle('hidden');
+                });
+                mobileMenu.addEventListener('click', (e) => {
+                    if (e.target === mobileMenu) {
+                        mobileMenu.classList.add('hidden');
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
 

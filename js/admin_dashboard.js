@@ -1,6 +1,16 @@
-// Base API URL (same-origin safe)
+// Base API URL (deployment-path safe)
 const baseApiUrl = (() => {
-    const fallback = `${window.location.origin}/FAS_music/api`;
+    const fallback = (() => {
+        try {
+            const appBase = (typeof window.appBaseUrl === 'string' && window.appBaseUrl)
+                ? window.appBaseUrl
+                : `${window.location.origin}/FAS_music`;
+            return `${appBase}/api`.replace(/\/$/, '');
+        } catch (e) {
+            return `${window.location.origin}/FAS_music/api`;
+        }
+    })();
+
     try {
         const stored = sessionStorage.getItem("baseAPIUrl") || '';
         if (!stored) return fallback;
@@ -21,15 +31,15 @@ async function apiGet(endpoint) {
     if (typeof axios === 'undefined') {
         throw new Error('Axios is required for API requests.');
     }
-    const res = await axios.get(`/${endpoint}`);
-    return res.data;
+    const res = await axios.get(`${baseApiUrl}/${endpoint}`, { validateStatus: () => true });
+    return res.data || {};
 }
 async function apiPost(endpoint, data) {
     if (typeof axios === 'undefined') {
         throw new Error('Axios is required for API requests.');
     }
-    const res = await axios.post(`/${endpoint}`, data);
-    return res.data;
+    const res = await axios.post(`${baseApiUrl}/${endpoint}`, data, { validateStatus: () => true });
+    return res.data || {};
 }
 
 // Check authentication

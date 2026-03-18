@@ -1,7 +1,23 @@
-// Base API URL - derive from current origin to avoid localhost/127.0.0.1 CORS mismatch
+// Base API URL (same-origin, deployment-path safe)
 let baseApiUrl;
+let appBaseUrl;
 (function initApiBaseUrl() {
-    const defaultApiUrl = `${window.location.origin}/FAS_music/api`;
+    // Derive app base from where this script is served (works even if folder is renamed).
+    const defaultAppBaseUrl = (() => {
+        try {
+            const scriptSrc = document.currentScript && document.currentScript.src ? document.currentScript.src : '';
+            const scriptUrl = new URL(scriptSrc, window.location.href);
+            // Expected: {origin}/{app}/js/index.js
+            const basePath = scriptUrl.pathname.replace(/\/js\/index\.js$/i, '');
+            return `${scriptUrl.origin}${basePath}`.replace(/\/$/, '');
+        } catch (e) {
+            // Last-resort fallback for legacy deployments
+            return `${window.location.origin}/FAS_music`;
+        }
+    })();
+
+    appBaseUrl = defaultAppBaseUrl;
+    const defaultApiUrl = `${defaultAppBaseUrl}/api`;
     let storedApiUrl = '';
 
     try {
@@ -28,6 +44,7 @@ let baseApiUrl;
 
     // Keep global access explicit for inline page scripts
     window.baseApiUrl = baseApiUrl;
+    window.appBaseUrl = appBaseUrl;
 
     // Wire axios if available
     if (typeof axios !== 'undefined') {
@@ -35,6 +52,32 @@ let baseApiUrl;
         axios.defaults.withCredentials = true;
         axios.defaults.headers.common['Content-Type'] = 'application/json';
         axios.defaults.validateStatus = () => true;
+
+        // Minimal debug help for endpoint/method mismatches (e.g., 405 "Method not allowed")
+        try {
+            if (!window.__fasAxiosInterceptorInstalled) {
+                window.__fasAxiosInterceptorInstalled = true;
+                axios.interceptors.response.use(
+                    (response) => {
+                        if (response && typeof response.status === 'number' && response.status >= 400) {
+                            const method = (response.config?.method || '').toUpperCase();
+                            const url = response.config?.url || '';
+                            const serverError = response.data?.error || response.data?.message || '';
+                            console.warn(`[API ${response.status}] ${method} ${url}${serverError ? ` -> ${serverError}` : ''}`);
+                        }
+                        return response;
+                    },
+                    (error) => {
+                        const method = (error?.config?.method || '').toUpperCase();
+                        const url = error?.config?.url || '';
+                        console.warn(`[API ERROR] ${method} ${url}`, error);
+                        return Promise.reject(error);
+                    }
+                );
+            }
+        } catch (e) {
+            // Ignore interceptor failures
+        }
     }
 })();
 
@@ -74,9 +117,11 @@ const Auth = {
             // Storage access blocked - continue anyway
         }
         // Redirect to app root index from any nested page
-        const appBase = (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
-            ? baseApiUrl.slice(0, -4)
-            : `${window.location.origin}/FAS_music`;
+        const appBase = (typeof appBaseUrl === 'string' && appBaseUrl)
+            ? appBaseUrl
+            : ((typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+                ? baseApiUrl.slice(0, -4)
+                : `${window.location.origin}/FAS_music`);
         window.location.href = `${appBase}/index.html`;
     },
 
@@ -341,11 +386,14 @@ function initLoginForm() {
 
                 // Redirect based on role
                 setTimeout(() => {
-                    if (data.user.role_name === 'Admin' || data.user.role_name === 'SuperAdmin') {
+                    const role = String(data.user.role_name || '').trim();
+                    if (role === 'Admin' || role === 'SuperAdmin') {
                         window.location.href = 'pages/admin/admin_dashboard.html';
-                    } else if (data.user.role_name === 'Staff') {
+                    } else if (role === 'Manager' || role === 'Branch Manager') {
+                        window.location.href = 'pages/manager/manager_dashboard.html';
+                    } else if (role === 'Staff') {
                         window.location.href = 'pages/desk/desk_scanner.html';
-                    } else if (data.user.role_name === 'Student') {
+                    } else if (role === 'Student') {
                         window.location.href = 'pages/student/student_dashboard.html';
                     } else if (data.user.role_name === 'Guardians') {
                         window.location.href = 'pages/guardian/guardian_students.html';
@@ -364,6 +412,7 @@ function initLoginForm() {
                             ? 'Your account is pending admin approval.'
                             : 'An error occurred. Please try again.';
 
+<<<<<<< HEAD
                 const isPending = status === 403 || /pending/i.test(message);
                 Swal.fire({
                     icon: isPending ? 'info' : 'error',
@@ -377,6 +426,24 @@ function initLoginForm() {
                     loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
                     loginBtnIcon.classList.add('fa-sign-in-alt');
                 }
+=======
+                const title = status === 403 ? 'Pending Account' : status === 401 ? 'Login Failed' : 'Error';
+                const icon = status === 403 ? 'info' : 'error';
+
+                // Show error message with SweetAlert
+                Swal.fire({
+                    icon,
+                    title,
+                    text: message,
+                    confirmButtonColor: '#b8860b'
+                });
+            if (loginBtn) loginBtn.disabled = false;
+            if (loginBtnText) loginBtnText.textContent = 'Sign In';
+            if (loginBtnIcon) {
+                loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
+                loginBtnIcon.classList.add('fa-sign-in-alt');
+            }
+>>>>>>> 6440a41401e7df2b40cbef7ea925bff32ea52d28
             }
         } catch (error) {
             const status = error?.response?.status;
@@ -388,11 +455,19 @@ function initLoginForm() {
                     : status === 403
                         ? 'Your account is pending admin approval.'
                         : 'An error occurred. Please try again.';
+            const title = status === 403 ? 'Pending Account' : status === 401 ? 'Login Failed' : 'Error';
+            const icon = status === 403 ? 'info' : 'error';
             console.error('Login error:', error);
+<<<<<<< HEAD
             const isPending = status === 403 || /pending/i.test(message);
             Swal.fire({
                 icon: isPending ? 'info' : 'error',
                 title: isPending ? 'Pending Account' : 'Login Failed',
+=======
+            Swal.fire({
+                icon,
+                title,
+>>>>>>> 6440a41401e7df2b40cbef7ea925bff32ea52d28
                 text: message,
                 confirmButtonColor: '#b8860b'
             });
@@ -1301,9 +1376,11 @@ function checkAuth() {
             confirmButtonColor: '#b8860b',
             confirmButtonText: 'Go to Login'
         }).then(() => {
-            const appBase = (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
-                ? baseApiUrl.slice(0, -4)
-                : `${window.location.origin}/FAS_music`;
+            const appBase = (typeof appBaseUrl === 'string' && appBaseUrl)
+                ? appBaseUrl
+                : ((typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+                    ? baseApiUrl.slice(0, -4)
+                    : `${window.location.origin}/FAS_music`);
             window.location.href = `${appBase}/index.html`;
         });
     }
@@ -1321,9 +1398,11 @@ function checkStudentAuth() {
             confirmButtonColor: '#b8860b',
             confirmButtonText: 'Go to Login'
         }).then(() => {
-            const appBase = (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
-                ? baseApiUrl.slice(0, -4)
-                : `${window.location.origin}/FAS_music`;
+            const appBase = (typeof appBaseUrl === 'string' && appBaseUrl)
+                ? appBaseUrl
+                : ((typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+                    ? baseApiUrl.slice(0, -4)
+                    : `${window.location.origin}/FAS_music`);
             window.location.href = `${appBase}/index.html`;
         });
         return false;
@@ -3342,6 +3421,21 @@ async function rejectRegistration(studentId) {
         }
     } catch (error) {
         showMessage('Failed to reject registration: ' + (error.message || error), 'error');
+    }
+}
+
+// Admin Users - load all users into admin_users.html table
+async function loadAdminUsers() {
+    try {
+        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-users`);
+        const data = res.data;
+        if (data && data.success && Array.isArray(data.users)) {
+            if (typeof setAdminUsersRows === 'function') {
+                setAdminUsersRows(data.users);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load admin users', error);
     }
 }
 
