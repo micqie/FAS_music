@@ -7,7 +7,7 @@ ini_set('log_errors', 1);
 $servername = "localhost";
 $dbusername = "root";
 $dbpassword = "";
-$dbname = "music-db";
+$dbname = "music_db";
 
 try {
     $conn = new PDO("mysql:host=$servername;dbname=$dbname;charset=utf8mb4", $dbusername, $dbpassword);
