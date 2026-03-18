@@ -412,11 +412,14 @@ function initLoginForm() {
                             ? 'Your account is pending admin approval.'
                             : 'An error occurred. Please try again.';
 
-<<<<<<< HEAD
                 const isPending = status === 403 || /pending/i.test(message);
+                const title = isPending ? 'Pending Account' : status === 401 ? 'Login Failed' : 'Error';
+                const icon = isPending ? 'info' : 'error';
+
+                // Show error message with SweetAlert
                 Swal.fire({
-                    icon: isPending ? 'info' : 'error',
-                    title: isPending ? 'Pending Account' : 'Login Failed',
+                    icon,
+                    title,
                     text: message,
                     confirmButtonColor: '#b8860b'
                 });
@@ -426,24 +429,6 @@ function initLoginForm() {
                     loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
                     loginBtnIcon.classList.add('fa-sign-in-alt');
                 }
-=======
-                const title = status === 403 ? 'Pending Account' : status === 401 ? 'Login Failed' : 'Error';
-                const icon = status === 403 ? 'info' : 'error';
-
-                // Show error message with SweetAlert
-                Swal.fire({
-                    icon,
-                    title,
-                    text: message,
-                    confirmButtonColor: '#b8860b'
-                });
-            if (loginBtn) loginBtn.disabled = false;
-            if (loginBtnText) loginBtnText.textContent = 'Sign In';
-            if (loginBtnIcon) {
-                loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
-                loginBtnIcon.classList.add('fa-sign-in-alt');
-            }
->>>>>>> 6440a41401e7df2b40cbef7ea925bff32ea52d28
             }
         } catch (error) {
             const status = error?.response?.status;
@@ -455,19 +440,13 @@ function initLoginForm() {
                     : status === 403
                         ? 'Your account is pending admin approval.'
                         : 'An error occurred. Please try again.';
-            const title = status === 403 ? 'Pending Account' : status === 401 ? 'Login Failed' : 'Error';
-            const icon = status === 403 ? 'info' : 'error';
             console.error('Login error:', error);
-<<<<<<< HEAD
             const isPending = status === 403 || /pending/i.test(message);
-            Swal.fire({
-                icon: isPending ? 'info' : 'error',
-                title: isPending ? 'Pending Account' : 'Login Failed',
-=======
+            const title = isPending ? 'Pending Account' : status === 401 ? 'Login Failed' : 'Error';
+            const icon = isPending ? 'info' : 'error';
             Swal.fire({
                 icon,
                 title,
->>>>>>> 6440a41401e7df2b40cbef7ea925bff32ea52d28
                 text: message,
                 confirmButtonColor: '#b8860b'
             });
