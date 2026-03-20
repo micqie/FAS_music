@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Student Dashboard</title>
+    <title>Student Dashboard | Father & Sons Music</title>
+    <script>
+        (function(){ var t=localStorage.getItem('theme')||'dark'; document.documentElement.classList.toggle('dark',t!=='light'); })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/portal.css">
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -24,41 +28,42 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .dark-glass { background: rgba(15, 17, 21, 0.88); backdrop-filter: blur(10px); }
+        .portal-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); }
+        html.dark .portal-nav { background: rgba(15,17,21,0.92); }
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
     </style>
 </head>
-<body class="bg-obsidian text-white antialiased">
+<body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
     <div id="studentDashboardRoot"></div>
 
-    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-2xl">
+    <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-3 sm:gap-6">
             <a href="../../index.html" class="h-10 flex items-center">
-                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
             </a>
             <div class="hidden md:block">
-                <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Student Portal</div>
-                <div class="text-sm text-zinc-300">Dashboard</div>
+                <div class="text-xs uppercase tracking-[0.25em] text-gold-500 font-bold">Student Portal</div>
+                <div class="text-sm text-zinc-500 dark:text-zinc-300">Dashboard</div>
             </div>
         </div>
         <div class="flex items-center gap-3">
-            <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-white/15 flex items-center justify-center text-zinc-200">
+            <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-zinc-300 dark:border-white/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200" aria-label="Open menu">
                 <i class="fas fa-bars text-lg"></i>
             </button>
             <div class="hidden md:flex items-center gap-4">
                 <div class="flex flex-col text-right">
-                    <span id="studentNavName" class="text-sm font-semibold text-white">Student</span>
-                    <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Account</span>
+                    <span id="studentNavName" class="text-sm font-semibold text-zinc-900 dark:text-white">Student</span>
+                    <span class="text-[10px] uppercase tracking-widest text-gold-500 font-bold">Account</span>
                 </div>
-                <button onclick="logout()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
-                    <i class="fas fa-sign-out-alt mr-2 text-gold-400"></i>Logout
+                <button onclick="logout()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
+                    <i class="fas fa-sign-out-alt mr-2 text-gold-500"></i>Logout
                 </button>
             </div>
         </div>
     </nav>
 
     <!-- Desktop sidebar -->
-    <aside class="fixed inset-y-0 left-0 w-72 bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-white/5">
+    <aside class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-zinc-200 dark:border-white/5">
         <div class="px-6 space-y-8 flex-1 mt-4">
             <div>
                 <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Navigation</h3>
@@ -66,29 +71,29 @@
                     <a href="student_dashboard.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
                         <i class="fas fa-grid-2 mr-3"></i> Dashboard
                     </a>
-                    <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-calendar-check mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Sessions
                     </a>
-                    <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-user mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Profile
+                    <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-user mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Profile
                     </a>
-                    <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-qrcode mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> My QR Code
+                    <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-qrcode mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> My QR Code
                     </a>
                 </nav>
             </div>
         </div>
-        <div class="p-6 border-t border-white/5">
-            <div class="rounded-2xl border border-gold-500/20 bg-gradient-to-b from-gold-500/10 to-transparent p-4">
-                <div class="text-xs uppercase tracking-[0.25em] text-gold-400 font-bold">Tip</div>
-                <div class="text-sm text-zinc-200 mt-1">Open <span class="font-semibold">My QR Code</span> when you arrive for attendance.</div>
+        <div class="p-6 border-t border-zinc-200 dark:border-white/5">
+            <div class="rounded-2xl border border-gold-500/30 bg-amber-50 dark:bg-gold-500/10 p-4">
+                <div class="text-xs uppercase tracking-[0.25em] text-gold-600 font-bold">Quick tip</div>
+                <div class="text-sm text-zinc-600 dark:text-zinc-200 mt-1">Open <span class="font-semibold">My QR Code</span> when you arrive for attendance.</div>
             </div>
         </div>
     </aside>
 
     <!-- Mobile nav drawer -->
-    <div id="studentMobileMenu" class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden hidden">
-        <div class="absolute inset-y-0 left-0 w-72 max-w-[80%] bg-obsidian border-r border-white/10 pt-20 pb-6 flex flex-col">
+    <div id="studentMobileMenu" class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden hidden" aria-hidden="true">
+        <div class="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-white dark:bg-obsidian border-r border-zinc-200 dark:border-white/10 pt-20 pb-6 flex flex-col shadow-xl">
             <div class="px-6 space-y-6 flex-1 overflow-y-auto">
                 <div>
                     <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Navigation</h3>
@@ -96,21 +101,21 @@
                         <a href="student_dashboard.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
                             <i class="fas fa-grid-2 mr-3"></i> Dashboard
                         </a>
-                        <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
                             <i class="fas fa-calendar-check mr-3 text-zinc-500"></i> Sessions
                         </a>
-                        <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
                             <i class="fas fa-user mr-3 text-zinc-500"></i> Profile
                         </a>
-                        <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
                             <i class="fas fa-qrcode mr-3 text-zinc-500"></i> My QR Code
                         </a>
                     </nav>
                 </div>
             </div>
-            <div class="px-6 border-t border-white/10 pt-4 flex items-center justify-between">
-                <div class="text-xs text-zinc-400" id="studentMobileMenuName">Signed in</div>
-                <button onclick="logout()" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold transition">
+            <div class="px-6 border-t border-zinc-200 dark:border-white/10 pt-4 flex items-center justify-between">
+                <div class="text-xs text-zinc-500 dark:text-zinc-400" id="studentMobileMenuName">Signed in</div>
+                <button onclick="logout()" class="px-3 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-xs font-semibold transition text-zinc-700 dark:text-zinc-300">
                     <i class="fas fa-sign-out-alt mr-1 text-gold-400"></i>Logout
                 </button>
             </div>
@@ -120,39 +125,39 @@
     <main class="lg:ml-72 pt-24 pb-8 px-4 sm:px-6 lg:px-8">
         <div class="max-w-7xl mx-auto">
             <div class="mb-8 sm:mb-10">
-                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">Welcome back</h1>
-                <p class="text-sm sm:text-base text-zinc-400 mt-2">Quick view of your account and QR. For full details, open Sessions or Profile.</p>
+                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">Welcome back</h1>
+                <p class="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-2">Quick view of your account and QR. For full details, open Sessions or Profile.</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                 <!-- Profile Card -->
-                <div class="lg:col-span-1 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <div class="lg:col-span-1 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center gap-4">
                         <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl">
                             <i class="fas fa-user"></i>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <div id="studentName" class="text-lg font-extrabold truncate">—</div>
-                            <div class="text-sm text-zinc-400">Branch: <span id="studentBranch" class="text-zinc-200 font-semibold">—</span></div>
+                            <div id="studentName" class="text-lg font-extrabold truncate text-zinc-900 dark:text-white">—</div>
+                            <div class="text-sm text-zinc-500 dark:text-zinc-400">Branch: <span id="studentBranch" class="text-zinc-700 dark:text-zinc-200 font-semibold">—</span></div>
                         </div>
                     </div>
                     <div class="mt-4" id="studentStatusBadge"></div>
 
                     <div class="mt-6 grid grid-cols-2 gap-3">
-                        <a href="student_profile.html" class="text-center px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
-                            <i class="fas fa-pen mr-2 text-gold-400"></i>Edit Profile
+                        <a href="student_profile.html" class="text-center px-4 py-3 rounded-2xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
+                            <i class="fas fa-pen mr-2 text-gold-500"></i>Edit Profile
                         </a>
-                        <a href="student_sessions.html" class="text-center px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
-                            <i class="fas fa-calendar mr-2 text-gold-400"></i>View Sessions
+                        <a href="student_sessions.html" class="text-center px-4 py-3 rounded-2xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
+                            <i class="fas fa-calendar mr-2 text-gold-500"></i>View Sessions
                         </a>
                     </div>
                 </div>
 
                 <!-- Balance Card -->
-                <div class="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-5 sm:p-6 shadow-2xl shadow-black/40">
+                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Current Balance Due</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Current Balance Due</div>
                             <div id="balanceDue" class="text-3xl font-black text-gold-400 mt-2">₱0.00</div>
                         </div>
                         <div class="h-12 w-12 rounded-2xl bg-gold-500/15 border border-gold-500/20 grid place-items-center">
@@ -160,23 +165,23 @@
                         </div>
                     </div>
                     <div class="mt-6 grid grid-cols-2 gap-4">
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-                            <div class="text-xs text-zinc-400">Paid</div>
-                            <div id="amountPaid" class="text-lg font-bold text-white mt-1">₱0.00</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Paid</div>
+                            <div id="amountPaid" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">₱0.00</div>
                         </div>
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-                            <div class="text-xs text-zinc-400">Total</div>
-                            <div id="amountTotal" class="text-lg font-bold text-white mt-1">₱0.00</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Total</div>
+                            <div id="amountTotal" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">₱0.00</div>
                         </div>
                     </div>
                     <p class="text-xs text-zinc-500 mt-4">Balance is computed from your registration + package fee minus recorded payments.</p>
                 </div>
 
                 <!-- Sessions Card (summary only) -->
-                <div class="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6 shadow-2xl shadow-black/40">
+                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Sessions</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Sessions</div>
                             <div id="packageName" class="text-xl font-extrabold mt-2">—</div>
                         </div>
                         <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
@@ -184,64 +189,64 @@
                         </div>
                     </div>
                     <div class="mt-4 grid grid-cols-2 gap-4">
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-                            <div class="text-xs text-zinc-400">Included</div>
-                            <div id="packageSessions" class="text-lg font-bold text-white mt-1">—</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Included</div>
+                            <div id="packageSessions" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-                            <div class="text-xs text-zinc-400">Max Instruments</div>
-                            <div id="packageMaxInstruments" class="text-lg font-bold text-white mt-1">—</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Max Instruments</div>
+                            <div id="packageMaxInstruments" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
                     </div>
                     <div class="mt-4 grid grid-cols-3 gap-3">
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-3 text-center">
-                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Attended</div>
-                            <div id="sessionsAttended" class="text-xl font-black text-white mt-1">0</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-3 text-center">
+                            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Attended</div>
+                            <div id="sessionsAttended" class="text-xl font-black text-zinc-900 dark:text-white mt-1">0</div>
                         </div>
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-3 text-center">
-                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Remaining</div>
-                            <div id="sessionsRemaining" class="text-xl font-black text-white mt-1">—</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-3 text-center">
+                            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Remaining</div>
+                            <div id="sessionsRemaining" class="text-xl font-black text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-3 text-center">
-                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Last</div>
-                            <div id="lastAttended" class="text-xs font-semibold text-zinc-200 mt-2">—</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-3 text-center">
+                            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Last</div>
+                            <div id="lastAttended" class="text-xs font-semibold text-zinc-600 dark:text-zinc-200 mt-2">—</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Current Enrollment (desktop / tablet; keep off small screens to reduce clutter) -->
-                <div class="hidden md:block lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <div class="hidden md:block lg:col-span-2 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Current Enrollment</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Current Enrollment</div>
                             <div class="text-lg font-extrabold mt-2">Approved status and start schedule</div>
                         </div>
                         <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
                             <i class="fas fa-calendar-check text-gold-400"></i>
                         </div>
                     </div>
-                    <div id="currentEnrollmentSummary" class="mt-5 text-sm text-zinc-300"></div>
+                    <div id="currentEnrollmentSummary" class="mt-5 text-sm text-zinc-600 dark:text-zinc-300"></div>
                 </div>
 
                 <!-- Enrollment History (desktop / tablet only) -->
-                <div class="hidden md:block lg:col-span-3 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <div class="hidden md:block lg:col-span-3 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Enrollment History</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Enrollment History</div>
                             <div class="text-lg font-extrabold mt-2">Previous enrollments</div>
                         </div>
                         <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
                             <i class="fas fa-clock-rotate-left text-gold-400"></i>
                         </div>
                     </div>
-                    <div id="enrollmentHistoryList" class="mt-4 space-y-2 text-sm text-zinc-200"></div>
+                    <div id="enrollmentHistoryList" class="mt-4 space-y-2 text-sm text-zinc-600 dark:text-zinc-200"></div>
                 </div>
 
                 <!-- Simple Request Enrollment shortcut for mobile -->
-                <div class="md:hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/40">
+                <div class="md:hidden rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between gap-3">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Request Enrollment</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Request Enrollment</div>
                             <div class="text-sm font-semibold mt-1">Choose package, instruments, and schedule.</div>
                         </div>
                         <a href="student_sessions.html" class="px-4 py-2 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-xs font-extrabold transition whitespace-nowrap">
@@ -251,10 +256,10 @@
                 </div>
 
                 <!-- Full Request Enrollment form (desktop / tablet only) -->
-                <div class="hidden md:block lg:col-span-3 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+                <div class="hidden md:block lg:col-span-3 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Request Enrollment</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Request Enrollment</div>
                             <div class="text-lg font-extrabold mt-2">Select package, instruments, and preferred date</div>
                         </div>
                         <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
@@ -266,34 +271,34 @@
 
                     <form id="studentPackageRequestForm" class="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div class="lg:col-span-1">
-                            <label class="block text-sm font-semibold text-zinc-200 mb-2">Session Package *</label>
-                            <select id="studentRequestPackage" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Session Package *</label>
+                            <select id="studentRequestPackage" class="w-full px-4 py-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500/30">
                                 <option value="">Select package...</option>
                             </select>
                             <div id="studentRequestAmount" class="mt-2 text-xs text-gold-300 font-semibold">Estimated package amount: ₱0.00</div>
-                            <label class="block text-sm font-semibold text-zinc-200 mt-4 mb-2">Payment Mode *</label>
-                            <select id="studentRequestPaymentMode" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mt-4 mb-2">Payment Mode *</label>
+                            <select id="studentRequestPaymentMode" class="w-full px-4 py-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                                 <option value="Partial Payment" selected>Partial Payment</option>
                                 <option value="Full Payment">Full Payment</option>
                                 <option value="Installment">Installment</option>
                             </select>
-                            <label class="block text-sm font-semibold text-zinc-200 mt-4 mb-2">Preferred Date *</label>
-                            <input type="date" id="studentRequestPreferredDate" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mt-4 mb-2">Preferred Date *</label>
+                            <input type="date" id="studentRequestPreferredDate" class="w-full px-4 py-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                         </div>
 
                         <div class="lg:col-span-1">
-                            <label class="block text-sm font-semibold text-zinc-200 mb-2">Select Instruments *</label>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Select Instruments *</label>
                             <div id="studentRequestInstrumentContainer" class="space-y-2">
                                 <div class="text-sm text-zinc-500">Select a package first.</div>
                             </div>
-<label class="block text-sm font-semibold text-zinc-200 mt-4 mb-2">Payment proof (optional)</label>
-                        <input type="file" id="studentRequestPaymentProof" name="package_payment_proof_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-400 file:font-semibold">
+<label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mt-4 mb-2">Payment proof (optional)</label>
+                        <input type="file" id="studentRequestPaymentProof" name="package_payment_proof_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold">
                         <div class="text-xs text-zinc-500 mt-1">JPG, PNG, WEBP or PDF. You can upload later or bring to the branch.</div>
                         </div>
 
                         <div class="lg:col-span-1">
-                            <label class="block text-sm font-semibold text-zinc-200 mb-2">Preferred Day *</label>
-                            <select id="studentRequestPreferredDay" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Preferred Day *</label>
+                            <select id="studentRequestPreferredDay" class="w-full px-4 py-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                                 <option value="">Select preferred day...</option>
                                 <option value="Monday">Monday</option>
                                 <option value="Tuesday">Tuesday</option>
@@ -314,13 +319,13 @@
                     </form>
 
                     <div class="mt-6">
-                        <div class="text-sm font-semibold text-zinc-200 mb-3">Teacher availability (reference)</div>
+                        <div class="text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-3">Teacher availability (reference)</div>
                         <div id="studentAvailabilityCalendar" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"></div>
                     </div>
                 </div>
 
                 <!-- QR -->
-                <div class="rounded-3xl border border-gold-500/25 bg-gradient-to-b from-gold-500/10 to-transparent p-6 shadow-2xl shadow-black/40">
+                <div class="rounded-3xl border-2 border-gold-500/30 bg-amber-50/50 dark:bg-gold-500/10 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Attendance QR</div>
@@ -332,12 +337,12 @@
                     </div>
 
                     <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                        <div class="rounded-2xl bg-obsidian/60 border border-gold-500/25 p-4 flex items-center justify-center">
-                            <div id="qrCodeBox" class="p-2"></div>
+                        <div class="rounded-2xl bg-white dark:bg-obsidian/60 border-2 border-gold-500/30 p-4 flex items-center justify-center">
+                            <div id="qrCodeBox" class="p-2 bg-white"></div>
                         </div>
                         <div>
-                            <div class="text-sm text-zinc-200 font-semibold">QR Data</div>
-                            <div id="qrPayloadText" class="mt-2 text-xs text-zinc-400 break-all font-mono">—</div>
+                            <div class="text-sm text-zinc-700 dark:text-zinc-200 font-semibold">QR Data</div>
+                            <div id="qrPayloadText" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 break-all font-mono">—</div>
                             <p class="mt-4 text-xs text-zinc-500">If scanning fails, show the QR page or ask the staff to verify your student ID.</p>
                         </div>
                     </div>
@@ -349,6 +354,13 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="../../js/mode.js"></script>
+    <!-- Floating dark/light mode toggle (student & guardian only) -->
+    <button id="themeToggle" aria-label="Toggle dark or light mode">
+        <div class="relative w-6 h-6 flex items-center justify-center">
+            <i id="sunIcon" class="fas fa-sun absolute inset-0 m-auto transition-opacity duration-300"></i>
+            <i id="moonIcon" class="fas fa-moon absolute inset-0 m-auto transition-opacity duration-300 opacity-0"></i>
+        </div>
+    </button>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/index.js"></script>
     <script>

@@ -58,6 +58,17 @@ class User
         }
     }
 
+    private function hasUserColumn($columnName)
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW COLUMNS FROM tbl_users LIKE ?");
+            $stmt->execute([$columnName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     private function isMultipartRequest()
     {
         $contentType = $_SERVER['CONTENT_TYPE'] ?? ($_SERVER['HTTP_CONTENT_TYPE'] ?? '');
@@ -166,12 +177,16 @@ class User
             $this->sendJSON(['error' => 'Username and password are required'], 400);
         }
         try {
+            $hasUserBranch = $this->hasUserColumn('branch_id');
+            $selectBranch = $hasUserBranch ? ", u.branch_id, b.branch_name" : "";
+            $joinBranch = $hasUserBranch ? " LEFT JOIN tbl_branches b ON b.branch_id = u.branch_id " : "";
             // First check if user exists and get status
             $stmt = $this->conn->prepare("
                 SELECT u.user_id, u.username, u.password, u.first_name, u.last_name,
-                       u.email, u.phone, u.status, r.role_name
+                       u.email, u.phone, u.status, r.role_name{$selectBranch}
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
+                {$joinBranch}
                 WHERE u.username = ? OR u.email = ?
                 LIMIT 1
             ");

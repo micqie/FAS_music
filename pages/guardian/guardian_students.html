@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Guardian Portal</title>
+    <title>Guardian Portal | Father & Sons Music</title>
+    <script>(function(){ var t=localStorage.getItem('theme')||'dark'; document.documentElement.classList.toggle('dark',t!=='light'); })();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/portal.css">
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -24,71 +26,72 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .dark-glass { background: rgba(15, 17, 21, 0.88); backdrop-filter: blur(10px); }
+        .portal-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); }
+        html.dark .portal-nav { background: rgba(15,17,21,0.92); }
     </style>
 </head>
-<body class="bg-obsidian text-white antialiased">
+<body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
     <div id="guardianStudentsRoot"></div>
 
-    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
-        <div class="flex items-center gap-6">
+    <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-3 sm:gap-6">
             <a href="../../index.html" class="h-10 flex items-center">
-                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
             </a>
             <div class="hidden md:block">
-                <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Guardian Portal</div>
-                <div class="text-sm text-zinc-300">Students & Payments</div>
+                <div class="text-xs uppercase tracking-[0.25em] text-gold-500 font-bold">Guardian Portal</div>
+                <div class="text-sm text-zinc-500 dark:text-zinc-300">Students & Payments</div>
             </div>
         </div>
         <div class="flex items-center gap-4">
             <div class="hidden md:flex flex-col text-right">
-                <span id="guardianNavName" class="text-sm font-semibold text-white">Guardian</span>
-                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Account</span>
+                <span id="guardianNavName" class="text-sm font-semibold text-zinc-900 dark:text-white">Guardian</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-500 font-bold">Account</span>
             </div>
-            <button onclick="logout()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
-                <i class="fas fa-sign-out-alt mr-2 text-gold-400"></i>Logout
+            <button onclick="logout()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
+                <i class="fas fa-sign-out-alt mr-2 text-gold-500"></i>Logout
             </button>
         </div>
     </nav>
 
-    <main class="pt-28 p-8">
+    <main class="pt-24 sm:pt-28 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-                <div class="lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-10">
+                <div class="lg:col-span-2 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center gap-4">
                         <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl">
                             <i class="fas fa-user-shield"></i>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <div id="guardianName" class="text-xl font-extrabold truncate">—</div>
-                            <div class="text-sm text-zinc-400">Email: <span id="guardianEmail" class="text-zinc-200 font-semibold">—</span></div>
-                            <div class="text-sm text-zinc-400">Phone: <span id="guardianPhone" class="text-zinc-200 font-semibold">—</span></div>
+                            <div id="guardianName" class="text-xl font-extrabold truncate text-zinc-900 dark:text-white">—</div>
+                            <div class="text-sm text-zinc-500 dark:text-zinc-400">Email: <span id="guardianEmail" class="text-zinc-700 dark:text-zinc-200 font-semibold">—</span></div>
+                            <div class="text-sm text-zinc-500 dark:text-zinc-400">Phone: <span id="guardianPhone" class="text-zinc-700 dark:text-zinc-200 font-semibold">—</span></div>
                         </div>
                     </div>
-                    <p class="text-sm text-zinc-400 mt-4">This portal shows your linked students, session progress, and payment status.</p>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-4">This portal shows your linked students, session progress, and payment status.</p>
                 </div>
-                <div class="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-6 shadow-2xl shadow-black/40">
-                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Overview</div>
+                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Overview</div>
                     <div class="mt-4 space-y-4">
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-                            <div class="text-xs text-zinc-400">Students</div>
-                            <div id="guardianStudentCount" class="text-2xl font-black text-white mt-1">0</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Students</div>
+                            <div id="guardianStudentCount" class="text-2xl font-black text-zinc-900 dark:text-white mt-1">0</div>
                         </div>
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-                            <div class="text-xs text-zinc-400">Total Balance Due</div>
-                            <div id="guardianTotalBalance" class="text-2xl font-black text-gold-400 mt-1">₱0.00</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Total Balance Due</div>
+                            <div id="guardianTotalBalance" class="text-2xl font-black text-gold-500 mt-1">₱0.00</div>
                         </div>
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-                            <div class="text-xs text-zinc-400">Total Paid</div>
-                            <div id="guardianTotalPaid" class="text-2xl font-black text-white mt-1">₱0.00</div>
+                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Total Paid</div>
+                            <div id="guardianTotalPaid" class="text-2xl font-black text-zinc-900 dark:text-white mt-1">₱0.00</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="mb-6">
-                <h1 class="text-3xl md:text-4xl font-black tracking-tight">Your Students</h1>
-                <p class="text-zinc-400 mt-2">Track attendance progress, schedules, and payments in one place.</p>
+                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">Your Students</h1>
+                <p class="text-zinc-500 dark:text-zinc-400 mt-2">Track attendance progress, schedules, and payments in one place.</p>
             </div>
 
             <div id="guardianStudentsList" class="grid grid-cols-1 gap-6"></div>
@@ -98,6 +101,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/mode.js"></script>
+    <button id="themeToggle" aria-label="Toggle dark or light mode"><div class="relative w-6 h-6 flex items-center justify-center"><i id="sunIcon" class="fas fa-sun absolute inset-0 m-auto transition-opacity duration-300"></i><i id="moonIcon" class="fas fa-moon absolute inset-0 m-auto transition-opacity duration-300 opacity-0"></i></div></button>
     <script src="../../js/index.js"></script>
 </body>
 </html>

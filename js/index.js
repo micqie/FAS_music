@@ -1473,10 +1473,12 @@ function renderInstrumentChips(instruments) {
 }
 
 function buildStudentQrPayload(student) {
-    // Simple stable payload for QR scanning (can be extended to signed tokens later)
+    // Payload format: FAS_ATTENDANCE|STUDENT|student_id|email|branch_id
+    // branch_id ensures uptown=uptown, downtown=downtown validation at scan
     const sid = student?.student_id ?? '';
     const email = student?.email ?? '';
-    return `FAS_ATTENDANCE|STUDENT|${sid}|${email}`;
+    const bid = student?.branch_id ?? '';
+    return `FAS_ATTENDANCE|STUDENT|${sid}|${email}|${bid}`;
 }
 
 function renderQrCode(targetElId, payload) {

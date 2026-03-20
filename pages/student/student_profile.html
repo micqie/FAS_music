@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Student Profile</title>
+    <title>My Profile | Father & Sons Music</title>
+    <script>(function(){ var t=localStorage.getItem('theme')||'dark'; document.documentElement.classList.toggle('dark',t!=='light'); })();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/portal.css">
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -24,17 +26,18 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .dark-glass { background: rgba(15, 17, 21, 0.88); backdrop-filter: blur(10px); }
+        .portal-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); }
+        html.dark .portal-nav { background: rgba(15,17,21,0.92); }
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
     </style>
 </head>
-<body class="bg-obsidian text-white antialiased">
+<body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
     <div id="studentProfileRoot"></div>
 
-    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-2xl">
+    <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-3 sm:gap-6">
             <a href="student_dashboard.html" class="h-10 flex items-center">
-                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
             </a>
             <div class="hidden md:block">
                 <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Student Portal</div>
@@ -58,7 +61,7 @@
     </nav>
 
     <!-- Desktop sidebar -->
-    <aside class="fixed inset-y-0 left-0 w-72 bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-white/5">
+    <aside class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-zinc-200 dark:border-white/5">
         <div class="px-6 space-y-8 flex-1 mt-4">
             <div>
                 <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Navigation</h3>
@@ -81,8 +84,8 @@
     </aside>
 
     <!-- Mobile nav drawer -->
-    <div id="studentMobileMenu" class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden hidden">
-        <div class="absolute inset-y-0 left-0 w-72 max-w-[80%] bg-obsidian border-r border-white/10 pt-20 pb-6 flex flex-col">
+    <div id="studentMobileMenu" class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden hidden">
+        <div class="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-white dark:bg-obsidian border-r border-zinc-200 dark:border-white/10 pt-20 pb-6 flex flex-col shadow-xl">
             <div class="px-6 space-y-6 flex-1 overflow-y-auto">
                 <div>
                     <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Navigation</h3>
@@ -191,6 +194,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/mode.js"></script>
+    <button id="themeToggle" aria-label="Toggle dark or light mode"><div class="relative w-6 h-6 flex items-center justify-center"><i id="sunIcon" class="fas fa-sun absolute inset-0 m-auto transition-opacity duration-300"></i><i id="moonIcon" class="fas fa-moon absolute inset-0 m-auto transition-opacity duration-300 opacity-0"></i></div></button>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/index.js"></script>
     <script>

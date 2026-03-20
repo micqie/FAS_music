@@ -1,0 +1,33 @@
+/* Student & Guardian Portal - Floating Theme Toggle */
+#themeToggle {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 60;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    background: #fff;
+    border: 2px solid #e4e4e7;
+}
+
+html.dark #themeToggle {
+    background: #27272a;
+    border-color: #52525b;
+    color: #d4af37;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+
+#themeToggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 12px 30px rgba(212, 175, 55, 0.25);
+}
+
+html.dark #themeToggle:hover {
+    border-color: #d4af37;
+}

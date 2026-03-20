@@ -51,11 +51,11 @@ window.ThemeMode = {
             return;
         }
 
-        // Create button dynamically if not in HTML
+        // Create floating button dynamically if not in HTML
         const button = document.createElement('button');
         button.id = 'themeToggle';
-        button.className = 'fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gold-500 hover:bg-gold-400 text-black shadow-lg transition-all duration-300 flex items-center justify-center group';
-        button.setAttribute('aria-label', 'Toggle theme');
+        button.className = 'fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300';
+        button.setAttribute('aria-label', 'Toggle dark or light mode');
         button.onclick = () => this.toggle();
 
         // Create icon container

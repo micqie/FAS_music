@@ -53,6 +53,27 @@ class Admin
         }
     }
 
+    private function hasUserColumn($columnName)
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW COLUMNS FROM tbl_users LIKE ?");
+            $stmt->execute([$columnName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function ensureUserBranchColumn()
+    {
+        if ($this->hasUserColumn('branch_id')) return;
+        try {
+            $this->conn->exec("ALTER TABLE tbl_users ADD COLUMN branch_id INT NULL AFTER role_id");
+        } catch (PDOException $e) {
+            // Keep API working even if alter fails
+        }
+    }
+
     private function ensureStudentRegistrationFeesTable()
     {
         // Registration fee state now comes from tbl_registration_payments.
@@ -677,6 +698,7 @@ class Admin
     public function getUsers()
     {
         try {
+            $hasUserBranch = $this->hasUserColumn('branch_id');
             $sql = "
                 SELECT
                     u.user_id,
@@ -691,11 +713,12 @@ class Admin
                         WHEN r.role_name = 'Staff' THEN 'Staff'
                         ELSE r.role_name
                     END AS role_name,
-                    COALESCE(b.branch_name, '') AS branch_name
+                    COALESCE(" . ($hasUserBranch ? "bu.branch_name," : "") . " bt.branch_name, '') AS branch_name
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 LEFT JOIN tbl_teachers t ON t.user_id = u.user_id
-                LEFT JOIN tbl_branches b ON t.branch_id = b.branch_id
+                LEFT JOIN tbl_branches bt ON t.branch_id = bt.branch_id
+                " . ($hasUserBranch ? "LEFT JOIN tbl_branches bu ON u.branch_id = bu.branch_id" : "") . "
                 ORDER BY r.role_name, u.first_name, u.last_name, u.user_id
             ";
             $stmt = $this->conn->prepare($sql);
@@ -725,6 +748,7 @@ class Admin
         $phone     = trim((string)($data['phone'] ?? ''));
         $roleName  = trim((string)($data['role'] ?? ''));
         $password  = (string)($data['password'] ?? '');
+        $branchId  = isset($data['branch_id']) ? (int) $data['branch_id'] : 0;
 
         if ($firstName === '' || $lastName === '' || $email === '' || $roleName === '' || $password === '') {
             $this->sendJSON(['error' => 'first_name, last_name, email, role and password are required'], 400);
@@ -764,22 +788,48 @@ class Admin
             }
 
             $hashed = password_hash($password, PASSWORD_DEFAULT);
+            $needsBranch = in_array(strtolower($lookupRoleName), ['staff', 'manager'], true);
+            if ($needsBranch && $branchId < 1) {
+                $this->sendJSON(['error' => 'Branch is required for Staff/Manager accounts'], 400);
+            }
 
-            $stmt = $this->conn->prepare("
-                INSERT INTO tbl_users (
-                    username, password, role_id, first_name, last_name,
-                    email, phone, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
-            ");
-            $stmt->execute([
-                $email,
-                $hashed,
-                $roleId,
-                $firstName,
-                $lastName,
-                $email,
-                $phone
-            ]);
+            $this->ensureUserBranchColumn();
+            $hasBranchCol = $this->hasUserColumn('branch_id');
+
+            if ($hasBranchCol) {
+                $stmt = $this->conn->prepare("
+                    INSERT INTO tbl_users (
+                        username, password, role_id, branch_id, first_name, last_name,
+                        email, phone, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+                ");
+                $stmt->execute([
+                    $email,
+                    $hashed,
+                    $roleId,
+                    $branchId > 0 ? $branchId : null,
+                    $firstName,
+                    $lastName,
+                    $email,
+                    $phone
+                ]);
+            } else {
+                $stmt = $this->conn->prepare("
+                    INSERT INTO tbl_users (
+                        username, password, role_id, first_name, last_name,
+                        email, phone, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
+                ");
+                $stmt->execute([
+                    $email,
+                    $hashed,
+                    $roleId,
+                    $firstName,
+                    $lastName,
+                    $email,
+                    $phone
+                ]);
+            }
 
             $userId = (int)$this->conn->lastInsertId();
 

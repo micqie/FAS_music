@@ -367,7 +367,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="../../js/mode.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/index.js"></script>
     <script>
@@ -618,7 +617,8 @@
                 rows = rows.filter(r => {
                     const name = `${r.first_name || ''} ${r.last_name || ''}`.toLowerCase();
                     const email = (r.email || '').toLowerCase();
-                    return name.includes(searchValue) || email.includes(searchValue);
+                    const branch = (r.branch_name || '').toLowerCase();
+                    return name.includes(searchValue) || email.includes(searchValue) || branch.includes(searchValue);
                 });
             }
             adminUsersTableState.filtered = rows;
@@ -667,8 +667,12 @@
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                     : 'bg-amber-50 text-amber-700 border-amber-100';
                 const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || (user.username || 'User');
-                const branch = user.branch_name || '—';
                 const role = user.role_name || '—';
+                const branchName = (user.branch_name || '').trim();
+                let branch = branchName || '—';
+                if (!branchName && ['staff', 'branch manager', 'manager'].includes(role.toLowerCase())) {
+                    branch = 'Not assigned';
+                }
                 const statusLabel = user.status || 'Inactive';
 
                 return `
