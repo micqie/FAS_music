@@ -330,7 +330,9 @@ class AttendanceApi
                         'student_id' => (int) $student['student_id'],
                         'first_name' => $student['first_name'],
                         'last_name' => $student['last_name'],
-                        'email' => $student['email']
+                        'email' => $student['email'],
+                        'branch_id' => $studentBranchId,
+                        'branch_name' => $student['branch_name'] ?? null
                     ]
                 ]);
             }

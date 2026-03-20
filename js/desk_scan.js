@@ -65,6 +65,19 @@ function formatTime(ts) {
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatDateTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
 function setStatus(message, type = 'info') {
     const el = document.getElementById('scannerStatus');
     if (!el) return;
@@ -179,13 +192,16 @@ function handleApiResponse(data, parsed, payload, isManual) {
 
     const student = data.student || {};
     const name = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
-    const branchName = student.branch_name || (parsed && parsed.branch_id) || '—';
+    const branchName = student.branch_name || '—';
+    const checkinStamp = data.attendance && data.attendance.attended_at
+        ? formatDateTime(data.attendance.attended_at)
+        : formatDateTime(new Date());
     let html = `
         <div class="text-left space-y-2">
             <p><strong>${escapeHtml(name)}</strong></p>
             <p class="text-sm">Email: ${escapeHtml(student.email || (parsed && parsed.email) || '')}</p>
             <p class="text-sm">Branch: ${escapeHtml(branchName)}</p>
-            ${!isManual && payload ? `<p class="text-sm text-slate-500 font-mono break-all">${escapeHtml(payload)}</p>` : ''}
+            <p class="text-sm">Checked in: ${escapeHtml(checkinStamp)}</p>
         </div>`;
     if (data.already_checked_in) {
         setStatus(`${name} already checked in today.`, 'warn');

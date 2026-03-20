@@ -1493,15 +1493,20 @@ function renderQrCode(targetElId, payload) {
         target.innerHTML = '<div class="text-sm text-zinc-400">QR library not loaded.</div>';
         return;
     }
+    // Ensure high-contrast QR for camera scanning
+    target.style.background = '#ffffff';
+    target.style.padding = '10px';
+    target.style.borderRadius = '12px';
+    target.style.boxShadow = '0 8px 20px rgba(0,0,0,0.08)';
     // QRCode.js expects a DOM element
     // eslint-disable-next-line no-new
     new QRCode(target, {
         text: payload,
-        width: 200,
-        height: 200,
-        colorDark: '#d4af37',
-        colorLight: '#0f1115',
-        correctLevel: QRCode.CorrectLevel.M
+        width: 220,
+        height: 220,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
     });
 }
 
