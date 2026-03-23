@@ -317,6 +317,15 @@ class User
         $registrationSource = strtolower(trim((string)($data['registration_source'] ?? '')));
         $isAdminRegistration = $isWalkIn || in_array($registrationSource, ['admin', 'walkin', 'staff'], true);
 
+        // Desk staff branch hardening:
+        // If desk staff submits a walk-in registration, require branch_id to match desk_branch_id.
+        // This prevents registering students into another branch.
+        $deskBranchId = (int)($data['desk_branch_id'] ?? 0);
+        $requestedBranchId = (int)($data['branch_id'] ?? 0);
+        if ($deskBranchId > 0 && $requestedBranchId > 0 && $deskBranchId !== $requestedBranchId) {
+            $this->sendJSON(['error' => 'Selected branch does not belong to your desk'], 403);
+        }
+
         // Base required fields (student only)
         $required = ['student_first_name', 'student_last_name', 'student_email',
                      'student_phone', 'branch_id'];

@@ -382,6 +382,20 @@
 
         function showInlineMessage(el, type, text) {
             if (!el) return;
+            if ((type === 'success' || type === 'error') && typeof Swal !== 'undefined') {
+                el.textContent = '';
+                el.classList.add('hidden');
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: type === 'error' ? 'error' : 'success',
+                    title: text || (type === 'error' ? 'Error' : 'Success'),
+                    showConfirmButton: false,
+                    timer: 2500,
+                    timerProgressBar: true
+                });
+                return;
+            }
             el.textContent = text;
             el.classList.remove('hidden');
             el.classList.remove('bg-red-50', 'text-red-700', 'border-red-200', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200');

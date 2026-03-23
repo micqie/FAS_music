@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager - Sessions</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .dark-glass { background: rgba(15, 17, 21, 0.9); backdrop-filter: blur(10px); }
+        .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: white !important; }
+        .sidebar-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    </style>
+</head>
+<body class="bg-[#f1f5f9] text-slate-900 antialiased">
+
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-8">
+            <a id="deskOrManagerLogoLink" href="manager_dashboard.html" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="userNameNav" class="text-sm font-semibold text-white">Manager</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Branch Manager</span>
+            </div>
+            <details class="relative group/profile">
+                <summary class="list-none cursor-pointer">
+                    <div class="h-10 w-10 rounded-full border-2 border-gold-500/30 p-0.5">
+                        <div class="w-full h-full rounded-full bg-darkSlate flex items-center justify-center">
+                            <i class="fas fa-user text-gold-400"></i>
+                        </div>
+                    </div>
+                </summary>
+                <div class="absolute right-0 mt-3 w-56 rounded-xl border border-white/10 bg-obsidian/95 backdrop-blur-md shadow-2xl overflow-hidden opacity-0 pointer-events-none group-open/profile:opacity-100 group-open/profile:pointer-events-auto transition-all">
+                    <div class="px-4 py-3 border-b border-white/10">
+                        <p id="profileMenuName" class="text-sm font-semibold text-white truncate">Manager</p>
+                        <p class="text-[10px] uppercase tracking-widest text-gold-400 font-bold mt-1">Account</p>
+                    </div>
+                    <button onclick="logout()" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-300 hover:text-red-200 hover:bg-red-400/10 transition-all">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </button>
+                </div>
+            </details>
+        </div>
+    </nav>
+
+    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto sidebar-scroll">
+        <div class="px-6 space-y-8 flex-1 mt-4">
+            <div class="px-4 mb-4">
+                <h2 id="sessionsSidePanelTitle" class="text-[1.5rem] leading-none font-extrabold text-white tracking-tight">Manager Panel</h2>
+                <div class="mt-3 h-2 w-[14rem] rounded-full bg-gold-500"></div>
+            </div>
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Management</h3>
+                <nav class="space-y-2">
+                    <a id="navDashboardLink" href="manager_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-chart-line mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
+                    </a>
+                    <a href="manager_teachers.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-chalkboard-teacher mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branch Teachers
+                    </a>
+                    <details class="group/dropdown" open>
+                        <summary class="sidebar-item-active flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all w-full list-none cursor-pointer">
+                            <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
+                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
+                        </summary>
+                        <div class="mt-2 space-y-1">
+                            <a id="navSessionPending" href="manager_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
+                            <a id="navSessionActive" href="manager_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
+                        </div>
+                    </details>
+                </nav>
+            </div>
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Branch</h3>
+                <div class="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
+                    <div class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Assigned Branch</div>
+                    <div id="managerBranchName" class="mt-2 text-sm font-semibold text-white">—</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="lg:ml-72 pt-28 p-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="mb-10">
+                <h1 id="sessionsPageTitle" class="text-3xl font-black text-slate-900 tracking-tight">Sessions</h1>
+                <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
+                <p id="sessionsPageSubtitle" class="text-slate-500 mt-2">Manage pending and active sessions</p>
+            </div>
+
+        <!-- Messages -->
+        <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+        <!-- Branch Notice -->
+        <div class="mb-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="text-sm text-slate-700">
+                    Sessions are locked to your branch:
+                    <span class="font-semibold text-slate-900" id="managerBranchNotice">—</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Student Requests -->
+        <div id="pendingSessionsSection" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden mb-6">
+            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Student Requests</h3>
+                <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Requested Package</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingRequestsTable" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading requests...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Active Sessions Table -->
+        <div id="activeSessionsSection" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-box mr-2 text-gold-500"></i>Active Sessions</h3>
+                <span class="text-xs text-slate-500" id="studentCount">Loading...</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Schedule</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentsTable" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading active sessions...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </div>
+    </main>
+
+    <!-- Assign Package Modal -->
+    <div id="assignPackageModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+            <button id="closeAssignPackageModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <h3 class="text-2xl font-bold text-white mb-2">Assign Session Package</h3>
+            <p class="text-zinc-400 text-xs mb-4" id="assignPackageStudentInfo">Select a session package for this student</p>
+
+            <div id="assignPackageMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+            <form id="assignPackageForm" class="space-y-4">
+                <input type="hidden" id="assignStudentId" value="">
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Session Package *</label>
+                    <select id="assignPackageSelect" required
+                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        <option value="">Select Package</option>
+                    </select>
+                    <p class="text-xs text-zinc-500 mt-1">12 sessions = 1 instrument, 20 sessions = 2 instruments</p>
+                </div>
+                <div class="flex items-center justify-end gap-3 pt-4">
+                    <button type="button" id="cancelAssignPackageBtn"
+                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitAssignPackageBtn"
+                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                        <span id="submitAssignPackageBtnText">Assign Package</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Assign Request Modal -->
+    <div id="assignRequestModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-2xl p-6 relative">
+            <button id="closeAssignRequestModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <h3 class="text-2xl font-bold text-slate-900">Assign Student Request</h3>
+            <p id="assignRequestStudentInfo" class="text-slate-500 text-sm mt-1">Finalize teacher and schedule before approval.</p>
+
+            <form id="assignRequestForm" class="mt-5 space-y-4">
+                <input type="hidden" id="assignRequestId" value="">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Teacher *</label>
+                        <select id="assignRequestTeacherSelect" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                            <option value="">Select teacher...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Date *</label>
+                        <input type="date" id="assignRequestDate" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Day *</label>
+                        <input type="text" id="assignRequestDay" readonly class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700" placeholder="Auto from date">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Start Time *</label>
+                        <input type="time" id="assignRequestStartTime" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">End Time *</label>
+                        <input type="time" id="assignRequestEndTime" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Room / Location</label>
+                        <select id="assignRequestRoom" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                            <option value="">Select room...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Notes</label>
+                        <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                    </div>
+                </div>
+                <div class="text-xs text-slate-500">Session must be exactly 1 hour.</div>
+                <div class="flex items-center justify-end gap-3 pt-2">
+                    <button type="button" id="cancelAssignRequestBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">
+                        Assign & Approve
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../../js/mode.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="../../js/index.js"></script>
+    <script>
+        let allStudents = [];
+        let packagePagePackages = [];
+        let availableRoomsByBranch = {};
+        let pendingRequestsById = {};
+        let managerBranchId = 0;
+        let managerBranchName = '';
+        let uiIsDesk = false;
+
+        function showMessage(message, type = 'error') {
+            Swal.fire({
+                icon: type === 'success' ? 'success' : 'error',
+                title: type === 'success' ? 'Success' : 'Error',
+                text: message,
+                confirmButtonColor: '#b8860b'
+            });
+        }
+
+        function showAssignPackageMessage(msg, type) {
+            Swal.fire({
+                icon: type === 'success' ? 'success' : 'error',
+                title: type === 'success' ? 'Success' : 'Error',
+                text: msg,
+                confirmButtonColor: '#b8860b'
+            });
+        }
+
+        function setSessionNavState(view) {
+            const pendingLink = document.getElementById('navSessionPending');
+            const activeLink = document.getElementById('navSessionActive');
+            const baseClass = 'block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all';
+            const activeClass = 'block ml-11 px-3 py-2 text-sm font-semibold text-white bg-white/10 rounded-lg';
+            if (pendingLink) pendingLink.className = (view === 'pending') ? activeClass : baseClass;
+            if (activeLink) activeLink.className = (view === 'active') ? activeClass : baseClass;
+        }
+
+        function applySessionView() {
+            const params = new URLSearchParams(window.location.search);
+            const view = String(params.get('view') || '').toLowerCase();
+            const pendingSection = document.getElementById('pendingSessionsSection');
+            const activeSection = document.getElementById('activeSessionsSection');
+            const title = document.getElementById('sessionsPageTitle');
+            const subtitle = document.getElementById('sessionsPageSubtitle');
+
+            const baseLabel = uiIsDesk ? 'Enrollments' : 'Sessions';
+            const pendingLabel = uiIsDesk ? 'Pending Enrollments' : 'Pending Sessions';
+            const activeLabel = uiIsDesk ? 'Active Enrollments' : 'Active Sessions';
+            const pendingSub = uiIsDesk
+                ? 'Review and assign pending enrollment requests'
+                : 'Review and assign pending session requests';
+            const activeSub = uiIsDesk
+                ? 'Manage active student enrollment assignments'
+                : 'Manage active student session assignments';
+            const baseSub = uiIsDesk
+                ? 'Manage pending and active enrollments'
+                : 'Manage pending and active sessions';
+
+            if (view === 'pending') {
+                if (pendingSection) pendingSection.classList.remove('hidden');
+                if (activeSection) activeSection.classList.add('hidden');
+                if (title) title.textContent = pendingLabel;
+                if (subtitle) subtitle.textContent = pendingSub;
+                setSessionNavState('pending');
+                return;
+            }
+
+            if (view === 'active') {
+                if (pendingSection) pendingSection.classList.add('hidden');
+                if (activeSection) activeSection.classList.remove('hidden');
+                if (title) title.textContent = activeLabel;
+                if (subtitle) subtitle.textContent = activeSub;
+                setSessionNavState('active');
+                return;
+            }
+
+            if (pendingSection) pendingSection.classList.remove('hidden');
+            if (activeSection) activeSection.classList.remove('hidden');
+            if (title) title.textContent = baseLabel;
+            if (subtitle) subtitle.textContent = baseSub;
+            setSessionNavState('');
+        }
+
+        async function maybeAutoOpenAssignPackageModalFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const studentId = Number(params.get('assign_student_id') || 0);
+            if (!studentId) return;
+
+            const studentName = params.get('assign_student_name') || '';
+            const packageId = Number(params.get('assign_package_id') || 0) || null;
+
+            // Always show the active students view when navigating from registration
+            const viewUrl = new URL(window.location.href);
+            viewUrl.searchParams.set('view', 'active');
+            window.history.replaceState({}, '', viewUrl.toString());
+            applySessionView();
+
+            // Ensure the packages are loaded before opening the modal
+            await loadSessionPackages();
+            await loadActiveStudents();
+            openAssignPackageModal(studentId, studentName, packageId);
+        }
+
+        async function maybeAutoOpenAssignRequestModalFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const requestId = Number(params.get('assign_request_id') || 0);
+            if (!requestId) return;
+
+            // Ensure pending requests are loaded so we can open the modal
+            await loadPendingRequests();
+
+            // Ensure we're viewing the pending requests tab
+            const viewUrl = new URL(window.location.href);
+            viewUrl.searchParams.set('view', 'pending');
+            window.history.replaceState({}, '', viewUrl.toString());
+            applySessionView();
+
+            openAssignRequestModal(requestId);
+        }
+
+        function requireManagerBranch() {
+            if (!managerBranchId) {
+                showMessage('Your account has no branch assigned. Please contact the administrator.', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        async function loadSessionPackages() {
+            try {
+                const response = await axios.get(`${baseApiUrl}/sessions.php?action=get-packages&branch_id=${encodeURIComponent(managerBranchId)}`);
+                const data = response.data;
+
+                if (data.success && data.packages) {
+                    packagePagePackages = data.packages;
+                    const select = document.getElementById('assignPackageSelect');
+                    if (select) {
+                        select.innerHTML = '<option value="">Select Package</option>';
+                        data.packages.forEach(pkg => {
+                            const option = document.createElement('option');
+                            option.value = pkg.package_id;
+                            option.textContent = `${pkg.package_name} (${pkg.sessions} sessions, ${pkg.max_instruments} instrument${pkg.max_instruments > 1 ? 's' : ''})`;
+                            select.appendChild(option);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load session packages:', error);
+            }
+        }
+
+        function formatCurrencyPHP(amount) {
+            const n = Number(amount || 0);
+            return `₱${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        function buildPublicFileUrl(filePath) {
+            if (!filePath) return '';
+            const raw = String(filePath).trim();
+            if (!raw) return '';
+            if (/^https?:\/\//i.test(raw)) return raw;
+            const appBase = String(baseApiUrl || '').replace(/\/api\/?$/, '');
+            const cleanPath = raw.replace(/^\/+/, '');
+            return `${appBase}/${cleanPath}`;
+        }
+
+        function formatTime12Hour(timeString) {
+            if (!timeString) return '—';
+            const parts = String(timeString).split(':');
+            if (parts.length < 2) return timeString;
+            const h = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+            if (Number.isNaN(h) || Number.isNaN(m)) return timeString;
+            const suffix = h >= 12 ? 'PM' : 'AM';
+            const hh = h % 12 === 0 ? 12 : h % 12;
+            return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
+        }
+
+        async function fetchRoomsForBranch(branchId) {
+            const key = Number(branchId || 0);
+            if (key > 0 && Array.isArray(availableRoomsByBranch[key])) {
+                return availableRoomsByBranch[key];
+            }
+            try {
+                let url = `${baseApiUrl}/students.php?action=get-available-rooms`;
+                if (key > 0) {
+                    url += `&branch_id=${key}`;
+                }
+                const response = await axios.get(url);
+                const data = response.data;
+                const rooms = data.success && Array.isArray(data.rooms) ? data.rooms : [];
+                availableRoomsByBranch[key] = rooms;
+                return rooms;
+            } catch (error) {
+                console.error('Failed to load rooms:', error);
+                return [];
+            }
+        }
+
+        async function populateAssignRoomDropdown(req) {
+            const roomEl = document.getElementById('assignRequestRoom');
+            if (!roomEl) return;
+
+            roomEl.innerHTML = '<option value="">Select room...</option>';
+            const rooms = await fetchRoomsForBranch(req?.branch_id || 0);
+            if (!rooms.length) {
+                roomEl.innerHTML = '<option value="">No available rooms in this branch</option>';
+                return;
+            }
+            roomEl.innerHTML = '<option value="">Select room...</option>' + rooms.map(room => {
+                const label = `${escapeHtml(room.room_name || 'Room')} (${escapeHtml(room.room_type || 'Room')}, cap ${Number(room.capacity || 1)})`;
+                return `<option value="${escapeHtml(room.room_name || '')}">${label}</option>`;
+            }).join('');
+        }
+
+        async function loadPendingRequests() {
+            const tableBody = document.getElementById('pendingRequestsTable');
+            const countEl = document.getElementById('pendingRequestCount');
+            if (!tableBody) return;
+
+            try {
+                if (!requireManagerBranch()) return;
+                let url = `${baseApiUrl}/students.php?action=get-pending-package-requests&branch_id=${encodeURIComponent(managerBranchId)}`;
+
+                const response = await axios.get(url);
+                const data = response.data;
+                const requests = data.success && Array.isArray(data.requests) ? data.requests : [];
+
+                if (countEl) countEl.textContent = `${requests.length} pending`;
+
+                if (!requests.length) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
+                                <p>${uiIsDesk ? 'No pending enrollment requests.' : 'No pending student requests.'}</p>
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                pendingRequestsById = {};
+                tableBody.innerHTML = requests.map(r => {
+                    pendingRequestsById[String(r.request_id)] = r;
+                    const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
+                    const pkg = escapeHtml(r.package_name || '—');
+                    const instruments = Array.isArray(r.instruments) && r.instruments.length
+                        ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
+                        : '—';
+                    const schedule = r.preferred_day_of_week
+                        ? `${escapeHtml(r.preferred_day_of_week)}`
+                        : '—';
+                    const prefDate = r.preferred_date ? new Date(r.preferred_date).toLocaleDateString() : '—';
+                    const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
+                    const paymentProofHtml = r.payment_proof_path
+                        ? `<a href="${escapeHtml(buildPublicFileUrl(r.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">View payment proof</a>`
+                        : '<span class="text-xs text-slate-500">No payment proof</span>';
+                    return `
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="px-6 py-4">
+                                <div class="font-medium text-slate-900">${studentName || 'Student'}</div>
+                                <div class="text-sm text-slate-500">${escapeHtml(r.email || '')}</div>
+                                <div class="text-xs text-slate-400">${escapeHtml(r.branch_name || '')}</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-700">${pkg}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700">${instruments}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700">
+                                <div>${schedule}</div>
+                                <div class="text-xs text-slate-500 mt-1">Date: ${prefDate}</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-700">
+                                <div class="font-semibold text-slate-800">${paymentType}</div>
+                                <div class="text-xs text-slate-500 mt-1">${formatCurrencyPHP(r.requested_amount || 0)}</div>
+                                <div class="mt-1">${paymentProofHtml}</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm font-semibold text-gold-600">${formatCurrencyPHP(r.requested_amount || 0)}</td>
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-2">
+                                    <button onclick="(window.onPendingRequestAssignClick || openAssignRequestModal)(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-xs font-bold">
+                                        ${window.pendingRequestActionLabel || 'Assign & Approve'}
+                                    </button>
+                                    <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold">
+                                        Reject
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>`;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load pending package requests:', error);
+                if (countEl) countEl.textContent = 'Error';
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>Failed to load pending requests.</p>
+                        </td>
+                    </tr>`;
+            }
+        }
+
+        function getDayNameFromDate(dateValue) {
+            if (!dateValue) return '';
+            const parts = String(dateValue).split('-');
+            if (parts.length !== 3) return '';
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+            const dNum = parseInt(parts[2], 10);
+            if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(dNum)) return '';
+            const d = new Date(y, m - 1, dNum);
+            if (Number.isNaN(d.getTime())) return '';
+            return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] || '';
+        }
+
+        async function openAssignRequestModal(requestId) {
+            const req = pendingRequestsById[String(requestId)];
+            if (!req) {
+                showMessage('Request not found.', 'error');
+                return;
+            }
+
+            const modal = document.getElementById('assignRequestModal');
+            const info = document.getElementById('assignRequestStudentInfo');
+            const requestIdEl = document.getElementById('assignRequestId');
+            const teacherSelect = document.getElementById('assignRequestTeacherSelect');
+            const dateEl = document.getElementById('assignRequestDate');
+            const dayEl = document.getElementById('assignRequestDay');
+            const startEl = document.getElementById('assignRequestStartTime');
+            const endEl = document.getElementById('assignRequestEndTime');
+            const roomEl = document.getElementById('assignRequestRoom');
+            const notesEl = document.getElementById('assignRequestNotes');
+
+            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !dayEl || !startEl || !endEl || !roomEl || !notesEl) return;
+
+            const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
+            info.textContent = `${studentName} • ${req.package_name || 'Package'} • Preferred: ${req.preferred_day_of_week || '—'} / ${req.preferred_date || '—'}`;
+            requestIdEl.value = String(requestId);
+
+            const options = Array.isArray(req.teacher_candidates) ? req.teacher_candidates : [];
+            teacherSelect.innerHTML = '<option value="">Select teacher...</option>' + options.map(t =>
+                `<option value="${Number(t.teacher_id)}">${escapeHtml(t.teacher_name || 'Teacher')} (${escapeHtml(t.specialization || 'General')})</option>`
+            ).join('');
+
+            dateEl.value = req.preferred_date || '';
+            dayEl.value = getDayNameFromDate(dateEl.value || '') || req.preferred_day_of_week || '';
+            startEl.value = '';
+            endEl.value = '';
+            await populateAssignRoomDropdown(req);
+            roomEl.value = '';
+            notesEl.value = '';
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeAssignRequestModal() {
+            const modal = document.getElementById('assignRequestModal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function approveStudentRequest(payload) {
+            try {
+                const response = await axios.post(`${baseApiUrl}/students.php`, payload);
+                const data = response.data;
+                if (data.success) {
+                    closeAssignRequestModal();
+                    showMessage(data.message || 'Request approved.', 'success');
+                    loadPendingRequests();
+                    loadActiveStudents();
+                } else {
+                    showMessage(data.error || 'Failed to approve request.', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error while approving request.', 'error');
+            }
+        }
+
+        async function submitAssignRequestForm(e) {
+            e.preventDefault();
+            const requestId = Number(document.getElementById('assignRequestId')?.value || 0);
+            const teacherId = Number(document.getElementById('assignRequestTeacherSelect')?.value || 0);
+            const assignedDate = document.getElementById('assignRequestDate')?.value || '';
+            const assignedDay = getDayNameFromDate(assignedDate);
+            const assignedStart = document.getElementById('assignRequestStartTime')?.value || '';
+            const assignedEnd = document.getElementById('assignRequestEndTime')?.value || '';
+            const assignedRoom = document.getElementById('assignRequestRoom')?.value?.trim() || '';
+            const adminNotes = document.getElementById('assignRequestNotes')?.value?.trim() || '';
+
+            if (!requestId || !teacherId || !assignedDate || !assignedDay || !assignedStart || !assignedEnd) {
+                showMessage('Please complete teacher, date, start time, and end time.', 'error');
+                return;
+            }
+            if (assignedStart >= assignedEnd) {
+                showMessage('End time must be later than start time.', 'error');
+                return;
+            }
+
+            await approveStudentRequest({
+                action: 'approve-package-request',
+                request_id: requestId,
+                teacher_id: teacherId,
+                assigned_date: assignedDate,
+                assigned_day_of_week: assignedDay,
+                assigned_start_time: assignedStart,
+                assigned_end_time: assignedEnd,
+                assigned_room: assignedRoom,
+                admin_notes: adminNotes,
+                branch_id: managerBranchId
+            });
+        }
+
+        async function rejectStudentRequest(requestId) {
+            if (!requestId) return;
+            const input = await Swal.fire({
+                icon: 'warning',
+                title: 'Reject request?',
+                text: 'You can add an optional reason for the student.',
+                input: 'text',
+                inputPlaceholder: 'Reason (optional)',
+                showCancelButton: true,
+                confirmButtonText: 'Reject',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#dc2626'
+            });
+            if (!input.isConfirmed) return;
+
+            try {
+                const response = await axios.post(`${baseApiUrl}/students.php`, {
+                    action: 'reject-package-request',
+                    request_id: Number(requestId),
+                    admin_notes: input.value || '',
+                    branch_id: managerBranchId
+                });
+                const data = response.data;
+                if (data.success) {
+                    showMessage(data.message || 'Request rejected.', 'success');
+                    loadPendingRequests();
+                } else {
+                    showMessage(data.error || 'Failed to reject request.', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error while rejecting request.', 'error');
+            }
+        }
+
+        async function loadActiveStudents() {
+            const tableBody = document.getElementById('studentsTable');
+            const countEl = document.getElementById('studentCount');
+            if (!tableBody) return;
+
+            try {
+                if (!requireManagerBranch()) return;
+                let url = `${baseApiUrl}/students.php?action=get-active-enrollments&branch_id=${encodeURIComponent(managerBranchId)}`;
+
+                const response = await axios.get(url);
+                const data = response.data;
+
+                if (data.success && Array.isArray(data.enrollments)) {
+                    allStudents = data.enrollments;
+                    renderStudents(tableBody);
+                    if (countEl) countEl.textContent = `${data.enrollments.length} active`;
+                } else {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
+                                <p>${uiIsDesk ? 'No active enrollments found.' : 'No active sessions found.'}</p>
+                            </td>
+                        </tr>`;
+                    if (countEl) countEl.textContent = '0 active';
+                }
+            } catch (error) {
+                console.error('Failed to load active sessions:', error);
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>${uiIsDesk ? 'Failed to load active enrollments. Please try again.' : 'Failed to load active sessions. Please try again.'}</p>
+                        </td>
+                    </tr>`;
+            }
+        }
+
+        function renderStudents(tableBody) {
+            if (!allStudents.length) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
+                            <p>${uiIsDesk ? 'No active enrollments found.' : 'No active sessions found.'}</p>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = allStudents.map(student => {
+                const packageName = student.package_name || '—';
+                const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
+                const roomName = escapeHtml(student.assigned_room || '—');
+                const sessionDate = student.first_session_date ? new Date(student.first_session_date).toLocaleDateString() : '—';
+                const startTime = formatTime12Hour(student.first_start_time);
+                const endTime = formatTime12Hour(student.first_end_time);
+                const sessionTime = student.first_session_date ? `${sessionDate} • ${startTime} - ${endTime}` : '—';
+
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="px-6 py-4">
+                            <div class="font-medium text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
+                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                        </td>
+                        <td class="px-6 py-4 text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
+                        <td class="px-6 py-4 text-slate-700">${escapeHtml(packageName)}</td>
+                        <td class="px-6 py-4 text-slate-700">${sessionTime}</td>
+                        <td class="px-6 py-4 text-slate-700">${teacherName}</td>
+                        <td class="px-6 py-4 text-slate-700">${roomName}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function openAssignPackageModal(studentId, studentName, currentPackageId) {
+            const modal = document.getElementById('assignPackageModal');
+            const studentInfo = document.getElementById('assignPackageStudentInfo');
+            const studentIdInput = document.getElementById('assignStudentId');
+            const packageSelect = document.getElementById('assignPackageSelect');
+
+            if (modal && studentInfo && studentIdInput && packageSelect) {
+                studentInfo.textContent = `Select a session package for ${studentName}`;
+                studentIdInput.value = studentId;
+                packageSelect.value = currentPackageId || '';
+                document.getElementById('assignPackageMessage').classList.add('hidden');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeAssignPackageModal() {
+            const modal = document.getElementById('assignPackageModal');
+            const msg = document.getElementById('assignPackageMessage');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            if (msg) msg.classList.add('hidden');
+        }
+
+        async function assignPackage(e) {
+            e.preventDefault();
+            const studentId = document.getElementById('assignStudentId').value;
+            const packageId = document.getElementById('assignPackageSelect').value;
+
+            if (!studentId || !packageId) {
+                showAssignPackageMessage('Please select a package.', 'error');
+                return;
+            }
+
+            try {
+                const response = await axios.post(`${baseApiUrl}/students.php`, {
+                    action: 'assign-package',
+                    student_id: parseInt(studentId),
+                    session_package_id: parseInt(packageId)
+                });
+                const data = response.data;
+
+                if (data.success) {
+                    closeAssignPackageModal();
+                    showMessage('Package assigned successfully.', 'success');
+                    loadActiveStudents();
+                } else {
+                    showAssignPackageMessage(data.error || 'Failed to assign package.', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to assign package:', error);
+                showAssignPackageMessage('Network error. Please try again.', 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (typeof Auth !== 'undefined' && Auth.getUser) {
+                const user = Auth.getUser();
+                const role = String(user?.role_name || '').toLowerCase();
+                const params = new URLSearchParams(window.location.search);
+                const mode = String(params.get('mode') || '').toLowerCase();
+
+                const deskRoles = ['staff', 'desk', 'front desk'];
+                const managerRoles = ['manager', 'branch manager'];
+
+                const isDeskRole = deskRoles.includes(role);
+                const isManager = managerRoles.includes(role);
+                // Desk view is active for desk roles (UI hint is still passed via `mode=desk`).
+                const isDesk = isDeskRole;
+                uiIsDesk = isDesk;
+
+                if (!user || (!isDeskRole && !isManager)) {
+                    showMessage('Access denied. Desk/Manager only.', 'error');
+                    setTimeout(() => {
+                        window.location.href = '../../index.html';
+                    }, 900);
+                    return;
+                }
+
+                const userNameNav = document.getElementById('userNameNav');
+                const profileMenuName = document.getElementById('profileMenuName');
+                const displayName = user.username || user.email || (isDesk ? 'Front Desk' : 'Manager');
+                managerBranchId = Number(user.branch_id || 0);
+                managerBranchName = user.branch_name || '';
+                if (userNameNav) userNameNav.textContent = displayName;
+                if (profileMenuName) profileMenuName.textContent = displayName;
+
+                // Swap dashboard links for desk users.
+                const deskDashboardHref = '../desk/desk_scanner.html';
+                const managerDashboardHref = 'manager_dashboard.html';
+                const logoLink = document.getElementById('deskOrManagerLogoLink');
+                const dashLink = document.getElementById('navDashboardLink');
+                if (logoLink) logoLink.href = isDesk ? deskDashboardHref : managerDashboardHref;
+                if (dashLink) dashLink.href = isDesk ? deskDashboardHref : managerDashboardHref;
+
+                const sideTitle = document.getElementById('sessionsSidePanelTitle');
+                if (sideTitle) sideTitle.textContent = isDesk ? 'Desk Panel' : 'Manager Panel';
+
+                const branchNameEl = document.getElementById('managerBranchName');
+                const branchNotice = document.getElementById('managerBranchNotice');
+                if (branchNameEl) branchNameEl.textContent = managerBranchName || '—';
+                if (branchNotice) branchNotice.textContent = managerBranchName || '—';
+            }
+
+            await Promise.all([
+                loadSessionPackages()
+            ]);
+
+            await loadPendingRequests();
+            await loadActiveStudents();
+
+            applySessionView();
+            await maybeAutoOpenAssignPackageModalFromUrl();
+            await maybeAutoOpenAssignRequestModalFromUrl();
+
+            document.getElementById('closeAssignPackageModalBtn')?.addEventListener('click', closeAssignPackageModal);
+            document.getElementById('cancelAssignPackageBtn')?.addEventListener('click', closeAssignPackageModal);
+            document.getElementById('assignPackageForm')?.addEventListener('submit', assignPackage);
+            document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', closeAssignRequestModal);
+            document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', closeAssignRequestModal);
+            document.getElementById('assignRequestForm')?.addEventListener('submit', submitAssignRequestForm);
+            document.getElementById('assignRequestDate')?.addEventListener('change', (e) => {
+                const dayEl = document.getElementById('assignRequestDay');
+                if (!dayEl) return;
+                const d = getDayNameFromDate(e.target.value || '');
+                dayEl.value = d || '';
+            });
+        });
+    </script>
+</body>
+</html>

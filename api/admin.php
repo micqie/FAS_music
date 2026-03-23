@@ -184,6 +184,8 @@ class Admin
     {
         $this->ensureStudentRegistrationProofColumn();
         $hasProofCol = $this->hasStudentColumn('registration_proof_path');
+        $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
+        $branchSql = $branchId > 0 ? " AND s.branch_id = ?" : "";
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
@@ -209,10 +211,14 @@ class Admin
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-            WHERE s.status = 'Inactive'
+            WHERE s.status = 'Inactive'" . $branchSql . "
             ORDER BY s.created_at DESC
         ");
-        $stmt->execute();
+        if ($branchId > 0) {
+            $stmt->execute([$branchId]);
+        } else {
+            $stmt->execute();
+        }
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -227,6 +233,8 @@ class Admin
     {
         $this->ensureStudentRegistrationProofColumn();
         $hasProofCol = $this->hasStudentColumn('registration_proof_path');
+        $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
+        $branchSql = $branchId > 0 ? " AND s.branch_id = ?" : "";
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
@@ -261,9 +269,14 @@ class Admin
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
+            WHERE 1=1" . $branchSql . "
             ORDER BY s.created_at DESC
         ");
-        $stmt->execute();
+        if ($branchId > 0) {
+            $stmt->execute([$branchId]);
+        } else {
+            $stmt->execute();
+        }
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -416,18 +429,24 @@ class Admin
         }
 
         $studentId = (int) $data['student_id'];
+        $branchId = isset($data['branch_id']) ? (int) $data['branch_id'] : 0;
 
         try {
             $this->conn->beginTransaction();
 
             // Get student email before delete (for user account removal)
-            $stmtStudent = $this->conn->prepare("SELECT email FROM tbl_students WHERE student_id = ?");
+            $stmtStudent = $this->conn->prepare("SELECT email, branch_id FROM tbl_students WHERE student_id = ?");
             $stmtStudent->execute([$studentId]);
             $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
 
             if (!$student) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Student not found'], 404);
+            }
+
+            if ($branchId > 0 && (int)($student['branch_id'] ?? 0) !== $branchId) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Student does not belong to your branch'], 403);
             }
 
             $email = $student['email'] ?? null;
@@ -488,14 +507,21 @@ class Admin
             $this->sendJSON(['error' => 'student_id, amount, and payment_method are required'], 400);
         }
 
+        $branchId = isset($data['branch_id']) ? (int) $data['branch_id'] : 0;
+
         try {
             $this->conn->beginTransaction();
-            $stmtStudent = $this->conn->prepare("SELECT student_id, email FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmtStudent = $this->conn->prepare("SELECT student_id, email, branch_id FROM tbl_students WHERE student_id = ? LIMIT 1");
             $stmtStudent->execute([(int)$data['student_id']]);
             $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
             if (!$student) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Student not found'], 404);
+            }
+
+            if ($branchId > 0 && (int)($student['branch_id'] ?? 0) !== $branchId) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Student does not belong to your branch'], 403);
             }
 
             $currentPaid = $this->getRegistrationPaidAmount((int)$data['student_id']);
@@ -603,9 +629,12 @@ class Admin
             $this->sendJSON(['error' => 'Student ID is required'], 400);
         }
 
+        $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
+
         try {
             $this->ensureStudentRegistrationProofColumn();
             $hasProofCol = $this->hasStudentColumn('registration_proof_path');
+            $branchSql = $branchId > 0 ? " AND s.branch_id = ?" : "";
             $stmt = $this->conn->prepare("
                 SELECT
                     s.*,
@@ -629,9 +658,13 @@ class Admin
                     END AS registration_status
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
-                WHERE s.student_id = ?
+                WHERE s.student_id = ?" . $branchSql . "
             ");
-            $stmt->execute([$studentId]);
+            if ($branchId > 0) {
+                $stmt->execute([$studentId, $branchId]);
+            } else {
+                $stmt->execute([$studentId]);
+            }
             $student = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$student) {

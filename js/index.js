@@ -2999,7 +2999,13 @@ async function loadPendingRegistrations() {
     }
 
     try {
-        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-pending-registrations`);
+        const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        const role = String(user?.role_name || '').toLowerCase();
+        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        let url = `${baseApiUrl}/admin.php?action=get-pending-registrations`;
+        if (staffBranchId > 0) url += `&branch_id=${encodeURIComponent(staffBranchId)}`;
+
+        const res = await axios.get(url);
         const data = res.data;
 
         if (data.success) {
@@ -3019,7 +3025,13 @@ async function loadAllRegistrations() {
     }
 
     try {
-        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-all-registrations`);
+        const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        const role = String(user?.role_name || '').toLowerCase();
+        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        let url = `${baseApiUrl}/admin.php?action=get-all-registrations`;
+        if (staffBranchId > 0) url += `&branch_id=${encodeURIComponent(staffBranchId)}`;
+
+        const res = await axios.get(url);
         const data = res.data;
 
         if (data.success) {
@@ -3229,7 +3241,13 @@ function updateStats(registrations) {
 // View Details
 async function viewDetails(studentId) {
     try {
-        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-registration-details&student_id=${studentId}`);
+        const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        const role = String(user?.role_name || '').toLowerCase();
+        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        let url = `${baseApiUrl}/admin.php?action=get-registration-details&student_id=${studentId}`;
+        if (staffBranchId > 0) url += `&branch_id=${encodeURIComponent(staffBranchId)}`;
+
+        const res = await axios.get(url);
         const data = res.data;
 
         if (data.success) {
@@ -3329,7 +3347,13 @@ async function openPaymentModal(studentId) {
     currentStudentId = studentId;
 
     try {
-        const res = await axios.get(`${baseApiUrl}/admin.php?action=get-registration-details&student_id=${studentId}`);
+        const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        const role = String(user?.role_name || '').toLowerCase();
+        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        let url = `${baseApiUrl}/admin.php?action=get-registration-details&student_id=${studentId}`;
+        if (staffBranchId > 0) url += `&branch_id=${encodeURIComponent(staffBranchId)}`;
+
+        const res = await axios.get(url);
         const data = res.data;
         if (data.success) {
             const student = data.student;
@@ -3378,6 +3402,11 @@ function initPaymentForm() {
         };
 
         try {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const role = String(user?.role_name || '').toLowerCase();
+            const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+            if (staffBranchId > 0) paymentData.branch_id = staffBranchId;
+
             const res = await axios.post(`${baseApiUrl}/admin.php?action=confirm-payment`, paymentData);
             const data = res.data;
             if (data.success) {
@@ -3399,7 +3428,13 @@ async function rejectRegistration(studentId) {
     if (!confirm('Are you sure you want to reject this registration?')) return;
 
     try {
-        const res = await axios.post(`${baseApiUrl}/admin.php?action=reject-registration`, { student_id: studentId });
+        const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        const role = String(user?.role_name || '').toLowerCase();
+        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        const payload = { student_id: studentId };
+        if (staffBranchId > 0) payload.branch_id = staffBranchId;
+
+        const res = await axios.post(`${baseApiUrl}/admin.php?action=reject-registration`, payload);
         const data = res.data;
         if (data.success) {
             showMessage(data.message, 'success');

@@ -913,17 +913,34 @@ class StudentsApi
 
         try {
             // Check if student exists
-            $checkStudent = $this->conn->prepare("SELECT student_id FROM tbl_students WHERE student_id = ?");
+            $checkStudent = $this->conn->prepare("SELECT student_id, branch_id FROM tbl_students WHERE student_id = ?");
             $checkStudent->execute([$studentId]);
-            if (!$checkStudent->fetch()) {
+            $studentRow = $checkStudent->fetch(PDO::FETCH_ASSOC);
+            if (!$studentRow) {
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
+            $studentBranchId = (int) ($studentRow['branch_id'] ?? 0);
 
-            // Check if package exists
-            $checkPackage = $this->conn->prepare("SELECT package_id FROM tbl_session_packages WHERE package_id = ?");
-            $checkPackage->execute([$packageId]);
-            if (!$checkPackage->fetch()) {
-                $this->sendJSON(['error' => 'Session package not found'], 404);
+            // Check if package exists (and enforce branch match when branch_id exists on tbl_session_packages)
+            $hasPackageBranchCol = $this->tableHasColumn('tbl_session_packages', 'branch_id');
+            if ($hasPackageBranchCol) {
+                $checkPackage = $this->conn->prepare("SELECT package_id, branch_id FROM tbl_session_packages WHERE package_id = ?");
+                $checkPackage->execute([$packageId]);
+                $packageRow = $checkPackage->fetch(PDO::FETCH_ASSOC);
+                if (!$packageRow) {
+                    $this->sendJSON(['error' => 'Session package not found'], 404);
+                }
+
+                $packageBranchId = (int) ($packageRow['branch_id'] ?? 0);
+                if ($studentBranchId > 0 && $packageBranchId > 0 && $packageBranchId !== $studentBranchId) {
+                    $this->sendJSON(['error' => 'Selected package is not available for this student branch'], 400);
+                }
+            } else {
+                $checkPackage = $this->conn->prepare("SELECT package_id FROM tbl_session_packages WHERE package_id = ?");
+                $checkPackage->execute([$packageId]);
+                if (!$checkPackage->fetch()) {
+                    $this->sendJSON(['error' => 'Session package not found'], 404);
+                }
             }
 
             // Check if session_package_id column exists
@@ -2015,6 +2032,7 @@ class StudentsApi
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $requestId = (int) ($data['request_id'] ?? 0);
         $teacherId = (int) ($data['teacher_id'] ?? 0);
+        $deskBranchId = (int) ($data['branch_id'] ?? $data['desk_branch_id'] ?? 0);
         $assignedDate = trim($data['assigned_date'] ?? '');
         $assignedDay = trim($data['assigned_day_of_week'] ?? '');
         $assignedStart = trim($data['assigned_start_time'] ?? '');
@@ -2084,6 +2102,12 @@ class StudentsApi
             if ($req['status'] !== 'Pending') {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Only pending requests can be approved'], 400);
+            }
+
+            // Optional: enforce desk branch context when provided by the caller.
+            if ($deskBranchId > 0 && (int)($req['branch_id'] ?? 0) !== $deskBranchId) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Request does not belong to your branch'], 403);
             }
 
             $resolvedRoomId = null;
@@ -2267,11 +2291,31 @@ class StudentsApi
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $requestId = (int) ($data['request_id'] ?? 0);
         $adminNotes = trim($data['admin_notes'] ?? '');
+        $deskBranchId = (int) ($data['branch_id'] ?? $data['desk_branch_id'] ?? 0);
         if ($requestId < 1) {
             $this->sendJSON(['error' => 'request_id is required'], 400);
         }
 
         try {
+            if ($deskBranchId > 0) {
+                // Validate the request belongs to the caller's branch.
+                $stmtReq = $this->conn->prepare("
+                    SELECT s.branch_id
+                    FROM tbl_enrollments e
+                    INNER JOIN tbl_students s ON e.student_id = s.student_id
+                    WHERE e.enrollment_id = ?
+                    LIMIT 1
+                ");
+                $stmtReq->execute([$requestId]);
+                $reqRow = $stmtReq->fetch(PDO::FETCH_ASSOC);
+                if (!$reqRow) {
+                    $this->sendJSON(['error' => 'Request not found'], 404);
+                }
+                if ((int)($reqRow['branch_id'] ?? 0) !== $deskBranchId) {
+                    $this->sendJSON(['error' => 'Request does not belong to your branch'], 403);
+                }
+            }
+
             $meta = [];
             $stmtGet = $this->conn->prepare("
                 SELECT request_notes
