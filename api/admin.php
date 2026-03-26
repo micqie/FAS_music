@@ -732,6 +732,10 @@ class Admin
     {
         try {
             $hasUserBranch = $this->hasUserColumn('branch_id');
+            $userBranchIdSql = $hasUserBranch ? "u.branch_id" : "NULL";
+            $userBranchJoinSql = $hasUserBranch ? "LEFT JOIN tbl_branches bu ON u.branch_id = bu.branch_id" : "";
+            $userBranchNameSql = $hasUserBranch ? "bu.branch_name," : "";
+
             $sql = "
                 SELECT
                     u.user_id,
@@ -741,17 +745,24 @@ class Admin
                     u.email,
                     u.phone,
                     u.status,
+                    COALESCE({$userBranchIdSql}, t.branch_id, s.branch_id, sgs.branch_id) AS branch_id,
                     CASE
                         WHEN r.role_name = 'Manager' THEN 'Branch Manager'
                         WHEN r.role_name = 'Staff' THEN 'Staff'
                         ELSE r.role_name
                     END AS role_name,
-                    COALESCE(" . ($hasUserBranch ? "bu.branch_name," : "") . " bt.branch_name, '') AS branch_name
+                    COALESCE({$userBranchNameSql} bt.branch_name, bs.branch_name, bg.branch_name, '') AS branch_name
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 LEFT JOIN tbl_teachers t ON t.user_id = u.user_id
                 LEFT JOIN tbl_branches bt ON t.branch_id = bt.branch_id
-                " . ($hasUserBranch ? "LEFT JOIN tbl_branches bu ON u.branch_id = bu.branch_id" : "") . "
+                {$userBranchJoinSql}
+                LEFT JOIN tbl_students s ON s.email = u.email
+                LEFT JOIN tbl_branches bs ON s.branch_id = bs.branch_id
+                LEFT JOIN tbl_guardians g ON g.email = u.email
+                LEFT JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id AND sg.is_primary_guardian = 'Y'
+                LEFT JOIN tbl_students sgs ON sgs.student_id = sg.student_id
+                LEFT JOIN tbl_branches bg ON sgs.branch_id = bg.branch_id
                 ORDER BY r.role_name, u.first_name, u.last_name, u.user_id
             ";
             $stmt = $this->conn->prepare($sql);
@@ -878,6 +889,119 @@ class Admin
             $this->sendJSON(['error' => 'Failed to create user: ' . $e->getMessage()], 500);
         }
     }
+
+    // ✏️ Update a user's profile (admin-only)
+    public function updateUser($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid payload'], 400);
+        }
+
+        $userId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
+        $firstName = trim((string)($data['first_name'] ?? ''));
+        $lastName = trim((string)($data['last_name'] ?? ''));
+        $email = trim((string)($data['email'] ?? ''));
+        $phone = trim((string)($data['phone'] ?? ''));
+        $branchId = isset($data['branch_id']) && $data['branch_id'] !== '' ? (int)$data['branch_id'] : 0;
+
+        if ($userId <= 0 || $firstName === '' || $lastName === '' || $email === '') {
+            $this->sendJSON(['error' => 'user_id, first_name, last_name and email are required'], 400);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->sendJSON(['error' => 'Invalid email address'], 400);
+        }
+
+        try {
+            // Prevent duplicate username/email (exclude current user)
+            $stmtCheck = $this->conn->prepare("
+                SELECT user_id FROM tbl_users
+                WHERE (username = ? OR email = ?) AND user_id <> ?
+                LIMIT 1
+            ");
+            $stmtCheck->execute([$email, $email, $userId]);
+            $exists = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+            if ($exists) {
+                $this->sendJSON(['error' => 'Email already exists'], 409);
+            }
+
+            $hasBranchCol = $this->hasUserColumn('branch_id');
+            if ($hasBranchCol) {
+                $stmt = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET first_name = ?, last_name = ?, email = ?, phone = ?, username = ?, branch_id = ?
+                    WHERE user_id = ?
+                ");
+                $stmt->execute([
+                    $firstName,
+                    $lastName,
+                    $email,
+                    $phone,
+                    $email,
+                    $branchId > 0 ? $branchId : null,
+                    $userId
+                ]);
+            } else {
+                $stmt = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET first_name = ?, last_name = ?, email = ?, phone = ?, username = ?
+                    WHERE user_id = ?
+                ");
+                $stmt->execute([
+                    $firstName,
+                    $lastName,
+                    $email,
+                    $phone,
+                    $email,
+                    $userId
+                ]);
+            }
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'User profile updated successfully.'
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Failed to update user: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // 🔒 Activate/deactivate user account
+    public function setUserStatus($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid payload'], 400);
+        }
+
+        $userId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
+        $status = trim((string)($data['status'] ?? ''));
+        $normalized = strcasecmp($status, 'Active') === 0 ? 'Active' : (strcasecmp($status, 'Inactive') === 0 ? 'Inactive' : '');
+
+        if ($userId <= 0 || $normalized === '') {
+            $this->sendJSON(['error' => 'user_id and valid status are required'], 400);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("UPDATE tbl_users SET status = ? WHERE user_id = ?");
+            $stmt->execute([$normalized, $userId]);
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'User status updated successfully.'
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Failed to update status: ' . $e->getMessage()], 500);
+        }
+    }
 }
 
 // Router
@@ -915,6 +1039,12 @@ switch ($action) {
         break;
     case 'create-user':
         $admin->createUser(file_get_contents('php://input'));
+        break;
+    case 'update-user':
+        $admin->updateUser(file_get_contents('php://input'));
+        break;
+    case 'set-user-status':
+        $admin->setUserStatus(file_get_contents('php://input'));
         break;
     default:
         $admin->sendJSON(['error' => 'Invalid action'], 400);

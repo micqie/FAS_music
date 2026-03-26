@@ -208,14 +208,20 @@ class User
 
             // Check if account is active
             if ($user['status'] !== 'Active') {
-                $this->sendJSON(['error' => 'Your account is pending admin approval. Please wait for approval before logging in.'], 403);
+                $this->sendJSON(['error' => 'Your account was deactivated. Please contact the administrator.'], 403);
             }
 
-            // Detect default password "fasmusic2020" for non-admin roles (first-login change requirement)
+            // Detect default/temporary passwords for non-admin roles (first-login change requirement)
             $mustChangePassword = false;
             $roleName = (string)($user['role_name'] ?? '');
-            $isDefaultPassword = password_verify('fasmusic2020', $storedPassword)
-                || hash_equals($storedPassword, 'fasmusic2020');
+            $defaultPasswords = ['fasmusic@2020', 'fasmusic2020'];
+            $isDefaultPassword = false;
+            foreach ($defaultPasswords as $defaultPwd) {
+                if (password_verify($defaultPwd, $storedPassword) || hash_equals($storedPassword, $defaultPwd)) {
+                    $isDefaultPassword = true;
+                    break;
+                }
+            }
             if ($isDefaultPassword && strcasecmp($roleName, 'Admin') !== 0) {
                 $mustChangePassword = true;
             }
@@ -242,9 +248,10 @@ class User
         $userId = $data['user_id'] ?? null;
         $oldPassword = $data['old_password'] ?? '';
         $newPassword = $data['new_password'] ?? '';
+        $isAdminOverride = !empty($data['is_admin_override']);
 
-        if (empty($userId) || empty($oldPassword) || empty($newPassword)) {
-            $this->sendJSON(['error' => 'user_id, old_password and new_password are required'], 400);
+        if (empty($userId) || empty($newPassword) || (!$isAdminOverride && empty($oldPassword))) {
+            $this->sendJSON(['error' => 'user_id and new_password are required'], 400);
         }
 
         try {
@@ -256,12 +263,14 @@ class User
                 $this->sendJSON(['error' => 'User not found'], 404);
             }
 
-            $storedPassword = (string) ($user['password'] ?? '');
-            $isOldPasswordValid = password_verify($oldPassword, $storedPassword)
-                || hash_equals($storedPassword, $oldPassword);
+            if (!$isAdminOverride) {
+                $storedPassword = (string) ($user['password'] ?? '');
+                $isOldPasswordValid = password_verify($oldPassword, $storedPassword)
+                    || hash_equals($storedPassword, $oldPassword);
 
-            if (!$isOldPasswordValid) {
-                $this->sendJSON(['error' => 'Current password is incorrect'], 400);
+                if (!$isOldPasswordValid) {
+                    $this->sendJSON(['error' => 'Current password is incorrect'], 400);
+                }
             }
 
             // Validate new password with same strong policy as registration

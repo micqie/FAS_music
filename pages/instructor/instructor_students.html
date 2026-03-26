@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Students | Father & Sons</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .dark-glass { background: rgba(15, 17, 21, 0.92); backdrop-filter: blur(10px); }
+        .soft-shadow { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12); }
+    </style>
+</head>
+<body class="bg-[#f1f5f9] text-slate-900 antialiased">
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-6 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-3">
+            <button class="lg:hidden text-white/80 hover:text-white" onclick="toggleInstructorMenu()" aria-label="Toggle menu">
+                <i id="instructorMenuIcon" class="fas fa-bars text-lg"></i>
+            </button>
+            <a href="#" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
+        </div>
+        <div class="flex items-center gap-6">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="instructorNameNav" class="text-sm font-semibold text-white">Instructor</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Teaching Portal</span>
+            </div>
+            <div class="h-10 w-10 rounded-full border-2 border-gold-500/30 p-0.5">
+                <div class="w-full h-full rounded-full bg-darkSlate flex items-center justify-center">
+                    <i class="fas fa-guitar text-gold-400"></i>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div id="instructorMobileMenu" class="fixed inset-0 z-40 hidden lg:hidden">
+        <div class="absolute inset-0 bg-black/60" onclick="toggleInstructorMenu()"></div>
+        <div class="absolute inset-y-0 left-0 w-72 bg-obsidian pt-24 px-6">
+            <div class="mb-6">
+                <h2 class="text-xl font-extrabold text-white">Instructor Panel</h2>
+                <div class="mt-3 h-2 w-36 rounded-full bg-gold-500"></div>
+            </div>
+            <nav class="space-y-2">
+                <a href="instructor_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                    <i class="fas fa-chart-line mr-3 text-slate-500"></i> Dashboard
+                </a>
+                <a href="instructor_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl transition-all">
+                    <i class="fas fa-user-graduate mr-3 text-gold-400"></i> My Students
+                </a>
+                <a href="instructor_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                    <i class="fas fa-calendar-alt mr-3 text-slate-500"></i> Sessions
+                </a>
+                <a href="instructor_availability.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                    <i class="fas fa-clock mr-3 text-slate-500"></i> Availability
+                </a>
+                <a href="instructor_profile.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                    <i class="fas fa-id-badge mr-3 text-slate-500"></i> Profile
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto">
+        <div class="px-6 space-y-8 flex-1 mt-4">
+            <div class="px-4 mb-4">
+                <h2 class="text-[1.5rem] leading-none font-extrabold text-white tracking-tight">Instructor Panel</h2>
+                <div class="mt-3 h-2 w-[14rem] rounded-full bg-gold-500"></div>
+            </div>
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Teaching</h3>
+                <nav class="space-y-2">
+                    <a href="instructor_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-chart-line mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
+                    </a>
+                    <a href="instructor_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl transition-all">
+                        <i class="fas fa-user-graduate mr-3 text-gold-400"></i> My Students
+                    </a>
+                    <a href="instructor_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-alt mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
+                    <a href="instructor_availability.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-clock mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Availability
+                    </a>
+                    <a href="instructor_profile.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-id-badge mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Profile
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </aside>
+
+    <main class="lg:ml-72 pt-28 p-6 md:p-8">
+        <div class="max-w-7xl mx-auto space-y-8">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">My Students</h1>
+                    <p class="text-slate-500 mt-1">Track progress and lesson focus for each learner.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <i class="fas fa-search text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                        <input id="studentSearch" type="text" placeholder="Search students..."
+                            class="pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                    </div>
+                </div>
+            </div>
+
+            <section class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <h2 class="text-lg font-bold text-slate-900">Active Students</h2>
+                    <span id="studentCount" class="text-xs font-semibold text-slate-500">0 students</span>
+                </div>
+                <div class="mt-5 overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-slate-500 border-b border-slate-200">
+                                <th class="py-3 pr-4">Student</th>
+                                <th class="py-3 pr-4 hidden md:table-cell">Instrument</th>
+                                <th class="py-3 pr-4 hidden lg:table-cell">Level</th>
+                                <th class="py-3 pr-4">Status</th>
+                                <th class="py-3 pr-4 hidden xl:table-cell">Next Lesson</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentsTable" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+                    <h2 class="text-lg font-bold text-slate-900">Learning Focus</h2>
+                    <div class="mt-4 space-y-4">
+                        <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50">
+                            <p class="text-sm font-semibold text-slate-900">Technique Drills</p>
+                            <p class="text-xs text-slate-500 mt-1">Strengthen scales, posture, and tone control.</p>
+                        </div>
+                        <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50">
+                            <p class="text-sm font-semibold text-slate-900">Performance Readiness</p>
+                            <p class="text-xs text-slate-500 mt-1">Review repertoire and stage confidence.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+                    <h2 class="text-lg font-bold text-slate-900">Notes</h2>
+                    <textarea class="mt-4 w-full h-40 rounded-2xl border border-slate-200 p-4 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40" placeholder="Add reminders for students, recitals, or goals..."></textarea>
+                    <button class="mt-4 w-full py-2.5 rounded-xl bg-obsidian text-white text-sm font-semibold hover:bg-black transition">Save Notes</button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="../../js/index.js"></script>
+    <script>
+        const demoStudents = [
+            { name: 'Angela Ramos', instrument: 'Piano', level: 'Intermediate', status: 'On Track', nextLesson: 'Mar 27, 10:00 AM' },
+            { name: 'Carlo Santos', instrument: 'Guitar', level: 'Beginner', status: 'Needs Review', nextLesson: 'Mar 28, 01:00 PM' },
+            { name: 'Mira Delgado', instrument: 'Violin', level: 'Advanced', status: 'Excellent', nextLesson: 'Mar 29, 03:00 PM' },
+            { name: 'Jasper Lim', instrument: 'Drums', level: 'Beginner', status: 'On Track', nextLesson: 'Mar 29, 09:00 AM' }
+        ];
+
+        function toggleInstructorMenu() {
+            const menu = document.getElementById('instructorMobileMenu');
+            const icon = document.getElementById('instructorMenuIcon');
+            if (!menu || !icon) return;
+            const isHidden = menu.classList.contains('hidden');
+            menu.classList.toggle('hidden');
+            icon.classList.toggle('fa-bars', !isHidden);
+            icon.classList.toggle('fa-times', isHidden);
+        }
+
+        function renderStudents(filter = '') {
+            const tbody = document.getElementById('studentsTable');
+            const count = document.getElementById('studentCount');
+            if (!tbody) return;
+            const term = filter.trim().toLowerCase();
+            const rows = demoStudents.filter(s => s.name.toLowerCase().includes(term) || s.instrument.toLowerCase().includes(term));
+            if (count) count.textContent = `${rows.length} students`;
+            tbody.innerHTML = rows.length ? rows.map(s => `
+                <tr class="hover:bg-gold-500/5 transition">
+                    <td class="py-3 pr-4">
+                        <div class="font-semibold text-slate-900">${s.name}</div>
+                        <div class="text-xs text-slate-500 md:hidden">${s.instrument}</div>
+                    </td>
+                    <td class="py-3 pr-4 hidden md:table-cell text-slate-700">${s.instrument}</td>
+                    <td class="py-3 pr-4 hidden lg:table-cell text-slate-700">${s.level}</td>
+                    <td class="py-3 pr-4">
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full ${s.status === 'Excellent' ? 'bg-emerald-100 text-emerald-700' : s.status === 'Needs Review' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${s.status}</span>
+                    </td>
+                    <td class="py-3 pr-4 hidden xl:table-cell text-slate-700">${s.nextLesson}</td>
+                </tr>
+            `).join('') : `
+                <tr>
+                    <td colspan="5" class="py-8 text-center text-slate-500">No students found.</td>
+                </tr>
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof Auth !== 'undefined' && Auth.getUser) {
+                const user = Auth.getUser() || {};
+                const displayName = user.username || user.email || 'Instructor';
+                const nameEl = document.getElementById('instructorNameNav');
+                if (nameEl) nameEl.textContent = displayName;
+            }
+            renderStudents();
+            const search = document.getElementById('studentSearch');
+            if (search) {
+                search.addEventListener('input', (e) => renderStudents(e.target.value));
+            }
+        });
+    </script>
+</body>
+</html>

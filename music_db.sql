@@ -42,7 +42,7 @@ CREATE TABLE `tbl_branches` (
 --
 
 INSERT INTO `tbl_branches` (`branch_id`, `branch_name`, `address`, `phone`, `email`, `status`, `created_at`) VALUES
-(1, 'TEST BRANCH', 'Test', '1231', 'asd@gmaol.com', 'Inactive', '2026-02-20 16:23:23'),
+(1, 'Main Branch', 'Cagayan de Oro City', '0912345678'),
 (5, 'SM Downtown', 'CDO', '0909090909', 'smdt@gmail.com', 'Active', '2026-02-21 00:18:58'),
 (6, 'SM Uptown', 'CDO', '0192092019', 'smupt@gmail.com', 'Active', '2026-02-21 00:19:18');
 
@@ -74,12 +74,7 @@ CREATE TABLE `tbl_enrollments` (
 -- Dumping data for table `tbl_enrollments`
 --
 
-INSERT INTO `tbl_enrollments` (`enrollment_id`, `student_id`, `package_id`, `instrument_id`, `preferred_schedule`, `request_notes`, `enrollment_date`, `start_date`, `end_date`, `status`, `created_at`, `enrolled_by_type`, `student_guardian_id`, `total_sessions`, `completed_sessions`) VALUES
-(8, 2, 1, NULL, NULL, NULL, '2026-02-21', '2026-02-23', '2026-05-11', 'Active', '2026-02-20 18:27:03', 'Self', NULL, 12, 0),
-(9, 2, 1, NULL, NULL, NULL, '2026-02-21', '2026-02-22', '2026-05-10', 'Active', '2026-02-21 00:35:03', 'Self', NULL, 12, 0),
-(10, 3, 6, 10, 'Tuesday|2026-02-24', '{\"payment_type\":\"Partial Payment\",\"instrument_ids\":[10,11],\"payment_proof_path\":null}', '2026-02-21', NULL, NULL, 'Pending', '2026-02-21 04:10:00', 'Self', NULL, 8, 0),
-(11, 4, 10, 13, 'Thursday|2026-02-26', '{\"payment_type\":\"Full Payment\",\"instrument_ids\":[13],\"payment_proof_path\":null,\"admin_notes\":\"hays\"}', '2026-02-21', NULL, NULL, 'Cancelled', '2026-02-21 04:20:00', 'Self', NULL, 16, 0),
-(12, 9, 6, 10, 'Friday|2026-03-13', '{\"payment_type\":\"Full Payment\",\"instrument_ids\":[10],\"payment_proof_path\":null}', '2026-03-13', NULL, NULL, 'Pending', '2026-03-13 05:34:15', 'Self', NULL, 8, 0);
+
 
 -- --------------------------------------------------------
 
@@ -104,10 +99,7 @@ CREATE TABLE `tbl_guardians` (
 -- Dumping data for table `tbl_guardians`
 --
 
-INSERT INTO `tbl_guardians` (`guardian_id`, `first_name`, `last_name`, `relationship_type`, `phone`, `occupation`, `email`, `address`, `status`, `created_at`) VALUES
-(1, 'jonah', 'lago', 'Mother', '09090909', 'manager ', 'jon@gmail.com', 'tablon cdo', 'Active', '2026-03-11 22:32:19'),
-(2, 'guardian', 'test', 'Legal Guardian', '09659153090', 'none ', 'guardian@gmail.com', 'zone 3 upper, Brgy. Bulua, Cagayan de Oro City, Misamis Oriental', 'Active', '2026-03-13 02:22:18'),
-(3, 'Kim', 'Seokjin', 'Legal Guardian', '09102390123', 'none ', 'jin@gmail.com', 'tablon ', 'Active', '2026-03-13 02:30:51');
+
 
 -- --------------------------------------------------------
 

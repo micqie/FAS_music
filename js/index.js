@@ -387,12 +387,15 @@ function initLoginForm() {
                 // Redirect based on role
                 setTimeout(() => {
                     const role = String(data.user.role_name || '').trim();
+                    const roleLower = role.toLowerCase();
                     if (role === 'Admin' || role === 'SuperAdmin') {
                         window.location.href = 'pages/admin/admin_dashboard.html';
                     } else if (role === 'Manager' || role === 'Branch Manager') {
                         window.location.href = 'pages/manager/manager_dashboard.html';
                     } else if (role === 'Staff') {
                         window.location.href = 'pages/desk/desk_scanner.html';
+                    } else if (roleLower === 'instructor' || roleLower === 'teacher' || roleLower === 'instructors' || roleLower === 'teachers') {
+                        window.location.href = 'pages/instructor/instructor_dashboard.html';
                     } else if (role === 'Student') {
                         window.location.href = 'pages/student/student_dashboard.html';
                     } else if (data.user.role_name === 'Guardians') {
@@ -409,11 +412,11 @@ function initLoginForm() {
                     : status === 401
                         ? 'Invalid username or password.'
                         : status === 403
-                            ? 'Your account is pending admin approval.'
+                            ? 'Your account was deactivated. Please contact the administrator.'
                             : 'An error occurred. Please try again.';
 
-                const isPending = status === 403 || /pending/i.test(message);
-                const title = isPending ? 'Pending Account' : status === 401 ? 'Login Failed' : 'Error';
+                const isPending = status === 403 || /pending|deactivated/i.test(message);
+                const title = isPending ? '' : status === 401 ? 'Login Failed' : 'Error';
                 const icon = isPending ? 'info' : 'error';
 
                 // Show error message with SweetAlert
@@ -438,11 +441,11 @@ function initLoginForm() {
                 : status === 401
                     ? 'Invalid username or password.'
                     : status === 403
-                        ? 'Your account is pending admin approval.'
+                        ? 'Your account was deactivated. Please contact the administrator.'
                         : 'An error occurred. Please try again.';
             console.error('Login error:', error);
-            const isPending = status === 403 || /pending/i.test(message);
-            const title = isPending ? 'Pending Account' : status === 401 ? 'Login Failed' : 'Error';
+            const isPending = status === 403 || /pending|deactivated/i.test(message);
+            const title = isPending ? '' : status === 401 ? 'Login Failed' : 'Error';
             const icon = isPending ? 'info' : 'error';
             Swal.fire({
                 icon,
@@ -1261,14 +1264,14 @@ function initScrollAnimations() {
     animateElements.forEach(el => observer.observe(el));
 }
 
-// Prompt student to change password on first login (when using default "fasmusic2020")
+// Prompt user to change password on first login (when using a default/temporary password)
 async function promptPasswordChange(user, currentPassword) {
     try {
         const { value: formValues } = await Swal.fire({
             title: 'Change Your Password',
             html:
                 '<div class="text-left text-sm mb-3">' +
-                    '<p class="mb-1">For security, please change your default password <strong>fasmusic2020</strong>.</p>' +
+                    '<p class="mb-1">For security, please change your temporary password now.</p>' +
                     '<ul class="list-disc list-inside text-xs text-zinc-300">' +
                         '<li>At least 8 characters</li>' +
                         '<li>Include uppercase, lowercase, number and special character (!@#$%^&*)</li>' +
@@ -3493,3 +3496,4 @@ document.addEventListener('DOMContentLoaded', () => {
         initGuardianStudentsPage();
     }
 });
+

@@ -70,6 +70,62 @@ class TeachersApi
         return ((int)$stmt->fetchColumn()) === count($ids);
     }
 
+    private function getTeacherRoleId()
+    {
+        $roleNames = ['Instructor', 'Teacher'];
+        foreach ($roleNames as $roleName) {
+            $stmt = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = ? LIMIT 1");
+            $stmt->execute([$roleName]);
+            $roleId = (int)$stmt->fetchColumn();
+            if ($roleId > 0) {
+                return $roleId;
+            }
+        }
+
+        // Create Instructor role if it doesn't exist yet
+        $insert = $this->conn->prepare("INSERT INTO tbl_roles (role_name) VALUES ('Instructor')");
+        $insert->execute();
+        return (int)$this->conn->lastInsertId();
+    }
+
+    private function userExists($username, $email)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT user_id
+            FROM tbl_users
+            WHERE username = ?
+               OR (email IS NOT NULL AND email <> '' AND email = ?)
+            LIMIT 1
+        ");
+        $stmt->execute([$username, $email]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private function usernameExists($username)
+    {
+        $stmt = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE username = ? LIMIT 1");
+        $stmt->execute([$username]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private function generateUsername($firstName, $lastName, $email)
+    {
+        if ($email !== '') {
+            return $email;
+        }
+        $base = strtolower(preg_replace('/[^a-z0-9]+/i', '', $firstName . $lastName));
+        if ($base === '') {
+            $base = 'teacher';
+        }
+        $candidate = $base;
+        $suffix = 1;
+        while ($this->usernameExists($candidate)) {
+            $candidate = $base . $suffix;
+            $suffix++;
+        }
+        return $candidate;
+    }
+
     public function getSpecializations()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -267,6 +323,40 @@ class TeachersApi
         try {
             $this->conn->beginTransaction();
 
+            $createdUsername = null;
+            $tempPassword = null;
+            if ($userId === null) {
+                $roleId = $this->getTeacherRoleId();
+                $username = $this->generateUsername($firstName, $lastName, $email);
+                if ($this->userExists($username, $email)) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'User account already exists for this username or email'], 400);
+                }
+
+                $tempPassword = 'fasmusic@2020';
+                $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT);
+                $userStatus = $status === 'Active' ? 'Active' : 'Inactive';
+
+                $stmtUser = $this->conn->prepare("
+                    INSERT INTO tbl_users (
+                        username, password, role_id, first_name, last_name,
+                        email, phone, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmtUser->execute([
+                    $username,
+                    $hashedPassword,
+                    $roleId,
+                    $firstName,
+                    $lastName,
+                    ($email !== '' ? $email : null),
+                    ($phone !== '' ? $phone : null),
+                    $userStatus
+                ]);
+                $userId = (int)$this->conn->lastInsertId();
+                $createdUsername = $username;
+            }
+
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_teachers (
                     user_id, branch_id, first_name, last_name, email, phone, employment_type, status
@@ -293,7 +383,13 @@ class TeachersApi
             }
 
             $this->conn->commit();
-            $this->sendJSON(['success' => true, 'teacher_id' => $teacherId]);
+            $this->sendJSON([
+                'success' => true,
+                'teacher_id' => $teacherId,
+                'user_id' => $userId,
+                'username' => $createdUsername,
+                'temp_password' => $tempPassword
+            ]);
         } catch (PDOException $e) {
             if ($this->conn->inTransaction()) {
                 $this->conn->rollBack();

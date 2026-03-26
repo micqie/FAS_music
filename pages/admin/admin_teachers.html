@@ -203,6 +203,9 @@
             <button id="closeTeacherModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
             <h3 id="teacherModalTitle" class="text-2xl font-bold text-white mb-2">Add Teacher</h3>
             <p class="text-zinc-400 text-xs mb-4">Fill in teacher details for masterfile records.</p>
+            <div class="mb-4 rounded-lg border border-gold-500/30 bg-gold-500/10 px-4 py-3 text-xs text-zinc-200">
+                Temporary Password: <span class="font-mono font-semibold">fasmusic@2020</span>
+            </div>
             <form id="teacherForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input type="hidden" id="teacherId">
                 <div>
@@ -448,7 +451,16 @@
                 return;
             }
             closeTeacherModal();
-            showMessage('Teacher saved successfully', 'success');
+            if (data.temp_password && data.username) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Teacher Account Created',
+                    html: `Login credentials:<br><br><strong>Username:</strong> ${esc(data.username)}<br><strong>Temporary Password:</strong> ${esc(data.temp_password)}<br><br>They will be required to change this on first login.`,
+                    confirmButtonColor: '#b8860b'
+                });
+            } else {
+                showMessage('Teacher saved successfully', 'success');
+            }
             await loadTeachers();
         }
 

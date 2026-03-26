@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instructor Dashboard | Father & Sons</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .dark-glass { background: rgba(15, 17, 21, 0.92); backdrop-filter: blur(10px); }
+        .soft-shadow { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12); }
+    </style>
+</head>
+<body class="bg-[#f1f5f9] text-slate-900 antialiased">
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-6 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-3">
+            <button class="lg:hidden text-white/80 hover:text-white" onclick="toggleInstructorMenu()" aria-label="Toggle menu">
+                <i id="instructorMenuIcon" class="fas fa-bars text-lg"></i>
+            </button>
+            <a href="#" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
+        </div>
+        <div class="flex items-center gap-6">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="instructorNameNav" class="text-sm font-semibold text-white">Instructor</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Teaching Portal</span>
+            </div>
+            <div class="h-10 w-10 rounded-full border-2 border-gold-500/30 p-0.5">
+                <div class="w-full h-full rounded-full bg-darkSlate flex items-center justify-center">
+                    <i class="fas fa-guitar text-gold-400"></i>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Drawer -->
+    <div id="instructorMobileMenu" class="fixed inset-0 z-40 hidden lg:hidden">
+        <div class="absolute inset-0 bg-black/60" onclick="toggleInstructorMenu()"></div>
+        <div class="absolute inset-y-0 left-0 w-72 bg-obsidian pt-24 px-6">
+            <div class="mb-6">
+                <h2 class="text-xl font-extrabold text-white">Instructor Panel</h2>
+                <div class="mt-3 h-2 w-36 rounded-full bg-gold-500"></div>
+            </div>
+            <nav class="space-y-2">
+                <a href="instructor_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl transition-all">
+                    <i class="fas fa-chart-line mr-3 text-gold-400"></i> Dashboard
+                </a>
+                <a href="instructor_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                    <i class="fas fa-user-graduate mr-3 text-slate-500"></i> My Students
+                </a>
+                <a href="instructor_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                    <i class="fas fa-calendar-alt mr-3 text-slate-500"></i> Sessions
+                </a>
+                <a href="instructor_availability.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                    <i class="fas fa-clock mr-3 text-slate-500"></i> Availability
+                </a>
+                <a href="instructor_profile.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                    <i class="fas fa-id-badge mr-3 text-slate-500"></i> Profile
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto">
+        <div class="px-6 space-y-8 flex-1 mt-4">
+            <div class="px-4 mb-4">
+                <h2 class="text-[1.5rem] leading-none font-extrabold text-white tracking-tight">Instructor Panel</h2>
+                <div class="mt-3 h-2 w-[14rem] rounded-full bg-gold-500"></div>
+            </div>
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Teaching</h3>
+                <nav class="space-y-2">
+                    <a href="instructor_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl transition-all">
+                        <i class="fas fa-chart-line mr-3 text-gold-400"></i> Dashboard
+                    </a>
+                    <a href="instructor_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> My Students
+                    </a>
+                    <a href="instructor_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-alt mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
+                    <a href="instructor_availability.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-clock mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Availability
+                    </a>
+                    <a href="instructor_profile.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-id-badge mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Profile
+                    </a>
+                </nav>
+            </div>
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Quick View</h3>
+                <div class="px-4 py-4 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Students</span>
+                        <span id="instructorStudentCount" class="text-sm font-semibold text-white">0</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Upcoming</span>
+                        <span id="instructorUpcomingCount" class="text-sm font-semibold text-white">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="lg:ml-72 pt-28 p-6 md:p-8">
+        <div class="max-w-7xl mx-auto space-y-8">
+            <div>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Welcome back</h1>
+                <p class="text-slate-500 mt-1">Here is a snapshot of your students and sessions today.</p>
+                <div class="h-1 w-12 bg-gold-500 mt-3 rounded-full"></div>
+            </div>
+
+            <section class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+                    <div class="flex items-center gap-4">
+                        <div class="h-12 w-12 rounded-2xl bg-gold-500/15 flex items-center justify-center text-gold-500">
+                            <i class="fas fa-user-graduate text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500">Active Students</p>
+                            <p id="statStudents" class="text-2xl font-black text-slate-900">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+                    <div class="flex items-center gap-4">
+                        <div class="h-12 w-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                            <i class="fas fa-calendar-day text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500">Sessions Today</p>
+                            <p id="statToday" class="text-2xl font-black text-slate-900">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+                    <div class="flex items-center gap-4">
+                        <div class="h-12 w-12 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
+                            <i class="fas fa-clock text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500">Next Session</p>
+                            <p id="statNext" class="text-xl font-black text-slate-900">--</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h2 class="text-lg font-bold text-slate-900">Today Sessions</h2>
+                        <a href="instructor_sessions.html" class="text-sm font-semibold text-gold-600 hover:text-gold-500">View all</a>
+                    </div>
+                    <div id="todaySessions" class="mt-5 space-y-4"></div>
+                </div>
+                <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+                    <h2 class="text-lg font-bold text-slate-900">Quick Actions</h2>
+                    <div class="mt-5 space-y-3">
+                        <a href="instructor_students.html" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
+                            <span class="text-sm font-semibold text-slate-800">Review Students</span>
+                            <i class="fas fa-arrow-right text-slate-400"></i>
+                        </a>
+                        <a href="instructor_sessions.html" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
+                            <span class="text-sm font-semibold text-slate-800">Manage Sessions</span>
+                            <i class="fas fa-arrow-right text-slate-400"></i>
+                        </a>
+                        <a href="instructor_availability.html" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
+                            <span class="text-sm font-semibold text-slate-800">Update Availability</span>
+                            <i class="fas fa-arrow-right text-slate-400"></i>
+                        </a>
+                        <a href="instructor_profile.html" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
+                            <span class="text-sm font-semibold text-slate-800">Profile & Settings</span>
+                            <i class="fas fa-arrow-right text-slate-400"></i>
+                        </a>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="../../js/index.js"></script>
+    <script>
+        const demoStudents = [
+            { name: 'Angela Ramos', level: 'Intermediate', instrument: 'Piano' },
+            { name: 'Carlo Santos', level: 'Beginner', instrument: 'Guitar' },
+            { name: 'Mira Delgado', level: 'Advanced', instrument: 'Violin' },
+            { name: 'Jasper Lim', level: 'Beginner', instrument: 'Drums' }
+        ];
+
+        const demoSessions = [
+            { student: 'Angela Ramos', time: '09:00 AM - 10:00 AM', room: 'Studio A', status: 'Confirmed' },
+            { student: 'Carlo Santos', time: '11:00 AM - 12:00 PM', room: 'Studio B', status: 'Pending' },
+            { student: 'Mira Delgado', time: '02:00 PM - 03:00 PM', room: 'Studio C', status: 'Confirmed' }
+        ];
+
+        function toggleInstructorMenu() {
+            const menu = document.getElementById('instructorMobileMenu');
+            const icon = document.getElementById('instructorMenuIcon');
+            if (!menu || !icon) return;
+            const isHidden = menu.classList.contains('hidden');
+            menu.classList.toggle('hidden');
+            icon.classList.toggle('fa-bars', !isHidden);
+            icon.classList.toggle('fa-times', isHidden);
+        }
+
+        function renderTodaySessions() {
+            const list = document.getElementById('todaySessions');
+            if (!list) return;
+            if (demoSessions.length === 0) {
+                list.innerHTML = '<div class="text-sm text-slate-500">No sessions scheduled for today.</div>';
+                return;
+            }
+            list.innerHTML = demoSessions.map(session => `
+                <div class="flex items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 bg-slate-50">
+                    <div>
+                        <div class="text-sm font-semibold text-slate-900">${session.student}</div>
+                        <div class="text-xs text-slate-500">${session.time} | ${session.room}</div>
+                    </div>
+                    <span class="text-xs font-semibold px-3 py-1 rounded-full ${session.status === 'Confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${session.status}</span>
+                </div>
+            `).join('');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof Auth !== 'undefined' && Auth.getUser) {
+                const user = Auth.getUser() || {};
+                const displayName = user.username || user.email || 'Instructor';
+                const nameEl = document.getElementById('instructorNameNav');
+                if (nameEl) nameEl.textContent = displayName;
+            }
+            const studentCount = demoStudents.length;
+            const upcomingCount = demoSessions.length;
+            const nextSession = demoSessions[0]?.time || '--';
+
+            document.getElementById('statStudents').textContent = String(studentCount);
+            document.getElementById('statToday').textContent = String(upcomingCount);
+            document.getElementById('statNext').textContent = nextSession;
+            document.getElementById('instructorStudentCount').textContent = String(studentCount);
+            document.getElementById('instructorUpcomingCount').textContent = String(upcomingCount);
+            renderTodaySessions();
+        });
+    </script>
+</body>
+</html>
