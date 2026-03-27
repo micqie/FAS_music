@@ -892,6 +892,85 @@ class StudentsApi
         }
     }
 
+    // Get students eligible for walk-in enrollment (exclude pending/active requests and active enrollments)
+    public function getWalkinEligibleStudents()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $this->ensureSessionPackageColumn();
+        $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
+        $q = trim((string) ($_GET['q'] ?? ''));
+
+        $hasStatusCol = $this->tableHasColumn('tbl_students', 'status');
+        $hasSessionPackageCol = $this->tableHasColumn('tbl_students', 'session_package_id');
+        $hasEnrollmentsTable = $this->tableExists('tbl_enrollments');
+
+        $sql = "
+            SELECT
+                s.student_id,
+                s.first_name,
+                s.last_name,
+                s.email,
+                s.branch_id,
+                b.branch_name" . ($hasSessionPackageCol ? ",
+                s.session_package_id" : "") . "
+            FROM tbl_students s
+            LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+            WHERE 1=1
+        ";
+
+        $params = [];
+
+        if ($hasStatusCol) {
+            $sql .= " AND s.status = 'Active' ";
+        }
+
+        if ($branchId > 0) {
+            $sql .= " AND s.branch_id = ? ";
+            $params[] = $branchId;
+        }
+
+        if ($hasSessionPackageCol) {
+            $sql .= " AND (s.session_package_id IS NULL OR s.session_package_id = 0) ";
+        }
+
+        if ($hasEnrollmentsTable) {
+            // Exclude students with a pending request or active enrollment
+            $sql .= "
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM tbl_enrollments e
+                    WHERE e.student_id = s.student_id
+                      AND e.status IN ('Pending', 'Active')
+                )
+            ";
+        }
+
+        if ($q !== '') {
+            $like = '%' . $q . '%';
+            $sql .= " AND (
+                s.first_name LIKE ?
+                OR s.last_name LIKE ?
+                OR s.email LIKE ?
+                OR b.branch_name LIKE ?
+            ) ";
+            array_push($params, $like, $like, $like, $like);
+        }
+
+        $sql .= " ORDER BY s.first_name ASC, s.last_name ASC, s.student_id ASC ";
+
+        try {
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $this->sendJSON(['success' => true, 'students' => $students]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     // Assign/Update session package for a student
     public function assignPackage()
     {
@@ -1620,6 +1699,191 @@ class StudentsApi
     }
 
     // Student submits package+instrument+preferred schedule request for admin/desk review
+    public function submitRegistrationFeeRequest()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $isMultipart = $this->isMultipartRequest();
+        $data = $isMultipart ? ($_POST ?: []) : (json_decode(file_get_contents('php://input'), true) ?: []);
+        $studentId = (int) ($data['student_id'] ?? 0);
+        $amount = isset($data['amount']) ? (float)$data['amount'] : 1000.0;
+        $paymentMethod = trim((string)($data['payment_method'] ?? 'Online Transfer'));
+        $receiptNumber = trim((string)($data['receipt_number'] ?? ''));
+
+        if ($studentId < 1) {
+            $this->sendJSON(['error' => 'student_id is required'], 400);
+        }
+        if ($amount <= 0) {
+            $this->sendJSON(['error' => 'amount must be greater than 0'], 400);
+        }
+        if ($paymentMethod === '') {
+            $paymentMethod = 'Online Transfer';
+        }
+
+        $proofPath = null;
+        if ($isMultipart && !empty($_FILES['registration_proof_file']['name'])) {
+            try {
+                $proofPath = $this->storePaymentProofUpload($_FILES['registration_proof_file'], 'registration');
+            } catch (Exception $e) {
+                $this->sendJSON(['error' => $e->getMessage()], 400);
+            }
+        }
+
+        try {
+            $stmtStudent = $this->conn->prepare("
+                SELECT student_id, status
+                FROM tbl_students
+                WHERE student_id = ?
+                LIMIT 1
+            ");
+            $stmtStudent->execute([$studentId]);
+            $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+            if (!$student) {
+                $this->sendJSON(['error' => 'Student not found'], 404);
+            }
+
+            if (strcasecmp((string)($student['status'] ?? ''), 'Active') === 0) {
+                $this->sendJSON(['error' => 'Registration fee is already approved for this account.'], 400);
+            }
+
+            $stmtPending = $this->conn->prepare("
+                SELECT payment_id
+                FROM tbl_registration_payments
+                WHERE student_id = ?
+                  AND status = 'Pending'
+                ORDER BY payment_id DESC
+                LIMIT 1
+            ");
+            $stmtPending->execute([$studentId]);
+            if ($stmtPending->fetch()) {
+                $this->sendJSON(['error' => 'You already have a pending registration fee request. Please wait for admin review.'], 400);
+            }
+
+            $receipt = $receiptNumber !== '' ? $receiptNumber : ('REG-REQ-' . time());
+
+            $stmtInsert = $this->conn->prepare("
+                INSERT INTO tbl_registration_payments (
+                    student_id, payment_date, amount, payment_method, status, receipt_number
+                ) VALUES (?, CURRENT_DATE, ?, ?, 'Pending', ?)
+            ");
+            $stmtInsert->execute([$studentId, $amount, $paymentMethod, $receipt]);
+
+            if ($this->tableHasColumn('tbl_students', 'registration_proof_path')) {
+                $stmtProof = $this->conn->prepare("
+                    UPDATE tbl_students
+                    SET registration_proof_path = ?
+                    WHERE student_id = ?
+                ");
+                $stmtProof->execute([$proofPath, $studentId]);
+            }
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Registration fee request submitted. Please wait for admin approval.',
+                'registration_proof_path' => $proofPath
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function saveGuardianPreference()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $studentId = (int)($data['student_id'] ?? 0);
+        $hasGuardian = filter_var(($data['has_guardian'] ?? false), FILTER_VALIDATE_BOOLEAN);
+
+        if ($studentId < 1) {
+            $this->sendJSON(['error' => 'student_id is required'], 400);
+        }
+
+        if (!$hasGuardian) {
+            $this->sendJSON(['success' => true, 'message' => 'Saved: student will proceed without guardian for now.']);
+        }
+
+        $firstName = trim((string)($data['guardian_first_name'] ?? ''));
+        $lastName = trim((string)($data['guardian_last_name'] ?? ''));
+        $relationship = trim((string)($data['guardian_relationship'] ?? ''));
+        $phone = trim((string)($data['guardian_phone'] ?? ''));
+        $email = trim((string)($data['guardian_email'] ?? ''));
+        $occupation = trim((string)($data['guardian_occupation'] ?? ''));
+        $address = trim((string)($data['guardian_address'] ?? ''));
+
+        if ($firstName === '' || $lastName === '' || $relationship === '' || $phone === '') {
+            $this->sendJSON(['error' => 'Guardian first name, last name, relationship, and phone are required when "with guardian" is selected.'], 400);
+        }
+
+        try {
+            $this->conn->beginTransaction();
+
+            $stmtLink = $this->conn->prepare("
+                SELECT sg.guardian_id
+                FROM tbl_student_guardians sg
+                WHERE sg.student_id = ?
+                  AND sg.is_primary_guardian = 'Y'
+                LIMIT 1
+            ");
+            $stmtLink->execute([$studentId]);
+            $existingGuardianId = (int)($stmtLink->fetchColumn() ?: 0);
+
+            if ($existingGuardianId > 0) {
+                $stmtUpdate = $this->conn->prepare("
+                    UPDATE tbl_guardians
+                    SET first_name = ?, last_name = ?, relationship_type = ?, phone = ?,
+                        occupation = ?, email = ?, address = ?, status = 'Active'
+                    WHERE guardian_id = ?
+                ");
+                $stmtUpdate->execute([
+                    $firstName,
+                    $lastName,
+                    $relationship,
+                    $phone,
+                    $occupation !== '' ? $occupation : null,
+                    $email !== '' ? $email : null,
+                    $address !== '' ? $address : null,
+                    $existingGuardianId
+                ]);
+            } else {
+                $stmtInsertGuardian = $this->conn->prepare("
+                    INSERT INTO tbl_guardians (
+                        first_name, last_name, relationship_type, phone, occupation, email, address, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
+                ");
+                $stmtInsertGuardian->execute([
+                    $firstName,
+                    $lastName,
+                    $relationship,
+                    $phone,
+                    $occupation !== '' ? $occupation : null,
+                    $email !== '' ? $email : null,
+                    $address !== '' ? $address : null
+                ]);
+                $guardianId = (int)$this->conn->lastInsertId();
+
+                $stmtInsertLink = $this->conn->prepare("
+                    INSERT INTO tbl_student_guardians (
+                        student_id, guardian_id, is_primary_guardian, can_enroll, can_pay, emergency_contact
+                    ) VALUES (?, ?, 'Y', 'Y', 'Y', 'Y')
+                ");
+                $stmtInsertLink->execute([$studentId, $guardianId]);
+            }
+
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'message' => 'Guardian info saved successfully.']);
+        } catch (PDOException $e) {
+            if ($this->conn && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function submitPackageRequest()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2381,6 +2645,9 @@ switch ($action) {
     case 'get-active-students':
         $studentsApi->getActiveStudents();
         break;
+    case 'get-walkin-eligible-students':
+        $studentsApi->getWalkinEligibleStudents();
+        break;
     case 'assign-package':
         $studentsApi->assignPackage();
         break;
@@ -2395,6 +2662,12 @@ switch ($action) {
         break;
     case 'submit-package-request':
         $studentsApi->submitPackageRequest();
+        break;
+    case 'submit-registration-fee-request':
+        $studentsApi->submitRegistrationFeeRequest();
+        break;
+    case 'save-guardian-preference':
+        $studentsApi->saveGuardianPreference();
         break;
     case 'get-pending-package-requests':
         $studentsApi->getPendingPackageRequests();

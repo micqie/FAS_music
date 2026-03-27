@@ -468,7 +468,7 @@ function initRegisterForm() {
     const registerForm = document.getElementById('registerForm');
     if (!registerForm) return;
 
-    // Registration now collects only student + guardian + account details.
+    // Registration now collects basic student account details only.
     // Package/instrument availing is done later in the student dashboard.
 
     // Add event listeners for password validation
@@ -532,12 +532,6 @@ function initRegisterForm() {
         }
 
         const formData = new FormData(registerForm);
-        const proofFile = formData.get('registration_proof_file');
-        if (!(proofFile instanceof File) || !proofFile.name) {
-            showRegisterMessage('Please upload your registration payment proof.', 'error');
-            registerForm.dataset.submitting = '0';
-            return;
-        }
 
         // Skip confirmation field; backend only needs the actual password.
         formData.delete('password_confirm');
@@ -594,7 +588,7 @@ function initRegisterForm() {
 
             if (result.success) {
                 registerForm.dataset.submitting = '0';
-                showRegisterMessage(result.message || 'Registration submitted successfully! Your account is pending admin approval.', 'success');
+                showRegisterMessage(result.message || 'Account created successfully! You can log in now. Module access will unlock after registration fee approval.', 'success');
                 registerForm.reset();
 
                 // Reset password validation indicators
@@ -618,12 +612,12 @@ function initRegisterForm() {
                 // Show success message with SweetAlert
                 Swal.fire({
                     icon: 'success',
-                    title: 'Registration Submitted!',
-                    html: `Your registration has been submitted successfully.<br><br>
-                           <strong>Status:</strong> Pending Admin Approval<br>
-                           <strong>Registration Fee:</strong> ₱1,000.00<br>
+                    title: 'Account Created!',
+                    html: `Your student account is ready.<br><br>
+                           <strong>Account:</strong> Active (can log in now)<br>
+                           <strong>Registration Fee:</strong> Pending admin confirmation<br>
                            <strong>Username:</strong> ${result.username || studentEmailVal}<br><br>
-                           Once approved, you can log in and choose your package/instruments from your dashboard.`,
+                           Your lesson/session modules stay limited until the registration fee is approved by admin.`,
                     confirmButtonColor: '#b8860b'
                 });
             } else {
@@ -1418,6 +1412,35 @@ async function fetchStudentPortalDataByEmail(email) {
     return res.data;
 }
 
+function isStudentRegistrationApproved(student) {
+    return String(student?.status || '') === 'Active';
+}
+
+function redirectStudentToDashboardWithNotice() {
+    Swal.fire({
+        icon: 'info',
+        title: 'Complete Registration First',
+        text: 'Please complete registration payment in Dashboard first. Sessions and other student modules unlock after admin approval.',
+        confirmButtonColor: '#b8860b'
+    }).then(() => {
+        window.location.href = 'student_dashboard.html';
+    });
+}
+
+function lockStudentNavigationUntilApproved() {
+    const lockTargets = [
+        'a[href="student_sessions.html"]',
+        'a[href="student_profile.html"]',
+        'a[href="student_qr.html"]'
+    ];
+    lockTargets.forEach((selector) => {
+        document.querySelectorAll(selector).forEach((el) => {
+            el.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+            el.setAttribute('title', 'Unlocks after registration approval');
+        });
+    });
+}
+
 async function fetchGuardianPortalDataByEmail(email) {
     const url = `${baseApiUrl}/students.php?action=get-guardian-portal&email=${encodeURIComponent(email)}`;
     const res = await axios.get(url);
@@ -2020,6 +2043,126 @@ async function postStudentPackageRequest(payload) {
     return res.data;
 }
 
+async function postStudentRegistrationFeeRequest(formData) {
+    formData.append('action', 'submit-registration-fee-request');
+    const res = await axios.post(`${baseApiUrl}/students.php`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data;
+}
+
+async function saveStudentGuardianPreference(payload) {
+    const res = await axios.post(`${baseApiUrl}/students.php?action=save-guardian-preference`, payload);
+    return res.data;
+}
+
+function renderRegistrationFeeUnlockForm(student) {
+    const studentId = Number(student?.student_id || 0);
+    return `
+        <div class="mt-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
+            <div class="text-xs uppercase tracking-wider text-yellow-300 font-bold">Registration Fee Approval Required</div>
+            <div class="text-xs text-zinc-200 mt-1">Submit registration details here. Payment proof is optional for now.</div>
+            <form id="studentRegistrationFeeForm" class="mt-3 grid grid-cols-1 md:grid-cols-4 gap-2">
+                <input type="hidden" id="studentRegFeeStudentId" value="${studentId}">
+                <select id="studentHasGuardian" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm">
+                    <option value="no" selected>Proceed without guardian</option>
+                    <option value="yes">With guardian</option>
+                </select>
+                <input type="text" id="studentGuardianFirstName" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm" placeholder="Guardian first name (if with guardian)">
+                <input type="text" id="studentGuardianLastName" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm" placeholder="Guardian last name (if with guardian)">
+                <input type="text" id="studentGuardianRelationship" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm" placeholder="Relationship (if with guardian)">
+                <input type="text" id="studentGuardianPhone" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm" placeholder="Guardian phone (if with guardian)">
+                <input type="email" id="studentGuardianEmail" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm" placeholder="Guardian email (optional)">
+                <input type="number" id="studentRegFeeAmount" min="1" step="0.01" value="1000" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm" placeholder="Amount">
+                <select id="studentRegFeeMethod" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm">
+                    <option value="Online Transfer">Online Transfer</option>
+                    <option value="GCash">GCash</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Other">Other</option>
+                </select>
+                <input type="text" id="studentRegFeeReceipt" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm" placeholder="Receipt # (optional)">
+                <input type="file" id="studentRegFeeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-xs file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:bg-gold-500/20 file:text-gold-300">
+                <button type="submit" id="studentRegFeeSubmitBtn" class="md:col-span-4 px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Submit Registration Fee Request</button>
+            </form>
+        </div>
+    `;
+}
+
+function bindRegistrationFeeUnlockForm(onSuccessRefresh) {
+    const form = document.getElementById('studentRegistrationFeeForm');
+    if (!form) return;
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('studentRegFeeSubmitBtn');
+        const studentId = Number(document.getElementById('studentRegFeeStudentId')?.value || 0);
+        const amount = Number(document.getElementById('studentRegFeeAmount')?.value || 0);
+        const paymentMethod = String(document.getElementById('studentRegFeeMethod')?.value || '').trim();
+        const receipt = String(document.getElementById('studentRegFeeReceipt')?.value || '').trim();
+        const proofFile = document.getElementById('studentRegFeeProof')?.files?.[0] || null;
+        const hasGuardian = String(document.getElementById('studentHasGuardian')?.value || 'no') === 'yes';
+        const guardianFirstName = String(document.getElementById('studentGuardianFirstName')?.value || '').trim();
+        const guardianLastName = String(document.getElementById('studentGuardianLastName')?.value || '').trim();
+        const guardianRelationship = String(document.getElementById('studentGuardianRelationship')?.value || '').trim();
+        const guardianPhone = String(document.getElementById('studentGuardianPhone')?.value || '').trim();
+        const guardianEmail = String(document.getElementById('studentGuardianEmail')?.value || '').trim();
+
+        if (studentId < 1) {
+            showMessage('Invalid student account.', 'error');
+            return;
+        }
+        if (hasGuardian && (!guardianFirstName || !guardianLastName || !guardianRelationship || !guardianPhone)) {
+            showMessage('Complete guardian first name, last name, relationship, and phone, or choose "Proceed without guardian".', 'error');
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+        }
+
+        try {
+            const guardianResult = await saveStudentGuardianPreference({
+                student_id: studentId,
+                has_guardian: hasGuardian,
+                guardian_first_name: guardianFirstName,
+                guardian_last_name: guardianLastName,
+                guardian_relationship: guardianRelationship,
+                guardian_phone: guardianPhone,
+                guardian_email: guardianEmail
+            });
+            if (!guardianResult?.success) {
+                showMessage(guardianResult?.error || 'Failed to save guardian preference.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('student_id', String(studentId));
+            formData.append('amount', String(amount > 0 ? amount : 1000));
+            formData.append('payment_method', paymentMethod || 'Online Transfer');
+            if (receipt) formData.append('receipt_number', receipt);
+            if (proofFile) formData.append('registration_proof_file', proofFile);
+
+            const result = await postStudentRegistrationFeeRequest(formData);
+            if (result?.success) {
+                showMessage(result.message || 'Registration fee request submitted.', 'success');
+                if (typeof onSuccessRefresh === 'function') {
+                    await onSuccessRefresh();
+                }
+            } else {
+                showMessage(result?.error || 'Failed to submit registration fee request.', 'error');
+            }
+        } catch (error) {
+            showMessage('Network error while submitting registration fee request.', 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Registration Fee Request';
+            }
+        }
+    };
+}
+
 function initStudentRequestSection(student, requestMeta) {
     const statusEl = document.getElementById('studentRequestStatus');
     const packageSelect = document.getElementById('studentRequestPackage');
@@ -2085,9 +2228,25 @@ function initStudentRequestSection(student, requestMeta) {
     preferredDateEl.min = today.toISOString().split('T')[0];
 
     if (String(student.status || '') !== 'Active') {
+        // Hide session enrollment controls until registration fee is approved.
+        form.classList.add('hidden');
+        const availableListEl = document.getElementById('availablePackagesList');
+        if (availableListEl) {
+            availableListEl.innerHTML = '<div class="text-xs text-zinc-400">Session enrollment will appear after registration approval.</div>';
+        }
+
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
-        statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Your student account is not active yet. Please contact desk/admin.</div>';
+        statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Your registration fee is still pending approval. Enrollment modules will unlock after admin confirmation.</div>';
+        statusEl.innerHTML += renderRegistrationFeeUnlockForm(student);
+        bindRegistrationFeeUnlockForm(async () => {
+            const user = Auth.getUser();
+            if (!user?.email) return;
+            const refreshedMeta = await fetchStudentRequestMetaByEmail(user.email);
+            if (refreshedMeta?.success) {
+                initStudentRequestSection(refreshedMeta.student || student, refreshedMeta);
+            }
+        });
     } else if (packages.length === 0) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
@@ -2186,6 +2345,9 @@ async function initStudentDashboardPage() {
     }
 
     const s = portal.student;
+    if (!isStudentRegistrationApproved(s)) {
+        lockStudentNavigationUntilApproved();
+    }
     setText('studentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
     setText('studentBranch', s.branch_name || '—');
     setHtml('studentStatusBadge', `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(s.registration_status)}">${escapeHtml(s.registration_status || '—')}</span>`);
@@ -2245,6 +2407,10 @@ async function initStudentQrPage() {
         return;
     }
     const s = portal.student;
+    if (!isStudentRegistrationApproved(s)) {
+        redirectStudentToDashboardWithNotice();
+        return;
+    }
     setText('studentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
     setText('studentEmail', s.email || '—');
 
@@ -2264,6 +2430,10 @@ async function initStudentSessionsPage() {
         return;
     }
     const s = portal.student;
+    if (!isStudentRegistrationApproved(s)) {
+        redirectStudentToDashboardWithNotice();
+        return;
+    }
     setText('packageName', s.package_name || 'Not assigned yet');
     setText('packageSessions', s.package_sessions ? `${s.package_sessions} sessions included` : '—');
 
@@ -2337,6 +2507,10 @@ async function initStudentProfilePage() {
     }
 
     const s = portal.student;
+    if (!isStudentRegistrationApproved(s)) {
+        redirectStudentToDashboardWithNotice();
+        return;
+    }
     setText('profileStudentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
     setText('profileBranch', s.branch_name || '—');
 

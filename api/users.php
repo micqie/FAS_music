@@ -466,9 +466,8 @@ class User
                 $this->sendJSON(['error' => $e->getMessage()], 400);
             }
         }
-        if (!$isAdminRegistration && empty($registrationProofPath)) {
-            $this->sendJSON(['error' => 'Registration payment proof is required.'], 400);
-        }
+        // Public signup now creates account first.
+        // Registration fee payment proof can be submitted later from the student account flow.
 
         try {
             $this->ensureStudentRegistrationProofColumn();
@@ -600,8 +599,10 @@ class User
                 $stmtLink->execute([$studentId, $guardianId]);
             }
 
-            // Create user account (Active for walk-in/admin, Inactive for self-registration until admin approves)
-            $userStatus = $isAdminRegistration ? 'Active' : 'Inactive';
+            // Create user account:
+            // - Admin/walk-in: active immediately
+            // - Public self-registration: also active immediately (limited modules until registration fee approval)
+            $userStatus = 'Active';
             $username = $data['username'] ?? $data['student_email'];
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
@@ -668,7 +669,7 @@ class User
                 'success' => true,
                 'message' => $isAdminRegistration
                     ? 'Student registered successfully. Account is active and can log in immediately.'
-                    : 'Registration submitted successfully. Your account is pending admin approval.',
+                    : 'Account created successfully. You can now log in, but lesson modules stay locked until your registration fee is approved.',
                 'student_id' => $studentId,
                 'guardian_id' => $guardianId,
                 'user_id' => $userId,
@@ -676,7 +677,9 @@ class User
                 'registration_status' => $regStatus,
                 'registration_fee_amount' => $data['registration_fee_amount'],
                 'registration_proof_path' => $registrationProofPath,
-                'account_status' => $isAdminRegistration ? 'Active - Can log in' : 'Inactive - Pending Admin Approval'
+                'account_status' => $isAdminRegistration
+                    ? 'Active - Can log in'
+                    : 'Active - Limited access until registration fee approval'
             ]);
 
         } catch (PDOException $e) {
