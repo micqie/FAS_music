@@ -1928,6 +1928,9 @@ class StudentsApi
                     e.package_id,
                     COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
                     COALESCE(sp.sessions, e.total_sessions, 0) AS sessions,
+                    COALESCE(sp.price, 0) AS total_amount,
+                    COALESCE(pay.paid_amount, 0) AS paid_amount,
+                    COALESCE(pay.payment_type, '—') AS payment_type,
                     e.status,
                     e.start_date,
                     e.end_date,
@@ -1959,6 +1962,18 @@ class StudentsApi
                     ) x ON x.enrollment_id = s1.enrollment_id
                        AND x.min_session_number = s1.session_number
                 ) fs ON fs.enrollment_id = e.enrollment_id
+                LEFT JOIN (
+                    SELECT
+                        p.enrollment_id,
+                        SUM(CASE WHEN p.status = 'Paid' THEN p.amount ELSE 0 END) AS paid_amount,
+                        SUBSTRING_INDEX(
+                            GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC),
+                            ',',
+                            1
+                        ) AS payment_type
+                    FROM tbl_payments p
+                    GROUP BY p.enrollment_id
+                ) pay ON pay.enrollment_id = e.enrollment_id
                 LEFT JOIN tbl_teachers t ON t.teacher_id = fs.teacher_id
                 LEFT JOIN tbl_rooms rm ON rm.room_id = fs.room_id
                 WHERE e.status = 'Active'
@@ -1973,6 +1988,49 @@ class StudentsApi
             $stmt = $this->conn->prepare($sql);
             $stmt->execute($params);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Attach session list per enrollment
+            if (!empty($rows) && $this->tableExists('tbl_sessions')) {
+                $enrollmentIds = array_values(array_filter(array_map(function ($r) {
+                    return (int)($r['enrollment_id'] ?? 0);
+                }, $rows)));
+                if (!empty($enrollmentIds)) {
+                    $placeholders = implode(',', array_fill(0, count($enrollmentIds), '?'));
+                    $stmtSessions = $this->conn->prepare("
+                        SELECT
+                            s.enrollment_id,
+                            s.session_number,
+                            s.session_date,
+                            s.start_time,
+                            s.end_time,
+                            s.status,
+                            s.notes,
+                            s.teacher_id,
+                            t.first_name AS teacher_first_name,
+                            t.last_name AS teacher_last_name,
+                            r.room_name
+                        FROM tbl_sessions s
+                        LEFT JOIN tbl_teachers t ON t.teacher_id = s.teacher_id
+                        LEFT JOIN tbl_rooms r ON r.room_id = s.room_id
+                        WHERE s.enrollment_id IN ({$placeholders})
+                        ORDER BY s.enrollment_id ASC, s.session_number ASC
+                    ");
+                    $stmtSessions->execute($enrollmentIds);
+                    $sessionRows = $stmtSessions->fetchAll(PDO::FETCH_ASSOC);
+                    $sessionsByEnrollment = [];
+                    foreach ($sessionRows as $sr) {
+                        $eid = (int)($sr['enrollment_id'] ?? 0);
+                        if ($eid < 1) continue;
+                        if (!isset($sessionsByEnrollment[$eid])) $sessionsByEnrollment[$eid] = [];
+                        $sessionsByEnrollment[$eid][] = $sr;
+                    }
+                    foreach ($rows as &$row) {
+                        $eid = (int)($row['enrollment_id'] ?? 0);
+                        $row['sessions_list'] = $sessionsByEnrollment[$eid] ?? [];
+                    }
+                    unset($row);
+                }
+            }
 
             $this->sendJSON(['success' => true, 'enrollments' => $rows]);
         } catch (PDOException $e) {
@@ -2017,6 +2075,173 @@ class StudentsApi
             $rooms = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             $this->sendJSON(['success' => true, 'rooms' => $rooms]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // Admin schedules a specific session for an active enrollment
+    public function scheduleEnrollmentSession()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $enrollmentId = (int)($data['enrollment_id'] ?? 0);
+        $sessionNumber = (int)($data['session_number'] ?? 0);
+        $teacherId = (int)($data['teacher_id'] ?? 0);
+        $sessionDate = trim((string)($data['session_date'] ?? ''));
+        $startTime = trim((string)($data['start_time'] ?? ''));
+        $endTime = trim((string)($data['end_time'] ?? ''));
+        $roomName = trim((string)($data['room_name'] ?? ''));
+
+        if ($enrollmentId < 1) {
+            $this->sendJSON(['error' => 'enrollment_id is required'], 400);
+        }
+        if ($sessionNumber < 1) {
+            $this->sendJSON(['error' => 'session_number is required'], 400);
+        }
+        if ($teacherId < 1) {
+            $this->sendJSON(['error' => 'teacher_id is required'], 400);
+        }
+        if ($sessionDate === '' || $startTime === '' || $endTime === '') {
+            $this->sendJSON(['error' => 'session_date, start_time, and end_time are required'], 400);
+        }
+        if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $startTime) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $endTime)) {
+            $this->sendJSON(['error' => 'Invalid time format'], 400);
+        }
+        $startTs = strtotime($startTime);
+        $endTs = strtotime($endTime);
+        if ($startTs === false || $endTs === false || $endTs <= $startTs) {
+            $this->sendJSON(['error' => 'End time must be later than start time'], 400);
+        }
+        if (($endTs - $startTs) !== 3600) {
+            $this->sendJSON(['error' => 'Assigned schedule must be exactly 1 hour per session'], 400);
+        }
+        if (!$this->tableExists('tbl_sessions')) {
+            $this->sendJSON(['error' => 'tbl_sessions table not found'], 500);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    e.enrollment_id,
+                    e.student_id,
+                    e.instrument_id,
+                    e.total_sessions,
+                    e.status,
+                    s.branch_id
+                FROM tbl_enrollments e
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                WHERE e.enrollment_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$enrollmentId]);
+            $enrollment = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$enrollment) {
+                $this->sendJSON(['error' => 'Enrollment not found'], 404);
+            }
+            if ((string)($enrollment['status'] ?? '') !== 'Active') {
+                $this->sendJSON(['error' => 'Enrollment is not active'], 400);
+            }
+            $totalSessions = (int)($enrollment['total_sessions'] ?? 0);
+            if ($totalSessions > 0 && $sessionNumber > $totalSessions) {
+                $this->sendJSON(['error' => 'Session number exceeds package total sessions'], 400);
+            }
+
+            $branchId = (int)($enrollment['branch_id'] ?? 0);
+            $roomId = null;
+            if ($roomName !== '') {
+                $roomId = $this->resolveRoomIdByName($branchId, $roomName);
+                if ($roomId === null) {
+                    $this->sendJSON(['error' => 'Selected room is not available in this branch'], 400);
+                }
+            }
+
+            if ($this->hasTeacherScheduleConflict($teacherId, $sessionDate, $startTime, $endTime)) {
+                $this->sendJSON(['error' => 'Selected teacher is not available at this time'], 400);
+            }
+            if ($roomId !== null && $this->hasRoomScheduleConflict($roomId, $sessionDate, $startTime, $endTime)) {
+                $this->sendJSON(['error' => 'Selected room is not available at this time'], 400);
+            }
+
+            $instrumentId = (int)($enrollment['instrument_id'] ?? 0);
+            if ($instrumentId < 1 && $this->tableExists('tbl_student_instruments')) {
+                $stmtInst = $this->conn->prepare("
+                    SELECT instrument_id
+                    FROM tbl_student_instruments
+                    WHERE student_id = ?
+                    ORDER BY priority_order ASC, student_instrument_id ASC
+                    LIMIT 1
+                ");
+                $stmtInst->execute([(int)$enrollment['student_id']]);
+                $instrumentId = (int)($stmtInst->fetchColumn() ?: 0);
+            }
+
+            $stmtCheck = $this->conn->prepare("
+                SELECT session_id
+                FROM tbl_sessions
+                WHERE enrollment_id = ?
+                  AND session_number = ?
+                LIMIT 1
+            ");
+            $stmtCheck->execute([$enrollmentId, $sessionNumber]);
+            $existingSessionId = (int)$stmtCheck->fetchColumn();
+
+            if ($existingSessionId > 0) {
+                $stmtUpdate = $this->conn->prepare("
+                    UPDATE tbl_sessions
+                    SET teacher_id = ?,
+                        instrument_id = ?,
+                        session_date = ?,
+                        start_time = ?,
+                        end_time = ?,
+                        room_id = ?,
+                        notes = ?,
+                        status = 'Scheduled'
+                    WHERE session_id = ?
+                ");
+                $stmtUpdate->execute([
+                    $teacherId,
+                    $instrumentId > 0 ? $instrumentId : null,
+                    $sessionDate,
+                    $startTime,
+                    $endTime,
+                    $roomId,
+                    $roomName !== '' ? $roomName : null,
+                    $existingSessionId
+                ]);
+            } else {
+                $stmtInsert = $this->conn->prepare("
+                    INSERT INTO tbl_sessions (
+                        enrollment_id,
+                        teacher_id,
+                        session_number,
+                        session_date,
+                        start_time,
+                        end_time,
+                        session_type,
+                        instrument_id,
+                        room_id,
+                        status,
+                        notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'Regular', ?, ?, 'Scheduled', ?)
+                ");
+                $stmtInsert->execute([
+                    $enrollmentId,
+                    $teacherId,
+                    $sessionNumber,
+                    $sessionDate,
+                    $startTime,
+                    $endTime,
+                    $instrumentId > 0 ? $instrumentId : null,
+                    $roomId,
+                    $roomName !== '' ? $roomName : null
+                ]);
+            }
+
+            $this->sendJSON(['success' => true, 'message' => 'Session scheduled successfully.']);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
@@ -2410,6 +2635,9 @@ switch ($action) {
         break;
     case 'reject-package-request':
         $studentsApi->rejectPackageRequest();
+        break;
+    case 'schedule-session':
+        $studentsApi->scheduleEnrollmentSession();
         break;
     default:
         $studentsApi->sendJSON(['error' => 'Invalid action'], 400);

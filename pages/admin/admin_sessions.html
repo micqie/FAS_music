@@ -100,8 +100,7 @@
                             <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
                         </summary>
                         <div class="mt-2 space-y-1">
-                            <a id="navSessionPending" href="admin_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
-                            <a id="navSessionActive" href="admin_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
+                            <span class="block ml-11 px-3 py-2 text-sm text-slate-300 bg-white/10 rounded-lg">All Sessions</span>
                         </div>
                     </details>
                     <details class="group/dropdown">
@@ -142,7 +141,7 @@
             <div class="mb-10">
                 <h1 id="sessionsPageTitle" class="text-3xl font-black text-slate-900 tracking-tight">Sessions</h1>
                 <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
-                <p id="sessionsPageSubtitle" class="text-slate-500 mt-2">Manage pending and active sessions</p>
+                <p id="sessionsPageSubtitle" class="text-slate-500 mt-2">View enrolled students and assign their session schedules.</p>
             </div>
 
         <!-- Messages -->
@@ -160,41 +159,13 @@
             </div>
         </div>
 
-        <!-- Pending Student Requests -->
-        <div id="pendingSessionsSection" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden mb-6">
+        <!-- Session Plans (Row View) -->
+        <div id="sessionsListSection" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
             <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Student Requests</h3>
-                <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Requested Package</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pendingRequestsTable" class="divide-y divide-slate-100">
-                        <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading requests...</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Active Sessions Table -->
-        <div id="activeSessionsSection" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-box mr-2 text-gold-500"></i>Active Sessions</h3>
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-calendar-alt mr-2 text-gold-500"></i>Session Plans</h3>
+                    <p class="text-xs text-slate-500 mt-1">All enrolled students. Open a schedule to view full session slots.</p>
+                </div>
                 <span class="text-xs text-slate-500" id="studentCount">Loading...</span>
             </div>
             <div class="overflow-x-auto">
@@ -204,16 +175,14 @@
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Schedule</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="studentsTable" class="divide-y divide-slate-100">
+                    <tbody id="sessionsList" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="4" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading active sessions...</p>
+                                <p>Loading sessions...</p>
                             </td>
                         </tr>
                     </tbody>
@@ -222,6 +191,64 @@
         </div>
         </div>
     </main>
+
+    <!-- Schedule Modal -->
+    <div id="scheduleModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-3xl p-6 relative">
+            <button id="closeScheduleModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <h3 class="text-2xl font-bold text-slate-900">Session Schedule</h3>
+            <p id="scheduleModalMeta" class="text-slate-500 text-sm mt-1">Loading schedule...</p>
+
+            <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <div class="text-sm font-semibold text-slate-800">Add Schedule</div>
+                        <div id="nextSessionHint" class="text-xs text-slate-500">Select date/time for the next unscheduled session.</div>
+                    </div>
+                    <button id="toggleAddScheduleBtn" type="button" class="px-3 py-1.5 rounded-lg bg-gold-500/15 text-gold-700 hover:bg-gold-500/25 text-xs font-bold">
+                        Add Schedule
+                    </button>
+                </div>
+                <form id="addScheduleForm" class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 hidden">
+                    <input type="hidden" id="scheduleEnrollmentId">
+                    <input type="hidden" id="scheduleSessionNumber">
+                    <div class="md:col-span-1">
+                        <label class="block text-xs text-slate-500 mb-1">Date</label>
+                        <input id="scheduleDate" type="date" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">Start</label>
+                        <input id="scheduleStart" type="time" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">End</label>
+                        <input id="scheduleEnd" type="time" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs text-slate-500 mb-1">Teacher</label>
+                        <select id="scheduleTeacher" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                            <option value="">Select teacher...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">Room</label>
+                        <select id="scheduleRoom" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                            <option value="">Select room...</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3 flex justify-end">
+                        <button type="submit" class="px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Save Schedule</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="scheduleModalBody" class="mt-5 space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                <div class="text-slate-500 text-sm">Loading...</div>
+            </div>
+        </div>
+    </div>
 
     <!-- Assign Package Modal -->
     <div id="assignPackageModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -348,48 +375,6 @@
             });
         }
 
-        function setSessionNavState(view) {
-            const pendingLink = document.getElementById('navSessionPending');
-            const activeLink = document.getElementById('navSessionActive');
-            const baseClass = 'block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all';
-            const activeClass = 'block ml-11 px-3 py-2 text-sm font-semibold text-white bg-white/10 rounded-lg';
-            if (pendingLink) pendingLink.className = (view === 'pending') ? activeClass : baseClass;
-            if (activeLink) activeLink.className = (view === 'active') ? activeClass : baseClass;
-        }
-
-        function applySessionView() {
-            const params = new URLSearchParams(window.location.search);
-            const view = String(params.get('view') || '').toLowerCase();
-            const pendingSection = document.getElementById('pendingSessionsSection');
-            const activeSection = document.getElementById('activeSessionsSection');
-            const title = document.getElementById('sessionsPageTitle');
-            const subtitle = document.getElementById('sessionsPageSubtitle');
-
-            if (view === 'pending') {
-                if (pendingSection) pendingSection.classList.remove('hidden');
-                if (activeSection) activeSection.classList.add('hidden');
-                if (title) title.textContent = 'Pending Sessions';
-                if (subtitle) subtitle.textContent = 'Review and assign pending session requests';
-                setSessionNavState('pending');
-                return;
-            }
-
-            if (view === 'active') {
-                if (pendingSection) pendingSection.classList.add('hidden');
-                if (activeSection) activeSection.classList.remove('hidden');
-                if (title) title.textContent = 'Active Sessions';
-                if (subtitle) subtitle.textContent = 'Manage active student session assignments';
-                setSessionNavState('active');
-                return;
-            }
-
-            if (pendingSection) pendingSection.classList.remove('hidden');
-            if (activeSection) activeSection.classList.remove('hidden');
-            if (title) title.textContent = 'Sessions';
-            if (subtitle) subtitle.textContent = 'Manage pending and active sessions';
-            setSessionNavState('');
-        }
-
         async function maybeAutoOpenAssignPackageModalFromUrl() {
             const params = new URLSearchParams(window.location.search);
             const studentId = Number(params.get('assign_student_id') || 0);
@@ -397,12 +382,6 @@
 
             const studentName = params.get('assign_student_name') || '';
             const packageId = Number(params.get('assign_package_id') || 0) || null;
-
-            // Always show the active students view when navigating from registration
-            const viewUrl = new URL(window.location.href);
-            viewUrl.searchParams.set('view', 'active');
-            window.history.replaceState({}, '', viewUrl.toString());
-            applySessionView();
 
             // Ensure the packages are loaded before opening the modal
             await loadSessionPackages();
@@ -417,12 +396,6 @@
 
             // Ensure pending requests are loaded so we can open the modal
             await loadPendingRequests();
-
-            // Ensure we're viewing the pending requests tab
-            const viewUrl = new URL(window.location.href);
-            viewUrl.searchParams.set('view', 'pending');
-            window.history.replaceState({}, '', viewUrl.toString());
-            applySessionView();
 
             openAssignRequestModal(requestId);
         }
@@ -536,7 +509,7 @@
         async function loadPendingRequests() {
             const tableBody = document.getElementById('pendingRequestsTable');
             const countEl = document.getElementById('pendingRequestCount');
-            if (!tableBody) return;
+            const hasTable = !!tableBody;
 
             try {
                 const branchFilter = document.getElementById('branchFilter');
@@ -551,6 +524,14 @@
 
                 if (countEl) countEl.textContent = `${requests.length} pending`;
 
+                pendingRequestsById = {};
+                if (!hasTable) {
+                    requests.forEach(r => {
+                        pendingRequestsById[String(r.request_id)] = r;
+                    });
+                    return;
+                }
+
                 if (!requests.length) {
                     tableBody.innerHTML = `
                         <tr>
@@ -562,7 +543,6 @@
                     return;
                 }
 
-                pendingRequestsById = {};
                 tableBody.innerHTML = requests.map(r => {
                     pendingRequestsById[String(r.request_id)] = r;
                     const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
@@ -767,9 +747,9 @@
         }
 
         async function loadActiveStudents() {
-            const tableBody = document.getElementById('studentsTable');
+            const listEl = document.getElementById('sessionsList');
             const countEl = document.getElementById('studentCount');
-            if (!tableBody) return;
+            if (!listEl) return;
 
             try {
                 const branchFilter = document.getElementById('branchFilter');
@@ -781,68 +761,231 @@
                 const response = await axios.get(url);
                 const data = response.data;
 
-                if (data.success && Array.isArray(data.enrollments)) {
-                    allStudents = data.enrollments;
-                    renderStudents(tableBody);
-                    if (countEl) countEl.textContent = `${data.enrollments.length} active`;
-                } else {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                                <p>No active sessions found.</p>
-                            </td>
-                        </tr>`;
-                    if (countEl) countEl.textContent = '0 active';
-                }
-            } catch (error) {
-                console.error('Failed to load active sessions:', error);
-                tableBody.innerHTML = `
+            if (data.success && Array.isArray(data.enrollments)) {
+                allStudents = data.enrollments;
+                renderStudents(listEl);
+                if (countEl) countEl.textContent = `${data.enrollments.length} enrolled`;
+            } else {
+                listEl.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
-                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                            <p>Failed to load active sessions. Please try again.</p>
+                        <td colspan="4" class="px-6 py-8 text-center text-slate-500">
+                            <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
+                            <p>No enrolled students found.</p>
                         </td>
                     </tr>`;
+                if (countEl) countEl.textContent = '0 enrolled';
             }
+        } catch (error) {
+            console.error('Failed to load sessions:', error);
+            listEl.innerHTML = `
+                <tr>
+                    <td colspan="4" class="px-6 py-8 text-center text-red-500">
+                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                        <p>Failed to load sessions. Please try again.</p>
+                    </td>
+                </tr>`;
         }
+    }
 
-        function renderStudents(tableBody) {
+        function renderStudents(listEl) {
             if (!allStudents.length) {
-                tableBody.innerHTML = `
+                listEl.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                        <td colspan="4" class="px-6 py-8 text-center text-slate-500">
                             <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                            <p>No active sessions found.</p>
+                            <p>No enrolled students found.</p>
                         </td>
                     </tr>`;
                 return;
             }
 
-            tableBody.innerHTML = allStudents.map(student => {
-                const packageName = student.package_name || '—';
-                const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
-                const roomName = escapeHtml(student.assigned_room || '—');
-                const sessionDate = student.first_session_date ? new Date(student.first_session_date).toLocaleDateString() : '—';
-                const startTime = formatTime12Hour(student.first_start_time);
-                const endTime = formatTime12Hour(student.first_end_time);
-                const sessionTime = student.first_session_date ? `${sessionDate} • ${startTime} - ${endTime}` : '—';
-
+            listEl.innerHTML = allStudents.map(student => {
+                const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
+                const packageName = escapeHtml(student.package_name || '—');
+                const sessionsTotal = Number(student.sessions || 0);
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-6 py-4">
-                            <div class="font-medium text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
+                            <div class="font-medium text-slate-900">${studentName}</div>
                             <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
-                        <td class="px-6 py-4 text-slate-700">${escapeHtml(packageName)}</td>
-                        <td class="px-6 py-4 text-slate-700">${sessionTime}</td>
-                        <td class="px-6 py-4 text-slate-700">${teacherName}</td>
-                        <td class="px-6 py-4 text-slate-700">${roomName}</td>
+                        <td class="px-6 py-4 text-sm text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
+                        <td class="px-6 py-4 text-sm text-slate-700">
+                            ${packageName}
+                            <div class="text-xs text-slate-400 mt-1">${sessionsTotal} sessions</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <button type="button" class="px-3 py-1.5 rounded-lg bg-gold-500/15 text-gold-700 hover:bg-gold-500/25 text-xs font-bold" onclick="openSessionScheduleModal(${Number(student.enrollment_id)})">
+                                View Schedule
+                            </button>
+                        </td>
                     </tr>
                 `;
             }).join('');
         }
+
+        const teachersByBranch = {};
+
+        async function fetchTeachersForBranch(branchId) {
+            const key = Number(branchId || 0);
+            if (key > 0 && Array.isArray(teachersByBranch[key])) {
+                return teachersByBranch[key];
+            }
+            try {
+                let url = `${baseApiUrl}/teachers.php?action=get-teachers&status=Active`;
+                if (key > 0) url += `&branch_id=${key}`;
+                const response = await axios.get(url);
+                const data = response.data;
+                const teachers = data.success && Array.isArray(data.teachers) ? data.teachers : [];
+                teachersByBranch[key] = teachers;
+                return teachers;
+            } catch (error) {
+                console.error('Failed to load teachers:', error);
+                return [];
+            }
+        }
+
+        function openSessionScheduleModal(enrollmentId) {
+            const modal = document.getElementById('scheduleModal');
+            const body = document.getElementById('scheduleModalBody');
+            const meta = document.getElementById('scheduleModalMeta');
+            const hint = document.getElementById('nextSessionHint');
+            const toggleBtn = document.getElementById('toggleAddScheduleBtn');
+            const form = document.getElementById('addScheduleForm');
+            const enrollmentInput = document.getElementById('scheduleEnrollmentId');
+            const sessionInput = document.getElementById('scheduleSessionNumber');
+            const teacherSelect = document.getElementById('scheduleTeacher');
+            const roomSelect = document.getElementById('scheduleRoom');
+            if (!modal || !body || !meta) return;
+
+            const row = allStudents.find(r => Number(r.enrollment_id) === Number(enrollmentId));
+            if (!row) return;
+
+            const studentName = `${escapeHtml(row.first_name || '')} ${escapeHtml(row.last_name || '')}`.trim() || 'Student';
+            meta.textContent = `${studentName} • ${escapeHtml(row.package_name || 'Package')} • ${Number(row.sessions || 0)} sessions`;
+
+            const sessionsList = Array.isArray(row.sessions_list) ? row.sessions_list : [];
+            const sessionsTotal = Number(row.sessions || 0);
+            const rows = [];
+            let nextUnscheduled = 0;
+            if (sessionsTotal > 0) {
+                for (let i = 1; i <= sessionsTotal; i += 1) {
+                    const slot = sessionsList.find(s => Number(s.session_number) === i);
+                    const dateText = slot?.session_date ? new Date(slot.session_date).toLocaleDateString() : 'Unscheduled';
+                    const timeText = slot?.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : '—';
+                    const roomText = slot?.room_name ? ` • ${escapeHtml(slot.room_name)}` : '';
+                    const teacherName = slot?.teacher_first_name || slot?.teacher_last_name
+                        ? `${escapeHtml(slot.teacher_first_name || '')} ${escapeHtml(slot.teacher_last_name || '')}`.trim()
+                        : '';
+                    const teacherText = teacherName ? ` • ${teacherName}` : '';
+                    rows.push(`
+                        <div class="flex items-center justify-between gap-3 rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                            <div class="font-semibold text-slate-700">Session ${i}</div>
+                            <div>${escapeHtml(dateText)} • ${escapeHtml(timeText)}${roomText}${teacherText}</div>
+                        </div>
+                    `);
+                    if (!slot && nextUnscheduled === 0) nextUnscheduled = i;
+                }
+            } else {
+                rows.push(`<div class="text-sm text-slate-500">No session count found for this package.</div>`);
+            }
+
+            body.innerHTML = rows.join('');
+            if (form) form.classList.add('hidden');
+            if (enrollmentInput) enrollmentInput.value = String(enrollmentId);
+            if (sessionInput) sessionInput.value = String(nextUnscheduled);
+            if (hint) {
+                hint.textContent = nextUnscheduled > 0
+                    ? `Next unscheduled: Session ${nextUnscheduled}`
+                    : 'All sessions are scheduled.';
+            }
+            if (toggleBtn) {
+                toggleBtn.disabled = nextUnscheduled < 1;
+                toggleBtn.classList.toggle('opacity-50', nextUnscheduled < 1);
+                toggleBtn.classList.toggle('cursor-not-allowed', nextUnscheduled < 1);
+            }
+
+            if (teacherSelect) {
+                teacherSelect.innerHTML = '<option value="">Select teacher...</option>';
+            }
+            if (roomSelect) {
+                roomSelect.innerHTML = '<option value="">Select room...</option>';
+            }
+            if (nextUnscheduled > 0) {
+                fetchTeachersForBranch(Number(row.branch_id || 0)).then(teachers => {
+                    if (!teacherSelect) return;
+                    teacherSelect.innerHTML = '<option value="">Select teacher...</option>' + teachers.map(t => {
+                        const label = `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'Teacher';
+                        const spec = t.specialization ? ` (${t.specialization})` : '';
+                        return `<option value="${Number(t.teacher_id)}">${escapeHtml(label + spec)}</option>`;
+                    }).join('');
+                });
+                fetchRoomsForBranch(Number(row.branch_id || 0)).then(rooms => {
+                    if (!roomSelect) return;
+                    roomSelect.innerHTML = '<option value="">Select room...</option>' + rooms.map(rm => {
+                        return `<option value="${escapeHtml(rm.room_name || '')}">${escapeHtml(rm.room_name || 'Room')}</option>`;
+                    }).join('');
+                });
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeScheduleModal() {
+            const modal = document.getElementById('scheduleModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function toggleAddScheduleForm() {
+            const form = document.getElementById('addScheduleForm');
+            if (!form) return;
+            form.classList.toggle('hidden');
+        }
+
+        async function submitAddScheduleForm(e) {
+            e.preventDefault();
+            const enrollmentId = Number(document.getElementById('scheduleEnrollmentId')?.value || 0);
+            const sessionNumber = Number(document.getElementById('scheduleSessionNumber')?.value || 0);
+            const sessionDate = document.getElementById('scheduleDate')?.value || '';
+            const startTime = document.getElementById('scheduleStart')?.value || '';
+            const endTime = document.getElementById('scheduleEnd')?.value || '';
+            const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
+            const roomName = document.getElementById('scheduleRoom')?.value || '';
+
+            if (!enrollmentId || !sessionNumber || !sessionDate || !startTime || !endTime || !teacherId) {
+                showMessage('Please complete date, time, and teacher before saving.', 'error');
+                return;
+            }
+
+            try {
+                const response = await axios.post(`${baseApiUrl}/students.php?action=schedule-session`, {
+                    enrollment_id: enrollmentId,
+                    session_number: sessionNumber,
+                    session_date: sessionDate,
+                    start_time: startTime,
+                    end_time: endTime,
+                    teacher_id: teacherId,
+                    room_name: roomName
+                });
+                const data = response.data || {};
+                if (data.success) {
+                    showMessage(data.message || 'Session scheduled.', 'success');
+                    await loadActiveStudents();
+                    openSessionScheduleModal(enrollmentId);
+                } else {
+                    showMessage(data.error || 'Failed to schedule session.', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.', 'error');
+            }
+        }
+
+        // Ensure global access for inline button handlers
+        window.openSessionScheduleModal = openSessionScheduleModal;
 
         function escapeHtml(text) {
             if (text == null) return '';
@@ -925,16 +1068,13 @@
                 loadSessionPackages()
             ]);
 
-            await loadPendingRequests();
             await loadActiveStudents();
 
-            applySessionView();
             await maybeAutoOpenAssignPackageModalFromUrl();
             await maybeAutoOpenAssignRequestModalFromUrl();
 
             document.getElementById('branchFilter')?.addEventListener('change', () => {
                 loadActiveStudents();
-                loadPendingRequests();
             });
             document.getElementById('closeAssignPackageModalBtn')?.addEventListener('click', closeAssignPackageModal);
             document.getElementById('cancelAssignPackageBtn')?.addEventListener('click', closeAssignPackageModal);
@@ -948,6 +1088,9 @@
                 const d = getDayNameFromDate(e.target.value || '');
                 dayEl.value = d || '';
             });
+            document.getElementById('closeScheduleModalBtn')?.addEventListener('click', closeScheduleModal);
+            document.getElementById('toggleAddScheduleBtn')?.addEventListener('click', toggleAddScheduleForm);
+            document.getElementById('addScheduleForm')?.addEventListener('submit', submitAddScheduleForm);
         });
     </script>
 </body>

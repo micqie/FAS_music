@@ -216,13 +216,16 @@
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">First Session</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Balance</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="activeEnrollmentsTable" class="divide-y divide-slate-100">
                             <tr>
-                                <td colspan="8" class="px-6 py-8 text-center text-slate-500">
+                                <td colspan="11" class="px-6 py-8 text-center text-slate-500">
                                     <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                     <p>Loading active enrollments...</p>
                                 </td>
@@ -411,11 +414,11 @@
                 if (!enrollments.length) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="8" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-user-check text-2xl mb-2 text-gold-500/60"></i>
-                                <p>No active enrollments found.</p>
-                            </td>
-                        </tr>`;
+                                <td colspan="11" class="px-6 py-8 text-center text-slate-500">
+                                    <i class="fas fa-user-check text-2xl mb-2 text-gold-500/60"></i>
+                                    <p>No active enrollments found.</p>
+                                </td>
+                            </tr>`;
                     return;
                 }
 
@@ -428,6 +431,11 @@
                     const startTime = formatTime12Hour(r.first_start_time);
                     const endTime = formatTime12Hour(r.first_end_time);
                     const sessionTime = r.first_session_date ? `${sessionDate} • ${startTime} - ${endTime}` : '—';
+                    const paymentType = escapeHtml(r.payment_type || '—');
+                    const totalAmount = Number(r.total_amount || 0);
+                    const paidAmount = Number(r.paid_amount || 0);
+                    const amountText = `${formatCurrencyPHP(paidAmount)} / ${formatCurrencyPHP(totalAmount)}`;
+                    const balanceText = formatCurrencyPHP(Math.max(0, totalAmount - paidAmount));
                     const statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-700">Active</span>';
                     return `
                         <tr class="hover:bg-slate-50/80 transition">
@@ -440,6 +448,9 @@
                             <td class="px-6 py-4 text-sm text-slate-700">${sessionTime}</td>
                             <td class="px-6 py-4 text-sm text-slate-700">${teacherName}</td>
                             <td class="px-6 py-4 text-sm text-slate-700">${roomName}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700">${paymentType}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700">${amountText}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700">${balanceText}</td>
                             <td class="px-6 py-4">${statusBadge}</td>
                             <td class="px-6 py-4">
                                 <a href="admin_sessions.html?view=active" class="text-gold-500 hover:text-gold-400 text-sm font-semibold">
