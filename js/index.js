@@ -2218,6 +2218,8 @@ async function initStudentDashboardPage() {
         setText('lastAttended', '—');
     }
 
+    // QR is now shown only on the QR page, not the dashboard.
+
     // QR code
     const payload = buildStudentQrPayload(s);
     setText('qrPayloadText', payload);
