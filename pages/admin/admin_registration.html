@@ -231,20 +231,34 @@
                         class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white">
                         ₱0.00
                     </div>
-                    <p class="mt-2 text-xs text-zinc-400">
+                    <p id="paymentAmountHint" class="mt-2 text-xs text-zinc-400">
                         This amount comes from the student's submitted registration payment request.
                     </p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-zinc-300 mb-2">Payment Method *</label>
                     <input type="hidden" id="paymentMethod">
-                    <div id="paymentMethodDisplay"
-                        class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white">
-                        Not available
+                    <div id="paymentMethodReadonlyWrap">
+                        <div id="paymentMethodDisplay"
+                            class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white">
+                            Not available
+                        </div>
+                        <p id="paymentMethodReadonlyHint" class="mt-2 text-xs text-zinc-400">
+                            This method was already selected by the student during registration.
+                        </p>
                     </div>
-                    <p class="mt-2 text-xs text-zinc-400">
-                        This method was already selected by the student during registration.
-                    </p>
+                    <div id="paymentMethodSelectWrap" class="hidden">
+                        <select id="paymentMethodSelect" class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                            <option value="">Select payment method</option>
+                            <option value="Cash">Cash</option>
+                            <option value="GCash">GCash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <p class="mt-2 text-xs text-zinc-400">
+                            Walk-in registration is being paid directly by the admin, so no proof upload is needed here.
+                        </p>
+                    </div>
                 </div>
                 <p class="text-xs text-zinc-400">
                     Receipt number is generated automatically by the system.
@@ -287,10 +301,12 @@
 
             <h3 class="text-2xl font-bold text-white mb-2">Register Student (Admin)</h3>
             <p class="text-zinc-400 text-xs mb-4">
-                This will create a student account using the student's email as username and a
-                <span class="font-mono font-semibold">simple default password</span> (currently <span class="font-mono">fasmusic2020</span>).
-                On first login, the student will be <span class="font-semibold text-gold-400">required to change this password</span>
-                to a strong one for security.
+                This will create a student account using the student's email as username with temporary password
+                <span class="font-mono font-semibold">fas@123</span>.
+                If a guardian account is created, its temporary password will be
+                <span class="font-mono font-semibold">fasmusic@2020</span>.
+                On first login, both accounts will be <span class="font-semibold text-gold-400">required to change their passwords</span>
+                for security.
             </p>
 
             <div id="walkinMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
@@ -339,11 +355,6 @@
                                 class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Grade/Year</label>
-                            <input type="text" name="student_grade_year"
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
                             <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Branch *</label>
                             <select name="branch_id" id="walkin_branch_id" required
                                 class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
@@ -354,11 +365,6 @@
                     <div class="mt-4">
                         <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Address</label>
                         <textarea name="student_address" rows="2"
-                            class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
-                    </div>
-                    <div class="mt-4">
-                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Health Diagnosis (if any)</label>
-                        <textarea name="student_health_diagnosis" rows="2"
                             class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
                     </div>
                 </div>
@@ -413,7 +419,6 @@
                     </div>
                 </div>
 
-
                 <!-- Actions -->
                 <div class="pt-4 flex items-center justify-end gap-3">
                     <button type="button" id="cancelRegisterStudentBtn"
@@ -422,7 +427,7 @@
                     </button>
                     <button type="submit" id="walkinSubmitBtn"
                         class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
-                        <span id="walkinSubmitBtnText">Register Student</span>
+                        <span id="walkinSubmitBtnText">Proceed Payment</span>
                     </button>
                 </div>
             </form>
@@ -431,7 +436,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="../../js/mode.js"></script>
     <script src="../../js/index.js"></script>
     <script>
         function setActiveMode(mode) {

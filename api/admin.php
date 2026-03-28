@@ -101,6 +101,16 @@ class Admin
         return;
     }
 
+    private function ensureStudentRegistrationSourceColumn()
+    {
+        if ($this->hasStudentColumn('registration_source')) return;
+        try {
+            $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_source VARCHAR(20) NOT NULL DEFAULT 'online' AFTER status");
+        } catch (PDOException $e) {
+            // Keep API working even if alter fails
+        }
+    }
+
     private function getRegistrationPaidAmount($studentId)
     {
         $stmt = $this->conn->prepare("
@@ -204,7 +214,9 @@ class Admin
     public function getPendingRegistrations()
     {
         $this->ensureStudentRegistrationProofColumn();
+        $this->ensureStudentRegistrationSourceColumn();
         $hasProofCol = $this->hasStudentColumn('registration_proof_path');
+        $hasSourceCol = $this->hasStudentColumn('registration_source');
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
         $branchSql = $branchId > 0 ? " AND s.branch_id = ?" : "";
         $stmt = $this->conn->prepare("
@@ -222,6 +234,7 @@ class Admin
                       AND rp.status = 'Paid'
                 ), 0.00) AS registration_fee_paid,
                 " . ($hasProofCol ? "s.registration_proof_path" : "NULL") . " AS registration_proof_path,
+                " . ($hasSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                 'Pending' AS registration_status,
                 s.created_at AS created_at,
                 b.branch_name,
@@ -232,8 +245,7 @@ class Admin
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-            WHERE s.status = 'Inactive'
-              AND EXISTS (
+            WHERE EXISTS (
                   SELECT 1
                   FROM tbl_registration_payments rp0
                   WHERE rp0.student_id = s.student_id
@@ -259,7 +271,9 @@ class Admin
     public function getAllRegistrations()
     {
         $this->ensureStudentRegistrationProofColumn();
+        $this->ensureStudentRegistrationSourceColumn();
         $hasProofCol = $this->hasStudentColumn('registration_proof_path');
+        $hasSourceCol = $this->hasStudentColumn('registration_source');
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
         $branchSql = $branchId > 0 ? " AND s.branch_id = ?" : "";
         $stmt = $this->conn->prepare("
@@ -277,8 +291,20 @@ class Admin
                       AND rp.status = 'Paid'
                 ), 0.00) AS registration_fee_paid,
                 " . ($hasProofCol ? "s.registration_proof_path" : "NULL") . " AS registration_proof_path,
+                " . ($hasSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                 CASE
-                    WHEN s.status = 'Active' THEN 'Approved'
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM tbl_registration_payments rp2
+                        WHERE rp2.student_id = s.student_id
+                          AND rp2.status = 'Pending'
+                    ) THEN 'Pending'
+                    WHEN COALESCE((
+                        SELECT SUM(rp3.amount)
+                        FROM tbl_registration_payments rp3
+                        WHERE rp3.student_id = s.student_id
+                          AND rp3.status = 'Paid'
+                    ), 0.00) >= 1000 AND s.status = 'Active' THEN 'Approved'
                     WHEN COALESCE((
                         SELECT SUM(rp3.amount)
                         FROM tbl_registration_payments rp3
@@ -296,11 +322,22 @@ class Admin
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-            WHERE (s.status = 'Active' OR EXISTS (
-                SELECT 1
-                FROM tbl_registration_payments rp0
-                WHERE rp0.student_id = s.student_id
-            ))" . $branchSql . "
+            WHERE (
+                EXISTS (
+                    SELECT 1
+                    FROM tbl_registration_payments rp0
+                    WHERE rp0.student_id = s.student_id
+                      AND rp0.status = 'Pending'
+                )
+                OR (
+                    s.status = 'Active'
+                    AND EXISTS (
+                        SELECT 1
+                        FROM tbl_registration_payments rp4
+                        WHERE rp4.student_id = s.student_id
+                    )
+                )
+            )" . $branchSql . "
             ORDER BY s.created_at DESC
         ");
         if ($branchId > 0) {
@@ -576,9 +613,8 @@ class Admin
             $stmtPending->execute([(int)$data['student_id']]);
             $pendingPayment = $stmtPending->fetch(PDO::FETCH_ASSOC);
 
-            $paymentAmount = $pendingPayment
-                ? (float)($pendingPayment['amount'] ?? 0)
-                : $requestedAmount;
+            $pendingAmount = $pendingPayment ? (float)($pendingPayment['amount'] ?? 0) : 0.0;
+            $paymentAmount = $pendingAmount > 0 ? $pendingAmount : $requestedAmount;
             if ($paymentAmount <= 0) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'No submitted payment amount was found for this registration'], 400);
@@ -713,7 +749,9 @@ class Admin
 
         try {
             $this->ensureStudentRegistrationProofColumn();
+            $this->ensureStudentRegistrationSourceColumn();
             $hasProofCol = $this->hasStudentColumn('registration_proof_path');
+            $hasSourceCol = $this->hasStudentColumn('registration_source');
             $branchSql = $branchId > 0 ? " AND s.branch_id = ?" : "";
             $stmt = $this->conn->prepare("
                 SELECT
@@ -726,8 +764,20 @@ class Admin
                         WHERE rp.student_id = s.student_id
                           AND rp.status = 'Paid'
                     ), 0.00) AS registration_fee_paid,
+                    " . ($hasSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                     CASE
-                        WHEN s.status = 'Active' THEN 'Approved'
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM tbl_registration_payments rp1
+                            WHERE rp1.student_id = s.student_id
+                              AND rp1.status = 'Pending'
+                        ) THEN 'Pending'
+                        WHEN COALESCE((
+                            SELECT SUM(rp2.amount)
+                            FROM tbl_registration_payments rp2
+                            WHERE rp2.student_id = s.student_id
+                              AND rp2.status = 'Paid'
+                        ), 0.00) >= 1000 AND s.status = 'Active' THEN 'Approved'
                         WHEN COALESCE((
                             SELECT SUM(rp2.amount)
                             FROM tbl_registration_payments rp2

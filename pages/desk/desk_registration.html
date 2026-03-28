@@ -50,9 +50,14 @@
                     <i class="fas fa-id-card text-blue-200"></i> Registrations
                 </a>
             </nav>
-            <div class="mt-10 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
-                <div class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Assigned Branch</div>
-                <div id="managerBranchName" class="mt-2 text-sm font-semibold text-white">—</div>
+            <div class="mt-auto space-y-4 pt-8">
+                <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-400/20 bg-red-400/10 text-sm font-semibold text-red-200 hover:bg-red-400/15 hover:text-white transition">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+                <div class="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
+                    <div class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Assigned Branch</div>
+                    <div id="managerBranchName" class="mt-2 text-sm font-semibold text-white">—</div>
+                </div>
             </div>
         </aside>
 
@@ -211,10 +216,12 @@
 
             <h3 class="text-2xl font-bold text-white mb-2">Register Student (Desk)</h3>
             <p class="text-zinc-400 text-xs mb-4">
-                This will create a student account using the student's email as username and a
-                <span class="font-mono font-semibold">simple default password</span> (currently <span class="font-mono">fasmusic2020</span>).
-                On first login, the student will be <span class="font-semibold text-gold-400">required to change this password</span>
-                to a strong one for security.
+                This will create a student account using the student's email as username with temporary password
+                <span class="font-mono font-semibold">fas@123</span>.
+                If a guardian account is created, its temporary password will be
+                <span class="font-mono font-semibold">fasmusic@2020</span>.
+                On first login, both accounts will be <span class="font-semibold text-gold-400">required to change their passwords</span>
+                for security.
             </p>
 
             <div id="walkinMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
@@ -263,11 +270,6 @@
                                 class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Grade/Year</label>
-                            <input type="text" name="student_grade_year"
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
                             <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Branch *</label>
                             <select name="branch_id" id="walkin_branch_id" required
                                 class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
@@ -278,11 +280,6 @@
                     <div class="mt-4">
                         <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Address</label>
                         <textarea name="student_address" rows="2"
-                            class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
-                    </div>
-                    <div class="mt-4">
-                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Health Diagnosis (if any)</label>
-                        <textarea name="student_health_diagnosis" rows="2"
                             class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
                     </div>
                 </div>
@@ -334,6 +331,67 @@
                         <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Address</label>
                         <textarea name="guardian_address" rows="2"
                             class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
+                        Walk-In Enrollment
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Session Package *</label>
+                            <select name="session_package_id" id="walkinSessionPackageId" required
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                                <option value="">Loading packages...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Registration Payment Mode *</label>
+                            <select name="registration_payment_method" required
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                                <option value="">Select payment mode</option>
+                                <option value="Cash">Cash</option>
+                                <option value="GCash">GCash</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Package Payment Type *</label>
+                            <select id="walkin_paymentType" required
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                                <option value="Partial Payment">Partial Payment</option>
+                                <option value="Full Payment">Full Payment</option>
+                                <option value="Installment">Installment</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Preferred Date *</label>
+                            <input type="date" id="walkinPreferredDate" required
+                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Preferred Day *</label>
+                            <input type="text" id="walkinPreferredDay" readonly
+                                class="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-sm text-zinc-300">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Registration Fee</label>
+                            <input type="hidden" name="registration_fee_amount" id="walkin_registration_fee_amount" value="1000">
+                            <div class="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-sm text-zinc-100 font-semibold">
+                                ₱1,000.00
+                            </div>
+                        </div>
+                    </div>
+                    <div id="walkinPackageDetails" class="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-300">
+                        Select a package to see the details.
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Instruments *</label>
+                        <div id="walkin_instrumentsContainer" class="space-y-3">
+                            <div class="text-sm text-zinc-500">Select a package first.</div>
+                        </div>
                     </div>
                 </div>
 
@@ -393,6 +451,9 @@
 
             // Seed dropdowns
             loadWalkinBranches();
+            if (typeof setupWalkinEnrollmentForm === 'function') {
+                setupWalkinEnrollmentForm();
+            }
 
             const branchSelect = document.getElementById('walkin_branch_id');
             const dobInput = document.getElementById('walkin_student_dob');
@@ -430,7 +491,16 @@
                     data[key] = value;
                 }
 
-                // Registration fee & package selection are provided by the form.
+                const enrollment = typeof getWalkinEnrollmentPayload === 'function'
+                    ? getWalkinEnrollmentPayload()
+                    : null;
+                if (!enrollment || enrollment.error) {
+                    showMessage(enrollment?.error || 'Please complete the walk-in enrollment details.', 'error');
+                    form.dataset.submitting = '0';
+                    if (btn) btn.disabled = false;
+                    if (btnText) btnText.textContent = 'Register Student';
+                    return;
+                }
 
                 // mark as walk-in so backend uses simple default password
                 data['is_walkin'] = true;
@@ -462,17 +532,39 @@
                         const packageLabel = selectedPackage ? `\n                           <strong>Package:</strong> ${escapeHtml(selectedPackage.package_name)}<br>` : '';
                         const paymentMethodLabel = data['registration_payment_method'] ? `\n                           <strong>Payment Method:</strong> ${escapeHtml(data['registration_payment_method'])}<br>` : '';
                         const paymentAmountLabel = data['registration_fee_amount'] ? `\n                           <strong>Paid Amount:</strong> ₱${Number(data['registration_fee_amount']).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<br>` : '';
+                        const guardianLabel = result.guardian_username
+                            ? `<strong>Guardian Username:</strong> ${escapeHtml(result.guardian_username)}<br><strong>Guardian Temporary Password:</strong> fasmusic@2020<br>`
+                            : '';
+                        const enrollmentResponse = typeof submitWalkinEnrollmentRequest === 'function'
+                            ? await submitWalkinEnrollmentRequest(result.student_id)
+                            : { success: false, error: 'Walk-in enrollment helper is unavailable.' };
+                        if (!enrollmentResponse.success || !enrollmentResponse.request_id) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Student Registered, Enrollment Not Submitted',
+                                html: `Student account was created successfully, but the walk-in enrollment was not completed.<br><br>
+                               <strong>Username:</strong> ${result.username || data['student_email']}<br>
+                               <strong>Student Temporary Password:</strong> fas@123<br>
+                               ${guardianLabel}<br>
+                               <strong>Reason:</strong> ${escapeHtml(enrollmentResponse.error || 'Unable to create the package request.')}`,
+                                confirmButtonColor: '#b8860b'
+                            });
+                            return;
+                        }
 
-                        // Go into desk enrollment workflow (desk-only)
-                        const assignUrl = `desk_enrollment.html?view=active&assign_student_id=${encodeURIComponent(result.student_id)}&assign_student_name=${encodeURIComponent(result.username || data['student_email'])}&assign_package_id=${encodeURIComponent(data['session_package_id'] || '')}`;
+                        const assignUrl = `desk_enrollment.html?view=pending&assign_request_id=${encodeURIComponent(enrollmentResponse.request_id)}`;
 
                         Swal.fire({
                             icon: 'success',
-                            title: 'Student Registered',
-                            html: `Student has been registered and can log in immediately.<br><br>
-                           <strong>Username:</strong> ${result.username || data['student_email']}<br>${packageLabel}${paymentMethodLabel}${paymentAmountLabel}<br>
-                           <strong>Default Password:</strong> fasmusic2020<br><br>
-                           On first login, they will be required to change this to a strong password.`,
+                            title: 'Walk-In Enrollment Submitted',
+                            html: `Student and enrollment were created successfully.<br><br>
+                           <strong>Username:</strong> ${result.username || data['student_email']}<br>${packageLabel}${paymentMethodLabel}${paymentAmountLabel}
+                           <strong>Package Payment Type:</strong> ${escapeHtml(enrollment.paymentType)}<br>
+                           <strong>Preferred Date:</strong> ${escapeHtml(enrollment.preferredDate)}<br>
+                           <strong>Student Temporary Password:</strong> fas@123<br>
+                           ${guardianLabel}<br>
+                           On first login, temporary passwords must be changed to a strong password.<br><br>
+                           You will now be redirected to assign the schedule.`,
                             confirmButtonColor: '#b8860b'
                         }).then(() => {
                             window.location.href = assignUrl;
@@ -571,6 +663,7 @@
                         branchSelect.disabled = false;
                         branchSelect.style.pointerEvents = 'none';
                         branchSelect.style.opacity = '0.85';
+                        branchSelect.dispatchEvent(new Event('change'));
                     }
                 } catch (_) {}
             };

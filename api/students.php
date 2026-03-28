@@ -1019,6 +1019,7 @@ class StudentsApi
         $this->ensureSessionPackageColumn();
         $this->ensureStudentRegistrationFeesTable();
         $branchId = $_GET['branch_id'] ?? null;
+        $hasRegistrationSourceCol = $this->tableHasColumn('tbl_students', 'registration_source');
 
         // Check if session_package_id exists and tbl_session_packages exists (avoid SQL errors)
         $hasPackageCol = false;
@@ -1045,6 +1046,7 @@ class StudentsApi
                     COALESCE(rf.registration_status, 'Pending') AS registration_status,
                     s.status,
                     s.branch_id,
+                    " . ($hasRegistrationSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                     s.session_package_id,
                     b.branch_name,
                     sp.package_name,
@@ -1080,6 +1082,7 @@ class StudentsApi
                     COALESCE(rf.registration_status, 'Pending') AS registration_status,
                     s.status,
                     s.branch_id,
+                    " . ($hasRegistrationSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                     b.branch_name,
                     s.created_at
                 FROM tbl_students s

@@ -155,11 +155,21 @@ class AttendanceApi
 
         try {
             if ($this->tableExists('tbl_sessions') && $this->tableExists('tbl_enrollments')) {
+                $roomJoin = "";
+                $roomExpr = "NULL";
+                if ($this->tableExists('tbl_rooms')) {
+                    $roomJoin = " LEFT JOIN tbl_rooms rm ON ts.room_id = rm.room_id ";
+                    $roomExpr = "rm.room_name";
+                }
                 $stmt = $this->conn->prepare("
                     SELECT
                         ts.session_id AS attendance_id,
                         te.student_id,
                         TIMESTAMP(ts.session_date, COALESCE(ts.start_time, '00:00:00')) AS attended_at,
+                        ts.session_date,
+                        ts.start_time,
+                        ts.end_time,
+                        {$roomExpr} AS room_name,
                         ts.session_type AS source,
                         COALESCE(ts.attendance_notes, ts.notes) AS notes,
                         CASE
@@ -170,13 +180,14 @@ class AttendanceApi
                         END AS status
                     FROM tbl_sessions ts
                     INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+                    {$roomJoin}
                     WHERE te.student_id = ?
                     ORDER BY ts.session_date DESC, ts.session_id DESC
                     LIMIT $limit
                 ");
             } else {
                 $stmt = $this->conn->prepare("
-                    SELECT attendance_id, student_id, attended_at, source, notes, status
+                    SELECT attendance_id, student_id, attended_at, DATE(attended_at) AS session_date, TIME(attended_at) AS start_time, NULL AS end_time, NULL AS room_name, source, notes, status
                     FROM tbl_attendance
                     WHERE student_id = ?
                     ORDER BY attended_at DESC, attendance_id DESC

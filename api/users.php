@@ -95,6 +95,16 @@ class User
         return;
     }
 
+    private function ensureStudentRegistrationSourceColumn()
+    {
+        if ($this->hasStudentColumn('registration_source')) return;
+        try {
+            $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_source VARCHAR(20) NOT NULL DEFAULT 'online' AFTER status");
+        } catch (PDOException $e) {
+            // Keep API working even if alter fails
+        }
+    }
+
     private function getRegistrationPaidAmount($studentId)
     {
         $stmt = $this->conn->prepare("
@@ -139,7 +149,15 @@ class User
         } catch (PDOException $e) {
             $studentStatus = 'Inactive';
         }
-        $status = ($paid >= 1000 && $studentStatus === 'Active' && !$hasPending) ? 'Approved' : 'Pending';
+        if ($hasPending) {
+            $status = 'Pending';
+        } elseif ($paid >= 1000 && $studentStatus === 'Active') {
+            $status = 'Approved';
+        } elseif ($paid >= 1000) {
+            $status = 'Fee Paid';
+        } else {
+            $status = 'Pending';
+        }
         return [
             'registration_fee_amount' => 1000.00,
             'registration_fee_paid' => $paid,
@@ -257,7 +275,7 @@ class User
             // Detect default/temporary passwords for non-admin roles (first-login change requirement)
             $mustChangePassword = false;
             $roleName = (string)($user['role_name'] ?? '');
-            $defaultPasswords = ['fasmusic@2020', 'fasmusic2020'];
+            $defaultPasswords = ['fas@123', 'fasmusic@2020', 'fasmusic2020'];
             $isDefaultPassword = false;
             foreach ($defaultPasswords as $defaultPwd) {
                 if (password_verify($defaultPwd, $storedPassword) || hash_equals($storedPassword, $defaultPwd)) {
@@ -502,6 +520,10 @@ class User
         // Public self-registration from index remains pending.
         $isWalkIn = filter_var(($data['is_walkin'] ?? false), FILTER_VALIDATE_BOOLEAN);
         $registrationSource = strtolower(trim((string)($data['registration_source'] ?? '')));
+        if (!in_array($registrationSource, ['public', 'online', 'admin', 'walkin', 'staff'], true)) {
+            $registrationSource = $isWalkIn ? 'walkin' : 'public';
+        }
+        $studentRegistrationSource = in_array($registrationSource, ['admin', 'walkin', 'staff'], true) ? 'walkin' : 'online';
         $isAdminRegistration = $isWalkIn || in_array($registrationSource, ['admin', 'walkin', 'staff'], true);
 
         // Desk staff branch hardening:
@@ -605,10 +627,10 @@ class User
         }
 
         // Determine password:
-        // - Admin-added (walk-in): default simple password "fasmusic2020" (no strict validation)
+        // - Admin-added (walk-in): default student password "fas@123" (no strict validation)
         // - Self-registration: strong password policy
         if ($isAdminRegistration) {
-            $password = 'fasmusic2020';
+            $password = 'fas@123';
         } else {
             if (empty($data['password'])) {
                 $this->sendJSON(['error' => 'Password is required'], 400);
@@ -651,6 +673,7 @@ class User
         try {
             $this->ensureStudentRegistrationProofColumn();
             $this->ensureStudentRegistrationColumns();
+            $this->ensureStudentRegistrationSourceColumn();
             $this->conn->beginTransaction();
 
             // Get default role for students
@@ -696,6 +719,11 @@ class User
                 $studentStatus
             ];
 
+            if ($this->hasStudentColumn('registration_source')) {
+                $studentColumns[] = 'registration_source';
+                $studentValues[] = $studentRegistrationSource;
+            }
+
             if ($hasSessionPackageCol) {
                 $studentColumns[] = 'session_package_id';
                 $studentValues[] = $data['session_package_id'] ?? null;
@@ -721,17 +749,14 @@ class User
                 $stmtProof->execute([$registrationProofPath, $studentId]);
             }
             if ($isAdminRegistration) {
-                $paymentMethod = trim((string)($data['registration_payment_method'] ?? '')) ?: 'Other';
                 $stmtRegPayment = $this->conn->prepare("
                     INSERT INTO tbl_registration_payments (
                         student_id, payment_date, amount, payment_method, status, receipt_number
-                    ) VALUES (?, CURRENT_DATE, ?, ?, 'Paid', ?)
+                    ) VALUES (?, CURRENT_DATE, 0.00, '', 'Pending', ?)
                 ");
                 $stmtRegPayment->execute([
                     $studentId,
-                    (float)$data['registration_fee_amount'],
-                    $paymentMethod,
-                    'REG-AUTO-' . time()
+                    'REG-WALKIN-' . time()
                 ]);
             } elseif ($registrationNotes) {
                 $stmtPendingProof = $this->conn->prepare("
@@ -747,6 +772,8 @@ class User
 
             // Insert Guardian and link only when guardian info is provided (required for minors, optional for 18+)
             $guardianId = null;
+            $guardianUsername = null;
+            $guardianDefaultPassword = 'fasmusic@2020';
             $hasGuardianData = !empty($data['guardian_first_name']) && !empty($data['guardian_last_name'])
                 && !empty($data['guardian_relationship']) && !empty($data['guardian_phone']);
 
@@ -805,11 +832,14 @@ class User
             // Create guardian login (shares the student's password) when guardian email is provided
             $guardianEmail = trim((string)($data['guardian_email'] ?? ''));
             if ($guardianId && $guardianEmail !== '' && $guardianRoleId) {
+                $guardianUsername = $guardianEmail;
                 $guardianExistsStmt = $this->conn->prepare("SELECT user_id, role_id FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
                 $guardianExistsStmt->execute([$guardianEmail, $guardianEmail]);
                 $existingGuardianUser = $guardianExistsStmt->fetch(PDO::FETCH_ASSOC);
 
                 if (!$existingGuardianUser) {
+                    $guardianPasswordToUse = $isAdminRegistration ? $guardianDefaultPassword : $password;
+                    $guardianHashedPassword = password_hash($guardianPasswordToUse, PASSWORD_DEFAULT);
                     $stmtGuardianUser = $this->conn->prepare("
                         INSERT INTO tbl_users (
                             username, password, role_id, first_name, last_name,
@@ -818,7 +848,7 @@ class User
                     ");
                     $stmtGuardianUser->execute([
                         $guardianEmail,
-                        $hashedPassword,
+                        $guardianHashedPassword,
                         $guardianRoleId,
                         $data['guardian_first_name'] ?? 'Guardian',
                         $data['guardian_last_name'] ?? '',
@@ -849,6 +879,7 @@ class User
                     : 'Registration submitted successfully. Your account is pending admin approval.',
                 'student_id' => $studentId,
                 'guardian_id' => $guardianId,
+                'guardian_username' => $guardianUsername,
                 'user_id' => $userId,
                 'username' => $username,
                 'registration_status' => $regStatus,

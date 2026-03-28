@@ -82,6 +82,8 @@ let appBaseUrl;
 })();
 
 let currentStudentId = null;
+let currentPaymentRedirectUrl = '';
+let currentPaymentSource = '';
 let currentRegistration = null;
 let pendingRequestsById = {};
 
@@ -1916,6 +1918,27 @@ function renderEnrollmentHistoryList(history) {
     }).join('');
 }
 
+let guardianPortalStudents = [];
+let guardianActiveStudentIndex = null;
+
+function getGuardianInstrumentLabel(item) {
+    const instruments = Array.isArray(item?.instruments) ? item.instruments : [];
+    if (instruments.length > 0) {
+        const names = instruments
+            .map(inst => String(inst.instrument_name || '').trim())
+            .filter(Boolean);
+        if (names.length > 0) return names.join(', ');
+    }
+
+    const enrollmentNames = String(item?.current_enrollment?.instrument_names || '').trim();
+    if (enrollmentNames) return enrollmentNames;
+
+    const studentNames = String(item?.student?.instrument_names || '').trim();
+    if (studentNames) return studentNames;
+
+    return 'Not set';
+}
+
 function renderGuardianStudentCard(item, index) {
     const s = item?.student || {};
     const enrollment = item?.current_enrollment || null;
@@ -1932,63 +1955,134 @@ function renderGuardianStudentCard(item, index) {
     const pkgTotal = Number(enrollment?.total_amount || s.package_price || 0);
     const pkgPaid = Number(enrollment?.paid_amount || 0);
     const pkgBalance = Math.max(0, pkgTotal - pkgPaid);
+    const attendanceTotal = Number(enrollment?.package_sessions || s.package_sessions || 0);
 
+    return `
+        <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Student</div>
+                    <div class="text-xl font-extrabold mt-2 text-zinc-900 dark:text-white">${escapeHtml(studentName)}</div>
+                    <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Branch: <span class="text-zinc-700 dark:text-zinc-200 font-semibold">${escapeHtml(branch)}</span></div>
+                </div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(regStatus)}">${escapeHtml(regStatus)}</span>
+            </div>
+
+            <div class="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
+                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Package</div>
+                    <div class="mt-2 text-sm font-semibold text-zinc-900 dark:text-white">${escapeHtml(pkgName)}</div>
+                    <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${pkgSessions ? `${pkgSessions} sessions` : 'No package yet'}</div>
+                </div>
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
+                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Package Balance</div>
+                    <div class="mt-2 text-lg font-black text-zinc-900 dark:text-white">${formatCurrencyPHP(pkgBalance)}</div>
+                </div>
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
+                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Progress</div>
+                    <div class="mt-2 text-sm text-zinc-900 dark:text-white font-semibold">
+                        <span id="guardianProgressAttended-${studentId}">—</span>
+                        <span class="text-zinc-500 dark:text-zinc-400 font-medium"> / ${attendanceTotal || '—'} attended</span>
+                    </div>
+                    <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Remaining: <span id="guardianProgressRemaining-${studentId}" class="font-semibold text-zinc-700 dark:text-zinc-200">—</span></div>
+                </div>
+            </div>
+
+            <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <div id="guardianProgressLast-${studentId}" class="text-xs text-zinc-500 dark:text-zinc-400">Last attendance: —</div>
+                <button type="button" onclick="openGuardianStudentModal(${index})" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold transition">
+                    <i class="fas fa-eye"></i> View Details
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderGuardianStudentModal(item, index) {
+    const s = item?.student || {};
+    const enrollment = item?.current_enrollment || null;
+    const history = item?.enrollment_history || item?.history || [];
+    const studentId = s.student_id ?? `g-${index}`;
+    const studentName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Student';
+    const branch = s.branch_name || '—';
+    const regStatus = s.registration_status || 'Pending';
+    const regPaid = Number(s.registration_fee_paid || 0);
+    const regTotal = Number(s.registration_fee_amount || 0);
+    const regRemaining = Math.max(0, regTotal - regPaid);
+    const pkgName = enrollment?.package_name || s.package_name || 'Not assigned yet';
+    const pkgSessions = enrollment?.package_sessions || s.package_sessions || 0;
+    const pkgTotal = Number(enrollment?.total_amount || s.package_price || 0);
+    const pkgPaid = Number(enrollment?.paid_amount || 0);
+    const pkgBalance = Math.max(0, pkgTotal - pkgPaid);
     const teacherName = `${enrollment?.teacher_first_name || ''} ${enrollment?.teacher_last_name || ''}`.trim() || 'Not set';
     const scheduleDate = formatDateLong(enrollment?.first_session_date || enrollment?.start_date || '');
     const scheduleStart = enrollment?.first_start_time ? formatTime12Hour(enrollment.first_start_time) : '';
     const scheduleEnd = enrollment?.first_end_time ? formatTime12Hour(enrollment.first_end_time) : '';
     const scheduleTime = scheduleStart && scheduleEnd ? `${scheduleStart} - ${scheduleEnd}` : 'Not set';
     const scheduleRoom = enrollment?.first_room || 'Not set';
+    const paymentState = enrollment?.payment_status || s.registration_status || 'Pending';
+    const instrumentsLabel = getGuardianInstrumentLabel(item);
 
     return `
-        <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+        <div class="space-y-6">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Student</div>
-                    <div class="text-xl font-extrabold mt-2">${escapeHtml(studentName)}</div>
-                    <div class="text-sm text-zinc-400 mt-1">Branch: <span class="text-zinc-200 font-semibold">${escapeHtml(branch)}</span></div>
+                    <div class="text-sm text-zinc-500 dark:text-zinc-400">Branch: <span class="font-semibold text-zinc-700 dark:text-zinc-200">${escapeHtml(branch)}</span></div>
+                    <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Student ID: <span class="font-semibold text-zinc-700 dark:text-zinc-200">${escapeHtml(String(studentId))}</span></div>
                 </div>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(regStatus)}">${escapeHtml(regStatus)}</span>
             </div>
 
-            <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
                     <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Registration</div>
-                    <div class="mt-3 text-sm text-zinc-300">Paid: <span class="text-white font-semibold">${formatCurrencyPHP(regPaid)}</span></div>
-                    <div class="text-sm text-zinc-300">Total: <span class="text-white font-semibold">${formatCurrencyPHP(regTotal)}</span></div>
-                    <div class="text-sm text-zinc-300">Remaining: <span class="text-gold-400 font-semibold">${formatCurrencyPHP(regRemaining)}</span></div>
+                    <div class="mt-3 text-sm text-zinc-600 dark:text-zinc-300">Paid: <span class="text-zinc-900 dark:text-white font-semibold">${formatCurrencyPHP(regPaid)}</span></div>
+                    <div class="text-sm text-zinc-600 dark:text-zinc-300">Total: <span class="text-zinc-900 dark:text-white font-semibold">${formatCurrencyPHP(regTotal)}</span></div>
+                    <div class="text-sm text-zinc-600 dark:text-zinc-300">Remaining: <span class="text-gold-500 font-semibold">${formatCurrencyPHP(regRemaining)}</span></div>
                 </div>
-                <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
                     <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Package & Payments</div>
-                    <div class="mt-3 text-sm text-zinc-300">Package: <span class="text-white font-semibold">${escapeHtml(pkgName)}</span></div>
-                    <div class="text-sm text-zinc-300">Sessions: <span class="text-white font-semibold">${pkgSessions ? `${pkgSessions} sessions` : '—'}</span></div>
-                    <div class="text-sm text-zinc-300">Paid: <span class="text-white font-semibold">${formatCurrencyPHP(pkgPaid)}</span></div>
-                    <div class="text-sm text-zinc-300">Balance: <span class="text-gold-400 font-semibold">${formatCurrencyPHP(pkgBalance)}</span></div>
+                    <div class="mt-3 text-sm text-zinc-600 dark:text-zinc-300">Package: <span class="text-zinc-900 dark:text-white font-semibold">${escapeHtml(pkgName)}</span></div>
+                    <div class="text-sm text-zinc-600 dark:text-zinc-300">Sessions: <span class="text-zinc-900 dark:text-white font-semibold">${pkgSessions ? `${pkgSessions} sessions` : '—'}</span></div>
+                    <div class="text-sm text-zinc-600 dark:text-zinc-300">Paid: <span class="text-zinc-900 dark:text-white font-semibold">${formatCurrencyPHP(pkgPaid)}</span></div>
+                    <div class="text-sm text-zinc-600 dark:text-zinc-300">Balance: <span class="text-gold-500 font-semibold">${formatCurrencyPHP(pkgBalance)}</span></div>
                 </div>
-                <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Progress</div>
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
+                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Attendance</div>
                     <div class="mt-3 grid grid-cols-3 gap-2 text-center">
-                        <div class="rounded-xl bg-white/5 border border-white/10 p-2">
-                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Attended</div>
-                            <div id="guardianProgressAttended-${studentId}" class="text-lg font-black text-white mt-1">—</div>
+                        <div class="rounded-xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-2">
+                            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Attended</div>
+                            <div id="guardianModalProgressAttended-${studentId}" class="text-lg font-black text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
-                        <div class="rounded-xl bg-white/5 border border-white/10 p-2">
-                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Remaining</div>
-                            <div id="guardianProgressRemaining-${studentId}" class="text-lg font-black text-white mt-1">—</div>
+                        <div class="rounded-xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-2">
+                            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Remaining</div>
+                            <div id="guardianModalProgressRemaining-${studentId}" class="text-lg font-black text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
-                        <div class="rounded-xl bg-white/5 border border-white/10 p-2">
-                            <div class="text-[10px] text-zinc-400 uppercase tracking-widest">Last</div>
-                            <div id="guardianProgressLast-${studentId}" class="text-xs font-semibold text-zinc-200 mt-2">—</div>
+                        <div class="rounded-xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-2">
+                            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Last</div>
+                            <div id="guardianModalProgressLast-${studentId}" class="text-xs font-semibold text-zinc-700 dark:text-zinc-200 mt-2">—</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
                 <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Current Schedule</div>
-                <div class="mt-2 text-sm text-zinc-300">Teacher: <span class="text-white font-semibold">${escapeHtml(teacherName)}</span></div>
-                <div class="text-sm text-zinc-300">When: <span class="text-white font-semibold">${escapeHtml(scheduleDate || 'Not set')}</span> • <span class="text-white font-semibold">${escapeHtml(scheduleTime)}</span></div>
-                <div class="text-sm text-zinc-300">Room: <span class="text-white font-semibold">${escapeHtml(scheduleRoom)}</span></div>
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div><span class="text-zinc-500 dark:text-zinc-400">Teacher:</span> <span class="text-zinc-900 dark:text-white font-semibold">${escapeHtml(teacherName)}</span></div>
+                    <div><span class="text-zinc-500 dark:text-zinc-400">Payment:</span> <span class="text-zinc-900 dark:text-white font-semibold">${escapeHtml(paymentState)}</span></div>
+                    <div><span class="text-zinc-500 dark:text-zinc-400">Date:</span> <span class="text-zinc-900 dark:text-white font-semibold">${escapeHtml(scheduleDate || 'Not set')}</span></div>
+                    <div><span class="text-zinc-500 dark:text-zinc-400">Time:</span> <span class="text-zinc-900 dark:text-white font-semibold">${escapeHtml(scheduleTime)}</span></div>
+                    <div><span class="text-zinc-500 dark:text-zinc-400">Room:</span> <span class="text-zinc-900 dark:text-white font-semibold">${escapeHtml(scheduleRoom)}</span></div>
+                    <div><span class="text-zinc-500 dark:text-zinc-400">Instruments:</span> <span class="text-zinc-900 dark:text-white font-semibold">${escapeHtml(instrumentsLabel)}</span></div>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+                <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Enrollment History</div>
+                <div class="mt-3 space-y-3">
+                    ${renderEnrollmentHistoryList(history)}
+                </div>
             </div>
         </div>
     `;
@@ -1997,7 +2091,7 @@ function renderGuardianStudentCard(item, index) {
 function renderGuardianStudentsList(items) {
     if (!Array.isArray(items) || items.length === 0) {
         return `
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-10 text-center text-zinc-400">
+            <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-10 text-center text-zinc-500 dark:text-zinc-400">
                 <i class="fas fa-user-slash text-3xl mb-3"></i>
                 <div class="font-semibold">No linked students found.</div>
                 <div class="text-xs text-zinc-500 mt-2">Ask the admin to link your guardian account to a student profile.</div>
@@ -2040,7 +2134,9 @@ async function hydrateGuardianAttendance(items) {
 
         try {
             const summaryRes = await fetchAttendanceSummary(studentId);
-            const attended = summaryRes?.success ? (summaryRes.summary?.present_count ?? 0) : 0;
+            const attended = summaryRes?.success
+                ? Number(summaryRes.summary?.present_count ?? 0) + Number(summaryRes.summary?.late_count ?? 0)
+                : 0;
             const total = Number(item?.current_enrollment?.package_sessions || student.package_sessions || 0);
             const remaining = total > 0 ? Math.max(0, total - attended) : 0;
             const lastAttended = summaryRes?.success && summaryRes.summary?.last_attended_at
@@ -2049,13 +2145,54 @@ async function hydrateGuardianAttendance(items) {
 
             setText(`guardianProgressAttended-${studentId}`, String(attended));
             setText(`guardianProgressRemaining-${studentId}`, total > 0 ? String(remaining) : '—');
-            setText(`guardianProgressLast-${studentId}`, lastAttended);
+            setText(`guardianProgressLast-${studentId}`, `Last attendance: ${lastAttended}`);
+            setText(`guardianModalProgressAttended-${studentId}`, String(attended));
+            setText(`guardianModalProgressRemaining-${studentId}`, total > 0 ? String(remaining) : '—');
+            setText(`guardianModalProgressLast-${studentId}`, lastAttended);
         } catch (e) {
             setText(`guardianProgressAttended-${studentId}`, '—');
             setText(`guardianProgressRemaining-${studentId}`, '—');
-            setText(`guardianProgressLast-${studentId}`, '—');
+            setText(`guardianProgressLast-${studentId}`, 'Last attendance: —');
+            setText(`guardianModalProgressAttended-${studentId}`, '—');
+            setText(`guardianModalProgressRemaining-${studentId}`, '—');
+            setText(`guardianModalProgressLast-${studentId}`, '—');
         }
     }));
+}
+
+function openGuardianStudentModal(index) {
+    const item = guardianPortalStudents[index];
+    const modal = document.getElementById('guardianStudentModal');
+    const body = document.getElementById('guardianStudentModalBody');
+    const title = document.getElementById('guardianStudentModalTitle');
+    if (!item || !modal || !body || !title) return;
+
+    guardianActiveStudentIndex = index;
+    const student = item?.student || {};
+    const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
+    title.textContent = studentName;
+    body.innerHTML = renderGuardianStudentModal(item, index);
+    const studentId = student.student_id;
+    if (studentId) {
+        const attendedText = document.getElementById(`guardianProgressAttended-${studentId}`)?.textContent || '—';
+        const remainingText = document.getElementById(`guardianProgressRemaining-${studentId}`)?.textContent || '—';
+        const lastText = (document.getElementById(`guardianProgressLast-${studentId}`)?.textContent || 'Last attendance: —').replace(/^Last attendance:\s*/, '');
+        setText(`guardianModalProgressAttended-${studentId}`, attendedText);
+        setText(`guardianModalProgressRemaining-${studentId}`, remainingText);
+        setText(`guardianModalProgressLast-${studentId}`, lastText);
+    }
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.classList.add('overflow-hidden');
+}
+
+function closeGuardianStudentModal() {
+    const modal = document.getElementById('guardianStudentModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.classList.remove('overflow-hidden');
+    guardianActiveStudentIndex = null;
 }
 
 async function initGuardianStudentsPage() {
@@ -2077,9 +2214,21 @@ async function initGuardianStudentsPage() {
     setText('guardianPhone', primaryGuardian.phone || '—');
 
     const students = Array.isArray(portal.students) ? portal.students : [];
+    guardianPortalStudents = students;
     updateGuardianTotals(students);
     setHtml('guardianStudentsList', renderGuardianStudentsList(students));
     await hydrateGuardianAttendance(students);
+
+    const modal = document.getElementById('guardianStudentModal');
+    if (modal && !modal.dataset.bound) {
+        modal.dataset.bound = 'true';
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) closeGuardianStudentModal();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeGuardianStudentModal();
+        });
+    }
 }
 
 let studentRequestAvailableInstruments = [];
@@ -2189,6 +2338,41 @@ async function postStudentPackageRequest(payload) {
         isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
     );
     return res.data;
+}
+
+function initStudentAdditionalSessionAction(student, portal, requestMeta, attendanceSummary) {
+    const statusEl = document.getElementById('studentAdditionalSessionStatus');
+    const addBtn = document.getElementById('studentAddAnotherSessionBtn');
+    if (!statusEl || !addBtn) return;
+
+    const latest = requestMeta?.latest_request || null;
+    const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
+    const currentEnrollment = portal?.current_enrollment || null;
+    const totalSessions = Number(currentEnrollment?.package_sessions || student?.package_sessions || 0);
+    const attendedSessions = Number(attendanceSummary?.summary?.present_count || 0) + Number(attendanceSummary?.summary?.late_count || 0);
+    const remainingSessions = totalSessions > 0 ? Math.max(0, totalSessions - attendedSessions) : 0;
+
+    if (hasPendingRequest) {
+        statusEl.innerHTML = '<span class="text-yellow-300 font-semibold">You already have a pending session request.</span> Please wait for desk/admin to review it first.';
+    } else if (totalSessions > 0) {
+        statusEl.innerHTML = `Current progress: <span class="text-white font-semibold">${attendedSessions}</span> attended out of <span class="text-white font-semibold">${totalSessions}</span> session(s). Remaining: <span class="text-gold-400 font-semibold">${remainingSessions}</span>.`;
+    } else {
+        statusEl.innerHTML = 'No active session package was found. You can check if you are already allowed to add another session package.';
+    }
+
+    addBtn.onclick = () => {
+        if (hasPendingRequest) {
+            showMessage('You already have a pending request. Please wait for desk/admin approval first.', 'error');
+            return;
+        }
+
+        if (remainingSessions > 0) {
+            showMessage(`Cannot continue yet because you still have ${remainingSessions} remaining session(s) to finish.`, 'error');
+            return;
+        }
+
+        showMessage('You can finally add another session. Please contact desk/admin to process your next session package.', 'success');
+    };
 }
 
 function initStudentRequestSection(student, requestMeta) {
@@ -2572,17 +2756,6 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                                 <textarea id="regAddress" rows="3" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500"></textarea>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Grade/Year</label>
-                                    <input id="regGradeYear" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">School</label>
-                                    <input id="regSchool" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                                </div>
-                            </div>
-
                             <div>
                                 <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Branch *</label>
                                 <select id="regBranch" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
@@ -2596,9 +2769,16 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                     <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
                         <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">3. Registration Payment</div>
                         <form id="registrationPaymentForm" class="space-y-3">
+                            <div class="rounded-xl border border-amber-300/70 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                                <div class="font-bold">Required before enrollment</div>
+                                <div class="mt-1">Father &amp; Sons Music requires a <strong>₱1,000 registration fee</strong> before a student can be enrolled.</div>
+                            </div>
                             <div>
-                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Amount *</label>
-                                <input id="regPayAmount" type="number" min="0" step="0.01" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="0.00" />
+                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Registration Fee</label>
+                                <div class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-bold">
+                                    ₱1,000.00
+                                </div>
+                                <div class="text-xs text-amber-700 dark:text-amber-300 mt-2">This amount is fixed. You only need to choose the payment method and upload your proof of payment.</div>
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Method *</label>
@@ -2717,17 +2897,12 @@ function wireStudentOnboardingActions(student, meta, portal) {
     const regPhone = document.getElementById('regPhone');
     const regDob = document.getElementById('regDob');
     const regAddress = document.getElementById('regAddress');
-    const regGradeYear = document.getElementById('regGradeYear');
-    const regSchool = document.getElementById('regSchool');
-
     if (regFirstName && !regFirstName.value) regFirstName.value = student?.first_name || '';
     if (regLastName && !regLastName.value) regLastName.value = student?.last_name || '';
     if (regEmail && !regEmail.value) regEmail.value = student?.email || '';
     if (regPhone && !regPhone.value) regPhone.value = student?.phone || '';
     if (regDob && !regDob.value) regDob.value = student?.date_of_birth || '';
     if (regAddress && !regAddress.value) regAddress.value = student?.address || '';
-    if (regGradeYear && !regGradeYear.value) regGradeYear.value = student?.grade_year || '';
-    if (regSchool && !regSchool.value) regSchool.value = student?.school || '';
 
     if (regForm) {
         regForm.onsubmit = (e) => e.preventDefault();
@@ -2776,22 +2951,16 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 phone: document.getElementById('regPhone')?.value?.trim() || '',
                 address: document.getElementById('regAddress')?.value?.trim() || '',
                 date_of_birth: document.getElementById('regDob')?.value || null,
-                grade_year: document.getElementById('regGradeYear')?.value?.trim() || '',
-                school: document.getElementById('regSchool')?.value?.trim() || '',
                 branch_id: Number(document.getElementById('regBranch')?.value || 0)
             };
             payload.age = computeAgeFromDob(payload.date_of_birth);
 
-            const amount = Number(document.getElementById('regPayAmount')?.value || 0);
+            const amount = 1000;
             const method = document.getElementById('regPayMethod')?.value || 'Other';
             const proofFile = regPayProof?.files && regPayProof.files[0] ? regPayProof.files[0] : null;
 
             if (!isRegistrationProfileComplete(payload)) {
                 showMessage('Please complete all required registration details.', 'error');
-                return;
-            }
-            if (!amount || amount <= 0) {
-                showMessage('Enter a valid payment amount.', 'error');
                 return;
             }
             if (!proofFile) {
@@ -2900,7 +3069,7 @@ async function initStudentDashboardPage() {
     // Attendance summary (optional)
     const summaryRes = await fetchAttendanceSummary(s.student_id);
     if (summaryRes.success) {
-        const attended = summaryRes.summary?.present_count ?? 0;
+        const attended = Number(summaryRes.summary?.present_count ?? 0) + Number(summaryRes.summary?.late_count ?? 0);
         setText('sessionsAttended', String(attended));
         const total = Number(s.package_sessions || 0);
         const remaining = total > 0 ? Math.max(0, total - attended) : 0;
@@ -2982,6 +3151,7 @@ async function initStudentSessionsPage() {
     setText('packageSessions', s.package_sessions ? `${s.package_sessions} sessions included` : '—');
 
     const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
+    let summaryRes = null;
     if (!enrollmentApproved) {
         setHtml('attendanceTableBody', `
             <tr>
@@ -3031,25 +3201,120 @@ async function initStudentSessionsPage() {
         }
     }
 
-    // Enroll flow: available packages and request form (package, instruments, preferred date, payment proof)
+    // Next session action
     try {
         const meta = await fetchStudentRequestMetaByEmail(user.email);
-        const packages = meta?.success ? (meta.packages || []) : [];
-        const instruments = meta?.success ? (meta.instruments || []) : [];
-        const availableListEl = document.getElementById('availablePackagesList');
-        if (availableListEl) {
-            setHtml('availablePackagesList', renderAvailablePackagesAndInstruments(packages, instruments));
+        if (enrollmentApproved) {
+            summaryRes = await fetchAttendanceSummary(s.student_id);
         }
-        const formEl = document.getElementById('studentPackageRequestForm');
-        if (formEl && meta?.success) {
-            initStudentRequestSection(s, meta);
-        }
+        initStudentAdditionalSessionAction(s, portal, meta?.success ? meta : null, summaryRes?.success ? summaryRes : null);
     } catch (e) {
-        const availableListEl = document.getElementById('availablePackagesList');
-        if (availableListEl) setHtml('availablePackagesList', '<div class="text-zinc-500">Unable to load available options.</div>');
-        const calendarEl = document.getElementById('studentAvailabilityCalendar');
-        if (calendarEl) setHtml('studentAvailabilityCalendar', '<div class="text-zinc-500">Unable to load teacher availability.</div>');
+        const statusEl = document.getElementById('studentAdditionalSessionStatus');
+        if (statusEl) statusEl.textContent = 'Unable to check session eligibility right now.';
     }
+}
+
+function renderAttendanceStatusBadge(status) {
+    const value = String(status || '—');
+    const cls = value === 'Present'
+        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
+        : value === 'Late'
+            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
+            : value === 'Absent'
+                ? 'bg-red-500/15 text-red-400 border border-red-500/25'
+                : 'bg-zinc-500/15 text-zinc-300 border border-zinc-500/25';
+    return `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${cls}">${escapeHtml(value)}</span>`;
+}
+
+async function initStudentAttendancePage() {
+    if (!checkStudentAuth()) return;
+    const user = Auth.getUser();
+    setText('studentNavName', user.username || user.email || 'Student');
+    setText('studentMobileMenuName', user.username || user.email || 'Signed in');
+
+    const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (!portal.success) {
+        showMessage(portal.error || 'Failed to load attendance.', 'error');
+        return;
+    }
+
+    const s = portal.student || {};
+    const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
+    const totalSessions = Number(portal.current_enrollment?.package_sessions || s.package_sessions || 0);
+
+    if (!enrollmentApproved) {
+        setText('attendanceCompletedCount', '0');
+        setText('attendanceRemainingCount', totalSessions > 0 ? String(totalSessions) : '—');
+        setText('attendancePackageTotal', totalSessions > 0 ? String(totalSessions) : '—');
+        setText('attendanceLastDate', 'Locked until enrollment approval');
+        setHtml('studentAttendanceTableBody', `
+            <tr>
+                <td colspan="5" class="px-6 py-10 text-center text-zinc-400">
+                    <i class="fas fa-lock text-2xl mb-2"></i>
+                    <div class="font-semibold">Attendance is locked</div>
+                    <div class="text-xs text-zinc-500 mt-1">Your attendance records will appear here after admin approves your enrollment.</div>
+                </td>
+            </tr>
+        `);
+        return;
+    }
+
+    const [summaryRes, listRes] = await Promise.all([
+        fetchAttendanceSummary(s.student_id),
+        fetchAttendanceList(s.student_id, 200)
+    ]);
+
+    const completedCount = Number(summaryRes?.summary?.present_count || 0) + Number(summaryRes?.summary?.late_count || 0);
+    const remainingCount = totalSessions > 0 ? Math.max(0, totalSessions - completedCount) : 0;
+    const lastAttendedAt = summaryRes?.summary?.last_attended_at
+        ? new Date(summaryRes.summary.last_attended_at).toLocaleString()
+        : '—';
+
+    setText('attendanceCompletedCount', String(completedCount));
+    setText('attendanceRemainingCount', totalSessions > 0 ? String(remainingCount) : '—');
+    setText('attendancePackageTotal', totalSessions > 0 ? String(totalSessions) : '—');
+    setText('attendanceLastDate', lastAttendedAt);
+
+    if (!listRes.success) {
+        setHtml('studentAttendanceTableBody', `
+            <tr>
+                <td colspan="5" class="px-6 py-10 text-center text-zinc-400">Failed to load attendance records.</td>
+            </tr>
+        `);
+        return;
+    }
+
+    const rows = Array.isArray(listRes.attendance) ? listRes.attendance : [];
+    if (rows.length === 0) {
+        setHtml('studentAttendanceTableBody', `
+            <tr>
+                <td colspan="5" class="px-6 py-10 text-center text-zinc-400">
+                    <i class="fas fa-calendar-minus text-2xl mb-2"></i>
+                    <div class="font-semibold">No attendance records yet</div>
+                    <div class="text-xs text-zinc-500 mt-1">Your attendance history will appear here once sessions are recorded.</div>
+                </td>
+            </tr>
+        `);
+        return;
+    }
+
+    setHtml('studentAttendanceTableBody', rows.map(r => {
+        const dateLabel = r.session_date ? formatDateLong(r.session_date) : (r.attended_at ? new Date(r.attended_at).toLocaleDateString() : '—');
+        const start = r.start_time ? formatTime12Hour(r.start_time) : '';
+        const end = r.end_time ? formatTime12Hour(r.end_time) : '';
+        const timeLabel = start && end ? `${start} - ${end}` : (start || (r.attended_at ? new Date(r.attended_at).toLocaleTimeString() : '—'));
+        const roomLabel = r.room_name || '—';
+        const notes = escapeHtml(r.notes || '—');
+        return `
+            <tr class="border-t border-zinc-200 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/5 transition">
+                <td class="px-6 py-4 text-sm text-zinc-900 dark:text-white">${escapeHtml(dateLabel)}</td>
+                <td class="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-200">${escapeHtml(timeLabel)}</td>
+                <td class="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-200">${escapeHtml(roomLabel)}</td>
+                <td class="px-6 py-4 text-sm">${renderAttendanceStatusBadge(r.status)}</td>
+                <td class="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">${notes}</td>
+            </tr>
+        `;
+    }).join(''));
 }
 
 async function initStudentProfilePage() {
@@ -3251,7 +3516,7 @@ function updateWalkinInstrumentSelection() {
     const container = document.getElementById('walkin_instrumentsContainer');
     if (!container) return;
 
-    const sessionPackageSelect = document.getElementById('walkin_sessionPackage');
+    const sessionPackageSelect = document.getElementById('walkinSessionPackageId');
     if (!sessionPackageSelect || !sessionPackageSelect.value) {
         container.textContent = 'Select a branch and session package first';
         return;
@@ -3340,7 +3605,7 @@ function onWalkinInstrumentDropdownChange() {
 // Calculate total fee for walk-in admin registration (mirrors public logic)
 function calculateWalkinTotalFee() {
     const registrationFee = 1000;
-    const sessionPackageSelect = document.getElementById('walkin_sessionPackage');
+    const sessionPackageSelect = document.getElementById('walkinSessionPackageId');
     const paymentTypeSelect = document.getElementById('walkin_paymentType');
 
     const sessionFeeEl = document.getElementById('walkin_sessionFeeDisplay');
@@ -3371,22 +3636,25 @@ function calculateWalkinTotalFee() {
 
     let sessionFee = 0;
     if (basePrice > 0) {
-        if (paymentType === 'downpayment') {
+        if (paymentType === 'Partial Payment') {
             const downpaymentRatio = sessions === 12 ? (3000 / 7450) : (sessions === 20 ? (5000 / 11800) : 0.42);
             sessionFee = Math.round(basePrice * downpaymentRatio);
-        } else if (paymentType === 'fullpayment') {
+        } else if (paymentType === 'Full Payment') {
             if (hasSaxophone) {
                 const saxophoneMultiplier = sessions === 12 ? (8100 / 7450) : (sessions === 20 ? (13000 / 11800) : 1.09);
                 sessionFee = Math.round(basePrice * saxophoneMultiplier);
             } else {
                 sessionFee = basePrice;
             }
+        } else if (paymentType === 'Installment') {
+            const installmentRatio = sessions === 12 ? (3000 / 7450) : (sessions === 20 ? (5000 / 11800) : 0.42);
+            sessionFee = Math.round(basePrice * installmentRatio);
         }
     } else {
-        if (paymentType === 'downpayment') {
+        if (paymentType === 'Partial Payment' || paymentType === 'Installment') {
             if (sessions === 12) sessionFee = 3000;
             else if (sessions === 20) sessionFee = 5000;
-        } else if (paymentType === 'fullpayment') {
+        } else if (paymentType === 'Full Payment') {
             if (hasSaxophone) {
                 if (sessions === 12) sessionFee = 8100;
                 else if (sessions === 20) sessionFee = 13000;
@@ -3493,7 +3761,9 @@ async function loadWalkinPackages(branchId = 0) {
         walkinPackages = packages;
 
         select.innerHTML = '<option value="">Select package</option>' + packages.map(pkg => {
-            return `<option value="${pkg.package_id}">${pkg.package_name} (${pkg.sessions} sessions)</option>`;
+            const maxInstruments = Number(pkg.max_instruments || 1);
+            const price = Number(pkg.price || 0);
+            return `<option value="${pkg.package_id}" data-sessions="${Number(pkg.sessions || 0)}" data-max-instruments="${maxInstruments}" data-price="${price}">${pkg.package_name} (${pkg.sessions} sessions)</option>`;
         }).join('');
     } catch (error) {
         console.error('Failed to load packages for walk-in registration:', error);
@@ -3521,6 +3791,143 @@ function updateWalkinPackageDetails() {
         <div class="mt-1 text-xs text-zinc-300">${pkg.description ? pkg.description : ''}</div>
         <div class="mt-2 text-xs text-gold-200">Amount: ₱${Number(pkg.price || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
     `;
+}
+
+function updateWalkinPreferredDay() {
+    const dateEl = document.getElementById('walkinPreferredDate');
+    const dayEl = document.getElementById('walkinPreferredDay');
+    if (!dateEl || !dayEl) return;
+
+    const dateValue = dateEl.value || '';
+    if (!dateValue) {
+        dayEl.value = '';
+        return;
+    }
+
+    const selectedDate = new Date(`${dateValue}T00:00:00`);
+    if (Number.isNaN(selectedDate.getTime())) {
+        dayEl.value = '';
+        return;
+    }
+
+    dayEl.value = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+}
+
+function getWalkinSelectedInstrumentIds() {
+    return Array.from(document.querySelectorAll('#walkin_instrumentsContainer select[name="instruments[]"]'))
+        .map(select => parseInt(select.value, 10))
+        .filter(value => !Number.isNaN(value) && value > 0)
+        .filter((value, index, source) => source.indexOf(value) === index);
+}
+
+function getWalkinEnrollmentPayload() {
+    const packageSelect = document.getElementById('walkinSessionPackageId');
+    const paymentTypeEl = document.getElementById('walkin_paymentType');
+    const preferredDateEl = document.getElementById('walkinPreferredDate');
+    const preferredDayEl = document.getElementById('walkinPreferredDay');
+    const paymentProofEl = document.getElementById('walkinPackagePaymentProof');
+
+    if (!packageSelect || !paymentTypeEl || !preferredDateEl || !preferredDayEl) {
+        return null;
+    }
+
+    const packageId = parseInt(packageSelect.value, 10);
+    const paymentType = String(paymentTypeEl.value || '').trim();
+    const preferredDate = preferredDateEl.value || '';
+    const preferredDay = preferredDayEl.value || '';
+    const instrumentIds = getWalkinSelectedInstrumentIds();
+    const selectedOption = packageSelect.options[packageSelect.selectedIndex];
+    const maxInstruments = Number(selectedOption?.getAttribute('data-max-instruments') || 1);
+
+    if (!packageId || !paymentType || !preferredDate || !preferredDay || instrumentIds.length < 1) {
+        return { error: 'Please complete package, payment type, instruments, preferred date, and preferred day.' };
+    }
+
+    if (!['Full Payment', 'Partial Payment', 'Installment'].includes(paymentType)) {
+        return { error: 'Invalid package payment type selected.' };
+    }
+
+    if (instrumentIds.length > maxInstruments) {
+        return { error: `You can select up to ${maxInstruments} instrument(s) for this package.` };
+    }
+
+    return {
+        packageId,
+        paymentType,
+        preferredDate,
+        preferredDay,
+        instrumentIds,
+        paymentProofFile: paymentProofEl && paymentProofEl.files && paymentProofEl.files[0] ? paymentProofEl.files[0] : null
+    };
+}
+
+async function submitWalkinEnrollmentRequest(studentId) {
+    const enrollment = getWalkinEnrollmentPayload();
+    if (!enrollment || enrollment.error) {
+        return { success: false, error: enrollment?.error || 'Walk-in enrollment details are incomplete.' };
+    }
+
+    const requestFormData = new FormData();
+    requestFormData.append('action', 'submit-package-request');
+    requestFormData.append('student_id', String(Number(studentId)));
+    requestFormData.append('package_id', String(enrollment.packageId));
+    requestFormData.append('payment_type', enrollment.paymentType);
+    requestFormData.append('preferred_date', enrollment.preferredDate);
+    requestFormData.append('preferred_day_of_week', enrollment.preferredDay);
+    requestFormData.append('instrument_ids_json', JSON.stringify(enrollment.instrumentIds));
+    if (enrollment.paymentProofFile) {
+        requestFormData.append('package_payment_proof_file', enrollment.paymentProofFile);
+    }
+
+    return await postStudentPackageRequest(requestFormData);
+}
+
+function setupWalkinEnrollmentForm() {
+    const branchSelect = document.getElementById('walkin_branch_id');
+    const packageSelect = document.getElementById('walkinSessionPackageId');
+    const paymentTypeEl = document.getElementById('walkin_paymentType');
+    const preferredDateEl = document.getElementById('walkinPreferredDate');
+
+    if (branchSelect && !branchSelect.dataset.walkinEnrollmentBound) {
+        branchSelect.addEventListener('change', async function () {
+            const branchId = Number(this.value || 0);
+            await loadWalkinPackages(branchId);
+            await loadWalkinInstruments(branchId);
+            updateWalkinPackageDetails();
+            calculateWalkinTotalFee();
+        });
+        branchSelect.dataset.walkinEnrollmentBound = '1';
+    }
+
+    if (packageSelect && !packageSelect.dataset.walkinEnrollmentBound) {
+        packageSelect.addEventListener('change', function () {
+            updateWalkinPackageDetails();
+            updateWalkinInstrumentSelection();
+            calculateWalkinTotalFee();
+        });
+        packageSelect.dataset.walkinEnrollmentBound = '1';
+    }
+
+    if (paymentTypeEl && !paymentTypeEl.dataset.walkinEnrollmentBound) {
+        paymentTypeEl.addEventListener('change', calculateWalkinTotalFee);
+        paymentTypeEl.dataset.walkinEnrollmentBound = '1';
+    }
+
+    if (preferredDateEl && !preferredDateEl.dataset.walkinEnrollmentBound) {
+        preferredDateEl.addEventListener('change', updateWalkinPreferredDay);
+        preferredDateEl.dataset.walkinEnrollmentBound = '1';
+    }
+
+    const activeBranchId = Number(branchSelect?.value || 0);
+    if (activeBranchId > 0) {
+        loadWalkinPackages(activeBranchId);
+        loadWalkinInstruments(activeBranchId);
+    } else {
+        loadWalkinPackages();
+    }
+    updateWalkinPackageDetails();
+    updateWalkinPreferredDay();
+    calculateWalkinTotalFee();
 }
 
 // Initialize walk-in admin page (used on admin_registration.html)
@@ -3566,8 +3973,7 @@ function initWalkinPage() {
         for (let [key, value] of formData.entries()) {
             data[key] = value;
         }
-
-        // Registration fee & package selection are provided by the form.
+        data['registration_fee_amount'] = 1000;
 
         // mark as walk-in so backend uses simple default password
         data['is_walkin'] = true;
@@ -3587,25 +3993,9 @@ function initWalkinPage() {
             }
 
             if (result.success) {
-                const selectedPackageId = data['session_package_id'];
-                const selectedPackage = walkinPackages.find(p => String(p.package_id) === String(selectedPackageId));
-                const packageLabel = selectedPackage ? `\n                           <strong>Package:</strong> ${escapeHtml(selectedPackage.package_name)}<br>` : '';
-                const paymentMethodLabel = data['registration_payment_method'] ? `\n                           <strong>Payment Method:</strong> ${escapeHtml(data['registration_payment_method'])}<br>` : '';
-                const paymentAmountLabel = data['registration_fee_amount'] ? `\n                           <strong>Paid Amount:</strong> ₱${Number(data['registration_fee_amount']).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<br>` : '';
-
-                const assignUrl = `admin_sessions.html?view=active&assign_student_id=${encodeURIComponent(result.student_id)}&assign_student_name=${encodeURIComponent(result.username || data['student_email'])}&assign_package_id=${encodeURIComponent(data['session_package_id'] || '')}`;
-
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Student Registered',
-                    html: `Student has been registered and can log in immediately.<br><br>
-                           <strong>Username:</strong> ${result.username || data['student_email']}<br>${packageLabel}${paymentMethodLabel}${paymentAmountLabel}<br>
-                           <strong>Default Password:</strong> fasmusic2020<br><br>
-                           On first login, they will be required to change this to a strong password.`,
-                    confirmButtonColor: '#b8860b'
-                }).then(() => {
-                    window.location.href = assignUrl;
-                });
+                const guardianLabel = result.guardian_username
+                    ? `<strong>Guardian Username:</strong> ${escapeHtml(result.guardian_username)}<br><strong>Guardian Temporary Password:</strong> fasmusic@2020<br>`
+                    : '';
 
                 // Reset form and hide modal if present
                 form.reset();
@@ -3614,6 +4004,19 @@ function initWalkinPage() {
                     modal.classList.add('hidden');
                     modal.classList.remove('flex');
                 }
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Student Registered',
+                    html: `Student account was created successfully.<br><br>
+                           <strong>Username:</strong> ${result.username || data['student_email']}<br>
+                           <strong>Student Temporary Password:</strong> fas@123<br>
+                           ${guardianLabel}<br>
+                           Next step: confirm the walk-in registration payment method.`,
+                    confirmButtonColor: '#b8860b'
+                }).then(() => {
+                    openPaymentModal(result.student_id, { forceSource: 'walkin' });
+                });
             } else {
                 const errMsg = result.error || 'Registration failed. Please check all required fields and try again.';
                 console.error('Walk-in registration failed (400):', errMsg, result);
@@ -3625,7 +4028,7 @@ function initWalkinPage() {
         } finally {
             form.dataset.submitting = '0';
             if (btn) btn.disabled = false;
-            if (btnText) btnText.textContent = 'Register Student';
+            if (btnText) btnText.textContent = 'Proceed Payment';
         }
     });
 }
@@ -3878,15 +4281,23 @@ function renderRegistrationsTable() {
 
         const statusClass = statusColors[reg.registration_status] || 'text-slate-700 bg-slate-100';
         const remaining = parseFloat(reg.registration_fee_amount) - parseFloat(reg.registration_fee_paid || 0);
+        const registrationSource = String(reg.registration_source || 'online').toLowerCase() === 'walkin' ? 'walkin' : 'online';
+        const sourceBadgeClass = registrationSource === 'walkin'
+            ? 'bg-purple-100 text-purple-700'
+            : 'bg-sky-100 text-sky-700';
+        const sourceLabel = registrationSource === 'walkin' ? 'Walk-In' : 'Online';
         const registrationProofLink = reg.registration_proof_path
             ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 underline mt-1"><i class="fas fa-file-alt"></i>Proof</a>`
-            : '<div class="text-xs text-slate-500 mt-1">No proof uploaded</div>';
+            : (registrationSource === 'walkin'
+                ? '<div class="text-xs text-slate-500 mt-1">Walk-in payment handled by admin</div>'
+                : '<div class="text-xs text-slate-500 mt-1">No proof uploaded</div>');
 
         return `
             <tr class="hover:bg-gold-500/5 transition">
                 <td class="px-6 py-4">
                     <div class="font-medium text-slate-900" style="color:#0f172a;">${reg.first_name} ${reg.last_name}</div>
                     <div class="text-sm text-slate-500" style="color:#64748b;">${reg.email || ''}</div>
+                    <div class="mt-2"><span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold ${sourceBadgeClass}">${sourceLabel}</span></div>
                 </td>
                 <td class="px-6 py-4">
                     <div class="text-slate-900" style="color:#0f172a;">${reg.guardian_first_name || ''} ${reg.guardian_last_name || ''}</div>
@@ -3993,6 +4404,7 @@ async function viewDetails(studentId) {
                             <p><span class="text-zinc-400">Phone:</span> <span class="text-white">${student.phone || 'N/A'}</span></p>
                             <p><span class="text-zinc-400">Date of Birth:</span> <span class="text-white">${student.date_of_birth || 'N/A'}</span></p>
                             <p><span class="text-zinc-400">Branch:</span> <span class="text-white">${student.branch_name || 'N/A'}</span></p>
+                            <p><span class="text-zinc-400">Source:</span> <span class="text-white">${String(student.registration_source || 'online').toLowerCase() === 'walkin' ? 'Walk-In' : 'Online'}</span></p>
                         </div>
                     </div>
                     <div>
@@ -4002,7 +4414,7 @@ async function viewDetails(studentId) {
                             <p><span class="text-zinc-400">Fee Amount:</span> <span class="text-white">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</span></p>
                             <p><span class="text-zinc-400">Paid Amount:</span> <span class="text-white">₱${parseFloat(student.registration_fee_paid || 0).toFixed(2)}</span></p>
                             <p><span class="text-zinc-400">Remaining:</span> <span class="text-white">₱${(parseFloat(student.registration_fee_amount || 0) - parseFloat(student.registration_fee_paid || 0)).toFixed(2)}</span></p>
-                            <p><span class="text-zinc-400">Payment Proof:</span> <span class="text-white">${student.registration_proof_path ? `<a class="text-gold-300 underline" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.registration_proof_path)}">View file</a>` : 'N/A'}</span></p>
+                            <p><span class="text-zinc-400">Payment Proof:</span> <span class="text-white">${student.registration_proof_path ? `<a class="text-gold-300 underline" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.registration_proof_path)}">View file</a>` : (String(student.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A')}</span></p>
                         </div>
                     </div>
                 </div>
@@ -4073,8 +4485,9 @@ function closeDetailsModal() {
 }
 
 // Open Payment Modal
-async function openPaymentModal(studentId) {
+async function openPaymentModal(studentId, options = {}) {
     currentStudentId = studentId;
+    currentPaymentRedirectUrl = String(options.redirectUrl || '');
 
     try {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
@@ -4087,6 +4500,8 @@ async function openPaymentModal(studentId) {
         const data = res.data;
         if (data.success) {
             const student = data.student;
+            const registrationSource = String(options.forceSource || student.registration_source || '').toLowerCase() === 'walkin' ? 'walkin' : 'online';
+            currentPaymentSource = registrationSource;
             const remaining = parseFloat(student.registration_fee_amount || 0) - parseFloat(student.registration_fee_paid || 0);
             const payments = Array.isArray(data.payments) ? data.payments : [];
             const receiptPayment = payments.find(payment => String(payment.status || '').toLowerCase() === 'pending')
@@ -4097,8 +4512,13 @@ async function openPaymentModal(studentId) {
             const paymentStudentInfoEl = document.getElementById('paymentStudentInfo');
             const paymentAmountEl = document.getElementById('paymentAmount');
             const paymentAmountDisplayEl = document.getElementById('paymentAmountDisplay');
+            const paymentAmountHintEl = document.getElementById('paymentAmountHint');
             const paymentMethodEl = document.getElementById('paymentMethod');
             const paymentMethodDisplayEl = document.getElementById('paymentMethodDisplay');
+            const paymentMethodSelectEl = document.getElementById('paymentMethodSelect');
+            const paymentMethodReadonlyWrap = document.getElementById('paymentMethodReadonlyWrap');
+            const paymentMethodSelectWrap = document.getElementById('paymentMethodSelectWrap');
+            const paymentMethodReadonlyHint = document.getElementById('paymentMethodReadonlyHint');
             const modal = document.getElementById('paymentModal');
 
             if (!paymentStudentInfoEl || !paymentAmountEl || !paymentMethodEl || !modal) {
@@ -4115,9 +4535,26 @@ async function openPaymentModal(studentId) {
                 paymentAmountDisplayEl.textContent =
                     `₱${Number(receiptAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             }
+            if (paymentAmountHintEl) {
+                paymentAmountHintEl.textContent = registrationSource === 'walkin'
+                    ? 'This is the required ₱1,000.00 registration fee for the walk-in student.'
+                    : 'This amount comes from the student\'s submitted registration payment request.';
+            }
             paymentMethodEl.value = selectedMethod;
             if (paymentMethodDisplayEl) {
-                paymentMethodDisplayEl.textContent = selectedMethod || 'No method submitted';
+                paymentMethodDisplayEl.textContent = selectedMethod || (registrationSource === 'walkin' ? 'Choose below' : 'No method submitted');
+            }
+            if (paymentMethodReadonlyWrap && paymentMethodSelectWrap) {
+                paymentMethodReadonlyWrap.classList.toggle('hidden', registrationSource === 'walkin');
+                paymentMethodSelectWrap.classList.toggle('hidden', registrationSource !== 'walkin');
+            }
+            if (paymentMethodSelectEl) {
+                paymentMethodSelectEl.value = registrationSource === 'walkin' ? selectedMethod : '';
+            }
+            if (paymentMethodReadonlyHint) {
+                paymentMethodReadonlyHint.textContent = registrationSource === 'walkin'
+                    ? ''
+                    : 'This method was already selected by the student during registration.';
             }
 
             modal.classList.remove('hidden');
@@ -4137,15 +4574,25 @@ function closePaymentModal() {
     const paymentForm = document.getElementById('paymentForm');
     const paymentAmountEl = document.getElementById('paymentAmount');
     const paymentAmountDisplayEl = document.getElementById('paymentAmountDisplay');
+    const paymentAmountHintEl = document.getElementById('paymentAmountHint');
     const paymentMethodEl = document.getElementById('paymentMethod');
     const paymentMethodDisplayEl = document.getElementById('paymentMethodDisplay');
+    const paymentMethodSelectEl = document.getElementById('paymentMethodSelect');
+    const paymentMethodReadonlyWrap = document.getElementById('paymentMethodReadonlyWrap');
+    const paymentMethodSelectWrap = document.getElementById('paymentMethodSelectWrap');
 
     if (paymentForm) paymentForm.reset();
     if (paymentAmountEl) paymentAmountEl.value = '';
     if (paymentAmountDisplayEl) paymentAmountDisplayEl.textContent = '₱0.00';
+    if (paymentAmountHintEl) paymentAmountHintEl.textContent = 'This amount comes from the student\'s submitted registration payment request.';
     if (paymentMethodEl) paymentMethodEl.value = '';
     if (paymentMethodDisplayEl) paymentMethodDisplayEl.textContent = 'Not available';
+    if (paymentMethodSelectEl) paymentMethodSelectEl.value = '';
+    if (paymentMethodReadonlyWrap) paymentMethodReadonlyWrap.classList.remove('hidden');
+    if (paymentMethodSelectWrap) paymentMethodSelectWrap.classList.add('hidden');
     currentStudentId = null;
+    currentPaymentRedirectUrl = '';
+    currentPaymentSource = '';
 }
 
 // Confirm Payment Handler
@@ -4162,9 +4609,13 @@ function initPaymentForm() {
         btn.disabled = true;
         btnText.textContent = 'Processing...';
 
-        const selectedMethod = (document.getElementById('paymentMethod').value || '').trim();
+        const selectedMethod = currentPaymentSource === 'walkin'
+            ? (document.getElementById('paymentMethodSelect')?.value || '').trim()
+            : (document.getElementById('paymentMethod').value || '').trim();
         if (!selectedMethod) {
-            showMessage('No payment method was submitted by the student for this registration.', 'error');
+            showMessage(currentPaymentSource === 'walkin'
+                ? 'Please select the registration payment method.'
+                : 'No payment method was submitted by the student for this registration.', 'error');
             btn.disabled = false;
             btnText.textContent = 'Confirm Payment';
             return;
@@ -4193,9 +4644,13 @@ function initPaymentForm() {
             const res = await axios.post(`${baseApiUrl}/admin.php?action=confirm-payment`, paymentData);
             const data = res.data;
             if (data.success) {
+                const redirectUrl = currentPaymentRedirectUrl;
                 showMessage(data.message, 'success');
                 closePaymentModal();
                 reloadRegistrationsByActiveMode();
+                if (redirectUrl) {
+                    window.location.href = redirectUrl;
+                }
             }
         } catch (error) {
             showMessage('Failed to confirm payment: ' + (error.message || error), 'error');
@@ -4252,6 +4707,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentDashboard = document.getElementById('studentDashboardRoot');
     const studentProfile = document.getElementById('studentProfileRoot');
     const studentSessions = document.getElementById('studentSessionsRoot');
+    const studentAttendance = document.getElementById('studentAttendanceRoot');
     const studentQr = document.getElementById('studentQrRoot');
     const guardianStudentsRoot = document.getElementById('guardianStudentsRoot');
 
@@ -4270,6 +4726,8 @@ document.addEventListener('DOMContentLoaded', () => {
         initStudentProfilePage();
     } else if (studentSessions) {
         initStudentSessionsPage();
+    } else if (studentAttendance) {
+        initStudentAttendancePage();
     } else if (studentQr) {
         initStudentQrPage();
     } else if (guardianStudentsRoot) {

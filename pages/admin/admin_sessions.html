@@ -519,7 +519,12 @@
             const selected = assignRequestTeacherCandidates.find(t => Number(t.teacher_id) === Number(teacherId)) || null;
 
             if (hiddenInput) hiddenInput.value = selected ? String(Number(selected.teacher_id)) : '';
-            if (searchInput) searchInput.value = selected ? String(selected.teacher_name || '').trim() : '';
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.placeholder = selected
+                    ? `Selected: ${String(selected.teacher_name || '').trim()}`
+                    : 'Search teacher or specialization...';
+            }
             if (helpEl) {
                 helpEl.textContent = selected
                     ? `Selected: ${formatTeacherSuggestionText(selected)}`
@@ -548,14 +553,14 @@
                 return;
             }
 
-            suggestionsEl.innerHTML = rows.map((teacher, index) => `
+            suggestionsEl.innerHTML = rows.map((teacher) => `
                 <button type="button" class="w-full text-left px-4 py-3 hover:bg-zinc-900 transition border-b border-zinc-800 last:border-b-0" onclick="setAssignRequestTeacherSelection(${Number(teacher.teacher_id)})">
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <div class="text-sm font-semibold text-white">${escapeHtml(teacher.teacher_name || 'Teacher')}</div>
                             <div class="text-xs text-zinc-400 mt-1">${escapeHtml(teacher.specialization || 'General')}</div>
                         </div>
-                        ${index === 0 ? '<span class="inline-flex items-center px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold">Recommended</span>' : ''}
+                        <span class="inline-flex items-center px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold">Recommended</span>
                     </div>
                 </button>
             `).join('');
@@ -568,7 +573,7 @@
             if (!searchInput || !suggestionsEl) return;
 
             searchInput.addEventListener('focus', () => {
-                renderAssignRequestTeacherSuggestions(searchInput.value || '');
+                renderAssignRequestTeacherSuggestions('');
             });
             searchInput.addEventListener('input', () => {
                 renderAssignRequestTeacherSuggestions(searchInput.value || '');
