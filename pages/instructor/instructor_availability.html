@@ -116,71 +116,26 @@
             <section class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
                 <div class="flex items-center justify-between flex-wrap gap-2">
                     <h2 class="text-lg font-bold text-slate-900">Weekly Schedule</h2>
-                    <button class="px-4 py-2 rounded-xl bg-obsidian text-white text-sm font-semibold hover:bg-black transition">Save Availability</button>
+                    <button id="saveAvailabilityBtn" class="px-4 py-2 rounded-xl bg-obsidian text-white text-sm font-semibold hover:bg-black transition">Save Availability</button>
                 </div>
-                <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="font-semibold text-slate-900">Monday</span>
-                            <input type="checkbox" checked class="h-4 w-4">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <input type="time" value="09:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                            <input type="time" value="16:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                        </div>
-                    </div>
-                    <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="font-semibold text-slate-900">Tuesday</span>
-                            <input type="checkbox" checked class="h-4 w-4">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <input type="time" value="10:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                            <input type="time" value="18:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                        </div>
-                    </div>
-                    <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="font-semibold text-slate-900">Wednesday</span>
-                            <input type="checkbox" checked class="h-4 w-4">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <input type="time" value="09:30" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                            <input type="time" value="17:30" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                        </div>
-                    </div>
-                    <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="font-semibold text-slate-900">Thursday</span>
-                            <input type="checkbox" class="h-4 w-4">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <input type="time" value="09:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                            <input type="time" value="16:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                        </div>
-                    </div>
-                    <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="font-semibold text-slate-900">Friday</span>
-                            <input type="checkbox" checked class="h-4 w-4">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <input type="time" value="11:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                            <input type="time" value="19:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                        </div>
-                    </div>
-                    <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="font-semibold text-slate-900">Saturday</span>
-                            <input type="checkbox" class="h-4 w-4">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <input type="time" value="09:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                            <input type="time" value="13:00" class="rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                        </div>
-                    </div>
-                </div>
+                <p class="mt-2 text-sm text-slate-500">Admin scheduling only accepts 1-hour sessions inside the saved day and time ranges below.</p>
+                <div id="availabilityStatus" class="hidden mt-4 rounded-2xl border px-4 py-3 text-sm"></div>
+                <div id="availabilityGrid" class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
             </section>
+
+            <template id="availabilityCardTemplate">
+                <div class="availability-card p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="availability-label font-semibold text-slate-900"></span>
+                        <input type="checkbox" class="availability-enabled h-4 w-4">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <input type="time" class="availability-start rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                        <input type="time" class="availability-end rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                    </div>
+                    <p class="text-xs text-slate-500">Set one available time block for this day.</p>
+                </div>
+            </template>
 
             <section class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
                 <h2 class="text-lg font-bold text-slate-900">Notes for Scheduling Team</h2>
@@ -190,8 +145,11 @@
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/index.js"></script>
     <script>
+        const availabilityDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
         function toggleInstructorMenu() {
             const menu = document.getElementById('instructorMobileMenu');
             const icon = document.getElementById('instructorMenuIcon');
@@ -202,13 +160,122 @@
             icon.classList.toggle('fa-times', isHidden);
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        function showAvailabilityStatus(message, type = 'success') {
+            const box = document.getElementById('availabilityStatus');
+            if (!box) return;
+            box.textContent = message;
+            box.className = `mt-4 rounded-2xl border px-4 py-3 text-sm ${type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`;
+            box.classList.remove('hidden');
+        }
+
+        function renderAvailabilityGrid(entries = []) {
+            const grid = document.getElementById('availabilityGrid');
+            const template = document.getElementById('availabilityCardTemplate');
+            if (!grid || !template) return;
+
+            const byDay = new Map(entries.map(item => [item.day_of_week, item]));
+            grid.innerHTML = '';
+
+            availabilityDays.forEach(day => {
+                const row = byDay.get(day) || {};
+                const card = template.content.firstElementChild.cloneNode(true);
+                card.dataset.day = day;
+                card.querySelector('.availability-label').textContent = day;
+
+                const enabled = card.querySelector('.availability-enabled');
+                const start = card.querySelector('.availability-start');
+                const end = card.querySelector('.availability-end');
+
+                enabled.checked = !!row.start_time;
+                start.value = String(row.start_time || '09:00:00').slice(0, 5);
+                end.value = String(row.end_time || '17:00:00').slice(0, 5);
+
+                const syncDisabled = () => {
+                    const disabled = !enabled.checked;
+                    start.disabled = disabled;
+                    end.disabled = disabled;
+                    card.classList.toggle('opacity-60', disabled);
+                };
+                enabled.addEventListener('change', syncDisabled);
+                syncDisabled();
+
+                grid.appendChild(card);
+            });
+        }
+
+        async function loadAvailability() {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            if (!user?.user_id) {
+                renderAvailabilityGrid([]);
+                return;
+            }
+
+            try {
+                const response = await axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-availability&user_id=${encodeURIComponent(user.user_id)}`);
+                const rows = response.data?.success && Array.isArray(response.data.availability) ? response.data.availability : [];
+                renderAvailabilityGrid(rows);
+            } catch (error) {
+                console.error('Failed to load availability:', error);
+                renderAvailabilityGrid([]);
+                showAvailabilityStatus('Failed to load saved availability.', 'error');
+            }
+        }
+
+        function collectAvailabilityPayload() {
+            return Array.from(document.querySelectorAll('.availability-card')).map(card => ({
+                day_of_week: card.dataset.day || '',
+                enabled: !!card.querySelector('.availability-enabled')?.checked,
+                start_time: card.querySelector('.availability-start')?.value || '',
+                end_time: card.querySelector('.availability-end')?.value || ''
+            }));
+        }
+
+        async function saveAvailability() {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            if (!user?.user_id) {
+                showAvailabilityStatus('Teacher session not found. Please log in again.', 'error');
+                return;
+            }
+
+            const payload = collectAvailabilityPayload();
+            for (const row of payload) {
+                if (!row.enabled) continue;
+                if (!row.start_time || !row.end_time) {
+                    showAvailabilityStatus(`Please complete the time range for ${row.day_of_week}.`, 'error');
+                    return;
+                }
+                if (row.end_time <= row.start_time) {
+                    showAvailabilityStatus(`End time must be later than start time for ${row.day_of_week}.`, 'error');
+                    return;
+                }
+            }
+
+            try {
+                const response = await axios.post(`${baseApiUrl}/teachers.php?action=save-teacher-availability`, {
+                    action: 'save-teacher-availability',
+                    user_id: Number(user.user_id),
+                    availability: payload
+                });
+                if (response.data?.success) {
+                    showAvailabilityStatus('Availability saved. Admin scheduling will now follow these day and time limits.', 'success');
+                    await loadAvailability();
+                } else {
+                    showAvailabilityStatus(response.data?.error || 'Failed to save availability.', 'error');
+                }
+            } catch (error) {
+                showAvailabilityStatus(error.response?.data?.error || 'Network error while saving availability.', 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
             if (typeof Auth !== 'undefined' && Auth.getUser) {
                 const user = Auth.getUser() || {};
                 const displayName = user.username || user.email || 'Instructor';
                 const nameEl = document.getElementById('instructorNameNav');
                 if (nameEl) nameEl.textContent = displayName;
             }
+            await loadAvailability();
+            document.getElementById('saveAvailabilityBtn')?.addEventListener('click', saveAvailability);
         });
     </script>
 </body>

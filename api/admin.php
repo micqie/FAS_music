@@ -64,6 +64,27 @@ class Admin
         }
     }
 
+    private function getRegistrationPaymentPrimaryKeyColumn()
+    {
+        try {
+            $stmt = $this->conn->query("SHOW COLUMNS FROM tbl_registration_payments");
+            if (!$stmt) {
+                return 'registration_payment_id';
+            }
+            $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            if (in_array('registration_payment_id', $columns, true)) {
+                return 'registration_payment_id';
+            }
+            if (in_array('payment_id', $columns, true)) {
+                return 'payment_id';
+            }
+        } catch (PDOException $e) {
+            // fall through
+        }
+
+        return 'registration_payment_id';
+    }
+
     private function ensureUserBranchColumn()
     {
         if ($this->hasUserColumn('branch_id')) return;
@@ -503,8 +524,8 @@ class Admin
     {
         $data = json_decode($json, true);
 
-        if (empty($data['student_id']) || empty($data['amount']) || empty($data['payment_method'])) {
-            $this->sendJSON(['error' => 'student_id, amount, and payment_method are required'], 400);
+        if (empty($data['student_id'])) {
+            $this->sendJSON(['error' => 'student_id is required'], 400);
         }
 
         $branchId = isset($data['branch_id']) ? (int) $data['branch_id'] : 0;
@@ -524,16 +545,65 @@ class Admin
                 $this->sendJSON(['error' => 'Student does not belong to your branch'], 403);
             }
 
-            $currentPaid = $this->getRegistrationPaidAmount((int)$data['student_id']);
-            $newPaid = $currentPaid + (float)$data['amount'];
-            $remaining = 1000.0 - $newPaid;
+            $requestedAmount = isset($data['amount']) ? (float)$data['amount'] : 0.0;
             $receipt = $data['receipt_number'] ?? 'REG-' . time();
+            $paymentMethod = trim((string)($data['payment_method'] ?? ''));
+            $registrationPaymentPk = $this->getRegistrationPaymentPrimaryKeyColumn();
+
+            $stmtPending = $this->conn->prepare("
+                SELECT {$registrationPaymentPk} AS registration_payment_pk, amount, payment_method, receipt_number, status
+                FROM tbl_registration_payments
+                WHERE student_id = ?
+                ORDER BY
+                    CASE
+                        WHEN status = 'Pending' THEN 0
+                        WHEN status = 'Paid' THEN 2
+                        ELSE 1
+                    END,
+                    {$registrationPaymentPk} DESC
+                LIMIT 1
+            ");
+            $stmtPending->execute([(int)$data['student_id']]);
+            $pendingPayment = $stmtPending->fetch(PDO::FETCH_ASSOC);
+
+            $paymentAmount = $pendingPayment
+                ? (float)($pendingPayment['amount'] ?? 0)
+                : $requestedAmount;
+            if ($paymentAmount <= 0) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'No submitted payment amount was found for this registration'], 400);
+            }
+
+            if ($paymentMethod === '' && $pendingPayment) {
+                $paymentMethod = trim((string)($pendingPayment['payment_method'] ?? ''));
+            }
+            if ($paymentMethod === '') {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'No submitted payment method was found for this registration'], 400);
+            }
+
+            $currentPaid = $this->getRegistrationPaidAmount((int)$data['student_id']);
+            $newPaid = $currentPaid + $paymentAmount;
+            $remaining = 1000.0 - $newPaid;
 
             // Insert payment record - check if table uses student_id or enrollment_id
             $checkCol = $this->conn->query("SHOW COLUMNS FROM tbl_registration_payments LIKE 'student_id'");
             $hasStudentId = $checkCol && $checkCol->rowCount() > 0;
 
-            if ($hasStudentId) {
+            if ($hasStudentId && $pendingPayment && strcasecmp((string)($pendingPayment['status'] ?? ''), 'Paid') !== 0) {
+                $receipt = trim((string)($pendingPayment['receipt_number'] ?? '')) ?: $receipt;
+                $stmtPayment = $this->conn->prepare("
+                    UPDATE tbl_registration_payments
+                    SET amount = ?, payment_method = ?, receipt_number = ?, status = 'Paid', payment_date = CURRENT_DATE
+                    WHERE {$registrationPaymentPk} = ?
+                ");
+                $stmtPayment->execute([
+                    $paymentAmount,
+                    $paymentMethod,
+                    $receipt,
+                    (int)$pendingPayment['registration_payment_pk']
+                ]);
+            } elseif ($hasStudentId) {
                 $stmtPayment = $this->conn->prepare("
                     INSERT INTO tbl_registration_payments (
                         student_id, amount, payment_method, receipt_number, status, payment_date
@@ -541,8 +611,8 @@ class Admin
                 ");
                 $stmtPayment->execute([
                     $data['student_id'],
-                    $data['amount'],
-                    $data['payment_method'],
+                    $paymentAmount,
+                    $paymentMethod,
                     $receipt
                 ]);
             } else {
@@ -556,8 +626,8 @@ class Admin
                     ");
                     $stmtPayment->execute([
                         $targetEnrollmentId,
-                        $data['amount'],
-                        $data['payment_method'],
+                        $paymentAmount,
+                        $paymentMethod,
                         $receipt
                     ]);
                 }

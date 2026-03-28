@@ -94,15 +94,9 @@
                             <a href="admin_specializations.html" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Specializations</a>
                         </div>
                     </details>
-                    <details class="group/dropdown" open>
-                        <summary class="sidebar-item-active flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <span class="block ml-11 px-3 py-2 text-sm text-slate-300 bg-white/10 rounded-lg">All Sessions</span>
-                        </div>
-                    </details>
+                    <a href="admin_sessions.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-calendar-check mr-3"></i> Sessions
+                    </a>
                     <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
@@ -126,6 +120,9 @@
                     </a>
                     <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
+                    </a>
+                    <a href="admin_room.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-door-open mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Rooms
                     </a>
                     <a href="admin_package.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-box mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Packages
@@ -189,6 +186,19 @@
                 </table>
             </div>
         </div>
+
+        <div id="cancelledSessionsSection" class="mt-8 bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <div class="p-6 bg-rose-50/70 border-b border-rose-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-rotate-left mr-2 text-rose-500"></i>Teacher Cancellations</h3>
+                    <p class="text-xs text-slate-500 mt-1">Admin-only reschedule queue for sessions cancelled by teachers.</p>
+                </div>
+                <span class="text-xs text-slate-500" id="cancelledSessionCount">Loading...</span>
+            </div>
+            <div id="cancelledSessionsList" class="p-6 space-y-3">
+                <div class="text-sm text-slate-500">Loading cancelled sessions...</div>
+            </div>
+        </div>
         </div>
     </main>
 
@@ -228,9 +238,8 @@
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-xs text-slate-500 mb-1">Teacher</label>
-                        <select id="scheduleTeacher" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
-                            <option value="">Select teacher...</option>
-                        </select>
+                        <input id="scheduleTeacherLabel" type="text" readonly class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 bg-slate-100">
+                        <input id="scheduleTeacher" type="hidden">
                     </div>
                     <div>
                         <label class="block text-xs text-slate-500 mb-1">Room</label>
@@ -287,60 +296,77 @@
     </div>
 
     <!-- Assign Request Modal -->
-    <div id="assignRequestModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-2xl p-6 relative">
-            <button id="closeAssignRequestModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
+    <div id="assignRequestModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-5xl p-6 md:p-8 relative max-h-[92vh] overflow-y-auto">
+            <button id="closeAssignRequestModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
-            <h3 class="text-2xl font-bold text-slate-900">Assign Student Request</h3>
-            <p id="assignRequestStudentInfo" class="text-slate-500 text-sm mt-1">Finalize teacher and schedule before approval.</p>
+            <h3 class="text-2xl font-bold text-white">Assign Student Request</h3>
+            <p id="assignRequestStudentInfo" class="text-zinc-400 text-sm mt-1">Finalize teacher and schedule before approval.</p>
+            <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="rounded-xl border border-zinc-800 bg-zinc-900/80 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-500">Student</div>
+                    <div id="assignRequestStudentName" class="mt-2 text-sm font-semibold text-white">Student</div>
+                </div>
+                <div class="rounded-xl border border-zinc-800 bg-zinc-900/80 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-500">Branch</div>
+                    <div id="assignRequestStudentBranch" class="mt-2 text-sm font-semibold text-white">Branch</div>
+                </div>
+                <div class="rounded-xl border border-zinc-800 bg-zinc-900/80 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-500">Package</div>
+                    <div id="assignRequestStudentPackage" class="mt-2 text-sm font-semibold text-white">Package</div>
+                </div>
+            </div>
 
             <form id="assignRequestForm" class="mt-5 space-y-4">
                 <input type="hidden" id="assignRequestId" value="">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Teacher *</label>
-                        <select id="assignRequestTeacherSelect" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
-                            <option value="">Select teacher...</option>
-                        </select>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Teacher *</label>
+                        <input type="hidden" id="assignRequestTeacherSelect" value="">
+                        <div class="relative">
+                            <input type="text" id="assignRequestTeacherSearch" placeholder="Search teacher or specialization..." class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <div id="assignRequestTeacherSearchHelp" class="mt-2 text-xs text-zinc-500">Recommended teachers will appear here based on the student's requested instrument.</div>
+                            <div id="assignRequestTeacherSuggestions" class="hidden absolute z-20 mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl max-h-64 overflow-y-auto"></div>
+                        </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Date *</label>
-                        <input type="date" id="assignRequestDate" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Assigned Date *</label>
+                        <input type="date" id="assignRequestDate" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Day *</label>
-                        <input type="text" id="assignRequestDay" readonly class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700" placeholder="Auto from date">
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Assigned Day *</label>
+                        <input type="text" id="assignRequestDay" readonly class="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200" placeholder="Auto from date">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Start Time *</label>
-                        <input type="time" id="assignRequestStartTime" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Start Time *</label>
+                        <input type="time" id="assignRequestStartTime" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">End Time *</label>
-                        <input type="time" id="assignRequestEndTime" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">End Time *</label>
+                        <input type="time" id="assignRequestEndTime" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Room / Location</label>
-                        <select id="assignRequestRoom" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Room / Location</label>
+                        <select id="assignRequestRoom" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
                             <option value="">Select room...</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Notes</label>
-                        <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <label class="block text-sm font-medium text-zinc-300 mb-1">Admin Notes</label>
+                        <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
                     </div>
                 </div>
-                <div class="text-xs text-slate-500">Session must be exactly 1 hour.</div>
+                <div class="text-xs text-zinc-500">Session must be exactly 1 hour.</div>
                 <div class="flex items-center justify-end gap-3 pt-2">
-                    <button type="button" id="cancelAssignRequestBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold">
+                    <button type="button" id="cancelAssignRequestBtn" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-semibold">
                         Cancel
                     </button>
-                    <button type="submit" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">
+                    <button type="submit" class="px-5 py-2 bg-gold-500 hover:bg-gold-400 text-black rounded-lg text-sm font-semibold shadow-lg shadow-gold-500/20">
                         Assign & Approve
                     </button>
                 </div>
@@ -354,8 +380,10 @@
 <script src="../../js/index.js"></script>
     <script>
         let allStudents = [];
+        let cancelledSessions = [];
         let packagePagePackages = [];
         let availableRoomsByBranch = {};
+        let assignRequestTeacherCandidates = [];
 
         function showMessage(message, type = 'error') {
             Swal.fire({
@@ -467,6 +495,102 @@
             const suffix = h >= 12 ? 'PM' : 'AM';
             const hh = h % 12 === 0 ? 12 : h % 12;
             return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
+        }
+
+        function formatDateShort(dateString) {
+            if (!dateString) return '—';
+            const d = new Date(dateString);
+            return Number.isNaN(d.getTime()) ? dateString : d.toLocaleDateString();
+        }
+
+        function formatTeacherSuggestionText(teacher) {
+            const teacherName = String(teacher?.teacher_name || 'Teacher').trim();
+            const specialization = String(teacher?.specialization || 'General').trim();
+            return specialization && specialization !== 'General'
+                ? `${teacherName} • ${specialization}`
+                : teacherName;
+        }
+
+        function setAssignRequestTeacherSelection(teacherId) {
+            const hiddenInput = document.getElementById('assignRequestTeacherSelect');
+            const searchInput = document.getElementById('assignRequestTeacherSearch');
+            const helpEl = document.getElementById('assignRequestTeacherSearchHelp');
+            const suggestionsEl = document.getElementById('assignRequestTeacherSuggestions');
+            const selected = assignRequestTeacherCandidates.find(t => Number(t.teacher_id) === Number(teacherId)) || null;
+
+            if (hiddenInput) hiddenInput.value = selected ? String(Number(selected.teacher_id)) : '';
+            if (searchInput) searchInput.value = selected ? String(selected.teacher_name || '').trim() : '';
+            if (helpEl) {
+                helpEl.textContent = selected
+                    ? `Selected: ${formatTeacherSuggestionText(selected)}`
+                    : 'Search teacher or specialization.';
+            }
+            if (suggestionsEl) {
+                suggestionsEl.classList.add('hidden');
+                suggestionsEl.innerHTML = '';
+            }
+        }
+
+        function renderAssignRequestTeacherSuggestions(query = '') {
+            const suggestionsEl = document.getElementById('assignRequestTeacherSuggestions');
+            if (!suggestionsEl) return;
+
+            const keyword = String(query || '').trim().toLowerCase();
+            const rows = assignRequestTeacherCandidates.filter(t => {
+                if (!keyword) return true;
+                const haystack = `${String(t.teacher_name || '')} ${String(t.specialization || '')}`.toLowerCase();
+                return haystack.includes(keyword);
+            });
+
+            if (!rows.length) {
+                suggestionsEl.innerHTML = '<div class="px-4 py-3 text-sm text-zinc-400">No matching teacher found.</div>';
+                suggestionsEl.classList.remove('hidden');
+                return;
+            }
+
+            suggestionsEl.innerHTML = rows.map((teacher, index) => `
+                <button type="button" class="w-full text-left px-4 py-3 hover:bg-zinc-900 transition border-b border-zinc-800 last:border-b-0" onclick="setAssignRequestTeacherSelection(${Number(teacher.teacher_id)})">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-semibold text-white">${escapeHtml(teacher.teacher_name || 'Teacher')}</div>
+                            <div class="text-xs text-zinc-400 mt-1">${escapeHtml(teacher.specialization || 'General')}</div>
+                        </div>
+                        ${index === 0 ? '<span class="inline-flex items-center px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold">Recommended</span>' : ''}
+                    </div>
+                </button>
+            `).join('');
+            suggestionsEl.classList.remove('hidden');
+        }
+
+        function initAssignTeacherSearchBox() {
+            const searchInput = document.getElementById('assignRequestTeacherSearch');
+            const suggestionsEl = document.getElementById('assignRequestTeacherSuggestions');
+            if (!searchInput || !suggestionsEl) return;
+
+            searchInput.addEventListener('focus', () => {
+                renderAssignRequestTeacherSuggestions(searchInput.value || '');
+            });
+            searchInput.addEventListener('input', () => {
+                renderAssignRequestTeacherSuggestions(searchInput.value || '');
+            });
+            document.addEventListener('click', (event) => {
+                const withinSearch = event.target.closest('#assignRequestTeacherSuggestions') || event.target.closest('#assignRequestTeacherSearch');
+                if (!withinSearch) {
+                    suggestionsEl.classList.add('hidden');
+                }
+            });
+        }
+
+        function getSessionStatusBadge(status) {
+            const value = String(status || '').trim();
+            const normalized = value.toLowerCase();
+            let classes = 'bg-slate-100 text-slate-700';
+            if (normalized === 'scheduled') classes = 'bg-sky-100 text-sky-700';
+            if (normalized === 'completed') classes = 'bg-emerald-100 text-emerald-700';
+            if (normalized === 'cancelled_by_teacher') classes = 'bg-rose-100 text-rose-700';
+            if (normalized === 'rescheduled') classes = 'bg-amber-100 text-amber-700';
+            if (normalized === 'no show') classes = 'bg-red-100 text-red-700';
+            return `<span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${classes}">${escapeHtml(value || 'Unknown')}</span>`;
         }
 
         async function fetchRoomsForBranch(branchId) {
@@ -624,8 +748,13 @@
 
             const modal = document.getElementById('assignRequestModal');
             const info = document.getElementById('assignRequestStudentInfo');
+            const studentNameEl = document.getElementById('assignRequestStudentName');
+            const studentBranchEl = document.getElementById('assignRequestStudentBranch');
+            const studentPackageEl = document.getElementById('assignRequestStudentPackage');
             const requestIdEl = document.getElementById('assignRequestId');
             const teacherSelect = document.getElementById('assignRequestTeacherSelect');
+            const teacherSearch = document.getElementById('assignRequestTeacherSearch');
+            const teacherHelp = document.getElementById('assignRequestTeacherSearchHelp');
             const dateEl = document.getElementById('assignRequestDate');
             const dayEl = document.getElementById('assignRequestDay');
             const startEl = document.getElementById('assignRequestStartTime');
@@ -636,13 +765,25 @@
             if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !dayEl || !startEl || !endEl || !roomEl || !notesEl) return;
 
             const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
-            info.textContent = `${studentName} • ${req.package_name || 'Package'} • Preferred: ${req.preferred_day_of_week || '—'} / ${req.preferred_date || '—'}`;
+            info.textContent = `Preferred schedule: ${req.preferred_day_of_week || '—'} / ${req.preferred_date || '—'}`;
+            if (studentNameEl) studentNameEl.textContent = studentName || 'Student';
+            if (studentBranchEl) studentBranchEl.textContent = req.branch_name || 'No branch';
+            if (studentPackageEl) studentPackageEl.textContent = req.package_name || 'Package';
             requestIdEl.value = String(requestId);
 
-            const options = Array.isArray(req.teacher_candidates) ? req.teacher_candidates : [];
-            teacherSelect.innerHTML = '<option value="">Select teacher...</option>' + options.map(t =>
-                `<option value="${Number(t.teacher_id)}">${escapeHtml(t.teacher_name || 'Teacher')} (${escapeHtml(t.specialization || 'General')})</option>`
-            ).join('');
+            assignRequestTeacherCandidates = Array.isArray(req.teacher_candidates) ? req.teacher_candidates : [];
+            teacherSelect.value = '';
+            if (teacherSearch) teacherSearch.value = '';
+            if (teacherHelp) {
+                teacherHelp.textContent = assignRequestTeacherCandidates.length
+                    ? 'Recommended teachers are matched from the student request. You can search by name or specialization.'
+                    : 'No teacher suggestions found yet for this request.';
+            }
+            if (assignRequestTeacherCandidates.length) {
+                setAssignRequestTeacherSelection(assignRequestTeacherCandidates[0].teacher_id);
+            } else {
+                setAssignRequestTeacherSelection('');
+            }
 
             dateEl.value = req.preferred_date || '';
             dayEl.value = getDayNameFromDate(dateEl.value || '') || req.preferred_day_of_week || '';
@@ -761,31 +902,92 @@
                 const response = await axios.get(url);
                 const data = response.data;
 
-            if (data.success && Array.isArray(data.enrollments)) {
-                allStudents = data.enrollments;
-                renderStudents(listEl);
-                if (countEl) countEl.textContent = `${data.enrollments.length} enrolled`;
-            } else {
+                if (data.success && Array.isArray(data.enrollments)) {
+                    allStudents = data.enrollments;
+                    renderStudents(listEl);
+                    if (countEl) countEl.textContent = `${data.enrollments.length} enrolled`;
+                } else {
+                    listEl.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
+                                <p>No enrolled students found.</p>
+                            </td>
+                        </tr>`;
+                    if (countEl) countEl.textContent = '0 enrolled';
+                }
+            } catch (error) {
+                console.error('Failed to load sessions:', error);
                 listEl.innerHTML = `
                     <tr>
-                        <td colspan="4" class="px-6 py-8 text-center text-slate-500">
-                            <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                            <p>No enrolled students found.</p>
+                        <td colspan="4" class="px-6 py-8 text-center text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>Failed to load sessions. Please try again.</p>
                         </td>
                     </tr>`;
-                if (countEl) countEl.textContent = '0 enrolled';
             }
-        } catch (error) {
-            console.error('Failed to load sessions:', error);
-            listEl.innerHTML = `
-                <tr>
-                    <td colspan="4" class="px-6 py-8 text-center text-red-500">
-                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                        <p>Failed to load sessions. Please try again.</p>
-                    </td>
-                </tr>`;
         }
-    }
+
+        async function loadCancelledSessions() {
+            const listEl = document.getElementById('cancelledSessionsList');
+            const countEl = document.getElementById('cancelledSessionCount');
+            if (!listEl) return;
+
+            try {
+                const branchFilter = document.getElementById('branchFilter');
+                let url = `${baseApiUrl}/students.php?action=get-cancelled-sessions`;
+                if (branchFilter && branchFilter.value) {
+                    url += `&branch_id=${encodeURIComponent(branchFilter.value)}`;
+                }
+                const response = await axios.get(url);
+                const data = response.data || {};
+                cancelledSessions = data.success && Array.isArray(data.sessions) ? data.sessions : [];
+                if (countEl) countEl.textContent = `${cancelledSessions.length} waiting`;
+                renderCancelledSessions(listEl);
+            } catch (error) {
+                console.error('Failed to load cancelled sessions:', error);
+                cancelledSessions = [];
+                if (countEl) countEl.textContent = 'Error';
+                listEl.innerHTML = '<div class="text-sm text-red-500">Failed to load cancelled sessions.</div>';
+            }
+        }
+
+        function renderCancelledSessions(listEl) {
+            if (!cancelledSessions.length) {
+                listEl.innerHTML = `
+                    <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
+                        No teacher-cancelled sessions need rescheduling right now.
+                    </div>`;
+                return;
+            }
+
+            listEl.innerHTML = cancelledSessions.map(session => {
+                const studentName = `${escapeHtml(session.student_first_name || '')} ${escapeHtml(session.student_last_name || '')}`.trim() || 'Student';
+                const teacherName = `${escapeHtml(session.teacher_first_name || '')} ${escapeHtml(session.teacher_last_name || '')}`.trim() || 'Teacher';
+                const originalTime = `${formatDateShort(session.session_date)} • ${formatTime12Hour(session.start_time)} - ${formatTime12Hour(session.end_time)}`;
+                const reason = session.cancellation_reason ? escapeHtml(session.cancellation_reason) : 'No reason provided.';
+                const roomText = session.room_name ? ` • ${escapeHtml(session.room_name)}` : '';
+                return `
+                    <div class="rounded-2xl border border-rose-100 bg-rose-50/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div class="space-y-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <div class="text-sm font-bold text-slate-900">${studentName}</div>
+                                ${getSessionStatusBadge(session.status)}
+                            </div>
+                            <div class="text-xs text-slate-500">${escapeHtml(session.package_name || 'Package')} • Session ${Number(session.session_number || 0)}</div>
+                            <div class="text-sm text-slate-700">${teacherName}${roomText}</div>
+                            <div class="text-sm text-slate-600">Cancelled slot: ${originalTime}</div>
+                            <div class="text-xs text-slate-500">Reason: ${reason}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" class="px-3 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 text-xs font-bold" onclick="openReschedulePicker(${Number(session.session_id)})">
+                                Reschedule
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
 
         function renderStudents(listEl) {
             if (!allStudents.length) {
@@ -854,7 +1056,8 @@
             const form = document.getElementById('addScheduleForm');
             const enrollmentInput = document.getElementById('scheduleEnrollmentId');
             const sessionInput = document.getElementById('scheduleSessionNumber');
-            const teacherSelect = document.getElementById('scheduleTeacher');
+            const teacherInput = document.getElementById('scheduleTeacher');
+            const teacherLabel = document.getElementById('scheduleTeacherLabel');
             const roomSelect = document.getElementById('scheduleRoom');
             if (!modal || !body || !meta) return;
 
@@ -870,21 +1073,37 @@
             let nextUnscheduled = 0;
             if (sessionsTotal > 0) {
                 for (let i = 1; i <= sessionsTotal; i += 1) {
-                    const slot = sessionsList.find(s => Number(s.session_number) === i);
-                    const dateText = slot?.session_date ? new Date(slot.session_date).toLocaleDateString() : 'Unscheduled';
-                    const timeText = slot?.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : '—';
-                    const roomText = slot?.room_name ? ` • ${escapeHtml(slot.room_name)}` : '';
-                    const teacherName = slot?.teacher_first_name || slot?.teacher_last_name
-                        ? `${escapeHtml(slot.teacher_first_name || '')} ${escapeHtml(slot.teacher_last_name || '')}`.trim()
-                        : '';
-                    const teacherText = teacherName ? ` • ${teacherName}` : '';
+                    const slotHistory = sessionsList.filter(s => Number(s.session_number) === i);
+                    if (!slotHistory.length && nextUnscheduled === 0) nextUnscheduled = i;
+                    const slotHtml = slotHistory.length
+                        ? slotHistory.map(slot => {
+                            const dateText = slot?.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
+                            const timeText = slot?.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : '—';
+                            const roomText = slot?.room_name ? ` • ${escapeHtml(slot.room_name)}` : '';
+                            const teacherName = slot?.teacher_first_name || slot?.teacher_last_name
+                                ? `${escapeHtml(slot.teacher_first_name || '')} ${escapeHtml(slot.teacher_last_name || '')}`.trim()
+                                : '';
+                            const teacherText = teacherName ? ` • ${teacherName}` : '';
+                            const reasonText = slot?.cancellation_reason
+                                ? `<div class="text-[11px] text-slate-500 mt-1">Reason: ${escapeHtml(slot.cancellation_reason)}</div>`
+                                : '';
+                            return `
+                                <div class="rounded-lg border border-white/70 bg-white px-3 py-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        ${getSessionStatusBadge(slot.status)}
+                                        <div>${escapeHtml(dateText)} • ${escapeHtml(timeText)}${roomText}${teacherText}</div>
+                                    </div>
+                                    ${reasonText}
+                                </div>
+                            `;
+                        }).join('')
+                        : '<div class="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-slate-400">Unscheduled</div>';
                     rows.push(`
-                        <div class="flex items-center justify-between gap-3 rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                            <div class="font-semibold text-slate-700">Session ${i}</div>
-                            <div>${escapeHtml(dateText)} • ${escapeHtml(timeText)}${roomText}${teacherText}</div>
+                        <div class="rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-3 text-xs text-slate-600">
+                            <div class="font-semibold text-slate-700 mb-2">Session ${i}</div>
+                            <div class="space-y-2">${slotHtml}</div>
                         </div>
                     `);
-                    if (!slot && nextUnscheduled === 0) nextUnscheduled = i;
                 }
             } else {
                 rows.push(`<div class="text-sm text-slate-500">No session count found for this package.</div>`);
@@ -905,21 +1124,17 @@
                 toggleBtn.classList.toggle('cursor-not-allowed', nextUnscheduled < 1);
             }
 
-            if (teacherSelect) {
-                teacherSelect.innerHTML = '<option value="">Select teacher...</option>';
+            const teacherName = `${escapeHtml(row.teacher_first_name || '')} ${escapeHtml(row.teacher_last_name || '')}`.trim() || 'No fixed teacher assigned';
+            if (teacherInput) {
+                teacherInput.value = String(Number(row.assigned_teacher_id || 0));
+            }
+            if (teacherLabel) {
+                teacherLabel.value = teacherName;
             }
             if (roomSelect) {
                 roomSelect.innerHTML = '<option value="">Select room...</option>';
             }
             if (nextUnscheduled > 0) {
-                fetchTeachersForBranch(Number(row.branch_id || 0)).then(teachers => {
-                    if (!teacherSelect) return;
-                    teacherSelect.innerHTML = '<option value="">Select teacher...</option>' + teachers.map(t => {
-                        const label = `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'Teacher';
-                        const spec = t.specialization ? ` (${t.specialization})` : '';
-                        return `<option value="${Number(t.teacher_id)}">${escapeHtml(label + spec)}</option>`;
-                    }).join('');
-                });
                 fetchRoomsForBranch(Number(row.branch_id || 0)).then(rooms => {
                     if (!roomSelect) return;
                     roomSelect.innerHTML = '<option value="">Select room...</option>' + rooms.map(rm => {
@@ -956,8 +1171,8 @@
             const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
             const roomName = document.getElementById('scheduleRoom')?.value || '';
 
-            if (!enrollmentId || !sessionNumber || !sessionDate || !startTime || !endTime || !teacherId) {
-                showMessage('Please complete date, time, and teacher before saving.', 'error');
+            if (!enrollmentId || !sessionNumber || !sessionDate || !startTime || !endTime) {
+                showMessage('Please complete date and time before saving.', 'error');
                 return;
             }
 
@@ -984,8 +1199,75 @@
             }
         }
 
+        async function openReschedulePicker(sessionId) {
+            const target = cancelledSessions.find(s => Number(s.session_id) === Number(sessionId));
+            if (!target) {
+                showMessage('Cancelled session not found.', 'error');
+                return;
+            }
+
+            try {
+                const response = await axios.get(`${baseApiUrl}/students.php?action=get-reschedule-slots&session_id=${encodeURIComponent(sessionId)}`);
+                const data = response.data || {};
+                const slots = Array.isArray(data.slots) ? data.slots : [];
+                if (!data.success) {
+                    showMessage(data.error || 'Failed to load available slots.', 'error');
+                    return;
+                }
+                if (!slots.length) {
+                    showMessage('No available slots found for this teacher right now.', 'error');
+                    return;
+                }
+
+                const inputOptions = {};
+                slots.forEach((slot, index) => {
+                    inputOptions[String(index)] = `${formatDateShort(slot.session_date)} • ${slot.day_of_week} • ${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`;
+                });
+
+                const result = await Swal.fire({
+                    icon: 'info',
+                    title: 'Reschedule Cancelled Session',
+                    text: 'Student and teacher are fixed. Select one available slot.',
+                    input: 'select',
+                    inputOptions,
+                    inputPlaceholder: 'Select an available slot',
+                    showCancelButton: true,
+                    confirmButtonText: 'Reschedule',
+                    cancelButtonText: 'Close',
+                    confirmButtonColor: '#b8860b',
+                    inputValidator: value => value === '' || value == null ? 'Please select a slot.' : null
+                });
+                if (!result.isConfirmed) return;
+
+                const chosen = slots[Number(result.value)];
+                if (!chosen) {
+                    showMessage('Selected slot is invalid.', 'error');
+                    return;
+                }
+
+                const saveRes = await axios.post(`${baseApiUrl}/students.php?action=reschedule-cancelled-session`, {
+                    session_id: Number(sessionId),
+                    session_date: chosen.session_date,
+                    start_time: chosen.start_time,
+                    end_time: chosen.end_time
+                });
+                const saveData = saveRes.data || {};
+                if (saveData.success) {
+                    showMessage(saveData.message || 'Session rescheduled.', 'success');
+                    await Promise.all([loadActiveStudents(), loadCancelledSessions()]);
+                    openSessionScheduleModal(Number(target.enrollment_id));
+                } else {
+                    showMessage(saveData.error || 'Failed to reschedule session.', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error while rescheduling session.', 'error');
+            }
+        }
+
         // Ensure global access for inline button handlers
         window.openSessionScheduleModal = openSessionScheduleModal;
+        window.openReschedulePicker = openReschedulePicker;
+        window.setAssignRequestTeacherSelection = setAssignRequestTeacherSelection;
 
         function escapeHtml(text) {
             if (text == null) return '';
@@ -1063,18 +1345,24 @@
                 }
             }
 
+            initAssignTeacherSearchBox();
+
             await Promise.all([
                 loadBranches(),
                 loadSessionPackages()
             ]);
 
-            await loadActiveStudents();
+            await Promise.all([
+                loadActiveStudents(),
+                loadCancelledSessions()
+            ]);
 
             await maybeAutoOpenAssignPackageModalFromUrl();
             await maybeAutoOpenAssignRequestModalFromUrl();
 
             document.getElementById('branchFilter')?.addEventListener('change', () => {
                 loadActiveStudents();
+                loadCancelledSessions();
             });
             document.getElementById('closeAssignPackageModalBtn')?.addEventListener('click', closeAssignPackageModal);
             document.getElementById('cancelAssignPackageBtn')?.addEventListener('click', closeAssignPackageModal);
@@ -1095,3 +1383,6 @@
     </script>
 </body>
 </html>
+
+
+

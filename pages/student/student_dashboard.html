@@ -126,10 +126,21 @@
         <div class="max-w-7xl mx-auto">
             <div class="mb-8 sm:mb-10">
                 <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">Welcome back</h1>
-                <p class="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-2">Quick view of your account and QR. For full details, open Sessions or Profile.</p>
+                <p id="studentWelcomeNote" class="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-2">Quick view of your account and QR. For full details, open Sessions or Profile.</p>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40 mb-8">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Enrollment Overview</div>
+                        <div class="text-lg font-extrabold mt-2">Track your registration, enrollment, and class access</div>
+                    </div>
+                    <div class="text-xs text-zinc-500 dark:text-zinc-400">Registration → Enrollment Request → Approval → Sessions</div>
+                </div>
+                <div id="studentOnboardingSteps" class="mt-6 space-y-6"></div>
+            </div>
+
+            <div id="studentOverviewGrid" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                 <!-- Profile Card -->
                 <div class="lg:col-span-1 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center gap-4">
@@ -214,81 +225,140 @@
                     </div>
                 </div>
 
-                <!-- Full Request Enrollment form (desktop / tablet only) -->
-                <div class="lg:col-span-3 rounded-3xl border border-gold-500/30 bg-gradient-to-br from-white/80 via-white/40 to-amber-50/40 dark:from-black/60 dark:via-darkSlate/40 dark:to-black/50 p-6 shadow-xl dark:shadow-black/40">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
+                <!-- Current Enrollment (desktop / tablet; keep off small screens to reduce clutter) -->
+                <div class="hidden md:block lg:col-span-2 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-gold-600 dark:text-gold-400 font-bold">Enrollment Request</div>
-                            <div class="text-2xl font-extrabold mt-2">Build your lesson plan</div>
-                            <p class="text-sm text-zinc-600 dark:text-zinc-300 mt-2 max-w-2xl">Choose a package, instruments, and preferred schedule. Our team will confirm the final schedule after approval.</p>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Current Enrollment</div>
+                            <div class="text-lg font-extrabold mt-2">Approved status and start schedule</div>
                         </div>
-                        <div class="h-12 w-12 rounded-2xl bg-gold-500/15 border border-gold-500/30 grid place-items-center">
-                            <i class="fas fa-calendar-plus text-gold-500"></i>
+                        <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
+                            <i class="fas fa-calendar-check text-gold-400"></i>
+                        </div>
+                    </div>
+                    <div id="currentEnrollmentSummary" class="mt-5 text-sm text-zinc-600 dark:text-zinc-300"></div>
+                </div>
+
+                <!-- Enrollment History (desktop / tablet only) -->
+                <div class="hidden md:block lg:col-span-3 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Enrollment History</div>
+                            <div class="text-lg font-extrabold mt-2">Previous enrollments</div>
+                        </div>
+                        <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
+                            <i class="fas fa-clock-rotate-left text-gold-400"></i>
+                        </div>
+                    </div>
+                    <div id="enrollmentHistoryList" class="mt-4 space-y-2 text-sm text-zinc-600 dark:text-zinc-200"></div>
+                </div>
+
+                <!-- Simple Request Enrollment shortcut for mobile -->
+                <div class="md:hidden rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Request Enrollment</div>
+                            <div class="text-sm font-semibold mt-1">Choose package, instruments, and schedule.</div>
+                        </div>
+                        <a href="student_sessions.html" class="px-4 py-2 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-xs font-extrabold transition whitespace-nowrap">
+                            Open Sessions
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Full Request Enrollment form (desktop / tablet only) -->
+                <div class="hidden md:block lg:col-span-3 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="flex items-center justify-between gap-4">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Request Enrollment</div>
+                            <div class="text-lg font-extrabold mt-2">Build your class request</div>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Choose your package and schedule.</p>
+                        </div>
+                        <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
+                            <i class="fas fa-calendar-plus text-gold-400"></i>
                         </div>
                     </div>
 
-                    <div id="studentRequestStatus" class="mt-5"></div>
+                    <div id="studentRequestStatus" class="mt-4"></div>
 
-                    <form id="studentPackageRequestForm" class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div class="lg:col-span-2 rounded-2xl border border-zinc-200/60 dark:border-white/10 bg-white/80 dark:bg-white/5 p-5">
-                            <div class="text-sm font-semibold text-zinc-700 dark:text-zinc-200 mb-4">Package & Instruments</div>
-                            <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-2">Session Package *</label>
+                    <form id="studentPackageRequestForm" class="mt-5 grid grid-cols-1 xl:grid-cols-12 gap-5">
+                        <div class="xl:col-span-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+                            <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">1. Package & Payment</div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Session Package *</label>
                             <select id="studentRequestPackage" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500/30">
-                                <option value="">Select package...</option>
+                                <option value="">Choose a package...</option>
                             </select>
-                            <div id="studentRequestAmount" class="mt-2 text-xs text-gold-600 dark:text-gold-300 font-semibold">Estimated package amount: ₱0.00</div>
 
-                            <div class="mt-5">
-                                <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-2">Select Instruments *</label>
-                                <div id="studentRequestInstrumentContainer" class="space-y-2">
-                                    <div class="text-sm text-zinc-500">Select a package first.</div>
-                                </div>
+                            <div id="studentRequestAmount" class="mt-4 rounded-2xl border border-gold-500/20 bg-gold-500/10 px-4 py-4 text-sm text-zinc-700 dark:text-zinc-100">
+                                <div class="font-semibold text-gold-700 dark:text-gold-300">Choose a package first.</div>
                             </div>
-                        </div>
 
-                        <div class="rounded-2xl border border-zinc-200/60 dark:border-white/10 bg-white/80 dark:bg-white/5 p-5">
-                            <div class="text-sm font-semibold text-zinc-700 dark:text-zinc-200 mb-4">Preferred Schedule</div>
-                            <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-2">Preferred Day *</label>
-                            <select id="studentRequestPreferredDay" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
-                                <option value="">Select preferred day...</option>
-                                <option value="Monday">Monday</option>
-                                <option value="Tuesday">Tuesday</option>
-                                <option value="Wednesday">Wednesday</option>
-                                <option value="Thursday">Thursday</option>
-                                <option value="Friday">Friday</option>
-                                <option value="Saturday">Saturday</option>
-                                <option value="Sunday">Sunday</option>
-                            </select>
-
-                            <label class="block text-xs uppercase tracking-widest text-zinc-500 mt-5 mb-2">Preferred Date *</label>
-                            <input type="date" id="studentRequestPreferredDate" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
-
-                            <label class="block text-xs uppercase tracking-widest text-zinc-500 mt-5 mb-2">Payment Mode *</label>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mt-4 mb-2">Payment Mode *</label>
                             <select id="studentRequestPaymentMode" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                                 <option value="Partial Payment" selected>Partial Payment</option>
                                 <option value="Full Payment">Full Payment</option>
                                 <option value="Installment">Installment</option>
                             </select>
-
-                            <label class="block text-xs uppercase tracking-widest text-zinc-500 mt-5 mb-2">Payment Proof (optional)</label>
-                            <input type="file" id="studentRequestPaymentProof" name="package_payment_proof_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold">
-                            <div class="text-xs text-zinc-500 mt-2">You can upload later or bring proof to the branch.</div>
+                            <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Pick how you want to pay.</p>
                         </div>
 
-                        <div class="lg:col-span-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gold-500/20 bg-gold-500/10 px-5 py-4">
-                            <div class="text-sm text-zinc-700 dark:text-zinc-200">Desk/admin will assign a teacher and confirm your final 1‑hour lesson schedule.</div>
+                        <div class="xl:col-span-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+                            <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">2. Instruments & Proof</div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Select Instruments *</label>
+                            <div id="studentRequestInstrumentContainer" class="space-y-2">
+                                <div class="rounded-xl border border-dashed border-zinc-300 dark:border-white/10 px-4 py-4 text-sm text-zinc-500 dark:text-zinc-400">Choose a package first.</div>
+                            </div>
+
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mt-5 mb-2">Payment proof (optional)</label>
+                            <input type="file" id="studentRequestPaymentProof" name="package_payment_proof_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold">
+                            <div class="text-xs text-zinc-500 mt-2">Optional. You can submit this later.</div>
+                        </div>
+
+                        <div class="xl:col-span-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+                            <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">3. Preferred Schedule</div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Preferred Date *</label>
+                            <input type="date" id="studentRequestPreferredDate" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                            <div id="studentRequestAutoDay" class="mt-3 text-sm text-zinc-500 dark:text-zinc-300">Day will appear here after you choose a date.</div>
+
+                            <div class="mt-4 rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-4 text-sm text-zinc-500 dark:text-zinc-300">
+                                Admin will confirm your final schedule.
+                            </div>
+                        </div>
+
+                        <div class="xl:col-span-12 flex items-center justify-between gap-4 pt-1">
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Review, then submit.</p>
                             <button type="submit" id="studentSubmitRequestBtn" class="px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
-                                Submit Enrollment Request
+                                Submit Request
                             </button>
                         </div>
                     </form>
 
-                    <div class="mt-6">
-                        <div class="text-sm font-semibold text-zinc-700 dark:text-zinc-200 mb-3">Teacher availability (reference)</div>
-                        <div id="studentAvailabilityCalendar" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"></div>
-                    </div>
+                    <div id="studentAvailabilityCalendar" class="hidden"></div>
                 </div>
 
+                <!-- QR -->
+                <div id="studentQrCard" class="rounded-3xl border-2 border-gold-500/30 bg-amber-50/50 dark:bg-gold-500/10 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Attendance QR</div>
+                            <div class="text-lg font-extrabold mt-2">Show this when you arrive</div>
+                        </div>
+                        <a href="student_qr.html" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                            Open Fullscreen
+                        </a>
+                    </div>
+
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                        <div class="rounded-2xl bg-white dark:bg-obsidian/60 border-2 border-gold-500/30 p-4 flex items-center justify-center">
+                            <div id="qrCodeBox" class="p-2 bg-white"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-zinc-700 dark:text-zinc-200 font-semibold">QR Data</div>
+                            <div id="qrPayloadText" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 break-all font-mono">—</div>
+                            <p class="mt-4 text-xs text-zinc-500">If scanning fails, show the QR page or ask the staff to verify your student ID.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </main>

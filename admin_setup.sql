@@ -11,13 +11,13 @@ INSERT INTO tbl_roles (role_name) VALUES ('Guardians') ON DUPLICATE KEY UPDATE r
 
 -- Create Admin Account
 -- Username: fasadmin@music.com
--- Password: password2020 (hashed with PHP password_hash)
+-- Password: fasmusic@2020 (hashed with PHP password_hash)
 
 -- First, ensure Admin role exists
 INSERT INTO tbl_roles (role_name) VALUES ('Admin') ON DUPLICATE KEY UPDATE role_name = role_name;
 
 -- Create Admin User
--- Password hash generated for: password2020
+-- Password hash generated for: fasmusic@2020
 INSERT INTO tbl_users (
     username,
     password,
@@ -30,7 +30,7 @@ INSERT INTO tbl_users (
 )
 SELECT
     'fasadmin@music.com',
-    '$2y$10$rioDBIW6MNarnd6ZRJF9g.Dma59mDAHCdRiploZMYWYfnwvXJC1j2', -- Hash for password2020
+    '$2y$10$z3leOydLuLCNIgA3dHSQAeJAep.BZ7R92sufR87aETmyfLGSv7s5e', -- Hash for fasmusic@2020
     (SELECT role_id FROM tbl_roles WHERE role_name = 'Admin' LIMIT 1),
     'FAS',
     'Administrator',

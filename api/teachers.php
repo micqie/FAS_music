@@ -27,6 +27,7 @@ class TeachersApi
     public function __construct($pdo)
     {
         $this->conn = $pdo;
+        $this->ensureSessionRescheduleWorkflow();
     }
 
     public function sendJSON($data, $status = 200)
@@ -34,6 +35,91 @@ class TeachersApi
         http_response_code($status);
         echo json_encode($data);
         exit;
+    }
+
+    private function tableExists($tableName)
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function tableHasColumn($tableName, $columnName)
+    {
+        if (!preg_match('/^[A-Za-z0-9_]+$/', (string)$tableName)) {
+            return false;
+        }
+        try {
+            $stmt = $this->conn->prepare("SHOW COLUMNS FROM `{$tableName}` LIKE ?");
+            $stmt->execute([$columnName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function ensureSessionRescheduleWorkflow()
+    {
+        if (!$this->tableExists('tbl_sessions')) {
+            return;
+        }
+
+        try {
+            $this->conn->exec("
+                ALTER TABLE tbl_sessions
+                MODIFY COLUMN status ENUM('Scheduled','Completed','Cancelled','No Show','Late','cancelled_by_teacher','rescheduled')
+                NOT NULL DEFAULT 'Scheduled'
+            ");
+        } catch (PDOException $e) {
+            // Ignore enum differences.
+        }
+
+        $columns = [
+            'rescheduled_from_session_id' => "ALTER TABLE tbl_sessions ADD COLUMN rescheduled_from_session_id INT NULL AFTER notes",
+            'rescheduled_to_session_id' => "ALTER TABLE tbl_sessions ADD COLUMN rescheduled_to_session_id INT NULL AFTER rescheduled_from_session_id",
+            'needs_rescheduling' => "ALTER TABLE tbl_sessions ADD COLUMN needs_rescheduling TINYINT(1) NOT NULL DEFAULT 0 AFTER rescheduled_to_session_id",
+            'cancellation_reason' => "ALTER TABLE tbl_sessions ADD COLUMN cancellation_reason TEXT NULL AFTER needs_rescheduling",
+            'cancelled_by_teacher_at' => "ALTER TABLE tbl_sessions ADD COLUMN cancelled_by_teacher_at DATETIME NULL AFTER cancellation_reason",
+            'rescheduled_at' => "ALTER TABLE tbl_sessions ADD COLUMN rescheduled_at DATETIME NULL AFTER cancelled_by_teacher_at"
+        ];
+        foreach ($columns as $column => $sql) {
+            try {
+                if (!$this->tableHasColumn('tbl_sessions', $column)) {
+                    $this->conn->exec($sql);
+                }
+            } catch (PDOException $e) {
+                // Ignore per-column failures.
+            }
+        }
+    }
+
+    private function resolveTeacherId($teacherId, $userId)
+    {
+        $teacherId = (int)$teacherId;
+        $userId = (int)$userId;
+        if ($teacherId > 0) {
+            return $teacherId;
+        }
+        if ($userId < 1 || !$this->tableExists('tbl_teachers')) {
+            return 0;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT teacher_id
+                FROM tbl_teachers
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$userId]);
+            return (int)($stmt->fetchColumn() ?: 0);
+        } catch (PDOException $e) {
+            return 0;
+        }
     }
 
     private function branchExists($branchId)
@@ -276,6 +362,249 @@ class TeachersApi
             }
 
             $this->sendJSON(['success' => true, 'teachers' => $teachers]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getTeacherSessions()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $teacherId = $this->resolveTeacherId((int)($_GET['teacher_id'] ?? 0), (int)($_GET['user_id'] ?? 0));
+        $filter = strtolower(trim((string)($_GET['filter'] ?? 'all')));
+        if ($teacherId < 1) {
+            $this->sendJSON(['error' => 'teacher_id or user_id is required'], 400);
+        }
+        if (!$this->tableExists('tbl_sessions')) {
+            $this->sendJSON(['success' => true, 'sessions' => []]);
+        }
+
+        try {
+            $sql = "
+                SELECT
+                    ts.session_id,
+                    ts.enrollment_id,
+                    ts.session_number,
+                    ts.session_date,
+                    ts.start_time,
+                    ts.end_time,
+                    ts.status,
+                    ts.notes,
+                    ts.needs_rescheduling,
+                    ts.cancellation_reason,
+                    ts.cancelled_by_teacher_at,
+                    ts.rescheduled_from_session_id,
+                    ts.rescheduled_to_session_id,
+                    s.student_id,
+                    s.first_name AS student_first_name,
+                    s.last_name AS student_last_name,
+                    COALESCE(rm.room_name, NULLIF(TRIM(ts.notes), '')) AS room_name
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                LEFT JOIN tbl_rooms rm ON rm.room_id = ts.room_id
+                WHERE ts.teacher_id = ?
+            ";
+            $params = [$teacherId];
+
+            if ($filter === 'today') {
+                $sql .= " AND ts.session_date = CURDATE() ";
+            } elseif ($filter === 'week') {
+                $sql .= " AND ts.session_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) ";
+            }
+
+            $sql .= " ORDER BY ts.session_date ASC, ts.start_time ASC, ts.session_id ASC ";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            $this->sendJSON(['success' => true, 'sessions' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getTeacherAvailability()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $teacherId = $this->resolveTeacherId((int)($_GET['teacher_id'] ?? 0), (int)($_GET['user_id'] ?? 0));
+        if ($teacherId < 1) {
+            $this->sendJSON(['error' => 'teacher_id or user_id is required'], 400);
+        }
+        if (!$this->tableExists('tbl_teacher_availability')) {
+            $this->sendJSON(['success' => true, 'branch_id' => 0, 'availability' => []]);
+        }
+
+        try {
+            $branchStmt = $this->conn->prepare("SELECT branch_id FROM tbl_teachers WHERE teacher_id = ? LIMIT 1");
+            $branchStmt->execute([$teacherId]);
+            $branchId = (int)($branchStmt->fetchColumn() ?: 0);
+
+            $stmt = $this->conn->prepare("
+                SELECT availability_id, teacher_id, branch_id, day_of_week, start_time, end_time, status
+                FROM tbl_teacher_availability
+                WHERE teacher_id = ?
+                ORDER BY FIELD(day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'),
+                         start_time ASC,
+                         availability_id ASC
+            ");
+            $stmt->execute([$teacherId]);
+
+            $this->sendJSON([
+                'success' => true,
+                'branch_id' => $branchId,
+                'availability' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function saveTeacherAvailability()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $entries = is_array($data['availability'] ?? null) ? $data['availability'] : [];
+        $validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+        if ($teacherId < 1) {
+            $this->sendJSON(['error' => 'teacher_id or user_id is required'], 400);
+        }
+        if (!$this->tableExists('tbl_teacher_availability')) {
+            $this->sendJSON(['error' => 'tbl_teacher_availability table not found'], 500);
+        }
+
+        try {
+            $teacherStmt = $this->conn->prepare("
+                SELECT teacher_id, branch_id
+                FROM tbl_teachers
+                WHERE teacher_id = ?
+                LIMIT 1
+            ");
+            $teacherStmt->execute([$teacherId]);
+            $teacher = $teacherStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$teacher) {
+                $this->sendJSON(['error' => 'Teacher not found'], 404);
+            }
+
+            $normalized = [];
+            foreach ($entries as $entry) {
+                $enabled = !empty($entry['enabled']);
+                $day = trim((string)($entry['day_of_week'] ?? ''));
+                $start = trim((string)($entry['start_time'] ?? ''));
+                $end = trim((string)($entry['end_time'] ?? ''));
+
+                if (!$enabled) {
+                    continue;
+                }
+                if (!in_array($day, $validDays, true)) {
+                    $this->sendJSON(['error' => "Invalid day: {$day}"], 400);
+                }
+                if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $start) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $end)) {
+                    $this->sendJSON(['error' => "Invalid time format for {$day}"], 400);
+                }
+                $startTs = strtotime($start);
+                $endTs = strtotime($end);
+                if ($startTs === false || $endTs === false || $endTs <= $startTs) {
+                    $this->sendJSON(['error' => "End time must be later than start time for {$day}"], 400);
+                }
+
+                $normalized[] = [
+                    'day_of_week' => $day,
+                    'start_time' => strlen($start) === 5 ? $start . ':00' : $start,
+                    'end_time' => strlen($end) === 5 ? $end . ':00' : $end
+                ];
+            }
+
+            $this->conn->beginTransaction();
+
+            $deleteStmt = $this->conn->prepare("DELETE FROM tbl_teacher_availability WHERE teacher_id = ?");
+            $deleteStmt->execute([$teacherId]);
+
+            if (!empty($normalized)) {
+                $insertStmt = $this->conn->prepare("
+                    INSERT INTO tbl_teacher_availability (teacher_id, branch_id, day_of_week, start_time, end_time, status)
+                    VALUES (?, ?, ?, ?, ?, 'Available')
+                ");
+                foreach ($normalized as $row) {
+                    $insertStmt->execute([
+                        $teacherId,
+                        (int)($teacher['branch_id'] ?? 0),
+                        $row['day_of_week'],
+                        $row['start_time'],
+                        $row['end_time']
+                    ]);
+                }
+            }
+
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'message' => 'Availability saved successfully']);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function cancelSessionByTeacher()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $sessionId = (int)($data['session_id'] ?? 0);
+        $reason = trim((string)($data['reason'] ?? ''));
+
+        if ($teacherId < 1 || $sessionId < 1) {
+            $this->sendJSON(['error' => 'teacher_id/user_id and session_id are required'], 400);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                UPDATE tbl_sessions
+                SET status = 'cancelled_by_teacher',
+                    needs_rescheduling = 1,
+                    cancellation_reason = ?,
+                    cancelled_by_teacher_at = NOW(),
+                    rescheduled_to_session_id = NULL
+                WHERE session_id = ?
+                  AND teacher_id = ?
+                  AND status NOT IN ('Completed', 'cancelled_by_teacher')
+            ");
+            $stmt->execute([
+                ($reason !== '' ? $reason : null),
+                $sessionId,
+                $teacherId
+            ]);
+
+            if ($stmt->rowCount() === 0) {
+                $check = $this->conn->prepare("
+                    SELECT session_id
+                    FROM tbl_sessions
+                    WHERE session_id = ?
+                      AND teacher_id = ?
+                    LIMIT 1
+                ");
+                $check->execute([$sessionId, $teacherId]);
+                if (!$check->fetchColumn()) {
+                    $this->sendJSON(['error' => 'Session not found for this teacher'], 404);
+                }
+                $this->sendJSON(['error' => 'Only upcoming non-completed sessions can be cancelled'], 400);
+            }
+
+            $this->sendJSON(['success' => true, 'message' => 'Session cancelled and queued for admin rescheduling.']);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
@@ -547,6 +876,18 @@ switch ($action) {
     case 'get-teachers':
     case '':
         $api->getTeachers();
+        break;
+    case 'get-teacher-sessions':
+        $api->getTeacherSessions();
+        break;
+    case 'get-teacher-availability':
+        $api->getTeacherAvailability();
+        break;
+    case 'save-teacher-availability':
+        $api->saveTeacherAvailability();
+        break;
+    case 'cancel-session':
+        $api->cancelSessionByTeacher();
         break;
     case 'add-teacher':
         $api->addTeacher();

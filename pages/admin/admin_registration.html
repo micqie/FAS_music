@@ -95,16 +95,10 @@
                             <a href="admin_specializations.html" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Specializations</a>
                         </div>
                     </details>
+                    <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
                     <details class="group/dropdown">
-                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a href="admin_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
-                            <a href="admin_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
-                        </div>
-                    </details>                    <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
                             <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
@@ -127,6 +121,9 @@
                     </a>
                     <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
+                    </a>
+                    <a href="admin_room.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-door-open mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Rooms
                     </a>
                     <a href="admin_package.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-box mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Packages
@@ -229,21 +226,25 @@
             <form id="paymentForm" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-zinc-300 mb-2">Amount (PHP) *</label>
-                    <input type="number" id="paymentAmount" step="0.01" min="0" required
-                        class="w-full px-4 py-2.5 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-500/20 transition">
+                    <input type="hidden" id="paymentAmount">
+                    <div id="paymentAmountDisplay"
+                        class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white">
+                        ₱0.00
+                    </div>
+                    <p class="mt-2 text-xs text-zinc-400">
+                        This amount comes from the student's submitted registration payment request.
+                    </p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-zinc-300 mb-2">Payment Method *</label>
-                    <select id="paymentMethod" required
-                        class="w-full px-4 py-2.5 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-500/20 transition">
-                        <option value="">Select Method</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Card">Card</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                        <option value="GCash">GCash</option>
-                        <option value="Check">Check</option>
-                        <option value="Other">Other</option>
-                    </select>
+                    <input type="hidden" id="paymentMethod">
+                    <div id="paymentMethodDisplay"
+                        class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white">
+                        Not available
+                    </div>
+                    <p class="mt-2 text-xs text-zinc-400">
+                        This method was already selected by the student during registration.
+                    </p>
                 </div>
                 <p class="text-xs text-zinc-400">
                     Receipt number is generated automatically by the system.
@@ -522,3 +523,6 @@
     </script>
 </body>
 </html>
+
+
+

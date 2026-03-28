@@ -94,16 +94,10 @@
                             <a href="admin_specializations.html" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Specializations</a>
                         </div>
                     </details>
+                    <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
                     <details class="group/dropdown">
-                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a href="admin_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
-                            <a href="admin_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
-                        </div>
-                    </details>                    <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
                             <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
@@ -127,6 +121,9 @@
                     <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
                     </a>
+                    <a href="admin_room.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-door-open mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Rooms
+                    </a>
                     <a href="admin_package.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-box mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Packages
                     </a>
@@ -141,7 +138,7 @@
             <div class="mb-10">
                 <h1 class="text-3xl font-black text-slate-900 tracking-tight">Students</h1>
                 <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
-                <p class="text-slate-500 mt-2">View and filter students by branch</p>
+                <p class="text-slate-500 mt-2">View and filter approved school students by branch</p>
             </div>
 
         <!-- Branch Filter -->
@@ -161,7 +158,7 @@
         <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
             <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
                 <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-user-graduate mr-2 text-gold-500"></i>Registered Students</h3>
-                <span class="text-xs text-slate-500" id="tableCount">All students from your FAS database</span>
+                <span class="text-xs text-slate-500" id="tableCount">Approved and registered students only</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -442,5 +439,8 @@
     </script>
 </body>
 </html>
+
+
+
 
 

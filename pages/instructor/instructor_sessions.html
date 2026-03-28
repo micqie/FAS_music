@@ -111,7 +111,7 @@
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h1 class="text-3xl font-black text-slate-900 tracking-tight">Session Schedule</h1>
-                    <p class="text-slate-500 mt-1">Keep track of all upcoming lessons and rooms.</p>
+                    <p class="text-slate-500 mt-1">Review your live lesson queue and cancel sessions that need admin rescheduling.</p>
                 </div>
                 <div class="flex items-center gap-2 bg-white rounded-2xl border border-slate-200 p-1">
                     <button class="session-filter px-4 py-2 text-sm font-semibold rounded-xl bg-obsidian text-white" data-filter="today">Today</button>
@@ -140,22 +140,24 @@
                 <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
                     <h2 class="text-lg font-bold text-slate-900">Quick Actions</h2>
                     <div class="mt-4 space-y-3">
-                        <button class="w-full px-4 py-3 rounded-2xl bg-obsidian text-white text-sm font-semibold hover:bg-black transition">Request Schedule Update</button>
-                        <button class="w-full px-4 py-3 rounded-2xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition">Download Weekly Plan</button>
+                        <div class="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-800">
+                            Teacher cancellations keep the original session in history and send it to admin for rescheduling.
+                        </div>
+                        <div class="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-600">
+                            Student and teacher stay fixed during admin rescheduling.
+                        </div>
                     </div>
                 </div>
             </section>
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/index.js"></script>
     <script>
-        const demoSessions = [
-            { student: 'Angela Ramos', date: 'Mar 27', time: '09:00 AM - 10:00 AM', room: 'Studio A', status: 'Confirmed', window: 'today' },
-            { student: 'Carlo Santos', date: 'Mar 27', time: '11:00 AM - 12:00 PM', room: 'Studio B', status: 'Pending', window: 'today' },
-            { student: 'Mira Delgado', date: 'Mar 28', time: '02:00 PM - 03:00 PM', room: 'Studio C', status: 'Confirmed', window: 'week' },
-            { student: 'Jasper Lim', date: 'Mar 30', time: '10:00 AM - 11:00 AM', room: 'Studio D', status: 'Confirmed', window: 'week' }
-        ];
+        let currentFilter = 'today';
+        let teacherSessions = [];
 
         function toggleInstructorMenu() {
             const menu = document.getElementById('instructorMobileMenu');
@@ -167,27 +169,80 @@
             icon.classList.toggle('fa-times', isHidden);
         }
 
+        function formatTime12Hour(timeString) {
+            if (!timeString) return '—';
+            const parts = String(timeString).split(':');
+            if (parts.length < 2) return timeString;
+            const h = Number(parts[0]);
+            const m = Number(parts[1]);
+            if (Number.isNaN(h) || Number.isNaN(m)) return timeString;
+            const suffix = h >= 12 ? 'PM' : 'AM';
+            const hh = h % 12 === 0 ? 12 : h % 12;
+            return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
+        }
+
+        function formatDateShort(dateString) {
+            if (!dateString) return '—';
+            const d = new Date(dateString);
+            return Number.isNaN(d.getTime()) ? dateString : d.toLocaleDateString();
+        }
+
+        function getStatusBadge(status) {
+            const normalized = String(status || '').toLowerCase();
+            let classes = 'bg-slate-100 text-slate-700';
+            if (normalized === 'scheduled') classes = 'bg-sky-100 text-sky-700';
+            if (normalized === 'completed') classes = 'bg-emerald-100 text-emerald-700';
+            if (normalized === 'cancelled_by_teacher') classes = 'bg-rose-100 text-rose-700';
+            if (normalized === 'rescheduled') classes = 'bg-amber-100 text-amber-700';
+            return `text-xs font-semibold px-2.5 py-1 rounded-full ${classes}`;
+        }
+
+        function canTeacherCancel(session) {
+            const status = String(session?.status || '').toLowerCase();
+            if (status === 'completed' || status === 'cancelled_by_teacher') return false;
+            const sessionDateTime = new Date(`${session.session_date}T${session.start_time}`);
+            return !Number.isNaN(sessionDateTime.getTime()) && sessionDateTime > new Date();
+        }
+
+        async function loadTeacherSessions(filter = currentFilter) {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            if (!user?.user_id) {
+                teacherSessions = [];
+                renderSessions(filter);
+                return;
+            }
+
+            try {
+                const response = await axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-sessions&user_id=${encodeURIComponent(user.user_id)}&filter=${encodeURIComponent(filter)}`);
+                const data = response.data || {};
+                teacherSessions = data.success && Array.isArray(data.sessions) ? data.sessions : [];
+            } catch (error) {
+                console.error('Failed to load teacher sessions:', error);
+                teacherSessions = [];
+            }
+
+            renderSessions(filter);
+        }
+
         function renderSessions(filter) {
             const list = document.getElementById('sessionsList');
             const count = document.getElementById('sessionCount');
             if (!list) return;
-            let sessions = demoSessions;
-            if (filter === 'today') {
-                sessions = demoSessions.filter(s => s.window === 'today');
-            } else if (filter === 'week') {
-                sessions = demoSessions.filter(s => s.window === 'today' || s.window === 'week');
-            }
+            currentFilter = filter;
+            const sessions = teacherSessions;
             if (count) count.textContent = `${sessions.length} sessions`;
             list.innerHTML = sessions.length ? sessions.map(session => `
                 <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 flex flex-col gap-3">
                     <div class="flex items-center justify-between">
-                        <div class="text-sm font-semibold text-slate-900">${session.student}</div>
-                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full ${session.status === 'Confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${session.status}</span>
+                        <div class="text-sm font-semibold text-slate-900">${session.student_first_name || ''} ${session.student_last_name || ''}</div>
+                        <span class="${getStatusBadge(session.status)}">${session.status}</span>
                     </div>
-                    <div class="text-xs text-slate-500">${session.date} | ${session.time}</div>
+                    <div class="text-xs text-slate-500">${formatDateShort(session.session_date)} | ${formatTime12Hour(session.start_time)} - ${formatTime12Hour(session.end_time)}</div>
                     <div class="flex items-center justify-between text-xs text-slate-500">
-                        <span><i class="fas fa-map-marker-alt mr-2 text-gold-500"></i>${session.room}</span>
-                        <button class="text-gold-600 font-semibold hover:text-gold-500">View Details</button>
+                        <span><i class="fas fa-map-marker-alt mr-2 text-gold-500"></i>${session.room_name || 'Room not assigned'}</span>
+                        ${canTeacherCancel(session)
+                            ? `<button class="text-rose-600 font-semibold hover:text-rose-500" onclick="promptTeacherCancellation(${Number(session.session_id)})">Cancel Session</button>`
+                            : `<span>${session.cancellation_reason ? `Reason: ${session.cancellation_reason}` : 'History kept'}</span>`}
                     </div>
                 </div>
             `).join('') : `
@@ -195,20 +250,62 @@
             `;
         }
 
+        async function promptTeacherCancellation(sessionId) {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            if (!user?.user_id || !sessionId) return;
+
+            const result = await Swal.fire({
+                icon: 'warning',
+                title: 'Cancel this session?',
+                text: 'The session will stay in history and go to admin for rescheduling.',
+                input: 'text',
+                inputPlaceholder: 'Reason for cancellation (optional)',
+                showCancelButton: true,
+                confirmButtonText: 'Cancel Session',
+                cancelButtonText: 'Keep Session',
+                confirmButtonColor: '#dc2626'
+            });
+            if (!result.isConfirmed) return;
+
+            try {
+                const response = await axios.post(`${baseApiUrl}/teachers.php?action=cancel-session`, {
+                    user_id: Number(user.user_id),
+                    session_id: Number(sessionId),
+                    reason: result.value || ''
+                });
+                const data = response.data || {};
+                if (data.success) {
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'Session Cancelled',
+                        text: data.message || 'Admin has been asked to reschedule this session.',
+                        confirmButtonColor: '#b8860b'
+                    });
+                    loadTeacherSessions(currentFilter);
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Failed to cancel session.', confirmButtonColor: '#b8860b' });
+                }
+            } catch (error) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Network error while cancelling session.', confirmButtonColor: '#b8860b' });
+            }
+        }
+
+        window.promptTeacherCancellation = promptTeacherCancellation;
+
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof Auth !== 'undefined' && Auth.getUser) {
                 const user = Auth.getUser() || {};
-                const displayName = user.username || user.email || 'Instructor';
+                const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || user.email || 'Instructor';
                 const nameEl = document.getElementById('instructorNameNav');
                 if (nameEl) nameEl.textContent = displayName;
             }
-            renderSessions('today');
+            loadTeacherSessions('today');
             const filters = document.querySelectorAll('.session-filter');
             filters.forEach(btn => {
                 btn.addEventListener('click', () => {
                     filters.forEach(b => b.className = 'session-filter px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100');
                     btn.className = 'session-filter px-4 py-2 text-sm font-semibold rounded-xl bg-obsidian text-white';
-                    renderSessions(btn.dataset.filter);
+                    loadTeacherSessions(btn.dataset.filter);
                 });
             });
         });

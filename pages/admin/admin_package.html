@@ -84,7 +84,7 @@
                         <i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Students
                     </a>
                   <a href="admin_users.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-users-cog mr-3"></i> Users 
+                        <i class="fas fa-users-cog mr-3"></i> Users
                     </a>
                     <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
@@ -96,16 +96,10 @@
                             <a href="admin_specializations.html" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Specializations</a>
                         </div>
                     </details>
+                    <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
                     <details class="group/dropdown">
-                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a href="admin_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
-                            <a href="admin_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
-                        </div>
-                    </details>                    <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
                             <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
@@ -129,7 +123,9 @@
                     <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
                     </a>
-
+                    <a href="admin_room.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-door-open mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Rooms
+                    </a>
                     <a href="admin_package.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
                         <i class="fas fa-box mr-3"></i> Packages
                     </a>
@@ -234,7 +230,7 @@
 
     <!-- Add/Edit Package Modal -->
     <div id="packageModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto p-6 md:p-8 relative">
             <button id="closePackageModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
@@ -244,9 +240,9 @@
 
             <div id="packageMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
 
-            <form id="packageForm" class="space-y-4">
+            <form id="packageForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                 <input type="hidden" id="packageId" value="">
-                <div>
+                <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Branch *</label>
                     <select id="packageBranchId" required
                         class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
@@ -254,19 +250,19 @@
                     </select>
                     <p class="text-xs text-zinc-500 mt-1">Branch is required. Packages are managed per branch.</p>
                 </div>
-                <div>
+                <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Package Name *</label>
                     <input type="text" id="packageName" required
                         class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
                         placeholder="e.g., Basic 12, Standard 20, Premium 20+">
                 </div>
-                <div>
+                <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Number of Sessions *</label>
                     <input type="number" id="packageSessions" min="1" required
                         class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
                         placeholder="12, 20, or 24">
                 </div>
-                <div>
+                <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Max Instruments *</label>
                     <select id="packageMaxInstruments" required
                         class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
@@ -276,20 +272,21 @@
                     </select>
                     <p class="text-xs text-zinc-500 mt-1">12 sessions → 1, 20 sessions → 2, 20+ → 3</p>
                 </div>
-                <div>
+                <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Price (PHP) *</label>
                     <input type="number" id="packagePrice" min="0" step="0.01" required
                         class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
                         placeholder="0.00">
                     <p class="text-xs text-zinc-500 mt-1">Used for student payment calculations</p>
                 </div>
-                <div>
+
+                <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
-                    <textarea id="packageDescription" rows="2"
+                    <textarea id="packageDescription" rows="3"
                         class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
                         placeholder="Optional"></textarea>
                 </div>
-                <div class="flex items-center justify-end gap-3 pt-4">
+                <div class="md:col-span-2 flex items-center justify-end gap-3 pt-2">
                     <button type="button" id="cancelPackageBtn"
                         class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
                         Cancel

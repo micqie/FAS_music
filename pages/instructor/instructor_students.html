@@ -166,14 +166,10 @@
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/index.js"></script>
     <script>
-        const demoStudents = [
-            { name: 'Angela Ramos', instrument: 'Piano', level: 'Intermediate', status: 'On Track', nextLesson: 'Mar 27, 10:00 AM' },
-            { name: 'Carlo Santos', instrument: 'Guitar', level: 'Beginner', status: 'Needs Review', nextLesson: 'Mar 28, 01:00 PM' },
-            { name: 'Mira Delgado', instrument: 'Violin', level: 'Advanced', status: 'Excellent', nextLesson: 'Mar 29, 03:00 PM' },
-            { name: 'Jasper Lim', instrument: 'Drums', level: 'Beginner', status: 'On Track', nextLesson: 'Mar 29, 09:00 AM' }
-        ];
+        let instructorStudents = [];
 
         function toggleInstructorMenu() {
             const menu = document.getElementById('instructorMobileMenu');
@@ -185,25 +181,50 @@
             icon.classList.toggle('fa-times', isHidden);
         }
 
+        function formatDateTime(dateValue, timeValue) {
+            if (!dateValue) return 'No upcoming lesson';
+            const value = new Date(`${dateValue}T${timeValue || '00:00:00'}`);
+            return Number.isNaN(value.getTime()) ? `${dateValue} ${timeValue || ''}`.trim() : value.toLocaleString();
+        }
+
+        function getStudentRowStatus(student) {
+            const status = String(student.next_status || '').toLowerCase();
+            if (status === 'completed') return 'Completed';
+            if (status === 'cancelled_by_teacher') return 'Needs Reschedule';
+            if (student.next_lesson_date) return 'Scheduled';
+            return 'No Schedule';
+        }
+
+        function getStudentStatusClasses(label) {
+            if (label === 'Completed') return 'bg-emerald-100 text-emerald-700';
+            if (label === 'Needs Reschedule') return 'bg-rose-100 text-rose-700';
+            if (label === 'Scheduled') return 'bg-blue-100 text-blue-700';
+            return 'bg-slate-100 text-slate-700';
+        }
+
         function renderStudents(filter = '') {
             const tbody = document.getElementById('studentsTable');
             const count = document.getElementById('studentCount');
             if (!tbody) return;
             const term = filter.trim().toLowerCase();
-            const rows = demoStudents.filter(s => s.name.toLowerCase().includes(term) || s.instrument.toLowerCase().includes(term));
+            const rows = instructorStudents.filter(student => {
+                const name = String(student.name || '').toLowerCase();
+                const instrument = String(student.instrument || '').toLowerCase();
+                return name.includes(term) || instrument.includes(term);
+            });
             if (count) count.textContent = `${rows.length} students`;
             tbody.innerHTML = rows.length ? rows.map(s => `
                 <tr class="hover:bg-gold-500/5 transition">
                     <td class="py-3 pr-4">
                         <div class="font-semibold text-slate-900">${s.name}</div>
-                        <div class="text-xs text-slate-500 md:hidden">${s.instrument}</div>
+                        <div class="text-xs text-slate-500 md:hidden">${s.instrument || '—'}</div>
                     </td>
-                    <td class="py-3 pr-4 hidden md:table-cell text-slate-700">${s.instrument}</td>
-                    <td class="py-3 pr-4 hidden lg:table-cell text-slate-700">${s.level}</td>
+                    <td class="py-3 pr-4 hidden md:table-cell text-slate-700">${s.instrument || '—'}</td>
+                    <td class="py-3 pr-4 hidden lg:table-cell text-slate-700">${s.level || '—'}</td>
                     <td class="py-3 pr-4">
-                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full ${s.status === 'Excellent' ? 'bg-emerald-100 text-emerald-700' : s.status === 'Needs Review' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${s.status}</span>
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full ${getStudentStatusClasses(getStudentRowStatus(s))}">${getStudentRowStatus(s)}</span>
                     </td>
-                    <td class="py-3 pr-4 hidden xl:table-cell text-slate-700">${s.nextLesson}</td>
+                    <td class="py-3 pr-4 hidden xl:table-cell text-slate-700">${formatDateTime(s.next_lesson_date, s.next_lesson_time)}</td>
                 </tr>
             `).join('') : `
                 <tr>
@@ -212,14 +233,68 @@
             `;
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        async function loadInstructorStudents() {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            if (!user?.user_id) {
+                instructorStudents = [];
+                renderStudents();
+                return;
+            }
+
+            try {
+                const response = await axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-sessions&user_id=${encodeURIComponent(user.user_id)}&filter=all`);
+                const sessions = response.data?.success && Array.isArray(response.data.sessions) ? response.data.sessions : [];
+                const byStudent = new Map();
+
+                sessions.forEach(session => {
+                    const studentId = Number(session.student_id || 0);
+                    if (!studentId) return;
+
+                    const existing = byStudent.get(studentId) || {
+                        student_id: studentId,
+                        name: `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student',
+                        instrument: '',
+                        level: '',
+                        next_lesson_date: '',
+                        next_lesson_time: '',
+                        next_status: ''
+                    };
+
+                    const sessionDateTime = new Date(`${session.session_date}T${session.start_time || '00:00:00'}`);
+                    const now = new Date();
+                    const hasUpcoming = !Number.isNaN(sessionDateTime.getTime()) && sessionDateTime >= now;
+                    const existingDateTime = existing.next_lesson_date
+                        ? new Date(`${existing.next_lesson_date}T${existing.next_lesson_time || '00:00:00'}`)
+                        : null;
+
+                    if (hasUpcoming && (!existingDateTime || sessionDateTime < existingDateTime)) {
+                        existing.next_lesson_date = session.session_date || '';
+                        existing.next_lesson_time = session.start_time || '';
+                        existing.next_status = session.status || '';
+                    } else if (!existing.next_status) {
+                        existing.next_status = session.status || '';
+                    }
+
+                    byStudent.set(studentId, existing);
+                });
+
+                instructorStudents = Array.from(byStudent.values()).sort((a, b) => a.name.localeCompare(b.name));
+            } catch (error) {
+                console.error('Failed to load instructor students:', error);
+                instructorStudents = [];
+            }
+
+            renderStudents();
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
             if (typeof Auth !== 'undefined' && Auth.getUser) {
                 const user = Auth.getUser() || {};
                 const displayName = user.username || user.email || 'Instructor';
                 const nameEl = document.getElementById('instructorNameNav');
                 if (nameEl) nameEl.textContent = displayName;
             }
-            renderStudents();
+            await loadInstructorStudents();
             const search = document.getElementById('studentSearch');
             if (search) {
                 search.addEventListener('input', (e) => renderStudents(e.target.value));

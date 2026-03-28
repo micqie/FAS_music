@@ -107,20 +107,63 @@ class User
         return (float)($stmt->fetchColumn() ?: 0);
     }
 
-    private function getRegistrationSummary($studentId, $studentStatus = '')
+    private function hasAnyRegistrationPayment($studentId)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT COUNT(*) FROM tbl_registration_payments WHERE student_id = ?
+        ");
+        $stmt->execute([(int)$studentId]);
+        return ((int)$stmt->fetchColumn()) > 0;
+    }
+
+    private function hasPendingRegistrationPayment($studentId)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT COUNT(*) FROM tbl_registration_payments
+            WHERE student_id = ?
+              AND status <> 'Paid'
+        ");
+        $stmt->execute([(int)$studentId]);
+        return ((int)$stmt->fetchColumn()) > 0;
+    }
+
+    private function getRegistrationSummary($studentId)
     {
         $paid = $this->getRegistrationPaidAmount($studentId);
-        $status = 'Pending';
-        if ($studentStatus === 'Active') {
-            $status = 'Approved';
-        } elseif ($paid >= 1000) {
-            $status = 'Fee Paid';
+        $hasPending = $this->hasPendingRegistrationPayment($studentId);
+        $studentStatus = 'Inactive';
+        try {
+            $stmt = $this->conn->prepare("SELECT status FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmt->execute([(int)$studentId]);
+            $studentStatus = (string)($stmt->fetchColumn() ?: 'Inactive');
+        } catch (PDOException $e) {
+            $studentStatus = 'Inactive';
         }
+        $status = ($paid >= 1000 && $studentStatus === 'Active' && !$hasPending) ? 'Approved' : 'Pending';
         return [
             'registration_fee_amount' => 1000.00,
             'registration_fee_paid' => $paid,
             'registration_status' => $status
         ];
+    }
+
+    private function isRegistrationProfileComplete($student)
+    {
+        if (!$student || !is_array($student)) return false;
+        $required = [
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'branch_id',
+            'date_of_birth',
+            'address'
+        ];
+        foreach ($required as $field) {
+            $val = $student[$field] ?? null;
+            if ($val === null || trim((string)$val) === '') return false;
+        }
+        return true;
     }
 
     private function storePaymentProofUpload($file, $scope = 'registration')
@@ -300,6 +343,141 @@ class User
         }
     }
 
+    public function registerBasic($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid request data'], 400);
+        }
+
+        foreach (['student_first_name', 'student_last_name', 'student_email', 'student_phone', 'branch_id'] as $k) {
+            if (isset($data[$k]) && is_string($data[$k])) {
+                $data[$k] = trim($data[$k]);
+            }
+        }
+
+        $required = ['student_first_name', 'student_last_name', 'student_email', 'student_phone', 'branch_id', 'password'];
+        $labels = [
+            'student_first_name' => 'First Name',
+            'student_last_name' => 'Last Name',
+            'student_email' => 'Email',
+            'student_phone' => 'Phone',
+            'branch_id' => 'Branch',
+            'password' => 'Password'
+        ];
+        foreach ($required as $field) {
+            $val = $data[$field] ?? '';
+            if ($val === '' || $val === null) {
+                $label = $labels[$field] ?? $field;
+                $this->sendJSON(['error' => ucfirst($label) . ' is required'], 400);
+            }
+        }
+
+        $email = trim((string)($data['student_email'] ?? ''));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->sendJSON(['error' => 'Invalid email address format'], 400);
+        }
+        if (strlen($email) > 254) {
+            $this->sendJSON(['error' => 'Email address is too long (max 254 characters)'], 400);
+        }
+
+        $password = (string)($data['password'] ?? '');
+        if (strlen($password) < 8) {
+            $this->sendJSON(['error' => 'Password must be at least 8 characters long'], 400);
+        }
+        if (!preg_match('/[A-Z]/', $password)) {
+            $this->sendJSON(['error' => 'Password must contain at least one uppercase letter'], 400);
+        }
+        if (!preg_match('/[a-z]/', $password)) {
+            $this->sendJSON(['error' => 'Password must contain at least one lowercase letter'], 400);
+        }
+        if (!preg_match('/[0-9]/', $password)) {
+            $this->sendJSON(['error' => 'Password must contain at least one number'], 400);
+        }
+        if (!preg_match('/[!@#$%^&*]/', $password)) {
+            $this->sendJSON(['error' => 'Password must contain at least one special character (!@#$%^&*)'], 400);
+        }
+
+        try {
+            $dupStudent = $this->conn->prepare("SELECT student_id FROM tbl_students WHERE email = ? LIMIT 1");
+            $dupStudent->execute([$email]);
+            if ($dupStudent->fetch()) {
+                $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
+            }
+
+            $dupUser = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
+            $dupUser->execute([$email, $email]);
+            if ($dupUser->fetch()) {
+                $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
+            }
+
+            $this->conn->beginTransaction();
+
+            $roleStmt = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = 'Student' LIMIT 1");
+            $roleStmt->execute();
+            $role = $roleStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$role) throw new Exception("Student role not found");
+            $roleId = (int)$role['role_id'];
+
+            $stmtStudent = $this->conn->prepare("
+                INSERT INTO tbl_students (
+                    branch_id, first_name, last_name, phone, email, status
+                ) VALUES (?, ?, ?, ?, ?, 'Inactive')
+            ");
+            $stmtStudent->execute([
+                (int)$data['branch_id'],
+                $data['student_first_name'],
+                $data['student_last_name'],
+                $data['student_phone'],
+                $email
+            ]);
+            $studentId = (int)$this->conn->lastInsertId();
+
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            $stmtUser = $this->conn->prepare("
+                INSERT INTO tbl_users (
+                    username, password, role_id, first_name, last_name, email, phone, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
+            ");
+            $stmtUser->execute([
+                $email,
+                $hashedPassword,
+                $roleId,
+                $data['student_first_name'],
+                $data['student_last_name'],
+                $email,
+                $data['student_phone']
+            ]);
+            $userId = (int)$this->conn->lastInsertId();
+
+            $this->conn->commit();
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Account created successfully. Please complete your registration steps in the student dashboard.',
+                'student_id' => $studentId,
+                'user_id' => $userId
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            if ($e->getCode() == 23000 && (strpos($e->getMessage(), 'Duplicate entry') !== false || strpos($e->getMessage(), 'username') !== false || strpos($e->getMessage(), 'email') !== false)) {
+                $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
+            }
+            $this->sendJSON(['error' => 'Registration failed: ' . $e->getMessage()], 500);
+        } catch (Exception $e) {
+            if ($this->conn && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['error' => 'Registration failed: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function register($json)
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -402,7 +580,7 @@ class User
             $existingStudentStmt->execute([$email]);
             $existingStudent = $existingStudentStmt->fetch(PDO::FETCH_ASSOC);
             if ($existingStudent) {
-                $summary = $this->getRegistrationSummary((int)$existingStudent['student_id'], (string)($existingStudent['status'] ?? ''));
+                $summary = $this->getRegistrationSummary((int)$existingStudent['student_id']);
                 $alreadySettled = ((float)($summary['registration_fee_paid'] ?? 0) >= 1000)
                     || in_array((string)($summary['registration_status'] ?? ''), ['Approved', 'Fee Paid'], true);
 
@@ -721,7 +899,7 @@ class User
             $student = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$student) $this->sendJSON(['error' => 'Student not found'], 404);
-            $summary = $this->getRegistrationSummary((int)$student['student_id'], (string)$student['status']);
+            $summary = $this->getRegistrationSummary((int)$student['student_id']);
             $student = array_merge($student, $summary);
 
             $this->sendJSON(['success' => true, 'student' => $student]);
@@ -736,7 +914,11 @@ class User
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
 
-        $data = json_decode($json, true);
+        $isMultipart = $this->isMultipartRequest();
+        $data = $isMultipart ? $_POST : json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid request data'], 400);
+        }
         foreach (['student_id', 'amount', 'payment_method'] as $field) {
             if (empty($data[$field])) $this->sendJSON(['error' => "Field $field is required"], 400);
         }
@@ -744,11 +926,34 @@ class User
         try {
             $this->conn->beginTransaction();
 
-            $stmtStudent = $this->conn->prepare("SELECT student_id, email, status FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmtStudent = $this->conn->prepare("
+                SELECT student_id, email, status,
+                       first_name, last_name, phone, branch_id, date_of_birth, address
+                 FROM tbl_students
+                 WHERE student_id = ?
+                 LIMIT 1
+            ");
             $stmtStudent->execute([(int)$data['student_id']]);
             $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
             if (!$student) {
                 throw new Exception("Student not found");
+            }
+
+            if (!$this->isRegistrationProfileComplete($student)) {
+                throw new Exception("Please complete your registration details before submitting payment.");
+            }
+
+            if ($this->hasAnyRegistrationPayment((int)$data['student_id'])) {
+                throw new Exception("A registration payment request already exists. Please wait for admin approval.");
+            }
+
+            $registrationProofPath = null;
+            if ($isMultipart && isset($_FILES['registration_proof_file'])) {
+                try {
+                    $registrationProofPath = $this->storePaymentProofUpload($_FILES['registration_proof_file'], 'registration');
+                } catch (Exception $e) {
+                    $this->sendJSON(['error' => $e->getMessage()], 400);
+                }
             }
 
             $paidSoFar = $this->getRegistrationPaidAmount((int)$data['student_id']);
@@ -758,54 +963,28 @@ class User
 
             $newPaid = $paidSoFar + (float)$data['amount'];
             $remaining = 1000.0 - $newPaid;
-            $receipt = $data['receipt_number'] ?? 'REG-' . time();
+            $receipt = $data['receipt_number'] ?? ($registrationProofPath ? 'REG-PROOF-' . time() : 'REG-' . time());
             $notes = $data['notes'] ?? '';
 
+            $paymentStatus = 'Pending';
             $stmtPayment = $this->conn->prepare("
                 INSERT INTO tbl_registration_payments (
                     student_id, amount, payment_method, receipt_number, status
-                ) VALUES (?, ?, ?, ?, 'Paid')
+                ) VALUES (?, ?, ?, ?, ?)
             ");
-            $stmtPayment->execute([$data['student_id'], $data['amount'], $data['payment_method'], $receipt]);
+            $stmtPayment->execute([$data['student_id'], $data['amount'], $data['payment_method'], $receipt, $paymentStatus]);
 
-            $newStatus = ($remaining <= 0) ? 'Approved' : 'Pending';
+            $newStatus = 'Pending';
 
-            if ($newStatus === 'Approved') {
-                $stmtActivateStudent = $this->conn->prepare("
-                    UPDATE tbl_students
-                    SET status = 'Active'
-                    WHERE student_id = ?
-                ");
-                $stmtActivateStudent->execute([$data['student_id']]);
-
-                if (!empty($student['email'])) {
-                    $stmtActivateUser = $this->conn->prepare("
-                        UPDATE tbl_users
-                        SET status = 'Active'
-                        WHERE email = ?
+            if ($registrationProofPath) {
+                $this->ensureStudentRegistrationProofColumn();
+                if ($this->hasStudentColumn('registration_proof_path')) {
+                    $stmtProof = $this->conn->prepare("
+                        UPDATE tbl_students
+                        SET registration_proof_path = ?
+                        WHERE student_id = ?
                     ");
-                    $stmtActivateUser->execute([$student['email']]);
-                }
-
-                // Activate guardian user accounts linked to this student (by guardian email)
-                $stmtGuardianEmails = $this->conn->prepare("
-                    SELECT g.email
-                    FROM tbl_guardians g
-                    INNER JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
-                    WHERE sg.student_id = ?
-                      AND g.email IS NOT NULL
-                      AND TRIM(g.email) <> ''
-                ");
-                $stmtGuardianEmails->execute([(int)$data['student_id']]);
-                $guardianEmails = $stmtGuardianEmails->fetchAll(PDO::FETCH_COLUMN);
-                if (!empty($guardianEmails)) {
-                    $placeholders = implode(',', array_fill(0, count($guardianEmails), '?'));
-                    $stmtGuardianUsers = $this->conn->prepare("
-                        UPDATE tbl_users
-                        SET status = 'Active'
-                        WHERE email IN ({$placeholders})
-                    ");
-                    $stmtGuardianUsers->execute($guardianEmails);
+                    $stmtProof->execute([$registrationProofPath, (int)$data['student_id']]);
                 }
             }
 
@@ -813,11 +992,12 @@ class User
 
             $this->sendJSON([
                 'success' => true,
-                'message' => 'Registration fee payment recorded successfully',
+                'message' => 'Payment submitted. Waiting for admin approval.',
                 'paid_amount' => $newPaid,
                 'remaining_amount' => max(0, $remaining),
                 'registration_status' => $newStatus,
-                'receipt_number' => $receipt
+                'receipt_number' => $receipt,
+                'registration_proof_path' => $registrationProofPath
             ]);
 
         } catch (Exception $e) {
@@ -839,6 +1019,9 @@ switch ($action) {
         break;
     case 'register':
         $user->register(file_get_contents('php://input'));
+        break;
+    case 'register-basic':
+        $user->registerBasic(file_get_contents('php://input'));
         break;
     case 'check-registration-status':
         $user->checkRegistrationStatus($_GET['student_id'] ?? '');

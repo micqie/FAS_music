@@ -198,20 +198,11 @@
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/index.js"></script>
     <script>
-        const demoStudents = [
-            { name: 'Angela Ramos', level: 'Intermediate', instrument: 'Piano' },
-            { name: 'Carlo Santos', level: 'Beginner', instrument: 'Guitar' },
-            { name: 'Mira Delgado', level: 'Advanced', instrument: 'Violin' },
-            { name: 'Jasper Lim', level: 'Beginner', instrument: 'Drums' }
-        ];
-
-        const demoSessions = [
-            { student: 'Angela Ramos', time: '09:00 AM - 10:00 AM', room: 'Studio A', status: 'Confirmed' },
-            { student: 'Carlo Santos', time: '11:00 AM - 12:00 PM', room: 'Studio B', status: 'Pending' },
-            { student: 'Mira Delgado', time: '02:00 PM - 03:00 PM', room: 'Studio C', status: 'Confirmed' }
-        ];
+        let dashboardSessions = [];
+        let todaySessions = [];
 
         function toggleInstructorMenu() {
             const menu = document.getElementById('instructorMobileMenu');
@@ -223,41 +214,95 @@
             icon.classList.toggle('fa-times', isHidden);
         }
 
+        function formatTime12Hour(timeValue) {
+            if (!timeValue) return '--';
+            const [hour = '0', minute = '0'] = String(timeValue).split(':');
+            let h = Number(hour);
+            const suffix = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            return `${h}:${String(minute).padStart(2, '0')} ${suffix}`;
+        }
+
+        function getStatusBadge(status) {
+            const normalized = String(status || '').toLowerCase();
+            if (normalized === 'scheduled') return 'bg-sky-100 text-sky-700';
+            if (normalized === 'completed') return 'bg-emerald-100 text-emerald-700';
+            if (normalized === 'cancelled_by_teacher') return 'bg-rose-100 text-rose-700';
+            if (normalized === 'rescheduled') return 'bg-amber-100 text-amber-700';
+            return 'bg-slate-100 text-slate-700';
+        }
+
         function renderTodaySessions() {
             const list = document.getElementById('todaySessions');
             if (!list) return;
-            if (demoSessions.length === 0) {
+            if (todaySessions.length === 0) {
                 list.innerHTML = '<div class="text-sm text-slate-500">No sessions scheduled for today.</div>';
                 return;
             }
-            list.innerHTML = demoSessions.map(session => `
+            list.innerHTML = todaySessions.map(session => `
                 <div class="flex items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 bg-slate-50">
                     <div>
-                        <div class="text-sm font-semibold text-slate-900">${session.student}</div>
-                        <div class="text-xs text-slate-500">${session.time} | ${session.room}</div>
+                        <div class="text-sm font-semibold text-slate-900">${session.student_first_name || ''} ${session.student_last_name || ''}</div>
+                        <div class="text-xs text-slate-500">${formatTime12Hour(session.start_time)} - ${formatTime12Hour(session.end_time)} | ${session.room_name || 'Room not assigned'}</div>
                     </div>
-                    <span class="text-xs font-semibold px-3 py-1 rounded-full ${session.status === 'Confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${session.status}</span>
+                    <span class="text-xs font-semibold px-3 py-1 rounded-full ${getStatusBadge(session.status)}">${session.status || 'Scheduled'}</span>
                 </div>
             `).join('');
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        function getFutureSessions(sessions) {
+            const now = new Date();
+            return sessions.filter(session => {
+                const value = new Date(`${session.session_date}T${session.start_time}`);
+                return !Number.isNaN(value.getTime()) && value >= now && String(session.status || '').toLowerCase() !== 'completed';
+            });
+        }
+
+        async function loadDashboardData() {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            if (!user?.user_id) {
+                dashboardSessions = [];
+                todaySessions = [];
+                renderTodaySessions();
+                return;
+            }
+
+            try {
+                const [allResponse, todayResponse] = await Promise.all([
+                    axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-sessions&user_id=${encodeURIComponent(user.user_id)}&filter=all`),
+                    axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-sessions&user_id=${encodeURIComponent(user.user_id)}&filter=today`)
+                ]);
+                dashboardSessions = allResponse.data?.success && Array.isArray(allResponse.data.sessions) ? allResponse.data.sessions : [];
+                todaySessions = todayResponse.data?.success && Array.isArray(todayResponse.data.sessions) ? todayResponse.data.sessions : [];
+            } catch (error) {
+                console.error('Failed to load instructor dashboard data:', error);
+                dashboardSessions = [];
+                todaySessions = [];
+            }
+
+            const uniqueStudents = new Set(dashboardSessions.map(session => Number(session.student_id || 0)).filter(id => id > 0));
+            const futureSessions = getFutureSessions(dashboardSessions);
+            const nextSession = futureSessions[0] || null;
+            const nextSessionText = nextSession
+                ? `${formatTime12Hour(nextSession.start_time)} • ${nextSession.student_first_name || ''} ${nextSession.student_last_name || ''}`.trim()
+                : '--';
+
+            document.getElementById('statStudents').textContent = String(uniqueStudents.size);
+            document.getElementById('statToday').textContent = String(todaySessions.length);
+            document.getElementById('statNext').textContent = nextSessionText;
+            document.getElementById('instructorStudentCount').textContent = String(uniqueStudents.size);
+            document.getElementById('instructorUpcomingCount').textContent = String(futureSessions.length);
+            renderTodaySessions();
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
             if (typeof Auth !== 'undefined' && Auth.getUser) {
                 const user = Auth.getUser() || {};
                 const displayName = user.username || user.email || 'Instructor';
                 const nameEl = document.getElementById('instructorNameNav');
                 if (nameEl) nameEl.textContent = displayName;
             }
-            const studentCount = demoStudents.length;
-            const upcomingCount = demoSessions.length;
-            const nextSession = demoSessions[0]?.time || '--';
-
-            document.getElementById('statStudents').textContent = String(studentCount);
-            document.getElementById('statToday').textContent = String(upcomingCount);
-            document.getElementById('statNext').textContent = nextSession;
-            document.getElementById('instructorStudentCount').textContent = String(studentCount);
-            document.getElementById('instructorUpcomingCount').textContent = String(upcomingCount);
-            renderTodaySessions();
+            await loadDashboardData();
         });
     </script>
 </body>

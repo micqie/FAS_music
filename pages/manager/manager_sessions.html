@@ -78,16 +78,9 @@
                     <a href="manager_teachers.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-chalkboard-teacher mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branch Teachers
                     </a>
-                    <details class="group/dropdown" open>
-                        <summary class="sidebar-item-active flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a id="navSessionPending" href="manager_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
-                            <a id="navSessionActive" href="manager_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
-                        </div>
-                    </details>
+                    <a href="manager_sessions.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-calendar-check mr-3"></i> Sessions
+                    </a>
                 </nav>
             </div>
             <div>
@@ -948,3 +941,6 @@
     </script>
 </body>
 </html>
+
+
+

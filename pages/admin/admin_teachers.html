@@ -92,16 +92,10 @@
                             <a href="admin_specializations.html" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Specializations</a>
                         </div>
                     </details>
+                    <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
                     <details class="group/dropdown">
-                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-calendar-check mr-3"></i> Sessions</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a href="admin_sessions.html?view=pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Pending Sessions</a>
-                            <a href="admin_sessions.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Active Sessions</a>
-                        </div>
-                    </details>                    <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
                             <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
@@ -124,6 +118,9 @@
                     </a>
                     <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
+                    </a>
+                    <a href="admin_room.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-door-open mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Rooms
                     </a>
                     <a href="admin_package.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-box mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Packages
@@ -199,14 +196,14 @@
     </main>
 
     <div id="teacherModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
+        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto p-6 md:p-8 relative">
             <button id="closeTeacherModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
             <h3 id="teacherModalTitle" class="text-2xl font-bold text-white mb-2">Add Teacher</h3>
             <p class="text-zinc-400 text-xs mb-4">Fill in teacher details for masterfile records.</p>
             <div class="mb-4 rounded-lg border border-gold-500/30 bg-gold-500/10 px-4 py-3 text-xs text-zinc-200">
                 Temporary Password: <span class="font-mono font-semibold">fasmusic@2020</span>
             </div>
-            <form id="teacherForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form id="teacherForm" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
                 <input type="hidden" id="teacherId">
                 <div>
                     <label class="block text-sm font-medium text-zinc-300 mb-1">First Name *</label>
@@ -230,13 +227,18 @@
                         <option value="Contract">Contract</option>
                     </select>
                 </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Specializations * (Ctrl/Cmd + Click for multiple)</label>
-                    <div class="flex items-center gap-2">
-                        <select id="specializationIds" multiple required class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white min-h-[120px]">
-                        </select>
-                        <button type="button" id="addSpecializationBtn" class="px-3 py-2 bg-gold-500 hover:bg-gold-400 text-black text-xs font-bold rounded-lg whitespace-nowrap">+ Add</button>
-                    </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Status *</label>
+                    <select id="status" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2 xl:col-span-3">
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Specializations *</label>
+                    <select id="specializationIds" multiple required class="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white min-h-[140px] focus:outline-none focus:border-gold-400">
+                    </select>
+                    <p class="text-xs text-zinc-500 mt-2">Select from the existing specialization masterfile. Use Ctrl/Cmd + Click for multiple.</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Email</label>
@@ -246,14 +248,7 @@
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Phone</label>
                     <input id="phone" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Status *</label>
-                    <select id="status" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
-                </div>
-                <div class="md:col-span-2 flex items-center justify-end gap-3 pt-4">
+                <div class="md:col-span-2 xl:col-span-3 flex items-center justify-end gap-3 pt-4">
                     <button type="button" id="cancelTeacherBtn" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">Cancel</button>
                     <button type="submit" id="submitTeacherBtn" class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
                         <span id="submitTeacherBtnText">Save Teacher</span>
@@ -464,37 +459,6 @@
             await loadTeachers();
         }
 
-        async function addSpecializationMasterfile() {
-            const result = await Swal.fire({
-                title: 'Add Specialization',
-                input: 'text',
-                inputLabel: 'Specialization Name',
-                inputPlaceholder: 'e.g., Piano, Guitar, Violin',
-                showCancelButton: true,
-                confirmButtonText: 'Add',
-                confirmButtonColor: '#b8860b',
-                inputValidator: (value) => {
-                    if (!String(value || '').trim()) return 'Specialization name is required';
-                    return null;
-                }
-            });
-            if (!result.isConfirmed) return;
-
-            const res = await axios.post(`${baseApiUrl}/teachers.php?action=add-specialization`, {
-                action: 'add-specialization',
-                specialization_name: String(result.value || '').trim(),
-                status: 'Active'
-            });
-            const data = res.data;
-            if (!data.success) {
-                showMessage(data.error || 'Failed to add specialization', 'error');
-                return;
-            }
-
-            await loadSpecializations(String(data.specialization_id || ''));
-            showMessage('Specialization saved to masterfile', 'success');
-        }
-
         async function toggleTeacherStatus(teacherId, nextStatus) {
             const res = await axios.post(`${baseApiUrl}/teachers.php?action=set-teacher-status`, {
                 action: 'set-teacher-status',
@@ -524,7 +488,6 @@
             document.getElementById('openTeacherModalBtn')?.addEventListener('click', openTeacherModal);
             document.getElementById('closeTeacherModalBtn')?.addEventListener('click', closeTeacherModal);
             document.getElementById('cancelTeacherBtn')?.addEventListener('click', closeTeacherModal);
-            document.getElementById('addSpecializationBtn')?.addEventListener('click', addSpecializationMasterfile);
             document.getElementById('teacherForm')?.addEventListener('submit', saveTeacher);
             document.getElementById('branchFilter')?.addEventListener('change', applyFilters);
             document.getElementById('statusFilter')?.addEventListener('change', applyFilters);
@@ -533,5 +496,8 @@
     </script>
 </body>
 </html>
+
+
+
 
 
