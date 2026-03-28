@@ -232,7 +232,13 @@ class Admin
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-            WHERE s.status = 'Inactive'" . $branchSql . "
+            WHERE s.status = 'Inactive'
+              AND EXISTS (
+                  SELECT 1
+                  FROM tbl_registration_payments rp0
+                  WHERE rp0.student_id = s.student_id
+                    AND rp0.status = 'Pending'
+              )" . $branchSql . "
             ORDER BY s.created_at DESC
         ");
         if ($branchId > 0) {
@@ -290,7 +296,11 @@ class Admin
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
-            WHERE 1=1" . $branchSql . "
+            WHERE (s.status = 'Active' OR EXISTS (
+                SELECT 1
+                FROM tbl_registration_payments rp0
+                WHERE rp0.student_id = s.student_id
+            ))" . $branchSql . "
             ORDER BY s.created_at DESC
         ");
         if ($branchId > 0) {

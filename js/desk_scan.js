@@ -288,18 +288,35 @@ function initScanner() {
 function initManualEntry() {
     const input = document.getElementById('user_email');
     if (!input) return;
-    input.addEventListener('keypress', e => {
-        if (e.key === 'Enter') {
-            const email = input.value.trim();
-            if (email) {
-                handleManualEntry(email);
-                input.value = '';
-            }
+    input.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const email = input.value.trim();
+        if (email) {
+            handleManualEntry(email);
+            input.value = '';
         }
     });
 }
 
 function initDeskScanner() {
+    const user = getDeskUser();
+    const role = String(user?.role_name || '').toLowerCase();
+    const allowed = ['staff', 'desk', 'front desk'];
+    if (!user || !allowed.includes(role)) {
+        setStatus('Access denied. Please log in as desk staff.', 'error');
+        showScanAlert('Access Denied', 'You must be logged in as desk staff to use the scanner.', 'warning');
+        try {
+            const appBase = (typeof window.appBaseUrl === 'string' && window.appBaseUrl)
+                ? window.appBaseUrl
+                : ((typeof window.baseApiUrl === 'string' && window.baseApiUrl.endsWith('/api'))
+                    ? window.baseApiUrl.slice(0, -4)
+                    : `${window.location.origin}/FAS_music`);
+            window.location.href = `${appBase}/index.html`;
+        } catch (_) {}
+        return;
+    }
+
     updateClock();
     setInterval(updateClock, 1000);
     const branchName = getDeskBranchName();

@@ -41,8 +41,10 @@ CREATE TABLE `tbl_branches` (
 -- Dumping data for table `tbl_branches`
 --
 
-INSERT INTO `tbl_branches` (`branch_id`, `branch_name`, `address`, `phone`, `email`, `status`, `created_at`) VALUES
-(1, 'Main Branch', 'Cagayan de Oro City', '0912345678'),
+INSERT INTO `tbl_branches`
+(`branch_id`, `branch_name`, `address`, `phone`, `email`, `status`, `created_at`)
+VALUES
+(1, 'Main Branch', 'Cagayan de Oro City', '0912345678', NULL, 'Active', '2026-02-21 00:00:00'),
 (5, 'SM Downtown', 'CDO', '0909090909', 'smdt@gmail.com', 'Active', '2026-02-21 00:18:58'),
 (6, 'SM Uptown', 'CDO', '0192092019', 'smupt@gmail.com', 'Active', '2026-02-21 00:19:18');
 

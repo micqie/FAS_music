@@ -2397,6 +2397,7 @@ function renderStudentOnboardingSteps(student, meta, portal) {
     const latestReq = meta?.latest_request || null;
     const hasPendingReq = latestReq && String(latestReq.status || '') === 'Pending';
     const enrollmentApproved = portal?.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
+    const registrationLocked = !profileComplete || !regPaid;
     const registrationBadge = profileComplete
         ? renderOnboardingStatusBadge('Completed', 'green')
         : renderOnboardingStatusBadge('Required', 'amber');
@@ -2437,7 +2438,9 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                 </div>
                 <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Choose your package, instruments, and preferred class day below once registration is approved.</p>
                 <div class="mt-4 flex flex-wrap gap-3">
-                    <a href="#studentPackageRequestForm" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Go to Enrollment</a>
+                    ${registrationLocked
+                        ? `<span class="px-4 py-2 rounded-xl bg-zinc-200 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 text-sm font-bold cursor-not-allowed">Go to Enrollment (Locked)</span>`
+                        : `<a href="#studentPackageRequestForm" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Go to Enrollment</a>`}
                     <a href="student_sessions.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">Open Sessions</a>
                 </div>
                 ${latestReq ? `<div class="mt-4">${renderStudentRequestStatus(latestReq)}</div>` : ''}
@@ -2466,6 +2469,165 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                     </div>`}
             </div>
         </div>
+
+        ${registrationLocked ? `
+            <div id="studentRegistrationBlock" class="mt-6 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Registration Form</div>
+                        <div class="text-lg font-extrabold mt-2">Complete student + guardian details, then submit payment</div>
+                        <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">After admin confirms your registration payment, enrollment will unlock.</div>
+                    </div>
+                    <div class="h-12 w-12 rounded-2xl bg-gold-500/15 border border-gold-500/25 grid place-items-center">
+                        <i class="fas fa-clipboard-check text-gold-500"></i>
+                    </div>
+                </div>
+
+                <div class="mt-6 grid grid-cols-1 xl:grid-cols-12 gap-5">
+                    <div class="xl:col-span-12 max-w-4xl mx-auto w-full space-y-5">
+                    <!-- Guardian -->
+                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+                        <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">1. Guardian</div>
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-200 font-semibold">
+                                <input type="radio" id="guardianModeWith" name="guardian_mode" value="With Guardian" class="accent-gold-500">
+                                With Guardian (Recommended for minors)
+                            </label>
+                            <label class="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-200 font-semibold">
+                                <input type="radio" id="guardianModeWithout" name="guardian_mode" value="Without Guardian" class="accent-gold-500">
+                                Without Guardian
+                            </label>
+                        </div>
+
+                        <div id="guardianInputs" class="mt-4 space-y-3 hidden">
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200">Guardian Email *</label>
+                            <div class="flex gap-2">
+                                <input id="guardianEmailInput" type="email" class="flex-1 px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="guardian@email.com">
+                                <button type="button" id="guardianFindBtn" class="px-4 py-3 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">
+                                    Find
+                                </button>
+                            </div>
+                            <div id="guardianInfoBox" class="hidden text-xs text-zinc-500 dark:text-zinc-300"></div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">First Name *</label>
+                                    <input id="guardianFirstNameInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Last Name *</label>
+                                    <input id="guardianLastNameInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Phone *</label>
+                                    <input id="guardianPhoneInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Relationship *</label>
+                                    <input id="guardianRelationshipInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="e.g., Mother, Father, Guardian" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">If you already have a guardian account, use the email above to link it.</div>
+                    </div>
+
+                    <!-- Student details -->
+                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+                        <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">2. Student Details</div>
+                        <form id="registrationDetailsForm" class="space-y-3">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">First Name *</label>
+                                    <input id="regFirstName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Last Name *</label>
+                                    <input id="regLastName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Email *</label>
+                                    <input id="regEmail" type="email" readonly class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-600 dark:text-zinc-300 cursor-not-allowed" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Phone *</label>
+                                    <input id="regPhone" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Date of Birth *</label>
+                                    <input id="regDob" type="date" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Age</label>
+                                    <input id="regAge" readonly class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-600 dark:text-zinc-300 cursor-not-allowed" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Address *</label>
+                                <textarea id="regAddress" rows="3" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500"></textarea>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Grade/Year</label>
+                                    <input id="regGradeYear" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">School</label>
+                                    <input id="regSchool" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Branch *</label>
+                                <select id="regBranch" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                                    <option value="">Choose branch...</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Payment -->
+                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+                        <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">3. Registration Payment</div>
+                        <form id="registrationPaymentForm" class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Amount *</label>
+                                <input id="regPayAmount" type="number" min="0" step="0.01" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="0.00" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Method *</label>
+                                <select id="regPayMethod" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                                    <option value="GCash">GCash</option>
+                                    <option value="Bank Transfer">Bank Transfer</option>
+                                    <option value="Cash">Cash</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof of Payment *</label>
+                                <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
+                                <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">Upload JPG/PNG/WEBP/PDF for admin verification.</div>
+                            </div>
+                            <div id="regPayStatus" class="text-xs text-zinc-500 dark:text-zinc-300"></div>
+                        </form>
+                    </div>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div id="submitRegistrationStatus" class="text-sm text-zinc-500 dark:text-zinc-400"></div>
+                    <button type="button" id="submitRegistrationRequestBtn" class="px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                        Submit Registration Request
+                    </button>
+                </div>
+            </div>
+        ` : ''}
     `;
 }
 
@@ -2548,11 +2710,29 @@ function wireStudentOnboardingActions(student, meta, portal) {
         populateBranchSelect(regBranch, student?.branch_id || '');
     }
 
+    // Prefill registration fields from current student record
+    const regFirstName = document.getElementById('regFirstName');
+    const regLastName = document.getElementById('regLastName');
+    const regEmail = document.getElementById('regEmail');
+    const regPhone = document.getElementById('regPhone');
+    const regDob = document.getElementById('regDob');
+    const regAddress = document.getElementById('regAddress');
+    const regGradeYear = document.getElementById('regGradeYear');
+    const regSchool = document.getElementById('regSchool');
+
+    if (regFirstName && !regFirstName.value) regFirstName.value = student?.first_name || '';
+    if (regLastName && !regLastName.value) regLastName.value = student?.last_name || '';
+    if (regEmail && !regEmail.value) regEmail.value = student?.email || '';
+    if (regPhone && !regPhone.value) regPhone.value = student?.phone || '';
+    if (regDob && !regDob.value) regDob.value = student?.date_of_birth || '';
+    if (regAddress && !regAddress.value) regAddress.value = student?.address || '';
+    if (regGradeYear && !regGradeYear.value) regGradeYear.value = student?.grade_year || '';
+    if (regSchool && !regSchool.value) regSchool.value = student?.school || '';
+
     if (regForm) {
         regForm.onsubmit = (e) => e.preventDefault();
     }
 
-    const regDob = document.getElementById('regDob');
     const regAge = document.getElementById('regAge');
     if (regDob && regAge) {
         const updateAge = () => {
