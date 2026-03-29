@@ -60,7 +60,10 @@
                     <a href="manager_teachers.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-chalkboard-teacher mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branch Teachers
                     </a>
-                    <a href="manager_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <a href="manager_sessions.html?page=enrollments" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-user-plus mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Enrollments
+                    </a>
+                    <a href="manager_sessions.html?page=sessions" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
                     </a>
                 </nav>
@@ -81,7 +84,7 @@
                 <h1 class="text-3xl font-black text-slate-900 tracking-tight">Manager Dashboard</h1>
                 <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <a href="manager_teachers.html" class="group bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-8 hover:shadow-2xl transition">
                     <div class="flex items-center gap-4">
                         <div class="h-12 w-12 rounded-2xl bg-gold-500/15 flex items-center justify-center text-gold-500">
@@ -93,9 +96,28 @@
                         </div>
                     </div>
                 </a>
-                <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-8 text-slate-500">
-                    More manager tools coming soon.
-                </div>
+                <a href="manager_sessions.html?page=enrollments" class="group bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-8 hover:shadow-2xl transition">
+                    <div class="flex items-center gap-4">
+                        <div class="h-12 w-12 rounded-2xl bg-gold-500/15 flex items-center justify-center text-gold-500">
+                            <i class="fas fa-user-plus text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 group-hover:text-black">Branch Enrollments</h3>
+                            <p class="text-sm text-slate-500">Review package payments and pending enrollments for your branch.</p>
+                        </div>
+                    </div>
+                </a>
+                <a href="manager_sessions.html?page=sessions" class="group bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-8 hover:shadow-2xl transition">
+                    <div class="flex items-center gap-4">
+                        <div class="h-12 w-12 rounded-2xl bg-gold-500/15 flex items-center justify-center text-gold-500">
+                            <i class="fas fa-calendar-check text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 group-hover:text-black">Branch Sessions</h3>
+                            <p class="text-sm text-slate-500">Assign schedules and manage active sessions inside your branch.</p>
+                        </div>
+                    </div>
+                </a>
             </div>
         </div>
     </main>

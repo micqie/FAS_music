@@ -1255,6 +1255,8 @@ async function loadPendingRequests() {
         }
 
         pendingRequestsById = {};
+        const isAdminEnrollmentsPage = /admin_enrollments\.html$/i.test(window.location.pathname || '');
+
         tableBody.innerHTML = requests.map(r => {
             pendingRequestsById[String(r.request_id)] = r;
             const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
@@ -1267,9 +1269,19 @@ async function loadPendingRequests() {
                 : '—';
             const prefDate = r.preferred_date ? new Date(r.preferred_date).toLocaleDateString() : '—';
             const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
+            const paymentMethod = escapeHtml(r.payment_method || '—');
+            const payableNow = Number(r.payable_now || 0);
             const paymentProofHtml = r.payment_proof_path
                 ? `<a href="${escapeHtml(buildPublicFileUrl(r.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">View payment proof</a>`
                 : '<span class="text-xs text-slate-500">No payment proof</span>';
+            const paymentCellHtml = isAdminEnrollmentsPage
+                ? `<div class="font-semibold text-slate-800">${paymentType}</div>`
+                : `
+                        <div class="font-semibold text-slate-800">${paymentType}</div>
+                        <div class="text-xs text-slate-500 mt-1">Method: ${paymentMethod}</div>
+                        <div class="text-xs text-slate-500 mt-1">Pay now: ${formatCurrencyPHP(payableNow)}</div>
+                        <div class="mt-1">${paymentProofHtml}</div>
+                    `;
             return `
                 <tr class="hover:bg-slate-50/80 transition">
                     <td class="px-6 py-4">
@@ -1283,13 +1295,13 @@ async function loadPendingRequests() {
                         <div>${schedule}</div>
                         <div class="text-xs text-slate-500 mt-1">Date: ${prefDate}</div>
                     </td>
-                    <td class="px-6 py-4 text-sm text-slate-700">
-                        <div class="font-semibold text-slate-800">${paymentType}</div>
-                        <div class="text-xs text-slate-500 mt-1">${formatCurrencyPHP(r.requested_amount || 0)}</div>
-                        <div class="mt-1">${paymentProofHtml}</div>
-                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-700">${paymentCellHtml}</td>
+                    <td class="px-6 py-4 text-sm font-semibold text-gold-600">${formatCurrencyPHP(payableNow)}</td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
+                            <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
+                                View
+                            </button>
                             <button onclick="(window.onPendingRequestAssignClick || openAssignRequestModal)(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-xs font-bold">
                                 ${window.pendingRequestActionLabel || 'Assign & Approve'}
                             </button>
@@ -1311,6 +1323,55 @@ async function loadPendingRequests() {
                 </td>
             </tr>`;
     }
+}
+
+function openPendingRequestViewModal(requestId) {
+    const req = pendingRequestsById[String(requestId)];
+    if (!req) {
+        showMessage('Request not found.', 'error');
+        return;
+    }
+
+    const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
+    const instruments = Array.isArray(req.instruments) && req.instruments.length
+        ? req.instruments.map(i => {
+            const instrumentName = escapeHtml(i.instrument_name || 'Instrument');
+            const typeName = escapeHtml(i.type_name || '');
+            return typeName ? `${instrumentName} (${typeName})` : instrumentName;
+        }).join(', ')
+        : '—';
+    const preferredDay = escapeHtml(req.preferred_day_of_week || '—');
+    const preferredDate = req.preferred_date ? new Date(req.preferred_date).toLocaleDateString() : '—';
+    const paymentType = escapeHtml(req.payment_type || 'Partial Payment');
+    const paymentMethod = escapeHtml(req.payment_method || '—');
+    const payableNow = Number(req.payable_now || 0);
+    const packageAmount = Number(req.requested_amount || req.package_price || 0);
+    const proofHtml = req.payment_proof_path
+        ? `<a href="${escapeHtml(buildPublicFileUrl(req.payment_proof_path))}" target="_blank" rel="noopener" class="text-sm text-blue-600 underline">View payment proof</a>`
+        : '<span class="text-sm text-slate-500">No payment proof</span>';
+
+    Swal.fire({
+        title: 'Enrollment Request',
+        width: 760,
+        confirmButtonText: 'Close',
+        html: `
+            <div class="text-left space-y-4 text-sm text-slate-700">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div><span class="font-semibold text-slate-900">Student:</span> ${studentName}</div>
+                    <div><span class="font-semibold text-slate-900">Branch:</span> ${escapeHtml(req.branch_name || '—')}</div>
+                    <div><span class="font-semibold text-slate-900">Package:</span> ${escapeHtml(req.package_name || '—')}</div>
+                    <div><span class="font-semibold text-slate-900">Selected Instrument:</span> ${instruments}</div>
+                    <div><span class="font-semibold text-slate-900">Preferred Day:</span> ${preferredDay}</div>
+                    <div><span class="font-semibold text-slate-900">Preferred Date:</span> ${preferredDate}</div>
+                    <div><span class="font-semibold text-slate-900">Payment Type:</span> ${paymentType}</div>
+                    <div><span class="font-semibold text-slate-900">Payment Method:</span> ${paymentMethod}</div>
+                    <div><span class="font-semibold text-slate-900">Amount Paid:</span> ${formatCurrencyPHP(payableNow)}</div>
+                    <div><span class="font-semibold text-slate-900">Package Amount:</span> ${formatCurrencyPHP(packageAmount)}</div>
+                </div>
+                <div><span class="font-semibold text-slate-900">Proof of Payment:</span> ${proofHtml}</div>
+            </div>
+        `
+    });
 }
 
 async function rejectStudentRequest(requestId) {
@@ -2381,6 +2442,7 @@ function initStudentRequestSection(student, requestMeta) {
     const amountEl = document.getElementById('studentRequestAmount');
     const instrumentsContainer = document.getElementById('studentRequestInstrumentContainer');
     const paymentModeEl = document.getElementById('studentRequestPaymentMode');
+    const paymentMethodEl = document.getElementById('studentRequestPaymentMethod');
     const availabilityCalendar = document.getElementById('studentAvailabilityCalendar');
     const form = document.getElementById('studentPackageRequestForm');
     const submitBtn = document.getElementById('studentSubmitRequestBtn');
@@ -2388,7 +2450,7 @@ function initStudentRequestSection(student, requestMeta) {
     const paymentProofEl = document.getElementById('studentRequestPaymentProof');
     const autoDayEl = document.getElementById('studentRequestAutoDay');
 
-    if (!statusEl || !packageSelect || !amountEl || !instrumentsContainer || !paymentModeEl || !availabilityCalendar || !form || !submitBtn || !preferredDateEl) {
+    if (!statusEl || !packageSelect || !amountEl || !instrumentsContainer || !paymentModeEl || !paymentMethodEl || !availabilityCalendar || !form || !submitBtn || !preferredDateEl) {
         return;
     }
 
@@ -2495,13 +2557,14 @@ function initStudentRequestSection(student, requestMeta) {
         const preferredDate = preferredDateEl.value || '';
         const preferredDay = getDayOfWeekFromDate(preferredDate);
         const paymentType = String(paymentModeEl.value || '').trim();
+        const paymentMethod = String(paymentMethodEl.value || '').trim();
         const instrumentIds = Array.from(document.querySelectorAll('.student-request-instrument'))
             .map(el => parseInt(el.value, 10))
             .filter(v => !Number.isNaN(v) && v > 0);
         const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
 
-        if (!packageId || !preferredDate || !preferredDay || !paymentType || uniqueInstrumentIds.length < 1) {
-            showMessage('Please complete package, instruments, preferred date, and payment mode.', 'error');
+        if (!packageId || !preferredDate || !preferredDay || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
+            showMessage('Please complete package, instruments, preferred date, payment mode, and payment method.', 'error');
             return;
         }
         if (!['Full Payment', 'Partial Payment', 'Installment'].includes(paymentType)) {
@@ -2509,6 +2572,10 @@ function initStudentRequestSection(student, requestMeta) {
             return;
         }
         const paymentProofFile = paymentProofEl && paymentProofEl.files && paymentProofEl.files[0] ? paymentProofEl.files[0] : null;
+        if (paymentMethod !== 'Cash' && !paymentProofFile) {
+            showMessage('Upload proof of payment for non-cash enrollment payments.', 'error');
+            return;
+        }
 
         const selectedOption = packageSelect.options[packageSelect.selectedIndex];
         const maxInst = Number(selectedOption?.getAttribute('data-max-instruments') || 1);
@@ -2527,6 +2594,7 @@ function initStudentRequestSection(student, requestMeta) {
             requestFormData.append('student_id', String(Number(student.student_id)));
             requestFormData.append('package_id', String(packageId));
             requestFormData.append('payment_type', paymentType);
+            requestFormData.append('payment_method', paymentMethod);
             requestFormData.append('preferred_date', preferredDate);
             requestFormData.append('preferred_day_of_week', preferredDay);
             requestFormData.append('instrument_ids_json', JSON.stringify(uniqueInstrumentIds));
@@ -2712,7 +2780,9 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                                 </div>
                             </div>
                         </div>
-                        <div class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">If you already have a guardian account, use the email above to link it.</div>
+                        <div class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                            If you already have a guardian account, use the email above to link it. If no guardian account exists yet, the system will create one using the guardian email with temporary password <span class="font-semibold text-zinc-700 dark:text-zinc-200">fasmusic@2020</span>.
+                        </div>
                     </div>
 
                     <!-- Student details -->
@@ -3127,7 +3197,6 @@ async function initStudentQrPage() {
     if (!enrollmentApproved) {
         setHtml('qrCodeBox', '<div class="text-sm text-zinc-400 text-center">QR locked until admin approves your enrollment.</div>');
         setText('qrPayloadText', 'Locked — approval required');
-        showMessage('Your QR code will unlock after admin approves your enrollment.', 'info');
         return;
     }
 

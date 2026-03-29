@@ -116,7 +116,72 @@ class TeachersApi
                 LIMIT 1
             ");
             $stmt->execute([$userId]);
-            return (int)($stmt->fetchColumn() ?: 0);
+            $resolvedTeacherId = (int)($stmt->fetchColumn() ?: 0);
+            if ($resolvedTeacherId > 0) {
+                return $resolvedTeacherId;
+            }
+
+            // Fallback for legacy rows where tbl_teachers.user_id was never linked.
+            $userStmt = $this->conn->prepare("
+                SELECT user_id, first_name, last_name, email, username
+                FROM tbl_users
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+            $userStmt->execute([$userId]);
+            $user = $userStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$user) {
+                return 0;
+            }
+
+            $email = trim((string)($user['email'] ?? ''));
+            $username = trim((string)($user['username'] ?? ''));
+            $firstName = trim((string)($user['first_name'] ?? ''));
+            $lastName = trim((string)($user['last_name'] ?? ''));
+
+            if ($email !== '' || $username !== '') {
+                $byEmail = $this->conn->prepare("
+                    SELECT teacher_id
+                    FROM tbl_teachers
+                    WHERE (
+                            email IS NOT NULL
+                        AND email <> ''
+                        AND (
+                            LOWER(TRIM(email)) = LOWER(?)
+                            OR LOWER(TRIM(email)) = LOWER(?)
+                        )
+                    )
+                    ORDER BY teacher_id ASC
+                    LIMIT 1
+                ");
+                $byEmail->execute([$email, $username]);
+                $resolvedTeacherId = (int)($byEmail->fetchColumn() ?: 0);
+            }
+
+            if ($resolvedTeacherId < 1 && $firstName !== '' && $lastName !== '') {
+                $byName = $this->conn->prepare("
+                    SELECT teacher_id
+                    FROM tbl_teachers
+                    WHERE LOWER(TRIM(first_name)) = LOWER(?)
+                      AND LOWER(TRIM(last_name)) = LOWER(?)
+                    ORDER BY teacher_id ASC
+                    LIMIT 1
+                ");
+                $byName->execute([$firstName, $lastName]);
+                $resolvedTeacherId = (int)($byName->fetchColumn() ?: 0);
+            }
+
+            if ($resolvedTeacherId > 0) {
+                $linkStmt = $this->conn->prepare("
+                    UPDATE tbl_teachers
+                    SET user_id = ?
+                    WHERE teacher_id = ?
+                      AND (user_id IS NULL OR user_id = 0)
+                ");
+                $linkStmt->execute([$userId, $resolvedTeacherId]);
+            }
+
+            return $resolvedTeacherId;
         } catch (PDOException $e) {
             return 0;
         }
@@ -210,6 +275,112 @@ class TeachersApi
             $suffix++;
         }
         return $candidate;
+    }
+
+    private function validateStrongPassword($password)
+    {
+        $password = (string)$password;
+        if (strlen($password) < 8) {
+            $this->sendJSON(['error' => 'New password must be at least 8 characters long'], 400);
+        }
+        if (!preg_match('/[A-Z]/', $password)) {
+            $this->sendJSON(['error' => 'New password must contain at least one uppercase letter'], 400);
+        }
+        if (!preg_match('/[a-z]/', $password)) {
+            $this->sendJSON(['error' => 'New password must contain at least one lowercase letter'], 400);
+        }
+        if (!preg_match('/[0-9]/', $password)) {
+            $this->sendJSON(['error' => 'New password must contain at least one number'], 400);
+        }
+        if (!preg_match('/[!@#$%^&*]/', $password)) {
+            $this->sendJSON(['error' => 'New password must contain at least one special character (!@#$%^&*)'], 400);
+        }
+    }
+
+    private function ensureTeacherUserAccount($teacherId, $passwordForNewAccount = null)
+    {
+        $teacherId = (int)$teacherId;
+        if ($teacherId < 1) {
+            $this->sendJSON(['error' => 'teacher_id is required'], 400);
+        }
+
+        $stmt = $this->conn->prepare("
+            SELECT teacher_id, user_id, first_name, last_name, email, phone, status
+            FROM tbl_teachers
+            WHERE teacher_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$teacherId]);
+        $teacher = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$teacher) {
+            $this->sendJSON(['error' => 'Teacher not found'], 404);
+        }
+
+        $linkedUserId = (int)($teacher['user_id'] ?? 0);
+        if ($linkedUserId > 0) {
+            $check = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE user_id = ? LIMIT 1");
+            $check->execute([$linkedUserId]);
+            if ((int)$check->fetchColumn() > 0) {
+                return ['teacher' => $teacher, 'user_id' => $linkedUserId, 'created' => false];
+            }
+        }
+
+        $email = trim((string)($teacher['email'] ?? ''));
+        $matchedUserId = 0;
+
+        if ($email !== '') {
+            $find = $this->conn->prepare("
+                SELECT user_id
+                FROM tbl_users
+                WHERE username = ?
+                   OR (email IS NOT NULL AND email <> '' AND email = ?)
+                LIMIT 1
+            ");
+            $find->execute([$email, $email]);
+            $matchedUserId = (int)($find->fetchColumn() ?: 0);
+        }
+
+        if ($matchedUserId > 0) {
+            $link = $this->conn->prepare("UPDATE tbl_teachers SET user_id = ? WHERE teacher_id = ?");
+            $link->execute([$matchedUserId, $teacherId]);
+            return ['teacher' => $teacher, 'user_id' => $matchedUserId, 'created' => false];
+        }
+
+        if ($passwordForNewAccount === null) {
+            $this->sendJSON(['error' => 'This teacher does not have a linked user account yet.'], 400);
+        }
+
+        $username = $this->generateUsername(
+            (string)($teacher['first_name'] ?? ''),
+            (string)($teacher['last_name'] ?? ''),
+            $email
+        );
+        $roleId = $this->getTeacherRoleId();
+        $hashedPassword = password_hash((string)$passwordForNewAccount, PASSWORD_DEFAULT);
+        $userStatus = ((string)($teacher['status'] ?? 'Active')) === 'Inactive' ? 'Inactive' : 'Active';
+
+        $insertUser = $this->conn->prepare("
+            INSERT INTO tbl_users (
+                username, password, role_id, first_name, last_name, email, phone, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $insertUser->execute([
+            $username,
+            $hashedPassword,
+            $roleId,
+            (string)($teacher['first_name'] ?? ''),
+            (string)($teacher['last_name'] ?? ''),
+            ($email !== '' ? $email : null),
+            (($teacher['phone'] ?? '') !== '' ? (string)$teacher['phone'] : null),
+            $userStatus
+        ]);
+
+        $newUserId = (int)$this->conn->lastInsertId();
+        $link = $this->conn->prepare("UPDATE tbl_teachers SET user_id = ? WHERE teacher_id = ?");
+        $link->execute([$newUserId, $teacherId]);
+
+        return ['teacher' => $teacher, 'user_id' => $newUserId, 'created' => true];
     }
 
     public function getSpecializations()
@@ -853,6 +1024,50 @@ class TeachersApi
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }
+
+    public function resetTeacherPassword()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = (int)($data['teacher_id'] ?? 0);
+        $newPassword = (string)($data['new_password'] ?? '');
+
+        if ($teacherId < 1 || $newPassword === '') {
+            $this->sendJSON(['error' => 'teacher_id and new_password are required'], 400);
+        }
+
+        $this->validateStrongPassword($newPassword);
+
+        try {
+            $this->conn->beginTransaction();
+
+            $account = $this->ensureTeacherUserAccount($teacherId, $newPassword);
+            $userId = (int)($account['user_id'] ?? 0);
+            if ($userId < 1) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Unable to resolve teacher user account'], 500);
+            }
+
+            $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+            $update = $this->conn->prepare("UPDATE tbl_users SET password = ? WHERE user_id = ?");
+            $update->execute([$hashedPassword, $userId]);
+
+            $this->conn->commit();
+            $this->sendJSON([
+                'success' => true,
+                'user_id' => $userId,
+                'account_created' => !empty($account['created'])
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
 }
 
 $api = new TeachersApi($conn);
@@ -897,6 +1112,9 @@ switch ($action) {
         break;
     case 'set-teacher-status':
         $api->setTeacherStatus();
+        break;
+    case 'reset-teacher-password':
+        $api->resetTeacherPassword();
         break;
     default:
         $api->sendJSON(['error' => 'Invalid action'], 400);

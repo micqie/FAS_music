@@ -283,10 +283,36 @@ class StudentsApi
             if ($stmt && $stmt->rowCount() > 0) {
                 return;
             }
+            $afterClause = $this->tableHasColumn('tbl_enrollments', 'payment_deadline_session')
+                ? ' AFTER payment_deadline_session'
+                : '';
             $this->conn->exec("
                 ALTER TABLE tbl_enrollments
                 ADD COLUMN payment_type ENUM('Full Payment','Partial Payment','Installment') NOT NULL DEFAULT 'Partial Payment'
-                AFTER payment_deadline_session
+                {$afterClause}
+            ");
+        } catch (PDOException $e) {
+            // Do not break API.
+        }
+    }
+
+    private function ensurePaymentsPaymentTypeColumn()
+    {
+        if (!$this->tableExists('tbl_payments')) {
+            return;
+        }
+        try {
+            $stmt = $this->conn->query("SHOW COLUMNS FROM tbl_payments LIKE 'payment_type'");
+            if ($stmt && $stmt->rowCount() > 0) {
+                return;
+            }
+            $afterClause = $this->tableHasColumn('tbl_payments', 'payment_method')
+                ? ' AFTER payment_method'
+                : ($this->tableHasColumn('tbl_payments', 'amount') ? ' AFTER amount' : '');
+            $this->conn->exec("
+                ALTER TABLE tbl_payments
+                ADD COLUMN payment_type ENUM('Full Payment','Partial Payment','Installment') NOT NULL DEFAULT 'Partial Payment'
+                {$afterClause}
             ");
         } catch (PDOException $e) {
             // Do not break API.
@@ -307,6 +333,39 @@ class StudentsApi
             return 'Installment';
         }
         return '';
+    }
+
+    private function normalizeEnrollmentPaymentMethod($raw)
+    {
+        $v = strtolower(trim((string)$raw));
+        if ($v === '') return '';
+        if (in_array($v, ['cash'], true)) return 'Cash';
+        if (in_array($v, ['gcash', 'g-cash'], true)) return 'GCash';
+        if (in_array($v, ['bank transfer', 'banktransfer', 'bank'], true)) return 'Bank Transfer';
+        if (in_array($v, ['other'], true)) return 'Other';
+        return '';
+    }
+
+    private function computeEnrollmentPayableNow($basePrice, $sessions, $paymentType)
+    {
+        $price = (float) $basePrice;
+        $sessionCount = max(1, (int) $sessions);
+        $normalizedType = $this->normalizeEnrollmentPaymentType($paymentType);
+        if ($price <= 0) {
+            return 0.0;
+        }
+
+        $ratio = $sessionCount === 12 ? (3000 / 7450) : ($sessionCount === 20 ? (5000 / 11800) : 0.42);
+        $partialAmount = round($price * $ratio);
+
+        if ($normalizedType === 'Full Payment') {
+            return round($price, 2);
+        }
+        if ($normalizedType === 'Installment') {
+            return (float) max(1, round($price / $sessionCount));
+        }
+
+        return (float) max(1, $partialAmount);
     }
 
     /**
@@ -1321,6 +1380,10 @@ class StudentsApi
         $currentEnrollment = null;
         $enrollmentHistory = [];
         try {
+            $paymentsHasType = $this->tableExists('tbl_payments') && $this->tableHasColumn('tbl_payments', 'payment_type');
+            $paySummaryPaymentTypeSelect = $paymentsHasType
+                ? "SUBSTRING_INDEX(GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC), ',', 1) AS payment_type"
+                : "'Partial Payment' AS payment_type";
             $packageNameExpr = "CONCAT('Package #', e.package_id)";
             $packageSessionsExpr = "e.total_sessions";
             $packagePriceExpr = "0";
@@ -1395,11 +1458,7 @@ class StudentsApi
                     SELECT
                         p.enrollment_id,
                         SUM(CASE WHEN p.status = 'Paid' THEN p.amount ELSE 0 END) AS paid_amount,
-                        SUBSTRING_INDEX(
-                            GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC),
-                            ',',
-                            1
-                        ) AS payment_type
+                        {$paySummaryPaymentTypeSelect}
                     FROM tbl_payments p
                     GROUP BY p.enrollment_id
                 ) pay ON pay.enrollment_id = e.enrollment_id
@@ -2067,6 +2126,9 @@ class StudentsApi
                     $latestRequest['preferred_day_of_week'] = trim($parts[0] ?? '');
                     $latestRequest['preferred_date'] = trim($parts[1] ?? '');
                     $latestRequest['payment_type'] = (string)($meta['payment_type'] ?? 'Partial Payment');
+                    $latestRequest['payment_method'] = (string)($meta['payment_method'] ?? '');
+                    $latestRequest['payable_now'] = (float)($meta['payable_now'] ?? 0);
+                    $latestRequest['package_total_amount'] = (float)($meta['package_total_amount'] ?? 0);
                     $latestRequest['payment_proof_path'] = $meta['payment_proof_path'] ?? null;
                     $latestRequest['admin_notes'] = $meta['admin_notes'] ?? null;
                     $latestRequest['instrument_ids'] = is_array($meta['instrument_ids'] ?? null) ? $meta['instrument_ids'] : [];
@@ -2101,6 +2163,8 @@ class StudentsApi
         $packageId = (int) ($data['package_id'] ?? 0);
         $paymentRaw = $data['payment_type'] ?? ($data['payment_mode'] ?? '');
         $paymentType = $this->normalizeEnrollmentPaymentType($paymentRaw);
+        $paymentMethodRaw = $data['payment_method'] ?? '';
+        $paymentMethod = $this->normalizeEnrollmentPaymentMethod($paymentMethodRaw);
         $preferredDate = !empty($data['preferred_date']) ? $data['preferred_date'] : null;
         $preferredDay = trim($data['preferred_day_of_week'] ?? '');
         if ($preferredDay === '' && $preferredDate) {
@@ -2128,6 +2192,9 @@ class StudentsApi
         if ($paymentType === '') {
             // Backward-compatible fallback for cached clients/forms.
             $paymentType = 'Partial Payment';
+        }
+        if ($paymentMethod === '') {
+            $this->sendJSON(['error' => 'payment_method is required'], 400);
         }
 
         $this->ensureStudentInstrumentsTable();
@@ -2238,9 +2305,20 @@ class StudentsApi
             }
             $primaryInstrumentId = !empty($instrumentIds) ? (int)$instrumentIds[0] : null;
             $packageSessions = max(1, (int)($package['sessions'] ?? 1));
+            $packagePrice = (float)($package['price'] ?? 0);
+            $payableNow = $this->computeEnrollmentPayableNow($packagePrice, $packageSessions, $paymentType);
+            if ($payableNow <= 0) {
+                $this->sendJSON(['error' => 'Unable to compute the enrollment payment amount. Please contact desk/admin.'], 400);
+            }
+            if ($paymentMethod !== 'Cash' && !$paymentProofPath) {
+                $this->sendJSON(['error' => 'Upload proof of payment for this enrollment request.'], 400);
+            }
             $preferredSchedule = trim($preferredDay . '|' . $preferredDate);
             $requestMeta = json_encode([
                 'payment_type' => $paymentType,
+                'payment_method' => $paymentMethod,
+                'payable_now' => $payableNow,
+                'package_total_amount' => $packagePrice,
                 'instrument_ids' => array_values($instrumentIds),
                 'payment_proof_path' => $paymentProofPath
             ]);
@@ -2272,7 +2350,8 @@ class StudentsApi
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Request submitted. Desk/Admin will review and confirm your package payment.',
-                'request_id' => $requestId
+                'request_id' => $requestId,
+                'payable_now' => $payableNow
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
@@ -2289,6 +2368,10 @@ class StudentsApi
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
         $this->ensureSessionPackagesTable();
         try {
+            $paymentsHasType = $this->tableExists('tbl_payments') && $this->tableHasColumn('tbl_payments', 'payment_type');
+            $paySummaryPaymentTypeSelect = $paymentsHasType
+                ? "SUBSTRING_INDEX(GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC), ',', 1) AS payment_type"
+                : "'—' AS payment_type";
             $sql = "
                 SELECT
                     e.enrollment_id AS request_id,
@@ -2335,6 +2418,9 @@ class StudentsApi
                 if (empty($ids) && !empty($row['instrument_id'])) $ids = [(int)$row['instrument_id']];
                 $row['instrument_ids'] = $ids;
                 $row['payment_type'] = (string)($meta['payment_type'] ?? 'Partial Payment');
+                $row['payment_method'] = (string)($meta['payment_method'] ?? '');
+                $row['payable_now'] = (float)($meta['payable_now'] ?? 0);
+                $row['package_total_amount'] = (float)($meta['package_total_amount'] ?? ($row['requested_amount'] ?? 0));
                 $row['payment_proof_path'] = $meta['payment_proof_path'] ?? null;
                 $row['admin_notes'] = $meta['admin_notes'] ?? null;
                 $row['assigned_teacher_id'] = null;
@@ -2358,15 +2444,22 @@ class StudentsApi
                     ");
                     $stmtInst->execute($ids);
                     $instRows = $stmtInst->fetchAll(PDO::FETCH_ASSOC);
-                    $nameById = [];
+                    $detailsById = [];
                     foreach ($instRows as $instRow) {
-                        $nameById[(int) $instRow['instrument_id']] = $instRow['instrument_name'];
+                        $detailsById[(int) $instRow['instrument_id']] = [
+                            'instrument_name' => $instRow['instrument_name'] ?? null,
+                            'type_name' => $instRow['type_name'] ?? null,
+                        ];
                         if (!empty($instRow['instrument_name'])) $instrumentKeywords[] = $instRow['instrument_name'];
                         if (!empty($instRow['type_name'])) $instrumentKeywords[] = $instRow['type_name'];
                     }
                     foreach ($ids as $iid) {
-                        if (isset($nameById[$iid])) {
-                            $row['instruments'][] = ['instrument_id' => $iid, 'instrument_name' => $nameById[$iid]];
+                        if (isset($detailsById[$iid])) {
+                            $row['instruments'][] = [
+                                'instrument_id' => $iid,
+                                'instrument_name' => $detailsById[$iid]['instrument_name'],
+                                'type_name' => $detailsById[$iid]['type_name'],
+                            ];
                         }
                     }
                 }
@@ -2391,6 +2484,10 @@ class StudentsApi
         $this->ensureSessionPackagesTable();
 
         try {
+            $paymentsHasType = $this->tableExists('tbl_payments') && $this->tableHasColumn('tbl_payments', 'payment_type');
+            $paySummaryPaymentTypeSelect = $paymentsHasType
+                ? "SUBSTRING_INDEX(GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC), ',', 1) AS payment_type"
+                : "'—' AS payment_type";
             $sql = "
                 SELECT
                     e.enrollment_id,
@@ -2442,11 +2539,7 @@ class StudentsApi
                     SELECT
                         p.enrollment_id,
                         SUM(CASE WHEN p.status = 'Paid' THEN p.amount ELSE 0 END) AS paid_amount,
-                        SUBSTRING_INDEX(
-                            GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC),
-                            ',',
-                            1
-                        ) AS payment_type
+                        {$paySummaryPaymentTypeSelect}
                     FROM tbl_payments p
                     GROUP BY p.enrollment_id
                 ) pay ON pay.enrollment_id = e.enrollment_id
@@ -3174,6 +3267,8 @@ class StudentsApi
         $this->ensureSessionPackageColumn();
         $this->ensureStudentInstrumentsTable();
         $this->ensureStudentRegistrationFeesTable();
+        $this->ensureEnrollmentPaymentTypeColumn();
+        $this->ensurePaymentsPaymentTypeColumn();
 
         try {
             $this->conn->beginTransaction();
@@ -3327,9 +3422,51 @@ class StudentsApi
                 $decoded = json_decode((string)$req['request_notes'], true);
                 if (is_array($decoded)) $requestMeta = $decoded;
             }
+            $paymentType = $this->normalizeEnrollmentPaymentType($requestMeta['payment_type'] ?? 'Partial Payment');
+            if ($paymentType === '') {
+                $paymentType = 'Partial Payment';
+            }
+            $paymentMethod = $this->normalizeEnrollmentPaymentMethod($requestMeta['payment_method'] ?? '');
+            $paymentProofPath = trim((string)($requestMeta['payment_proof_path'] ?? ''));
+            $payableNow = (float)($requestMeta['payable_now'] ?? 0);
+            if ($payableNow <= 0) {
+                $payableNow = $this->computeEnrollmentPayableNow($packagePrice, $packageSessions, $paymentType);
+            }
+            if ($paymentMethod === '') {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'The student has not submitted an enrollment payment method yet.'], 400);
+            }
+            if ($payableNow <= 0) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'The enrollment payment amount is invalid.'], 400);
+            }
+            if ($paymentMethod !== 'Cash' && $paymentProofPath === '') {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Enrollment proof of payment is required before approval.'], 400);
+            }
             if ($adminNotes !== '') {
                 $requestMeta['admin_notes'] = $adminNotes;
             }
+            $requestMeta['payment_type'] = $paymentType;
+            $requestMeta['payment_method'] = $paymentMethod;
+            $requestMeta['payable_now'] = $payableNow;
+            $requestMeta['package_total_amount'] = (float)$packagePrice;
+            $requestMeta['payment_proof_path'] = $paymentProofPath;
+            $enrollmentHasPaymentType = $this->tableHasColumn('tbl_enrollments', 'payment_type');
+            $paymentTypeSql = $enrollmentHasPaymentType ? "payment_type = ?," : "";
+            $updateParams = [
+                $primaryInstrumentId,
+                (int)$teacherId,
+                trim($assignedDay . ' ' . $assignedStart . '-' . $assignedEnd),
+                json_encode($requestMeta),
+                $assignedDate,
+                $endDate,
+                max(1, (int)$packageSessions),
+            ];
+            if ($enrollmentHasPaymentType) {
+                $updateParams[] = $paymentType;
+            }
+            $updateParams[] = (int)$requestId;
             $stmtUpdateEnrollment = $this->conn->prepare("
                 UPDATE tbl_enrollments
                 SET instrument_id = ?,
@@ -3340,25 +3477,78 @@ class StudentsApi
                     end_date = ?,
                     total_sessions = ?,
                     completed_sessions = 0,
+                    {$paymentTypeSql}
                     status = 'Active'
                 WHERE enrollment_id = ?
                   AND status = 'Pending'
             ");
-            $stmtUpdateEnrollment->execute([
-                $primaryInstrumentId,
-                (int)$teacherId,
-                trim($assignedDay . ' ' . $assignedStart . '-' . $assignedEnd),
-                json_encode($requestMeta),
-                $assignedDate,
-                $endDate,
-                max(1, (int)$packageSessions),
-                (int)$requestId
-            ]);
+            $stmtUpdateEnrollment->execute($updateParams);
             if ($stmtUpdateEnrollment->rowCount() === 0) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Pending enrollment request not found'], 404);
             }
             $newEnrollmentId = (int)$requestId;
+
+            if ($this->tableExists('tbl_payments')) {
+                $paymentColumns = [];
+                $paymentValues = [];
+
+                if ($this->tableHasColumn('tbl_payments', 'enrollment_id')) {
+                    $paymentColumns[] = 'enrollment_id';
+                    $paymentValues[] = $newEnrollmentId;
+                }
+                if ($this->tableHasColumn('tbl_payments', 'amount')) {
+                    $paymentColumns[] = 'amount';
+                    $paymentValues[] = $payableNow;
+                }
+                if ($this->tableHasColumn('tbl_payments', 'payment_method')) {
+                    $paymentColumns[] = 'payment_method';
+                    $paymentValues[] = $paymentMethod;
+                }
+                if ($this->tableHasColumn('tbl_payments', 'payment_type')) {
+                    $paymentColumns[] = 'payment_type';
+                    $paymentValues[] = $paymentType;
+                }
+                if ($this->tableHasColumn('tbl_payments', 'status')) {
+                    $paymentColumns[] = 'status';
+                    $paymentValues[] = 'Paid';
+                }
+                if ($this->tableHasColumn('tbl_payments', 'payment_date')) {
+                    $paymentColumns[] = 'payment_date';
+                    $paymentValues[] = date('Y-m-d');
+                }
+                if ($this->tableHasColumn('tbl_payments', 'receipt_number')) {
+                    $paymentColumns[] = 'receipt_number';
+                    $paymentValues[] = 'ENR-' . $newEnrollmentId . '-' . time();
+                }
+
+                if (!empty($paymentColumns)) {
+                    $placeholders = implode(', ', array_fill(0, count($paymentColumns), '?'));
+                    $stmtPayment = $this->conn->prepare("
+                        INSERT INTO tbl_payments (" . implode(', ', $paymentColumns) . ")
+                        VALUES ({$placeholders})
+                    ");
+                    $stmtPayment->execute($paymentValues);
+                }
+            }
+
+            if ($this->tableExists('tbl_enrollment_financials')) {
+                $stmtFinancials = $this->conn->prepare("
+                    INSERT INTO tbl_enrollment_financials (enrollment_id, total_amount, paid_amount, payment_deadline_session)
+                    VALUES (?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        total_amount = VALUES(total_amount),
+                        paid_amount = VALUES(paid_amount),
+                        payment_deadline_session = VALUES(payment_deadline_session)
+                ");
+                $deadlineSession = $paymentType === 'Installment' ? 1 : max(1, (int)$packageSessions);
+                $stmtFinancials->execute([
+                    $newEnrollmentId,
+                    (float)$packagePrice,
+                    (float)$payableNow,
+                    $deadlineSession
+                ]);
+            }
 
             // Keep the assigned first schedule visible to students after approval.
             $this->upsertFirstSessionSchedule(

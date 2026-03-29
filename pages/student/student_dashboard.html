@@ -278,6 +278,16 @@
                                 <option value="Installment">Installment</option>
                             </select>
                             <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Pick how you want to pay.</p>
+
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mt-4 mb-2">Payment Method *</label>
+                            <select id="studentRequestPaymentMethod" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                                <option value="">Select payment method</option>
+                                <option value="Cash">Cash</option>
+                                <option value="GCash">GCash</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Choose the method used for your first enrollment payment.</p>
                         </div>
 
                         <div class="xl:col-span-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
@@ -287,9 +297,9 @@
                                 <div class="rounded-xl border border-dashed border-zinc-300 dark:border-white/10 px-4 py-4 text-sm text-zinc-500 dark:text-zinc-400">Choose a package first.</div>
                             </div>
 
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mt-5 mb-2">Payment proof (optional)</label>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mt-5 mb-2">Payment proof</label>
                             <input type="file" id="studentRequestPaymentProof" name="package_payment_proof_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold">
-                            <div class="text-xs text-zinc-500 mt-2">Optional. You can submit this later.</div>
+                            <div class="text-xs text-zinc-500 mt-2">Required for GCash, bank transfer, or other non-cash payments.</div>
                         </div>
 
                         <div class="xl:col-span-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">

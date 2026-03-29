@@ -92,7 +92,63 @@ class AttendanceApi
         }
 
         try {
-            if ($this->tableExists('tbl_sessions') && $this->tableExists('tbl_enrollments')) {
+            $hasSessions = $this->tableExists('tbl_sessions') && $this->tableExists('tbl_enrollments');
+            $hasAttendance = $this->tableExists('tbl_attendance');
+
+            if ($hasSessions && $hasAttendance) {
+                $stmt = $this->conn->prepare("
+                    SELECT
+                        COALESCE(sess.total_records, 0) + COALESCE(att.total_records, 0) AS total_records,
+                        COALESCE(sess.present_count, 0) + COALESCE(att.present_count, 0) AS present_count,
+                        COALESCE(sess.late_count, 0) + COALESCE(att.late_count, 0) AS late_count,
+                        COALESCE(sess.excused_count, 0) + COALESCE(att.excused_count, 0) AS excused_count,
+                        COALESCE(sess.absent_count, 0) + COALESCE(att.absent_count, 0) AS absent_count,
+                        CASE
+                            WHEN sess.last_attended_at IS NULL THEN att.last_attended_at
+                            WHEN att.last_attended_at IS NULL THEN sess.last_attended_at
+                            WHEN sess.last_attended_at >= att.last_attended_at THEN sess.last_attended_at
+                            ELSE att.last_attended_at
+                        END AS last_attended_at
+                    FROM (
+                        SELECT
+                            COUNT(*) AS total_records,
+                            SUM(ts.status = 'Completed') AS present_count,
+                            SUM(ts.status = 'Late') AS late_count,
+                            0 AS excused_count,
+                            SUM(ts.status IN ('Cancelled', 'No Show')) AS absent_count,
+                            MAX(
+                                CASE
+                                    WHEN ts.status IN ('Completed', 'Late')
+                                        THEN TIMESTAMP(ts.session_date, COALESCE(ts.end_time, ts.start_time, '00:00:00'))
+                                    ELSE NULL
+                                END
+                            ) AS last_attended_at
+                        FROM tbl_sessions ts
+                        INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+                        WHERE te.student_id = ?
+                    ) AS sess
+                    CROSS JOIN (
+                        SELECT
+                            COUNT(*) AS total_records,
+                            SUM(ta.status = 'Present') AS present_count,
+                            SUM(ta.status = 'Late') AS late_count,
+                            SUM(ta.status = 'Excused') AS excused_count,
+                            SUM(ta.status = 'Absent') AS absent_count,
+                            MAX(ta.attended_at) AS last_attended_at
+                        FROM tbl_attendance ta
+                        WHERE ta.student_id = ?
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM tbl_sessions ts
+                              INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+                              WHERE te.student_id = ta.student_id
+                                AND ts.session_date = DATE(ta.attended_at)
+                                AND ts.status IN ('Completed', 'Late', 'Cancelled', 'No Show')
+                          )
+                    ) AS att
+                ");
+                $stmt->execute([$studentId, $studentId]);
+            } elseif ($hasSessions) {
                 $stmt = $this->conn->prepare("
                     SELECT
                         COUNT(*) AS total_records,
@@ -111,6 +167,7 @@ class AttendanceApi
                     INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
                     WHERE te.student_id = ?
                 ");
+                $stmt->execute([$studentId]);
             } else {
                 $stmt = $this->conn->prepare("
                     SELECT
@@ -123,8 +180,8 @@ class AttendanceApi
                     FROM tbl_attendance
                     WHERE student_id = ?
                 ");
+                $stmt->execute([$studentId]);
             }
-            $stmt->execute([$studentId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
             // Normalize nulls
@@ -154,7 +211,69 @@ class AttendanceApi
         if ($limit > 200) $limit = 200;
 
         try {
-            if ($this->tableExists('tbl_sessions') && $this->tableExists('tbl_enrollments')) {
+            $hasSessions = $this->tableExists('tbl_sessions') && $this->tableExists('tbl_enrollments');
+            $hasAttendance = $this->tableExists('tbl_attendance');
+
+            if ($hasSessions && $hasAttendance) {
+                $roomJoin = "";
+                $roomExpr = "NULL";
+                if ($this->tableExists('tbl_rooms')) {
+                    $roomJoin = " LEFT JOIN tbl_rooms rm ON ts.room_id = rm.room_id ";
+                    $roomExpr = "rm.room_name";
+                }
+                $stmt = $this->conn->prepare("
+                    SELECT *
+                    FROM (
+                        SELECT
+                            ts.session_id AS attendance_id,
+                            te.student_id,
+                            TIMESTAMP(ts.session_date, COALESCE(ts.start_time, '00:00:00')) AS attended_at,
+                            ts.session_date,
+                            ts.start_time,
+                            ts.end_time,
+                            {$roomExpr} AS room_name,
+                            ts.session_type AS source,
+                            COALESCE(ts.attendance_notes, ts.notes) AS notes,
+                            CASE
+                                WHEN ts.status = 'Completed' THEN 'Present'
+                                WHEN ts.status = 'Late' THEN 'Late'
+                                WHEN ts.status IN ('Cancelled', 'No Show') THEN 'Absent'
+                                ELSE ts.status
+                            END AS status
+                        FROM tbl_sessions ts
+                        INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+                        {$roomJoin}
+                        WHERE te.student_id = ?
+
+                        UNION ALL
+
+                        SELECT
+                            ta.attendance_id,
+                            ta.student_id,
+                            ta.attended_at,
+                            DATE(ta.attended_at) AS session_date,
+                            TIME(ta.attended_at) AS start_time,
+                            NULL AS end_time,
+                            NULL AS room_name,
+                            ta.source,
+                            ta.notes,
+                            ta.status
+                        FROM tbl_attendance ta
+                        WHERE ta.student_id = ?
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM tbl_sessions ts
+                              INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+                              WHERE te.student_id = ta.student_id
+                                AND ts.session_date = DATE(ta.attended_at)
+                                AND ts.status IN ('Completed', 'Late', 'Cancelled', 'No Show')
+                          )
+                    ) AS combined_attendance
+                    ORDER BY attended_at DESC, attendance_id DESC
+                    LIMIT $limit
+                ");
+                $stmt->execute([$studentId, $studentId]);
+            } elseif ($hasSessions) {
                 $roomJoin = "";
                 $roomExpr = "NULL";
                 if ($this->tableExists('tbl_rooms')) {
@@ -185,6 +304,7 @@ class AttendanceApi
                     ORDER BY ts.session_date DESC, ts.session_id DESC
                     LIMIT $limit
                 ");
+                $stmt->execute([$studentId]);
             } else {
                 $stmt = $this->conn->prepare("
                     SELECT attendance_id, student_id, attended_at, DATE(attended_at) AS session_date, TIME(attended_at) AS start_time, NULL AS end_time, NULL AS room_name, source, notes, status
@@ -193,8 +313,8 @@ class AttendanceApi
                     ORDER BY attended_at DESC, attendance_id DESC
                     LIMIT $limit
                 ");
+                $stmt->execute([$studentId]);
             }
-            $stmt->execute([$studentId]);
             $this->sendJSON(['success' => true, 'attendance' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
