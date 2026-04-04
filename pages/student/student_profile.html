@@ -41,20 +41,20 @@
             </a>
             <div class="hidden md:block">
                 <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Student Portal</div>
-                <div class="text-sm text-zinc-300">Profile</div>
+                <div class="text-sm text-zinc-500 dark:text-zinc-300">Profile</div>
             </div>
         </div>
         <div class="flex items-center gap-3">
-            <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-white/15 flex items-center justify-center text-zinc-200">
+            <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-zinc-300 dark:border-white/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200" aria-label="Open menu">
                 <i class="fas fa-bars text-lg"></i>
             </button>
             <div class="hidden md:flex items-center gap-4">
                 <div class="flex flex-col text-right">
-                    <span id="studentNavName" class="text-sm font-semibold text-white">Student</span>
-                    <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Account</span>
+                    <span id="studentNavName" class="text-sm font-semibold text-zinc-900 dark:text-white">Student</span>
+                    <span class="text-[10px] uppercase tracking-widest text-gold-500 font-bold">Account</span>
                 </div>
-                <button onclick="logout()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
-                    <i class="fas fa-sign-out-alt mr-2 text-gold-400"></i>Logout
+                <button onclick="logout()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
+                    <i class="fas fa-sign-out-alt mr-2 text-gold-500"></i>Logout
                 </button>
             </div>
         </div>
@@ -66,20 +66,20 @@
             <div>
                 <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Navigation</h3>
                 <nav class="space-y-2">
-                    <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-grid-2 mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
+                    <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-grid-2 mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Dashboard
                     </a>
-                    <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-calendar-check mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Sessions
                     </a>
-                    <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-clipboard-check mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Attendance
+                    <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-clipboard-check mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Attendance
                     </a>
                     <a href="student_profile.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
                         <i class="fas fa-user mr-3"></i> Profile
                     </a>
-                    <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-qrcode mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> My QR Code
+                    <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-qrcode mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> My QR Code
                     </a>
                 </nav>
             </div>
@@ -93,99 +93,144 @@
                 <div>
                     <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Navigation</h3>
                     <nav class="space-y-2">
-                        <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
                             <i class="fas fa-grid-2 mr-3 text-zinc-500"></i> Dashboard
                         </a>
-                        <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
                             <i class="fas fa-calendar-check mr-3 text-zinc-500"></i> Sessions
                         </a>
-                        <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
                             <i class="fas fa-clipboard-check mr-3 text-zinc-500"></i> Attendance
                         </a>
                         <a href="student_profile.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
                             <i class="fas fa-user mr-3"></i> Profile
                         </a>
-                        <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
                             <i class="fas fa-qrcode mr-3 text-zinc-500"></i> My QR Code
                         </a>
                     </nav>
                 </div>
             </div>
-            <div class="px-6 border-t border-white/10 pt-4 flex items-center justify-between">
-                <div class="text-xs text-zinc-400" id="studentMobileMenuName">Signed in</div>
-                <button onclick="logout()" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold transition">
+            <div class="px-6 border-t border-zinc-200 dark:border-white/10 pt-4 flex items-center justify-between">
+                <div class="text-xs text-zinc-500 dark:text-zinc-400" id="studentMobileMenuName">Signed in</div>
+                <button onclick="logout()" class="px-3 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-xs font-semibold transition text-zinc-700 dark:text-zinc-300">
                     <i class="fas fa-sign-out-alt mr-1 text-gold-400"></i>Logout
                 </button>
             </div>
         </div>
     </div>
 
-    <main class="lg:ml-72 pt-28 p-8">
-        <div class="max-w-5xl mx-auto">
-            <div class="mb-10">
-                <h1 class="text-3xl md:text-4xl font-black tracking-tight">My Profile</h1>
-                <p class="text-zinc-400 mt-2">Keep your contact details up to date.</p>
+    <main class="lg:ml-72 pt-24 pb-8 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto">
+            <div class="mb-8 sm:mb-10">
+                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">My Profile</h1>
+                <p class="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-2">View your account, current enrollment, and class schedule in one place.</p>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-1 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
-                    <div class="h-16 w-16 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center text-2xl font-black">
-                        <i class="fas fa-id-card"></i>
-                    </div>
-                    <div id="profileStudentName" class="mt-4 text-xl font-extrabold">—</div>
-                    <div class="mt-1 text-sm text-zinc-400">Branch: <span id="profileBranch" class="text-zinc-200 font-semibold">—</span></div>
-
-                    <div class="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Guardian</div>
-                        <div class="mt-2 text-sm text-white font-semibold" id="guardianName">—</div>
-                        <div class="mt-1 text-xs text-zinc-400">
-                            <span id="guardianRelationship">—</span> • <span id="guardianPhone">—</span>
+            <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 sm:p-8 shadow-xl dark:shadow-black/40">
+                <div class="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-start gap-4">
+                            <div class="h-16 w-16 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center text-2xl font-black shadow-lg shadow-gold-500/20">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <h2 id="profileStudentName" class="text-2xl font-black text-zinc-900 dark:text-white">—</h2>
+                                    <div id="profileStatusBadge"></div>
+                                </div>
+                                <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Branch: <span id="profileBranch" class="font-semibold text-zinc-700 dark:text-zinc-200">—</span></p>
+                                <p id="profileQuickSummary" class="mt-3 text-sm text-zinc-600 dark:text-zinc-300">Your student account details appear here.</p>
+                            </div>
                         </div>
-                        <div class="mt-3 text-[10px] text-zinc-500">Guardian details are managed by admin.</div>
+
+                        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-4">
+                                <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">Guardian</div>
+                                <div class="mt-2 font-semibold text-zinc-900 dark:text-white" id="guardianName">—</div>
+                                <div class="mt-1 text-zinc-500 dark:text-zinc-400">
+                                    <span id="guardianRelationship">—</span>
+                                    <span class="mx-1">•</span>
+                                    <span id="guardianPhone">—</span>
+                                </div>
+                                <div class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-500">Guardian details are managed by admin.</div>
+                            </div>
+
+                            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">Current Schedule</div>
+                                        <div id="profileScheduleTitle" class="mt-2 font-semibold text-zinc-900 dark:text-white">Waiting for schedule</div>
+                                    </div>
+                                    <a href="student_sessions.html" class="shrink-0 px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition">
+                                        Open Sessions
+                                    </a>
+                                </div>
+                                <div id="profileScheduleMeta" class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">Your next approved class will appear here.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="xl:w-[320px] rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+                        <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">Enrollment</div>
+                        <div id="profileEnrollmentTitle" class="mt-2 text-lg font-extrabold text-zinc-900 dark:text-white">No active package yet</div>
+                        <div id="profileEnrollmentMeta" class="mt-3 space-y-2 text-sm text-zinc-600 dark:text-zinc-300"></div>
                     </div>
                 </div>
+            </section>
 
-                <div class="lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
-                    <form id="profileForm" class="space-y-6">
+            <div class="mt-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6">
+                <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-lg font-extrabold text-zinc-900 dark:text-white">Personal Details</h3>
+                            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Update the information students usually need to keep current.</p>
+                        </div>
+                        <a href="student_dashboard.html" class="hidden sm:inline-flex px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold text-zinc-700 dark:text-zinc-200 transition">
+                            Back to Dashboard
+                        </a>
+                    </div>
+
+                    <form id="profileForm" class="space-y-6 mt-6">
                         <input type="hidden" name="student_id" />
                         <input type="hidden" name="branch_id" />
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-widest">First Name</label>
-                                <input name="first_name" required class="w-full px-4 py-3 bg-zinc-950/60 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
+                                <input name="first_name" required class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-widest">Last Name</label>
-                                <input name="last_name" required class="w-full px-4 py-3 bg-zinc-950/60 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
+                                <input name="last_name" required class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-widest">Middle Name</label>
-                                <input name="middle_name" class="w-full px-4 py-3 bg-zinc-950/60 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
+                                <input name="middle_name" class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-widest">Grade/Year</label>
-                                <input name="grade_year" class="w-full px-4 py-3 bg-zinc-950/60 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
+                                <input name="grade_year" class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-widest">Email</label>
                                 <input name="email" type="email" readonly
-                                    class="w-full px-4 py-3 bg-zinc-950/40 border border-white/10 rounded-2xl text-zinc-300 cursor-not-allowed focus:outline-none transition" />
+                                    class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-950/40 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-500 dark:text-zinc-300 cursor-not-allowed focus:outline-none transition" />
                                 <div class="text-[10px] text-zinc-500 mt-2">Email is used for login. Ask admin if you need to change it.</div>
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-widest">Phone</label>
-                                <input name="phone" class="w-full px-4 py-3 bg-zinc-950/60 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
+                                <input name="phone" class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition" />
                             </div>
                         </div>
 
                         <div>
                             <label class="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-widest">Address</label>
-                            <textarea name="address" rows="3" class="w-full px-4 py-3 bg-zinc-950/60 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition"></textarea>
+                            <textarea name="address" rows="3" class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition"></textarea>
                         </div>
 
                         <div class="flex items-center justify-end gap-3 pt-2">
-                            <a href="student_dashboard.html" class="px-5 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
+                            <a href="student_dashboard.html" class="px-5 py-3 rounded-2xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold text-zinc-700 dark:text-zinc-200 transition">
                                 Cancel
                             </a>
                             <button type="submit" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-gold-500 to-gold-400 text-black text-sm font-extrabold shadow-lg shadow-gold-500/20 hover:from-gold-400 hover:to-gold-300 transition">
@@ -193,7 +238,22 @@
                             </button>
                         </div>
                     </form>
-                </div>
+                </section>
+
+                <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <h3 class="text-lg font-extrabold text-zinc-900 dark:text-white">Quick Notes</h3>
+                    <div class="mt-4 space-y-3 text-sm">
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-4 text-zinc-600 dark:text-zinc-300">
+                            Use <span class="font-semibold text-zinc-900 dark:text-white">Sessions</span> for the full class list and attendance progress.
+                        </div>
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-4 text-zinc-600 dark:text-zinc-300">
+                            If your schedule, guardian details, or email need correction, contact the admin so records stay accurate.
+                        </div>
+                        <div id="profileEnrollmentHint" class="rounded-2xl border border-gold-500/20 bg-amber-50 dark:bg-gold-500/10 px-4 py-4 text-zinc-700 dark:text-zinc-200">
+                            Your approved enrollment details will appear here once admin finalizes them.
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     </main>

@@ -1979,6 +1979,48 @@ function renderEnrollmentHistoryList(history) {
     }).join('');
 }
 
+function getStudentEnrollmentPaymentState(enrollment) {
+    const totalAmount = Number(enrollment?.total_amount || 0);
+    const paidAmount = Number(enrollment?.paid_amount || 0);
+    if (totalAmount > 0 && paidAmount >= totalAmount) return 'Paid';
+    if (paidAmount > 0) return 'Partial';
+    return 'Unpaid';
+}
+
+function renderStudentProfileEnrollmentMeta(enrollment, instruments, branchName) {
+    if (!enrollment) {
+        return `
+            <div class="text-zinc-500 dark:text-zinc-400">No approved or pending enrollment yet.</div>
+            <div class="text-zinc-500 dark:text-zinc-400">Open Sessions if you need to request a package.</div>
+        `;
+    }
+
+    const teacherName = `${enrollment.teacher_first_name || ''} ${enrollment.teacher_last_name || ''}`.trim() || 'Not assigned yet';
+    const scheduleDate = formatDateLong(enrollment.first_session_date || enrollment.start_date || '');
+    const scheduleStart = enrollment.first_start_time ? formatTime12Hour(enrollment.first_start_time) : '';
+    const scheduleEnd = enrollment.first_end_time ? formatTime12Hour(enrollment.first_end_time) : '';
+    const scheduleTime = scheduleStart && scheduleEnd ? `${scheduleStart} - ${scheduleEnd}` : 'Not scheduled yet';
+    const roomName = enrollment.first_room || 'To be announced';
+    const paymentState = getStudentEnrollmentPaymentState(enrollment);
+    const balance = Math.max(0, Number(enrollment.total_amount || 0) - Number(enrollment.paid_amount || 0));
+    const instrumentNames = (Array.isArray(instruments) ? instruments : [])
+        .map(inst => String(inst.instrument_name || inst.type_name || '').trim())
+        .filter(Boolean);
+    const instrumentsLabel = instrumentNames.length ? instrumentNames.join(', ') : 'Not assigned yet';
+
+    return `
+        <div><span class="text-zinc-500 dark:text-zinc-400">Status:</span> <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(enrollment.status || 'Pending')}</span></div>
+        <div><span class="text-zinc-500 dark:text-zinc-400">Teacher:</span> <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(teacherName)}</span></div>
+        <div><span class="text-zinc-500 dark:text-zinc-400">First class:</span> <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(scheduleDate || 'Not scheduled yet')}</span></div>
+        <div><span class="text-zinc-500 dark:text-zinc-400">Time:</span> <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(scheduleTime)}</span></div>
+        <div><span class="text-zinc-500 dark:text-zinc-400">Room:</span> <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(roomName)}</span></div>
+        <div><span class="text-zinc-500 dark:text-zinc-400">Instruments:</span> <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(instrumentsLabel)}</span></div>
+        <div><span class="text-zinc-500 dark:text-zinc-400">Payment:</span> <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(`${paymentState} (${enrollment.payment_type || 'Partial Payment'})`)}</span></div>
+        <div><span class="text-zinc-500 dark:text-zinc-400">Balance:</span> <span class="font-semibold text-zinc-900 dark:text-white">${formatCurrencyPHP(balance)}</span></div>
+        <div><span class="text-zinc-500 dark:text-zinc-400">Branch:</span> <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(branchName || '—')}</span></div>
+    `;
+}
+
 let guardianPortalStudents = [];
 let guardianActiveStudentIndex = null;
 
@@ -3099,6 +3141,7 @@ async function initStudentDashboardPage() {
     }
 
     setText('studentNavName', user.username || user.email || 'Student');
+    setText('studentMobileMenuName', user.username || user.email || 'Signed in');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
     if (!portal.success) {
@@ -3111,26 +3154,50 @@ async function initStudentDashboardPage() {
     setText('studentBranch', s.branch_name || '—');
     setHtml('studentStatusBadge', `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(s.registration_status)}">${escapeHtml(s.registration_status || '—')}</span>`);
 
-    setText('balanceDue', formatCurrencyPHP(s.balance_due));
-    setText('amountPaid', formatCurrencyPHP(s.registration_fee_paid || 0));
-    setText('amountTotal', formatCurrencyPHP(s.registration_fee_amount || 0));
-
     const profileComplete = isRegistrationProfileComplete(s);
     const regPaid = ['Approved', 'Fee Paid'].includes(String(s.registration_status || 'Pending'));
     const isNewStudent = !profileComplete || !regPaid;
+    const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
+    const isEnrolledStudent = Boolean(enrollmentApproved);
     const overviewGrid = document.getElementById('studentOverviewGrid');
+    const overviewCard = document.getElementById('studentEnrollmentOverviewCard');
+    const requestShortcutCard = document.getElementById('studentRequestShortcutCard');
+    const requestFormCard = document.getElementById('studentRequestFormCard');
     if (overviewGrid) {
         overviewGrid.classList.toggle('hidden', isNewStudent);
     }
     const welcomeNote = document.getElementById('studentWelcomeNote');
-    if (welcomeNote && isNewStudent) {
-        welcomeNote.textContent = 'Check your registration status here, then continue to enrollment once admin approval is complete.';
+    if (welcomeNote) {
+        if (isEnrolledStudent) {
+            welcomeNote.textContent = 'View your upcoming class, open your QR code, and keep your profile updated.';
+        } else if (isNewStudent) {
+            welcomeNote.textContent = 'Check your registration status here, then continue to enrollment once admin approval is complete.';
+        } else {
+            welcomeNote.textContent = 'Quick view of your account and QR. For full details, open Sessions or Profile.';
+        }
     }
+    if (overviewCard) overviewCard.classList.toggle('hidden', isEnrolledStudent);
+    if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent);
+    if (requestFormCard) requestFormCard.style.display = isEnrolledStudent ? 'none' : '';
 
     // Package
     setText('packageName', s.package_name || 'Not assigned yet');
     setText('packageSessions', s.package_sessions ? `${s.package_sessions} sessions` : '—');
     setText('packageMaxInstruments', s.package_max_instruments ? `${s.package_max_instruments} instrument(s)` : '—');
+
+    const upcomingDate = formatDateLong(portal.current_enrollment?.first_session_date || portal.current_enrollment?.start_date || '');
+    const upcomingStart = portal.current_enrollment?.first_start_time ? formatTime12Hour(portal.current_enrollment.first_start_time) : '';
+    const upcomingEnd = portal.current_enrollment?.first_end_time ? formatTime12Hour(portal.current_enrollment.first_end_time) : '';
+    const upcomingTime = upcomingStart && upcomingEnd ? `${upcomingStart} - ${upcomingEnd}` : 'To be announced';
+    const upcomingRoom = portal.current_enrollment?.first_room || 'To be announced';
+    const upcomingTeacher = `${portal.current_enrollment?.teacher_first_name || ''} ${portal.current_enrollment?.teacher_last_name || ''}`.trim() || 'Not assigned yet';
+    setText('studentUpcomingDate', upcomingDate || (isEnrolledStudent ? 'Schedule confirmed soon' : 'Waiting for schedule'));
+    setText('studentUpcomingTime', upcomingTime);
+    setText('studentUpcomingRoom', upcomingRoom);
+    setText('studentUpcomingTeacher', upcomingTeacher);
+    setText('studentUpcomingNote', isEnrolledStudent
+        ? 'This is the next schedule attached to your active enrollment.'
+        : 'Your next approved class will appear here.');
 
     // Enrollment focus cards
     setHtml('currentEnrollmentSummary', renderCurrentEnrollmentSummary(portal.current_enrollment || null, portal.student || {}, portal.instruments || []));
@@ -3156,16 +3223,21 @@ async function initStudentDashboardPage() {
         const resMeta = await fetchStudentRequestMetaByEmail(user.email);
         if (resMeta?.success) {
             meta = resMeta;
-            initStudentRequestSection(s, meta);
+            if (!isEnrolledStudent) {
+                initStudentRequestSection(s, meta);
+            }
         }
     } catch (e) {
         setHtml('studentAvailabilityCalendar', '<div class="text-zinc-500">Unable to load teacher availability right now.</div>');
     }
 
-    renderStudentOnboardingSteps(s, meta, portal);
-    wireStudentOnboardingActions(s, meta, portal);
+    if (!isEnrolledStudent) {
+        renderStudentOnboardingSteps(s, meta, portal);
+        wireStudentOnboardingActions(s, meta, portal);
+    } else {
+        setHtml('studentOnboardingSteps', '');
+    }
 
-    const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     const qrCard = document.getElementById('studentQrCard');
     if (!enrollmentApproved) {
         if (qrCard) qrCard.classList.add('opacity-70');
@@ -3390,6 +3462,7 @@ async function initStudentProfilePage() {
     if (!checkStudentAuth()) return;
     const user = Auth.getUser();
     setText('studentNavName', user.username || user.email || 'Student');
+    setText('studentMobileMenuName', user.username || user.email || 'Signed in');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
     if (!portal.success) {
@@ -3400,6 +3473,53 @@ async function initStudentProfilePage() {
     const s = portal.student;
     setText('profileStudentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
     setText('profileBranch', s.branch_name || '—');
+    setHtml('profileStatusBadge', `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(s.registration_status)}">${escapeHtml(s.registration_status || '—')}</span>`);
+
+    const enrollment = portal.current_enrollment || null;
+    const enrollmentStatus = enrollment?.status || '';
+    const teacherName = `${enrollment?.teacher_first_name || ''} ${enrollment?.teacher_last_name || ''}`.trim() || 'Teacher not assigned yet';
+    const sessionDate = formatDateLong(enrollment?.first_session_date || enrollment?.start_date || '');
+    const sessionStart = enrollment?.first_start_time ? formatTime12Hour(enrollment.first_start_time) : '';
+    const sessionEnd = enrollment?.first_end_time ? formatTime12Hour(enrollment.first_end_time) : '';
+    const sessionTime = sessionStart && sessionEnd ? `${sessionStart} - ${sessionEnd}` : '';
+    const roomName = enrollment?.first_room || 'Room to be announced';
+    const isActiveEnrollment = enrollmentStatus === 'Active';
+    const isPendingEnrollment = enrollmentStatus === 'Pending';
+
+    let quickSummary = 'Keep your phone number and address updated for school records.';
+    if (isActiveEnrollment) {
+        quickSummary = `You are currently enrolled in ${enrollment.package_name || 'your package'}. Check your schedule below for the next class details.`;
+    } else if (isPendingEnrollment) {
+        quickSummary = `Your ${enrollment.package_name || 'package'} enrollment is pending approval. Schedule details will appear here once finalized.`;
+    } else if (s.registration_status === 'Approved') {
+        quickSummary = 'Your registration is approved. You can open Sessions when you are ready to request or review enrollment.';
+    }
+    setText('profileQuickSummary', quickSummary);
+
+    if (isActiveEnrollment && (sessionDate || sessionTime)) {
+        setText('profileScheduleTitle', sessionDate || 'Schedule confirmed');
+        setText('profileScheduleMeta', `${teacherName} • ${sessionTime || 'Time to be announced'} • ${roomName}`);
+    } else if (isPendingEnrollment) {
+        setText('profileScheduleTitle', 'Schedule being finalized');
+        setText('profileScheduleMeta', 'Admin is still confirming your teacher, date, and room.');
+    } else {
+        setText('profileScheduleTitle', 'No approved class schedule yet');
+        setText('profileScheduleMeta', 'Your next approved class will appear here once enrollment is active.');
+    }
+
+    setText('profileEnrollmentTitle', enrollment?.package_name || 'No active package yet');
+    setHtml('profileEnrollmentMeta', renderStudentProfileEnrollmentMeta(enrollment, portal.instruments || [], s.branch_name || '—'));
+
+    const enrollmentHint = document.getElementById('profileEnrollmentHint');
+    if (enrollmentHint) {
+        if (isActiveEnrollment) {
+            enrollmentHint.textContent = 'You are already enrolled. This page is mainly for viewing your details and making simple profile updates.';
+        } else if (isPendingEnrollment) {
+            enrollmentHint.textContent = 'Your enrollment is pending. Watch the schedule section above for the approved class details.';
+        } else {
+            enrollmentHint.textContent = 'Your approved enrollment details will appear here once admin finalizes them.';
+        }
+    }
 
     const form = document.getElementById('profileForm');
     if (!form) return;

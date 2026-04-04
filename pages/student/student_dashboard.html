@@ -135,7 +135,7 @@
                 <p id="studentWelcomeNote" class="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-2">Quick view of your account and QR. For full details, open Sessions or Profile.</p>
             </div>
 
-            <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40 mb-8">
+            <div id="studentEnrollmentOverviewCard" class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40 mb-8">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Enrollment Overview</div>
@@ -170,69 +170,44 @@
                     </div>
                 </div>
 
-                <!-- Balance Card -->
-                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">
+                <!-- Upcoming Schedule Card -->
+                <div id="studentUpcomingScheduleCard" class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Current Balance Due</div>
-                            <div id="balanceDue" class="text-3xl font-black text-gold-400 mt-2">₱0.00</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Upcoming Schedule</div>
+                            <div id="studentUpcomingDate" class="text-2xl font-black text-zinc-900 dark:text-white mt-2">Waiting for schedule</div>
                         </div>
                         <div class="h-12 w-12 rounded-2xl bg-gold-500/15 border border-gold-500/20 grid place-items-center">
-                            <i class="fas fa-wallet text-gold-400"></i>
+                            <i class="fas fa-calendar-day text-gold-400"></i>
                         </div>
                     </div>
+
                     <div class="mt-6 grid grid-cols-2 gap-4">
                         <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Paid</div>
-                            <div id="amountPaid" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">₱0.00</div>
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Time</div>
+                            <div id="studentUpcomingTime" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
                         <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Total</div>
-                            <div id="amountTotal" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">₱0.00</div>
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Room</div>
+                            <div id="studentUpcomingRoom" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
                     </div>
-                    <p class="text-xs text-zinc-500 mt-4">Balance is computed from your registration + package fee minus recorded payments.</p>
-                </div>
 
-                <!-- Sessions Card (summary only) -->
-                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Sessions</div>
-                            <div id="packageName" class="text-xl font-extrabold mt-2">—</div>
-                        </div>
-                        <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
-                            <i class="fas fa-stopwatch text-gold-400"></i>
-                        </div>
-                    </div>
                     <div class="mt-4 grid grid-cols-2 gap-4">
                         <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Included</div>
-                            <div id="packageSessions" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">—</div>
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Teacher</div>
+                            <div id="studentUpcomingTeacher" class="text-sm font-bold text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
                         <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Max Instruments</div>
-                            <div id="packageMaxInstruments" class="text-lg font-bold text-zinc-900 dark:text-white mt-1">—</div>
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Package</div>
+                            <div id="packageName" class="text-sm font-bold text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
                     </div>
-                    <div class="mt-4 grid grid-cols-3 gap-3">
-                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-3 text-center">
-                            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Attended</div>
-                            <div id="sessionsAttended" class="text-xl font-black text-zinc-900 dark:text-white mt-1">0</div>
-                        </div>
-                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-3 text-center">
-                            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Remaining</div>
-                            <div id="sessionsRemaining" class="text-xl font-black text-zinc-900 dark:text-white mt-1">—</div>
-                        </div>
-                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-3 text-center">
-                            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Last</div>
-                            <div id="lastAttended" class="text-xs font-semibold text-zinc-600 dark:text-zinc-200 mt-2">—</div>
-                        </div>
-                    </div>
+                    <p id="studentUpcomingNote" class="text-xs text-zinc-500 mt-4">Your next approved class will appear here.</p>
                 </div>
 
                 <!-- Simple Request Enrollment shortcut for mobile -->
-                <div class="md:hidden rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
+                <div id="studentRequestShortcutCard" class="md:hidden rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Request Enrollment</div>
@@ -245,7 +220,7 @@
                 </div>
 
                 <!-- Full Request Enrollment form (desktop / tablet only) -->
-                <div class="hidden md:block lg:col-span-3 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                <div id="studentRequestFormCard" class="hidden md:block lg:col-span-3 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between gap-4">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Request Enrollment</div>
