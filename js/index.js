@@ -1298,17 +1298,21 @@ async function loadPendingRequests() {
                     <td class="px-6 py-4 text-sm text-slate-700">${paymentCellHtml}</td>
                     <td class="px-6 py-4 text-sm font-semibold text-gold-600">${formatCurrencyPHP(payableNow)}</td>
                     <td class="px-6 py-4">
-                        <div class="flex items-center gap-2">
-                            <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
+                        ${isAdminEnrollmentsPage
+                            ? `<button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
                                 View
-                            </button>
-                            <button onclick="(window.onPendingRequestAssignClick || openAssignRequestModal)(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-xs font-bold">
-                                ${window.pendingRequestActionLabel || 'Assign & Approve'}
-                            </button>
-                            <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold">
-                                Reject
-                            </button>
-                        </div>
+                            </button>`
+                            : `<div class="flex items-center gap-2">
+                                <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
+                                    View
+                                </button>
+                                <button onclick="(window.onPendingRequestAssignClick || openAssignRequestModal)(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-xs font-bold">
+                                    ${window.pendingRequestActionLabel || 'Assign & Approve'}
+                                </button>
+                                <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold">
+                                    Reject
+                                </button>
+                            </div>`}
                     </td>
                 </tr>`;
         }).join('');

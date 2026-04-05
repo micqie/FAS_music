@@ -138,7 +138,7 @@
             <div class="mb-10">
                 <h1 id="sessionsPageTitle" class="text-3xl font-black text-slate-900 tracking-tight">Sessions</h1>
                 <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
-                <p id="sessionsPageSubtitle" class="text-slate-500 mt-2">View enrolled students and assign their session schedules.</p>
+                <p id="sessionsPageSubtitle" class="text-slate-500 mt-2">General overview of sessions across all branches.</p>
             </div>
 
         <!-- Messages -->
@@ -161,7 +161,7 @@
             <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
                 <div>
                     <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-calendar-alt mr-2 text-gold-500"></i>Session Plans</h3>
-                    <p class="text-xs text-slate-500 mt-1">All enrolled students. Open a schedule to view full session slots.</p>
+                    <p class="text-xs text-slate-500 mt-1">All enrolled students. Open a schedule to view session slots.</p>
                 </div>
                 <span class="text-xs text-slate-500" id="studentCount">Loading...</span>
             </div>
@@ -191,7 +191,7 @@
             <div class="p-6 bg-rose-50/70 border-b border-rose-100 flex items-center justify-between">
                 <div>
                     <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-rotate-left mr-2 text-rose-500"></i>Teacher Cancellations</h3>
-                    <p class="text-xs text-slate-500 mt-1">Admin-only reschedule queue for sessions cancelled by teachers.</p>
+                    <p class="text-xs text-slate-500 mt-1">Read-only overview of sessions cancelled by teachers.</p>
                 </div>
                 <span class="text-xs text-slate-500" id="cancelledSessionCount">Loading...</span>
             </div>
@@ -212,45 +212,8 @@
             <p id="scheduleModalMeta" class="text-slate-500 text-sm mt-1">Loading schedule...</p>
 
             <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <div class="text-sm font-semibold text-slate-800">Add Schedule</div>
-                        <div id="nextSessionHint" class="text-xs text-slate-500">Select date/time for the next unscheduled session.</div>
-                    </div>
-                    <button id="toggleAddScheduleBtn" type="button" class="px-3 py-1.5 rounded-lg bg-gold-500/15 text-gold-700 hover:bg-gold-500/25 text-xs font-bold">
-                        Add Schedule
-                    </button>
-                </div>
-                <form id="addScheduleForm" class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 hidden">
-                    <input type="hidden" id="scheduleEnrollmentId">
-                    <input type="hidden" id="scheduleSessionNumber">
-                    <div class="md:col-span-1">
-                        <label class="block text-xs text-slate-500 mb-1">Date</label>
-                        <input id="scheduleDate" type="date" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-500 mb-1">Start</label>
-                        <input id="scheduleStart" type="time" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-500 mb-1">End</label>
-                        <input id="scheduleEnd" type="time" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-xs text-slate-500 mb-1">Teacher</label>
-                        <input id="scheduleTeacherLabel" type="text" readonly class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 bg-slate-100">
-                        <input id="scheduleTeacher" type="hidden">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-500 mb-1">Room</label>
-                        <select id="scheduleRoom" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
-                            <option value="">Select room...</option>
-                        </select>
-                    </div>
-                    <div class="md:col-span-3 flex justify-end">
-                        <button type="submit" class="px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Save Schedule</button>
-                    </div>
-                </form>
+                <div class="text-sm font-semibold text-slate-800">Session Summary</div>
+                <div id="nextSessionHint" class="text-xs text-slate-500 mt-1">This view is read-only for super admin.</div>
             </div>
 
             <div id="scheduleModalBody" class="mt-5 space-y-2 max-h-[50vh] overflow-y-auto pr-1">
@@ -714,17 +677,9 @@
                             </td>
                             <td class="px-6 py-4 text-sm font-semibold text-gold-600">${formatCurrencyPHP(payableNow)}</td>
                             <td class="px-6 py-4">
-                                <div class="flex items-center gap-2">
-                                    <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
-                                        View
-                                    </button>
-                                    <button onclick="(window.onPendingRequestAssignClick || openAssignRequestModal)(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-xs font-bold">
-                                        ${window.pendingRequestActionLabel || 'Assign & Approve'}
-                                    </button>
-                                    <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold">
-                                        Reject
-                                    </button>
-                                </div>
+                                <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
+                                    View
+                                </button>
                             </td>
                         </tr>`;
                 }).join('');
@@ -1052,11 +1007,7 @@
                             <div class="text-sm text-slate-600">Cancelled slot: ${originalTime}</div>
                             <div class="text-xs text-slate-500">Reason: ${reason}</div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button type="button" class="px-3 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 text-xs font-bold" onclick="openReschedulePicker(${Number(session.session_id)})">
-                                Reschedule
-                            </button>
-                        </div>
+                        <div class="text-xs font-semibold text-rose-600">Branch manager action required</div>
                     </div>
                 `;
             }).join('');
@@ -1187,14 +1138,7 @@
             if (enrollmentInput) enrollmentInput.value = String(enrollmentId);
             if (sessionInput) sessionInput.value = String(nextUnscheduled);
             if (hint) {
-                hint.textContent = nextUnscheduled > 0
-                    ? `Next unscheduled: Session ${nextUnscheduled}`
-                    : 'All sessions are scheduled.';
-            }
-            if (toggleBtn) {
-                toggleBtn.disabled = nextUnscheduled < 1;
-                toggleBtn.classList.toggle('opacity-50', nextUnscheduled < 1);
-                toggleBtn.classList.toggle('cursor-not-allowed', nextUnscheduled < 1);
+                hint.textContent = 'This view is read-only for super admin.';
             }
 
             const teacherName = `${escapeHtml(row.teacher_first_name || '')} ${escapeHtml(row.teacher_last_name || '')}`.trim() || 'No fixed teacher assigned';
@@ -1205,15 +1149,7 @@
                 teacherLabel.value = teacherName;
             }
             if (roomSelect) {
-                roomSelect.innerHTML = '<option value="">Select room...</option>';
-            }
-            if (nextUnscheduled > 0) {
-                fetchRoomsForBranch(Number(row.branch_id || 0)).then(rooms => {
-                    if (!roomSelect) return;
-                    roomSelect.innerHTML = '<option value="">Select room...</option>' + rooms.map(rm => {
-                        return `<option value="${escapeHtml(rm.room_name || '')}">${escapeHtml(rm.room_name || 'Room')}</option>`;
-                    }).join('');
-                });
+                roomSelect.innerHTML = '<option value="">Read-only view</option>';
             }
 
             modal.classList.remove('hidden');
@@ -1418,11 +1354,8 @@
                 }
             }
 
-            initAssignTeacherSearchBox();
-
             await Promise.all([
-                loadBranches(),
-                loadSessionPackages()
+                loadBranches()
             ]);
 
             await Promise.all([
@@ -1430,28 +1363,11 @@
                 loadCancelledSessions()
             ]);
 
-            await maybeAutoOpenAssignPackageModalFromUrl();
-            await maybeAutoOpenAssignRequestModalFromUrl();
-
             document.getElementById('branchFilter')?.addEventListener('change', () => {
                 loadActiveStudents();
                 loadCancelledSessions();
             });
-            document.getElementById('closeAssignPackageModalBtn')?.addEventListener('click', closeAssignPackageModal);
-            document.getElementById('cancelAssignPackageBtn')?.addEventListener('click', closeAssignPackageModal);
-            document.getElementById('assignPackageForm')?.addEventListener('submit', assignPackage);
-            document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', closeAssignRequestModal);
-            document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', closeAssignRequestModal);
-            document.getElementById('assignRequestForm')?.addEventListener('submit', submitAssignRequestForm);
-            document.getElementById('assignRequestDate')?.addEventListener('change', (e) => {
-                const dayEl = document.getElementById('assignRequestDay');
-                if (!dayEl) return;
-                const d = getDayNameFromDate(e.target.value || '');
-                dayEl.value = d || '';
-            });
             document.getElementById('closeScheduleModalBtn')?.addEventListener('click', closeScheduleModal);
-            document.getElementById('toggleAddScheduleBtn')?.addEventListener('click', toggleAddScheduleForm);
-            document.getElementById('addScheduleForm')?.addEventListener('submit', submitAddScheduleForm);
         });
     </script>
 </body>
