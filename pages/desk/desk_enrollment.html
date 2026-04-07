@@ -191,52 +191,72 @@
     </div>
 
     <!-- Assign Request Modal -->
-    <div id="assignRequestModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-2xl p-6 relative">
+    <div id="assignRequestModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-4xl p-6 relative">
             <button id="closeAssignRequestModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
                 <i class="fas fa-times text-xl"></i>
             </button>
             <h3 class="text-2xl font-bold text-slate-900">Assign Student Request</h3>
             <p id="assignRequestStudentInfo" class="text-slate-500 text-sm mt-1">Finalize teacher and schedule before approval.</p>
 
+            <div class="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Student</div>
+                    <div id="assignRequestStudentName" class="mt-2 text-sm font-semibold text-slate-900">Student</div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Branch</div>
+                    <div id="assignRequestStudentBranch" class="mt-2 text-sm font-semibold text-slate-900">Branch</div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Package</div>
+                    <div id="assignRequestStudentPackage" class="mt-2 text-sm font-semibold text-slate-900">Package</div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Instrument</div>
+                    <div id="assignRequestStudentInstrument" class="mt-2 text-sm font-semibold text-slate-900">Instrument</div>
+                </div>
+            </div>
+
             <form id="assignRequestForm" class="mt-5 space-y-4">
                 <input type="hidden" id="assignRequestId" value="">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                    <div class="relative">
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Teacher *</label>
-                        <select id="assignRequestTeacherSelect" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
-                            <option value="">Select teacher...</option>
-                        </select>
+                        <input type="hidden" id="assignRequestTeacherSelect" value="">
+                        <input type="text" id="assignRequestTeacherSearch" placeholder="Search teacher or specialization..." class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                        <div id="assignRequestTeacherSearchHelp" class="mt-2 text-xs text-slate-500">Recommended teachers will appear here based on the student's requested instrument.</div>
+                        <div id="assignRequestTeacherSuggestions" class="hidden absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl max-h-64 overflow-y-auto"></div>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Date *</label>
-                        <input type="date" id="assignRequestDate" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <input type="date" id="assignRequestDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Day *</label>
-                        <input type="text" id="assignRequestDay" readonly class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700" placeholder="Auto from date">
+                        <input type="text" id="assignRequestDay" readonly class="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700" placeholder="Auto from date">
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Start Time *</label>
-                        <input type="time" id="assignRequestStartTime" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <input type="time" id="assignRequestStartTime" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">End Time *</label>
-                        <input type="time" id="assignRequestEndTime" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <input type="time" id="assignRequestEndTime" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Room / Location</label>
-                        <select id="assignRequestRoom" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <select id="assignRequestRoom" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
                             <option value="">Select room...</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Notes</label>
-                        <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900">
+                        <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
                     </div>
                 </div>
                 <div class="text-xs text-slate-500">Session must be exactly 1 hour.</div>
@@ -264,6 +284,7 @@
         let managerBranchId = 0;
         let managerBranchName = '';
         let uiIsDesk = false;
+        let assignRequestTeacherCandidates = [];
 
         function showMessage(message, type = 'error') {
             Swal.fire({
@@ -624,6 +645,62 @@
             return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] || '';
         }
 
+        function setAssignRequestTeacherSelection(teacherId) {
+            const hiddenInput = document.getElementById('assignRequestTeacherSelect');
+            const searchInput = document.getElementById('assignRequestTeacherSearch');
+            const helpEl = document.getElementById('assignRequestTeacherSearchHelp');
+            const suggestionsEl = document.getElementById('assignRequestTeacherSuggestions');
+            const selected = assignRequestTeacherCandidates.find(t => Number(t.teacher_id) === Number(teacherId)) || null;
+            if (hiddenInput) hiddenInput.value = selected ? String(selected.teacher_id) : '';
+            if (searchInput) searchInput.value = selected ? (selected.teacher_name || '') : '';
+            if (helpEl && selected) {
+                helpEl.textContent = selected.specialization
+                    ? `Selected: ${selected.teacher_name} • ${selected.specialization}`
+                    : `Selected: ${selected.teacher_name}`;
+            }
+            if (helpEl && !selected) {
+                helpEl.textContent = assignRequestTeacherCandidates.length
+                    ? 'Recommended teachers will appear here based on the student\'s requested instrument.'
+                    : 'No teacher suggestions found yet for this request.';
+            }
+            if (suggestionsEl) suggestionsEl.classList.add('hidden');
+        }
+
+        function renderAssignRequestTeacherSuggestions(query = '') {
+            const suggestionsEl = document.getElementById('assignRequestTeacherSuggestions');
+            if (!suggestionsEl) return;
+            const q = String(query || '').trim().toLowerCase();
+            const rows = assignRequestTeacherCandidates.filter(t => {
+                const teacherName = String(t.teacher_name || '').toLowerCase();
+                const specialization = String(t.specialization || '').toLowerCase();
+                return !q || teacherName.includes(q) || specialization.includes(q);
+            });
+            if (!rows.length) {
+                suggestionsEl.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">No matching teachers found.</div>';
+                suggestionsEl.classList.remove('hidden');
+                return;
+            }
+            suggestionsEl.innerHTML = rows.map(teacher => `
+                <button type="button" class="w-full text-left px-4 py-3 hover:bg-slate-50 transition border-b border-slate-100 last:border-b-0" onclick="setAssignRequestTeacherSelection(${Number(teacher.teacher_id)})">
+                    <div class="text-sm font-semibold text-slate-900">${escapeHtml(teacher.teacher_name || 'Teacher')}</div>
+                    <div class="text-xs text-slate-500 mt-1">${escapeHtml(teacher.specialization || 'General')}</div>
+                </button>
+            `).join('');
+            suggestionsEl.classList.remove('hidden');
+        }
+
+        function initAssignTeacherSearchBox() {
+            const searchInput = document.getElementById('assignRequestTeacherSearch');
+            const suggestionsEl = document.getElementById('assignRequestTeacherSuggestions');
+            if (!searchInput || !suggestionsEl) return;
+            searchInput.addEventListener('focus', () => renderAssignRequestTeacherSuggestions(searchInput.value || ''));
+            searchInput.addEventListener('input', () => renderAssignRequestTeacherSuggestions(searchInput.value || ''));
+            document.addEventListener('click', (event) => {
+                const withinSearch = event.target.closest('#assignRequestTeacherSuggestions') || event.target.closest('#assignRequestTeacherSearch');
+                if (!withinSearch) suggestionsEl.classList.add('hidden');
+            });
+        }
+
         async function openAssignRequestModal(requestId) {
             const req = pendingRequestsById[String(requestId)];
             if (!req) {
@@ -634,7 +711,13 @@
             const modal = document.getElementById('assignRequestModal');
             const info = document.getElementById('assignRequestStudentInfo');
             const requestIdEl = document.getElementById('assignRequestId');
+            const studentNameEl = document.getElementById('assignRequestStudentName');
+            const studentBranchEl = document.getElementById('assignRequestStudentBranch');
+            const studentPackageEl = document.getElementById('assignRequestStudentPackage');
+            const studentInstrumentEl = document.getElementById('assignRequestStudentInstrument');
             const teacherSelect = document.getElementById('assignRequestTeacherSelect');
+            const teacherSearch = document.getElementById('assignRequestTeacherSearch');
+            const teacherHelp = document.getElementById('assignRequestTeacherSearchHelp');
             const dateEl = document.getElementById('assignRequestDate');
             const dayEl = document.getElementById('assignRequestDay');
             const startEl = document.getElementById('assignRequestStartTime');
@@ -652,13 +735,26 @@
                     return typeName ? `${instrumentName} (${typeName})` : instrumentName;
                 }).join(', ')
                 : '—';
-            info.innerHTML = `${escapeHtml(studentName)} • ${escapeHtml(req.package_name || 'Package')} • Instruments: ${instrumentSummary} • Preferred: ${escapeHtml(req.preferred_day_of_week || '—')} / ${escapeHtml(req.preferred_date || '—')}`;
+            info.textContent = `Preferred schedule: ${req.preferred_day_of_week || '—'} / ${req.preferred_date || '—'}`;
+            if (studentNameEl) studentNameEl.textContent = studentName || 'Student';
+            if (studentBranchEl) studentBranchEl.textContent = req.branch_name || 'No branch';
+            if (studentPackageEl) studentPackageEl.textContent = req.package_name || 'Package';
+            if (studentInstrumentEl) studentInstrumentEl.innerHTML = instrumentSummary;
             requestIdEl.value = String(requestId);
 
-            const options = Array.isArray(req.teacher_candidates) ? req.teacher_candidates : [];
-            teacherSelect.innerHTML = '<option value="">Select teacher...</option>' + options.map(t =>
-                `<option value="${Number(t.teacher_id)}">${escapeHtml(t.teacher_name || 'Teacher')} (${escapeHtml(t.specialization || 'General')})</option>`
-            ).join('');
+            assignRequestTeacherCandidates = Array.isArray(req.teacher_candidates) ? req.teacher_candidates : [];
+            teacherSelect.value = '';
+            if (teacherSearch) teacherSearch.value = '';
+            if (teacherHelp) {
+                teacherHelp.textContent = assignRequestTeacherCandidates.length
+                    ? 'Recommended teachers will appear here based on the student\'s requested instrument.'
+                    : 'No teacher suggestions found yet for this request.';
+            }
+            if (assignRequestTeacherCandidates.length) {
+                setAssignRequestTeacherSelection(assignRequestTeacherCandidates[0].teacher_id);
+            } else {
+                setAssignRequestTeacherSelection('');
+            }
 
             dateEl.value = req.preferred_date || '';
             dayEl.value = getDayNameFromDate(dateEl.value || '') || req.preferred_day_of_week || '';
@@ -957,6 +1053,7 @@
             applySessionView();
             await maybeAutoOpenAssignPackageModalFromUrl();
             await maybeAutoOpenAssignRequestModalFromUrl();
+            initAssignTeacherSearchBox();
 
             document.getElementById('closeAssignPackageModalBtn')?.addEventListener('click', closeAssignPackageModal);
             document.getElementById('cancelAssignPackageBtn')?.addEventListener('click', closeAssignPackageModal);

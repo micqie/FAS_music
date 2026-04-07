@@ -1256,6 +1256,7 @@ async function loadPendingRequests() {
 
         pendingRequestsById = {};
         const isAdminEnrollmentsPage = /admin_enrollments\.html$/i.test(window.location.pathname || '');
+        const adminEnrollmentsAllowActions = !!window.adminEnrollmentsAllowActions;
 
         tableBody.innerHTML = requests.map(r => {
             pendingRequestsById[String(r.request_id)] = r;
@@ -1298,7 +1299,7 @@ async function loadPendingRequests() {
                     <td class="px-6 py-4 text-sm text-slate-700">${paymentCellHtml}</td>
                     <td class="px-6 py-4 text-sm font-semibold text-gold-600">${formatCurrencyPHP(payableNow)}</td>
                     <td class="px-6 py-4">
-                        ${isAdminEnrollmentsPage
+                        ${isAdminEnrollmentsPage && !adminEnrollmentsAllowActions
                             ? `<button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
                                 View
                             </button>`
@@ -4168,9 +4169,25 @@ function initWalkinPage() {
         }
         data['registration_fee_amount'] = 1000;
 
-        // mark as walk-in so backend uses simple default password
+        // Mark as walk-in and attach role-scoped branch context.
         data['is_walkin'] = true;
-        data['registration_source'] = 'admin';
+        try {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const role = String(user?.role_name || '').toLowerCase();
+            if (['staff', 'desk', 'front desk'].includes(role)) {
+                data['registration_source'] = 'staff';
+                const deskBranchId = Number(user?.branch_id || 0);
+                if (deskBranchId > 0) data['desk_branch_id'] = deskBranchId;
+            } else if (['manager', 'branch manager'].includes(role)) {
+                data['registration_source'] = 'manager';
+                const managerBranchId = Number(user?.branch_id || 0);
+                if (managerBranchId > 0) data['manager_branch_id'] = managerBranchId;
+            } else {
+                data['registration_source'] = 'admin';
+            }
+        } catch (_) {
+            data['registration_source'] = 'admin';
+        }
 
         try {
             const response = await axios.post(`${baseApiUrl}/users.php?action=register`, data);
@@ -4208,7 +4225,11 @@ function initWalkinPage() {
                            Next step: confirm the walk-in registration payment method.`,
                     confirmButtonColor: '#b8860b'
                 }).then(() => {
-                    openPaymentModal(result.student_id, { forceSource: 'walkin' });
+                    const redirectTemplate = String(form.dataset.paymentRedirectTemplate || '').trim();
+                    const redirectUrl = redirectTemplate
+                        ? redirectTemplate.replace('{student_id}', encodeURIComponent(String(result.student_id)))
+                        : String(form.dataset.paymentRedirectUrl || '').trim();
+                    openPaymentModal(result.student_id, { forceSource: 'walkin', redirectUrl });
                 });
             } else {
                 const errMsg = result.error || 'Registration failed. Please check all required fields and try again.';
@@ -4327,7 +4348,8 @@ async function loadPendingRegistrations() {
     try {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
         const role = String(user?.role_name || '').toLowerCase();
-        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        const branchScopedRole = user && ['staff', 'desk', 'front desk', 'manager', 'branch manager'].includes(role);
+        const staffBranchId = branchScopedRole ? Number(user.branch_id || 0) : 0;
         let url = `${baseApiUrl}/admin.php?action=get-pending-registrations`;
         if (staffBranchId > 0) url += `&branch_id=${encodeURIComponent(staffBranchId)}`;
 
@@ -4353,7 +4375,8 @@ async function loadAllRegistrations() {
     try {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
         const role = String(user?.role_name || '').toLowerCase();
-        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        const branchScopedRole = user && ['staff', 'desk', 'front desk', 'manager', 'branch manager'].includes(role);
+        const staffBranchId = branchScopedRole ? Number(user.branch_id || 0) : 0;
         let url = `${baseApiUrl}/admin.php?action=get-all-registrations`;
         if (staffBranchId > 0) url += `&branch_id=${encodeURIComponent(staffBranchId)}`;
 
@@ -4482,7 +4505,7 @@ function renderRegistrationsTable() {
         const registrationProofLink = reg.registration_proof_path
             ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 underline mt-1"><i class="fas fa-file-alt"></i>Proof</a>`
             : (registrationSource === 'walkin'
-                ? '<div class="text-xs text-slate-500 mt-1">Walk-in payment handled by admin</div>'
+                ? '<div class="text-xs text-slate-500 mt-1">Walk-in payment handled at the branch</div>'
                 : '<div class="text-xs text-slate-500 mt-1">No proof uploaded</div>');
 
         return `
@@ -4577,7 +4600,8 @@ async function viewDetails(studentId) {
     try {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
         const role = String(user?.role_name || '').toLowerCase();
-        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        const branchScopedRole = user && ['staff', 'desk', 'front desk', 'manager', 'branch manager'].includes(role);
+        const staffBranchId = branchScopedRole ? Number(user.branch_id || 0) : 0;
         let url = `${baseApiUrl}/admin.php?action=get-registration-details&student_id=${studentId}`;
         if (staffBranchId > 0) url += `&branch_id=${encodeURIComponent(staffBranchId)}`;
 
@@ -4685,7 +4709,8 @@ async function openPaymentModal(studentId, options = {}) {
     try {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
         const role = String(user?.role_name || '').toLowerCase();
-        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        const branchScopedRole = user && ['staff', 'desk', 'front desk', 'manager', 'branch manager'].includes(role);
+        const staffBranchId = branchScopedRole ? Number(user.branch_id || 0) : 0;
         let url = `${baseApiUrl}/admin.php?action=get-registration-details&student_id=${studentId}`;
         if (staffBranchId > 0) url += `&branch_id=${encodeURIComponent(staffBranchId)}`;
 
@@ -4831,7 +4856,8 @@ function initPaymentForm() {
         try {
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
             const role = String(user?.role_name || '').toLowerCase();
-            const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+            const branchScopedRole = user && ['staff', 'desk', 'front desk', 'manager', 'branch manager'].includes(role);
+            const staffBranchId = branchScopedRole ? Number(user.branch_id || 0) : 0;
             if (staffBranchId > 0) paymentData.branch_id = staffBranchId;
 
             const res = await axios.post(`${baseApiUrl}/admin.php?action=confirm-payment`, paymentData);
@@ -4861,7 +4887,8 @@ async function rejectRegistration(studentId) {
     try {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
         const role = String(user?.role_name || '').toLowerCase();
-        const staffBranchId = (user && (role === 'staff' || role === 'desk' || role === 'front desk')) ? Number(user.branch_id || 0) : 0;
+        const branchScopedRole = user && ['staff', 'desk', 'front desk', 'manager', 'branch manager'].includes(role);
+        const staffBranchId = branchScopedRole ? Number(user.branch_id || 0) : 0;
         const payload = { student_id: studentId };
         if (staffBranchId > 0) payload.branch_id = staffBranchId;
 
@@ -4907,12 +4934,36 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginForm) {
         initIndexPage();
     } else if (walkinForm) {
-        checkAuth();
+        const user = Auth.getUser();
+        const role = String(user?.role_name || '').toLowerCase();
+        const isAdminRole = ['admin', 'superadmin'].includes(role);
+        const isBranchScopedRole = ['staff', 'desk', 'front desk', 'manager', 'branch manager'].includes(role);
+
+        if (isAdminRole) {
+            checkAuth();
+        } else if (!isBranchScopedRole) {
+            checkAuth();
+            return;
+        }
+
         initWalkinPage();
     } else if (adminTable) {
-        checkAuth();
+        const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        const role = String(user?.role_name || '').toLowerCase();
+        const isAdminRole = ['admin', 'superadmin'].includes(role);
+        const isBranchScopedRole = ['staff', 'desk', 'front desk', 'manager', 'branch manager'].includes(role);
+
+        if (isAdminRole) {
+            checkAuth();
+        } else if (!isBranchScopedRole) {
+            checkAuth();
+            return;
+        }
+
         initPaymentForm();
-        reloadRegistrationsByActiveMode();
+        if (document.body?.dataset?.customRegistrationMode !== '1') {
+            reloadRegistrationsByActiveMode();
+        }
     } else if (studentDashboard) {
         initStudentDashboardPage();
     } else if (studentProfile) {

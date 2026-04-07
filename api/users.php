@@ -520,19 +520,20 @@ class User
         // Public self-registration from index remains pending.
         $isWalkIn = filter_var(($data['is_walkin'] ?? false), FILTER_VALIDATE_BOOLEAN);
         $registrationSource = strtolower(trim((string)($data['registration_source'] ?? '')));
-        if (!in_array($registrationSource, ['public', 'online', 'admin', 'walkin', 'staff'], true)) {
+        if (!in_array($registrationSource, ['public', 'online', 'admin', 'walkin', 'staff', 'manager'], true)) {
             $registrationSource = $isWalkIn ? 'walkin' : 'public';
         }
-        $studentRegistrationSource = in_array($registrationSource, ['admin', 'walkin', 'staff'], true) ? 'walkin' : 'online';
-        $isAdminRegistration = $isWalkIn || in_array($registrationSource, ['admin', 'walkin', 'staff'], true);
+        $studentRegistrationSource = in_array($registrationSource, ['admin', 'walkin', 'staff', 'manager'], true) ? 'walkin' : 'online';
+        $isAdminRegistration = $isWalkIn || in_array($registrationSource, ['admin', 'walkin', 'staff', 'manager'], true);
 
-        // Desk staff branch hardening:
-        // If desk staff submits a walk-in registration, require branch_id to match desk_branch_id.
-        // This prevents registering students into another branch.
+        // Branch-scoped staff/manager hardening:
+        // If branch-scoped staff submits a walk-in registration, require branch_id to match their assigned branch.
         $deskBranchId = (int)($data['desk_branch_id'] ?? 0);
+        $managerBranchId = (int)($data['manager_branch_id'] ?? 0);
+        $scopedBranchId = $deskBranchId > 0 ? $deskBranchId : $managerBranchId;
         $requestedBranchId = (int)($data['branch_id'] ?? 0);
-        if ($deskBranchId > 0 && $requestedBranchId > 0 && $deskBranchId !== $requestedBranchId) {
-            $this->sendJSON(['error' => 'Selected branch does not belong to your desk'], 403);
+        if ($scopedBranchId > 0 && $requestedBranchId > 0 && $scopedBranchId !== $requestedBranchId) {
+            $this->sendJSON(['error' => 'Selected branch does not belong to your assigned branch'], 403);
         }
 
         // Base required fields (student only)
