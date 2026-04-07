@@ -25,60 +25,98 @@
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
         :root { --nav-bg: #0b0f18; --gold: #d4af37; }
         body { font-family: 'Space Grotesk', sans-serif; }
+        .sidebar-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-900">
+<body class="bg-[#f1f5f9] text-slate-900 antialiased" data-custom-registration-mode="1">
     <div class="min-h-screen flex">
-        <aside class="w-64 bg-[#0b0f18] text-white px-5 py-6 hidden lg:flex flex-col">
-            <div class="flex items-center gap-3 px-2">
-                <div class="h-10 w-10 rounded-xl bg-gold-500/20 flex items-center justify-center text-gold-400">
-                    <i class="fas fa-headset"></i>
-                </div>
-                <div>
-                    <div class="text-xs uppercase tracking-[0.3em] text-slate-400">Desk Staff</div>
-                    <div class="text-lg font-semibold">Front Desk</div>
-                </div>
+    <nav class="hidden fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-8">
+            <a id="deskOrManagerLogoLink" href="desk_scanner.html" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
+        </div>
+                <div class="flex items-center gap-4">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="userNameNav" class="text-sm font-semibold text-white">Front Desk</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Desk Staff</span>
             </div>
-            <nav class="mt-10 space-y-2">
-                <a href="desk_scanner.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
-                    <i class="fas fa-qrcode text-slate-400"></i> Scanner
-                </a>
-                <a href="desk_enrollment.html?view=pending" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
-                    <i class="fas fa-user-graduate text-slate-400"></i> Enrollments
-                </a>
-                <a href="desk_registration.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600/30 text-white border border-blue-500/40">
-                    <i class="fas fa-id-card text-blue-200"></i> Registrations
-                </a>
-            </nav>
-            <div class="mt-auto space-y-4 pt-8">
-                <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-400/20 bg-red-400/10 text-sm font-semibold text-red-200 hover:bg-red-400/15 hover:text-white transition">
-                    <i class="fas fa-sign-out-alt"></i> Sign Out
-                </button>
-                <div class="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
-                    <div class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Assigned Branch</div>
-                    <div id="managerBranchName" class="mt-2 text-sm font-semibold text-white">—</div>
-                </div>
-            </div>
-        </aside>
-
-        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6">
-            <div class="max-w-6xl mx-auto">
-                <div class="mb-6 flex items-center justify-between gap-4 flex-wrap">
-                    <div>
-                        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Registrations</h1>
-                        <p class="text-slate-500 text-sm mt-1">Manage student registrations and payments (branch-locked)</p>
-                        <div class="mt-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                            Desk branch: <span id="managerBranchNamePill">—</span>
+            <details class="relative group/profile">
+                <summary class="list-none cursor-pointer">
+                    <div class="h-10 w-10 rounded-full border-2 border-gold-500/30 p-0.5">
+                        <div class="w-full h-full rounded-full bg-darkSlate flex items-center justify-center">
+                            <i class="fas fa-user text-gold-400"></i>
                         </div>
-                        <div id="userNameNav" class="hidden"></div>
-                        <div id="profileMenuName" class="hidden"></div>
                     </div>
-                    <button id="openRegisterStudentModalBtn"
-                        class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/25 transition-all duration-200">
-                        <i class="fas fa-plus mr-2"></i>
-                        Register Student
+                </summary>
+                <div class="absolute right-0 mt-3 w-56 rounded-xl border border-white/10 bg-obsidian/95 backdrop-blur-md shadow-2xl overflow-hidden opacity-0 pointer-events-none group-open/profile:opacity-100 group-open/profile:pointer-events-auto transition-all">
+                    <div class="px-4 py-3 border-b border-white/10">
+                        <p id="profileMenuName" class="text-sm font-semibold text-white truncate">Front Desk</p>
+                        <p class="text-[10px] uppercase tracking-widest text-gold-400 font-bold mt-1">Account</p>
+                    </div>
+                    <button onclick="logout()" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-300 hover:text-red-200 hover:bg-red-400/10 transition-all">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
                     </button>
                 </div>
+            </details>
+        </div>
+    </nav>
+
+    <aside class="w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden lg:flex flex-col sidebar-scroll">
+        <div class="flex items-center gap-3 px-2">
+            <div class="h-10 w-10 rounded-xl bg-gold-500/20 flex items-center justify-center text-[color:var(--gold)]">
+                <i class="fas fa-headset"></i>
+            </div>
+            <div>
+                <div class="text-xs uppercase tracking-[0.3em] text-slate-400">Desk Staff</div>
+                <div id="registrationSidePanelTitle" class="text-lg font-semibold">Front Desk</div>
+            </div>
+        </div>
+        <nav class="mt-10 space-y-2">
+            <a id="navDashboardLink" href="desk_scanner.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <i class="fas fa-qrcode text-slate-400"></i> Scanner
+            </a>
+            <a href="desk_enrollment.html?view=pending" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <i class="fas fa-user-graduate text-slate-400"></i> Enrollments
+            </a>
+            <a href="desk_sessions.html?page=sessions" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <i class="fas fa-calendar-check text-slate-400"></i> Sessions
+            </a>
+            <a href="desk_registration.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600/30 text-white border border-blue-500/40">
+                <i class="fas fa-id-card text-blue-200"></i> Registrations
+            </a>
+        </nav>
+        <div class="mt-auto space-y-4 pt-8">
+            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-400/20 bg-red-400/10 text-sm font-semibold text-red-200 hover:bg-red-400/15 hover:text-white transition">
+                <i class="fas fa-sign-out-alt"></i> Sign Out
+            </button>
+            <div class="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
+                <div class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Assigned Branch</div>
+                <div id="managerBranchName" class="mt-2 text-sm font-semibold text-white">—</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="mb-6 flex items-end justify-between gap-4 flex-wrap">
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Registrations</h1>
+                    <p class="text-slate-500 text-sm mt-1">Manage branch registrations, online payment reviews, and walk-in registration payments.</p>
+                    <div class="mt-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                        Desk branch: <span id="managerBranchNamePill">—</span>
+                    </div>
+                    <div id="userNameNav" class="hidden"></div>
+                    <div id="profileMenuName" class="hidden"></div>
+                </div>
+                <button id="openRegisterStudentModalBtn"
+                    class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/25 transition-all duration-200">
+                    <i class="fas fa-plus mr-2"></i>
+                    Register Student
+                </button>
+            </div>
 
         <!-- Messages -->
         <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
@@ -87,15 +125,15 @@
         <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
             <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between gap-4 flex-wrap">
                 <div>
-                    <h3 class="text-xl font-bold text-slate-800" id="tableTitle"><i class="fas fa-list mr-2 text-gold-500"></i>All Registrations</h3>
-                    <p class="text-xs text-slate-500 mt-1" id="tableSubtitle">Showing all registration records in the system.</p>
+                    <h3 class="text-xl font-bold text-slate-800" id="tableTitle"><i class="fas fa-list mr-2 text-gold-500"></i>Pending Online Registrations</h3>
+                    <p class="text-xs text-slate-500 mt-1" id="tableSubtitle">Showing online registrations that are waiting for branch review and payment confirmation.</p>
                 </div>
                 <div class="flex gap-2">
                     <a href="#pending" id="btnPending" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-semibold text-sm transition">
-                        Pending
+                        Pending Online
                     </a>
-                    <a href="#all" id="btnAll" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black font-bold text-sm shadow-sm transition">
-                        All
+                    <a href="#active" id="btnActive" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-semibold text-sm transition">
+                        Active Registrations
                     </a>
                 </div>
             </div>
@@ -158,21 +196,39 @@
             <form id="paymentForm" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-zinc-300 mb-2">Amount (PHP) *</label>
-                    <input type="number" id="paymentAmount" step="0.01" min="0" required
-                        class="w-full px-4 py-2.5 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-500/20 transition">
+                    <input type="hidden" id="paymentAmount">
+                    <div id="paymentAmountDisplay"
+                        class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white">
+                        ₱0.00
+                    </div>
+                    <p id="paymentAmountHint" class="mt-2 text-xs text-zinc-400">
+                        This amount comes from the student's submitted registration payment request.
+                    </p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-zinc-300 mb-2">Payment Method *</label>
-                    <select id="paymentMethod" required
-                        class="w-full px-4 py-2.5 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-500/20 transition">
-                        <option value="">Select Method</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Card">Card</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                        <option value="GCash">GCash</option>
-                        <option value="Check">Check</option>
-                        <option value="Other">Other</option>
-                    </select>
+                    <input type="hidden" id="paymentMethod">
+                    <div id="paymentMethodReadonlyWrap">
+                        <div id="paymentMethodDisplay"
+                            class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white">
+                            Not available
+                        </div>
+                        <p id="paymentMethodReadonlyHint" class="mt-2 text-xs text-zinc-400">
+                            This method was already selected by the student during registration.
+                        </p>
+                    </div>
+                    <div id="paymentMethodSelectWrap" class="hidden">
+                        <select id="paymentMethodSelect" class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400">
+                            <option value="">Select payment method</option>
+                            <option value="Cash">Cash</option>
+                            <option value="GCash">GCash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <p class="mt-2 text-xs text-zinc-400">
+                            Walk-in registration is being paid directly at the branch, so no proof upload is needed here.
+                        </p>
+                    </div>
                 </div>
                 <p class="text-xs text-zinc-400">
                     Receipt number is generated automatically by the system.
@@ -202,7 +258,6 @@
                 <p class="text-xs uppercase tracking-[0.2em] text-gold-400/80">Registration</p>
                 <h3 class="text-2xl font-bold text-white">Registration Details</h3>
             </div>
-
             <div id="detailsContent" class="space-y-6"></div>
         </div>
     </div>
@@ -214,12 +269,13 @@
                 <i class="fas fa-times text-xl"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2">Register Student (Desk)</h3>
+            <h3 class="text-2xl font-bold text-white mb-2">Register Student (Manager)</h3>
             <p class="text-zinc-400 text-xs mb-4">
                 This will create a student account using the student's email as username with temporary password
                 <span class="font-mono font-semibold">fas@123</span>.
                 If a guardian account is created, its temporary password will be
                 <span class="font-mono font-semibold">fasmusic@2020</span>.
+                The registration is locked to your assigned branch.
                 On first login, both accounts will be <span class="font-semibold text-gold-400">required to change their passwords</span>
                 for security.
             </p>
@@ -334,67 +390,6 @@
                     </div>
                 </div>
 
-                <div>
-                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
-                        Walk-In Enrollment
-                    </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Session Package *</label>
-                            <select name="session_package_id" id="walkinSessionPackageId" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                                <option value="">Loading packages...</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Registration Payment Mode *</label>
-                            <select name="registration_payment_method" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                                <option value="">Select payment mode</option>
-                                <option value="Cash">Cash</option>
-                                <option value="GCash">GCash</option>
-                                <option value="Bank Transfer">Bank Transfer</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Package Payment Type *</label>
-                            <select id="walkin_paymentType" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                                <option value="Partial Payment">Partial Payment</option>
-                                <option value="Full Payment">Full Payment</option>
-                                <option value="Installment">Installment</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Preferred Date *</label>
-                            <input type="date" id="walkinPreferredDate" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Preferred Day *</label>
-                            <input type="text" id="walkinPreferredDay" readonly
-                                class="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-sm text-zinc-300">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Registration Fee</label>
-                            <input type="hidden" name="registration_fee_amount" id="walkin_registration_fee_amount" value="1000">
-                            <div class="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-sm text-zinc-100 font-semibold">
-                                ₱1,000.00
-                            </div>
-                        </div>
-                    </div>
-                    <div id="walkinPackageDetails" class="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-300">
-                        Select a package to see the details.
-                    </div>
-                    <div class="mt-4">
-                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Instruments *</label>
-                        <div id="walkin_instrumentsContainer" class="space-y-3">
-                            <div class="text-sm text-zinc-500">Select a package first.</div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Actions -->
                 <div class="pt-4 flex items-center justify-end gap-3">
                     <button type="button" id="cancelRegisterStudentBtn"
@@ -403,7 +398,7 @@
                     </button>
                     <button type="submit" id="walkinSubmitBtn"
                         class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
-                        <span id="walkinSubmitBtnText">Register Student</span>
+                        <span id="walkinSubmitBtnText">Proceed Payment</span>
                     </button>
                 </div>
             </form>
@@ -412,273 +407,140 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="../../js/mode.js"></script>
     <script src="../../js/index.js"></script>
     <script>
-        // Desktop/desk registration requires a different auth rule than admin pages.
-        function checkAuth() {
-            if (typeof Auth === 'undefined' || !Auth.getUser) {
-                window.location.href = '../../index.html';
-                return false;
+        function getManagerBranchId() {
+            try {
+                const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+                return Number(user?.branch_id || 0);
+            } catch (_) {
+                return 0;
             }
-            const user = Auth.getUser();
-            const role = String(user?.role_name || '').toLowerCase();
-            const allowed = ['staff', 'desk', 'front desk'];
-            if (!user || !allowed.includes(role)) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Access Denied',
-                    text: 'You must be logged in as desk staff to access this page.',
-                    confirmButtonColor: '#b8860b',
-                    confirmButtonText: 'Go to Login'
-                }).then(() => {
-                    const appBase = (typeof appBaseUrl === 'string' && appBaseUrl)
-                        ? appBaseUrl
-                        : ((typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
-                            ? baseApiUrl.slice(0, -4)
-                            : `${window.location.origin}/FAS_music`);
-                    window.location.href = `${appBase}/index.html`;
-                });
-                return false;
-            }
-            return true;
         }
 
-        // Override admin walk-in flow to redirect into desk enrollment workflow.
-        function initWalkinPage() {
-            const form = document.getElementById('walkinForm');
-            if (!form) return;
+        async function loadManagerPendingRegistrations() {
+            const branchId = getManagerBranchId();
+            let url = `${baseApiUrl}/admin.php?action=get-pending-registrations`;
+            if (branchId > 0) url += `&branch_id=${encodeURIComponent(branchId)}`;
+            const res = await axios.get(url);
+            const data = res.data || {};
+            const rows = Array.isArray(data.registrations)
+                ? data.registrations.filter(reg => String(reg.registration_source || 'online').toLowerCase() !== 'walkin')
+                : [];
+            displayRegistrations(rows);
+            updateStats(rows);
+        }
 
-            // Seed dropdowns
-            loadWalkinBranches();
-            if (typeof setupWalkinEnrollmentForm === 'function') {
-                setupWalkinEnrollmentForm();
-            }
-
-            const branchSelect = document.getElementById('walkin_branch_id');
-            const dobInput = document.getElementById('walkin_student_dob');
-
-            if (dobInput) {
-                dobInput.addEventListener('change', updateWalkinAgeAndGuardianRequired);
-                dobInput.addEventListener('input', updateWalkinAgeAndGuardianRequired);
-                // Initial state (e.g. if form is pre-filled)
-                updateWalkinAgeAndGuardianRequired();
-            }
-
-            if (branchSelect) {
-                branchSelect.addEventListener('change', function () {
-                    // Branch still matters for profile and assignment later.
-                });
-            }
-
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-
-                const btn = document.getElementById('walkinSubmitBtn');
-                const btnText = document.getElementById('walkinSubmitBtnText');
-
-                // Prevent double submit (first request can succeed, second gets "email already registered")
-                if (form.dataset.submitting === '1') {
-                    return;
-                }
-                form.dataset.submitting = '1';
-                if (btn) btn.disabled = true;
-                if (btnText) btnText.textContent = 'Creating...';
-
-                const formData = new FormData(form);
-                const data = {};
-                for (let [key, value] of formData.entries()) {
-                    data[key] = value;
-                }
-
-                const enrollment = typeof getWalkinEnrollmentPayload === 'function'
-                    ? getWalkinEnrollmentPayload()
-                    : null;
-                if (!enrollment || enrollment.error) {
-                    showMessage(enrollment?.error || 'Please complete the walk-in enrollment details.', 'error');
-                    form.dataset.submitting = '0';
-                    if (btn) btn.disabled = false;
-                    if (btnText) btnText.textContent = 'Register Student';
-                    return;
-                }
-
-                // mark as walk-in so backend uses simple default password
-                data['is_walkin'] = true;
-                data['registration_source'] = 'staff';
-
-                // Harden desk branch on submission (backend compares desk_branch_id vs branch_id)
-                try {
-                    const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
-                    const deskBranchId = user ? Number(user.branch_id || 0) : 0;
-                    if (deskBranchId > 0) data['desk_branch_id'] = deskBranchId;
-                } catch (_) {}
-
-                try {
-                    const response = await axios.post(`${baseApiUrl}/users.php?action=register`, data);
-
-                    const responseText = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-                    let result;
-                    try {
-                        result = typeof response.data === 'string' ? JSON.parse(responseText) : response.data;
-                    } catch (parseErr) {
-                        console.error('Walk-in registration 400 - Response was not JSON:', responseText);
-                        showMessage('Registration failed. The server returned an invalid response. Check the browser console (F12) for details.', 'error');
-                        return;
-                    }
-
-                    if (result.success) {
-                        const selectedPackageId = data['session_package_id'];
-                        const selectedPackage = walkinPackages.find(p => String(p.package_id) === String(selectedPackageId));
-                        const packageLabel = selectedPackage ? `\n                           <strong>Package:</strong> ${escapeHtml(selectedPackage.package_name)}<br>` : '';
-                        const paymentMethodLabel = data['registration_payment_method'] ? `\n                           <strong>Payment Method:</strong> ${escapeHtml(data['registration_payment_method'])}<br>` : '';
-                        const paymentAmountLabel = data['registration_fee_amount'] ? `\n                           <strong>Paid Amount:</strong> ₱${Number(data['registration_fee_amount']).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<br>` : '';
-                        const guardianLabel = result.guardian_username
-                            ? `<strong>Guardian Username:</strong> ${escapeHtml(result.guardian_username)}<br><strong>Guardian Temporary Password:</strong> fasmusic@2020<br>`
-                            : '';
-                        const enrollmentResponse = typeof submitWalkinEnrollmentRequest === 'function'
-                            ? await submitWalkinEnrollmentRequest(result.student_id)
-                            : { success: false, error: 'Walk-in enrollment helper is unavailable.' };
-                        if (!enrollmentResponse.success || !enrollmentResponse.request_id) {
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Student Registered, Enrollment Not Submitted',
-                                html: `Student account was created successfully, but the walk-in enrollment was not completed.<br><br>
-                               <strong>Username:</strong> ${result.username || data['student_email']}<br>
-                               <strong>Student Temporary Password:</strong> fas@123<br>
-                               ${guardianLabel}<br>
-                               <strong>Reason:</strong> ${escapeHtml(enrollmentResponse.error || 'Unable to create the package request.')}`,
-                                confirmButtonColor: '#b8860b'
-                            });
-                            return;
-                        }
-
-                        const assignUrl = `desk_enrollment.html?view=pending&assign_request_id=${encodeURIComponent(enrollmentResponse.request_id)}`;
-
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Walk-In Enrollment Submitted',
-                            html: `Student and enrollment were created successfully.<br><br>
-                           <strong>Username:</strong> ${result.username || data['student_email']}<br>${packageLabel}${paymentMethodLabel}${paymentAmountLabel}
-                           <strong>Package Payment Type:</strong> ${escapeHtml(enrollment.paymentType)}<br>
-                           <strong>Preferred Date:</strong> ${escapeHtml(enrollment.preferredDate)}<br>
-                           <strong>Student Temporary Password:</strong> fas@123<br>
-                           ${guardianLabel}<br>
-                           On first login, temporary passwords must be changed to a strong password.<br><br>
-                           You will now be redirected to assign the schedule.`,
-                            confirmButtonColor: '#b8860b'
-                        }).then(() => {
-                            window.location.href = assignUrl;
-                        });
-
-                        // Reset form and hide modal if present
-                        form.reset();
-                        const modal = document.getElementById('registerStudentModal');
-                        if (modal) {
-                            modal.classList.add('hidden');
-                            modal.classList.remove('flex');
-                        }
-                    } else {
-                        const errMsg = result.error || 'Registration failed. Please check all required fields and try again.';
-                        console.error('Walk-in registration failed (400):', errMsg, result);
-                        showMessage(errMsg, 'error');
-                    }
-                } catch (error) {
-                    console.error('Walk-in create error:', error);
-                    showMessage(error.message || 'An error occurred. Please try again.', 'error');
-                } finally {
-                    form.dataset.submitting = '0';
-                    if (btn) btn.disabled = false;
-                    if (btnText) btnText.textContent = 'Register Student';
-                }
-            });
+        async function loadManagerActiveRegistrations() {
+            const branchId = getManagerBranchId();
+            let url = `${baseApiUrl}/admin.php?action=get-all-registrations`;
+            if (branchId > 0) url += `&branch_id=${encodeURIComponent(branchId)}`;
+            const res = await axios.get(url);
+            const data = res.data || {};
+            const rows = Array.isArray(data.registrations)
+                ? data.registrations.filter(reg => {
+                    const status = String(reg.registration_status || '').toLowerCase();
+                    return status !== 'pending';
+                })
+                : [];
+            displayRegistrations(rows);
+            updateStats(rows);
         }
 
         function setActiveMode(mode) {
             const title = document.getElementById('tableTitle');
             const subtitle = document.getElementById('tableSubtitle');
             const btnPending = document.getElementById('btnPending');
-            const btnAll = document.getElementById('btnAll');
+            const btnActive = document.getElementById('btnActive');
 
-            const pendingActive = 'px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black font-semibold text-sm transition';
-            const normalBtn = 'px-4 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-900 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white border border-gray-200 dark:border-white/10 font-semibold text-sm transition';
+            const activeBtnClass = 'px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black font-bold text-sm shadow-sm transition';
+            const normalBtnClass = 'px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-semibold text-sm transition';
 
-            if (mode === 'all') {
-                if (title) title.textContent = 'All Registrations';
-                if (subtitle) subtitle.textContent = 'Showing all registration records in the system.';
-                if (btnAll) btnAll.className = pendingActive;
-                if (btnPending) btnPending.className = normalBtn;
-                if (typeof loadAllRegistrations === 'function') loadAllRegistrations();
+            if (mode === 'active') {
+                if (title) title.textContent = 'Active Registrations';
+                if (subtitle) subtitle.textContent = 'Showing branch registrations that are already confirmed, whether they came from online or walk-in.';
+                if (btnActive) btnActive.className = activeBtnClass;
+                if (btnPending) btnPending.className = normalBtnClass;
+                loadManagerActiveRegistrations().catch(error => {
+                    showMessage('Failed to load registrations: ' + (error.message || error), 'error');
+                });
             } else {
-                if (title) title.textContent = 'Pending Registrations';
-                if (subtitle) subtitle.textContent = 'Showing records that are waiting for desk staff review/payment confirmation.';
-                if (btnPending) btnPending.className = pendingActive;
-                if (btnAll) btnAll.className = normalBtn;
-                if (typeof loadPendingRegistrations === 'function') loadPendingRegistrations();
+                if (title) title.textContent = 'Pending Online Registrations';
+                if (subtitle) subtitle.textContent = 'Showing online registrations that are waiting for branch review and payment confirmation.';
+                if (btnPending) btnPending.className = activeBtnClass;
+                if (btnActive) btnActive.className = normalBtnClass;
+                loadManagerPendingRegistrations().catch(error => {
+                    showMessage('Failed to load registrations: ' + (error.message || error), 'error');
+                });
             }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            if (typeof checkAuth === 'function') {
-                checkAuth();
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const role = String(user?.role_name || '').toLowerCase();
+            const deskRoles = ['staff', 'desk', 'front desk'];
+            const managerRoles = ['manager', 'branch manager'];
+            const isDeskRole = deskRoles.includes(role);
+            const isManagerRole = managerRoles.includes(role);
+
+            if (!user || (!isDeskRole && !isManagerRole)) {
+                showMessage('Access denied. Desk/Manager only.', 'error');
+                setTimeout(() => {
+                    window.location.href = '../../index.html';
+                }, 900);
+                return;
             }
 
-            // Load user info in top nav
-            if (typeof Auth !== 'undefined' && Auth.getUser) {
-                const user = Auth.getUser();
-                if (user) {
-                    const userNameNav = document.getElementById('userNameNav');
-                    const profileMenuName = document.getElementById('profileMenuName');
-                    const displayName = user.username || user.email || 'Front Desk';
-                    const branchName = user.branch_name || '—';
-                    const branchNameEl = document.getElementById('managerBranchName');
-                    const branchPill = document.getElementById('managerBranchNamePill');
-                    if (userNameNav) userNameNav.textContent = displayName;
-                    if (profileMenuName) profileMenuName.textContent = displayName;
-                    if (branchNameEl) branchNameEl.textContent = branchName;
-                    if (branchPill) branchPill.textContent = branchName;
-                }
-            }
+            const displayName = user.username || user.email || (isDeskRole ? 'Front Desk' : 'Manager');
+            const branchName = user.branch_name || '—';
+            const userNameNav = document.getElementById('userNameNav');
+            const profileMenuName = document.getElementById('profileMenuName');
+            const branchNameEl = document.getElementById('managerBranchName');
+            const branchPill = document.getElementById('managerBranchNamePill');
+            const sideTitle = document.getElementById('registrationSidePanelTitle');
+            const logoLink = document.getElementById('deskOrManagerLogoLink');
+            const dashLink = document.getElementById('navDashboardLink');
+
+            if (userNameNav) userNameNav.textContent = displayName;
+            if (profileMenuName) profileMenuName.textContent = displayName;
+            if (branchNameEl) branchNameEl.textContent = branchName;
+            if (branchPill) branchPill.textContent = branchName;
+            if (sideTitle) sideTitle.textContent = isDeskRole ? 'Desk Panel' : 'Manager Panel';
+            if (logoLink) logoLink.href = isDeskRole ? '../desk/desk_scanner.html' : 'manager_dashboard.html';
+            if (dashLink) dashLink.href = isDeskRole ? '../desk/desk_scanner.html' : 'manager_dashboard.html';
 
             if (typeof initPaymentForm === 'function') {
                 initPaymentForm();
             }
 
-            // Initialize Register Student Modal
             const registerModal = document.getElementById('registerStudentModal');
             const openRegisterBtn = document.getElementById('openRegisterStudentModalBtn');
             const closeRegisterBtn = document.getElementById('closeRegisterStudentModalBtn');
             const cancelRegisterBtn = document.getElementById('cancelRegisterStudentBtn');
             const walkinForm = document.getElementById('walkinForm');
 
-            const lockDeskBranch = () => {
+            const lockManagerBranch = () => {
                 const branchSelect = document.getElementById('walkin_branch_id');
-                if (!branchSelect) return;
-                try {
-                    const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
-                    const deskBranchId = user ? Number(user.branch_id || 0) : 0;
-                    if (deskBranchId > 0) {
-                        branchSelect.value = String(deskBranchId);
-                        // Do NOT disable the control: disabled form fields are not submitted.
-                        // Instead, prevent interaction while still posting `branch_id`.
-                        branchSelect.disabled = false;
-                        branchSelect.style.pointerEvents = 'none';
-                        branchSelect.style.opacity = '0.85';
-                        branchSelect.dispatchEvent(new Event('change'));
-                    }
-                } catch (_) {}
+                const branchId = getManagerBranchId();
+                if (!branchSelect || branchId < 1) return;
+                branchSelect.value = String(branchId);
+                branchSelect.disabled = false;
+                branchSelect.style.pointerEvents = 'none';
+                branchSelect.style.opacity = '0.85';
+                branchSelect.dispatchEvent(new Event('change'));
             };
 
             const openRegisterModal = () => {
                 registerModal.classList.remove('hidden');
                 registerModal.classList.add('flex');
-
-                // Load branches/options, then lock to this desk's branch.
-                if (typeof loadWalkinBranches === 'function') {
-                    Promise.resolve(loadWalkinBranches()).then(lockDeskBranch).catch(lockDeskBranch);
-                } else {
-                    lockDeskBranch();
+                if (walkinForm) {
+                    walkinForm.dataset.paymentRedirectUrl = 'desk_registration.html#active';
                 }
-
+                if (typeof loadWalkinBranches === 'function') {
+                    Promise.resolve(loadWalkinBranches()).then(lockManagerBranch).catch(lockManagerBranch);
+                } else {
+                    lockManagerBranch();
+                }
                 if (typeof updateWalkinAgeAndGuardianRequired === 'function') updateWalkinAgeAndGuardianRequired();
             };
 
@@ -697,20 +559,23 @@
             if (closeRegisterBtn) closeRegisterBtn.addEventListener('click', closeRegisterModal);
             if (cancelRegisterBtn) cancelRegisterBtn.addEventListener('click', closeRegisterModal);
 
-            // Initialize walk-in form submission
             if (walkinForm && typeof initWalkinPage === 'function') {
+                walkinForm.dataset.paymentRedirectUrl = 'desk_registration.html#active';
                 initWalkinPage();
+                lockManagerBranch();
             }
 
             const hash = (window.location.hash || '').replace('#', '').toLowerCase();
-            setActiveMode(hash === 'pending' ? 'pending' : 'all');
+            setActiveMode(hash === 'active' ? 'active' : 'pending');
 
             window.addEventListener('hashchange', () => {
                 const h = (window.location.hash || '').replace('#', '').toLowerCase();
-                setActiveMode(h === 'pending' ? 'pending' : 'all');
+                setActiveMode(h === 'active' ? 'active' : 'pending');
             });
         });
     </script>
 </body>
 </html>
+
+
 

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desk - Attendance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+        :root { --nav-bg: #0b0f18; --gold: #d4af37; }
+        body { font-family: 'Space Grotesk', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900">
+    <div class="min-h-screen flex">
+        <aside class="w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden lg:flex flex-col">
+            <div class="flex items-center gap-3 px-2">
+                <div class="h-10 w-10 rounded-xl bg-gold-500/20 flex items-center justify-center text-[color:var(--gold)]">
+                    <i class="fas fa-headset"></i>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[0.3em] text-slate-400">Desk Staff</div>
+                    <div class="text-lg font-semibold">Front Desk</div>
+                </div>
+            </div>
+            <nav class="mt-10 space-y-2">
+                <a href="desk_attendance.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600/30 text-white border border-blue-500/40">
+                    <i class="fas fa-clipboard-check text-blue-200"></i> Attendance
+                </a>
+                <a href="desk_scanner.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-qrcode text-slate-400"></i> Scanner
+                </a>
+                <a href="desk_enrollment.html?view=pending" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-user-graduate text-slate-400"></i> Enrollments
+                </a>
+                <a href="desk_sessions.html?page=sessions" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-calendar-check text-slate-400"></i> Sessions
+                </a>
+                <a href="desk_registration.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-id-card text-slate-400"></i> Registrations
+                </a>
+            </nav>
+            <div class="mt-auto space-y-4">
+                <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-400/20 bg-red-400/10 text-sm font-semibold text-red-200 hover:bg-red-400/15 hover:text-white transition">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+                <div class="px-4 py-4 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
+                    <div class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Assigned Branch</div>
+                    <div id="deskBranchNameSidebar" class="mt-2 text-sm font-semibold text-white">—</div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6">
+            <div class="max-w-6xl mx-auto">
+                <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Attendance Overview</h1>
+                        <p class="text-slate-500 text-sm mt-1">Track upcoming sessions, scanner attendance, absences, and make-up session alerts.</p>
+                        <div class="mt-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                            Desk branch: <span id="deskBranchNamePill">—</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 min-w-[140px]">
+                            <div class="text-[11px] uppercase tracking-[0.25em] text-slate-400 font-semibold">Students</div>
+                            <div id="attendanceStudentCount" class="mt-2 text-2xl font-bold text-slate-900">0</div>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 min-w-[140px]">
+                            <div class="text-[11px] uppercase tracking-[0.25em] text-slate-400 font-semibold">Make-Up List</div>
+                            <div id="attendanceMakeupCount" class="mt-2 text-2xl font-bold text-rose-600">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+                <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+                    <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-list-check mr-2 text-gold-500"></i>Enrolled Students Attendance</h3>
+                            <p class="text-xs text-slate-500 mt-1">Session dates come from the branch scheduling records.</p>
+                        </div>
+                        <span id="attendanceTableCount" class="text-xs text-slate-500">Loading...</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Session Dates</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Completed</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Absences</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Remaining</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                        <p>Loading attendance data...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+                    <div class="p-6 bg-rose-50/70 border-b border-rose-100 flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-triangle-exclamation mr-2 text-rose-500"></i>Make-Up Sessions Required</h3>
+                            <p class="text-xs text-slate-500 mt-1">Students move to the red list after repeated absences based on their package session count.</p>
+                        </div>
+                        <span id="attendanceMakeupLabel" class="text-xs text-rose-600 font-semibold">Checking branch absences...</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-rose-50/40">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Absences</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Threshold</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Next Session</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceMakeupBody" class="divide-y divide-rose-100">
+                                <tr>
+                                    <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                        <p>Checking make-up session needs...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../../js/index.js"></script>
+    <script>
+        let deskBranchId = 0;
+        let attendanceRows = [];
+        let attendanceByStudentId = {};
+
+        function showMessage(message, type = 'error') {
+            Swal.fire({
+                icon: type === 'success' ? 'success' : 'error',
+                title: type === 'success' ? 'Success' : 'Error',
+                text: message,
+                confirmButtonColor: '#b8860b'
+            });
+        }
+
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatTime12Hour(timeString) {
+            if (!timeString) return '—';
+            const parts = String(timeString).split(':');
+            if (parts.length < 2) return timeString;
+            const hour = parseInt(parts[0], 10);
+            const minute = parseInt(parts[1], 10);
+            if (Number.isNaN(hour) || Number.isNaN(minute)) return timeString;
+            const suffix = hour >= 12 ? 'PM' : 'AM';
+            const normalizedHour = hour % 12 === 0 ? 12 : hour % 12;
+            return `${normalizedHour}:${String(minute).padStart(2, '0')} ${suffix}`;
+        }
+
+        function formatDateShort(dateString) {
+            if (!dateString) return '—';
+            const date = new Date(dateString);
+            if (Number.isNaN(date.getTime())) return String(dateString);
+            return date.toLocaleDateString();
+        }
+
+        function normalizeDateKey(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            if (Number.isNaN(date.getTime())) return String(dateString).slice(0, 10);
+            return date.toISOString().slice(0, 10);
+        }
+
+        function getAttendanceContext(student) {
+            const studentId = Number(student?.student_id || 0);
+            return attendanceByStudentId[studentId] || { rows: [], attendedKeys: new Set(), excusedKeys: new Set() };
+        }
+
+        function getCompletedCount(student) {
+            const sessionsList = Array.isArray(student.sessions_list) ? student.sessions_list : [];
+            const attendanceContext = getAttendanceContext(student);
+
+            return sessionsList.filter(slot => {
+                const status = String(slot.status || '').toLowerCase();
+                if (['completed', 'late', 'present'].includes(status)) return true;
+                const sessionKey = normalizeDateKey(slot.session_date);
+                return sessionKey && attendanceContext.attendedKeys.has(sessionKey);
+            }).length;
+        }
+
+        function getAbsenceCount(student) {
+            const sessionsList = Array.isArray(student.sessions_list) ? student.sessions_list : [];
+            const attendanceContext = getAttendanceContext(student);
+            const now = new Date();
+
+            return sessionsList.filter(slot => {
+                if (!slot || !slot.session_date) return false;
+
+                const status = String(slot.status || '').toLowerCase();
+                if (['completed', 'present', 'late', 'cancelled_by_teacher', 'rescheduled'].includes(status)) return false;
+
+                const sessionDateTime = new Date(`${slot.session_date}T${slot.end_time || slot.start_time || '23:59:59'}`);
+                if (Number.isNaN(sessionDateTime.getTime()) || sessionDateTime > now) return false;
+
+                const sessionKey = normalizeDateKey(slot.session_date);
+                if (sessionKey && attendanceContext.attendedKeys.has(sessionKey)) return false;
+                if (sessionKey && attendanceContext.excusedKeys.has(sessionKey)) return false;
+
+                return ['absent', 'no show', 'scheduled', 'cancelled'].includes(status) || !status;
+            }).length;
+        }
+
+        function getMakeupThreshold(student) {
+            const totalSessions = Number(student?.sessions || 0);
+            return totalSessions >= 20 ? 3 : 2;
+        }
+
+        function isMakeupRequired(student) {
+            return getAbsenceCount(student) >= getMakeupThreshold(student);
+        }
+
+        function getRemainingCount(student) {
+            const totalSessions = Number(student.sessions || 0);
+            const completedCount = getCompletedCount(student);
+            if (totalSessions < 1) return 0;
+            return Math.max(0, totalSessions - completedCount);
+        }
+
+        function getUpcomingScheduledSessions(student) {
+            const sessionsList = Array.isArray(student.sessions_list) ? student.sessions_list : [];
+            const now = new Date();
+            return sessionsList
+                .filter(slot => {
+                    if (!slot || !slot.session_date) return false;
+                    const status = String(slot.status || '').toLowerCase();
+                    if (['completed', 'present', 'late', 'cancelled_by_teacher', 'cancelled', 'absent', 'no show'].includes(status)) {
+                        return false;
+                    }
+                    const sessionDateTime = new Date(`${slot.session_date}T${slot.start_time || '00:00:00'}`);
+                    if (Number.isNaN(sessionDateTime.getTime())) return false;
+                    return sessionDateTime >= now;
+                })
+                .sort((a, b) => new Date(`${a.session_date}T${a.start_time || '00:00:00'}`) - new Date(`${b.session_date}T${b.start_time || '00:00:00'}`));
+        }
+
+        function getNextSessionLabel(student) {
+            const nextSession = getUpcomingScheduledSessions(student)[0];
+            if (!nextSession) return 'No upcoming sessions';
+            const dateText = formatDateShort(nextSession.session_date);
+            const timeText = nextSession.start_time ? `${formatTime12Hour(nextSession.start_time)} - ${formatTime12Hour(nextSession.end_time)}` : '';
+            return timeText ? `${dateText} • ${timeText}` : dateText;
+        }
+
+        function getSessionDatesPreview(student) {
+            const upcoming = getUpcomingScheduledSessions(student);
+
+            if (!upcoming.length) return 'No upcoming sessions';
+
+            return upcoming.slice(0, 3).map(slot => {
+                const dateText = formatDateShort(slot.session_date);
+                const timeText = slot.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : '';
+                return timeText ? `${dateText} • ${timeText}` : dateText;
+            }).join('<br>');
+        }
+
+        function updateAttendanceSummary(rows) {
+            const studentCountEl = document.getElementById('attendanceStudentCount');
+            const makeupCountEl = document.getElementById('attendanceMakeupCount');
+            const tableCountEl = document.getElementById('attendanceTableCount');
+            const makeupLabelEl = document.getElementById('attendanceMakeupLabel');
+
+            const totalStudents = rows.length;
+            const totalMakeupRequired = rows.filter(isMakeupRequired).length;
+
+            if (studentCountEl) studentCountEl.textContent = String(totalStudents);
+            if (makeupCountEl) makeupCountEl.textContent = String(totalMakeupRequired);
+            if (tableCountEl) tableCountEl.textContent = `${totalStudents} enrolled student${totalStudents === 1 ? '' : 's'}`;
+            if (makeupLabelEl) makeupLabelEl.textContent = totalMakeupRequired
+                ? `${totalMakeupRequired} student${totalMakeupRequired === 1 ? '' : 's'} currently need make-up monitoring`
+                : 'No students currently on the make-up list';
+        }
+
+        function renderMakeupTable() {
+            const tbody = document.getElementById('attendanceMakeupBody');
+            if (!tbody) return;
+
+            const makeupRows = attendanceRows
+                .filter(isMakeupRequired)
+                .sort((a, b) => getAbsenceCount(b) - getAbsenceCount(a));
+
+            if (!makeupRows.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <i class="fas fa-shield-heart text-2xl mb-2 text-emerald-500/70"></i>
+                            <p>No students are currently on the make-up session red list.</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = makeupRows.map(student => {
+                const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
+                const packageName = escapeHtml(student.package_name || '—');
+                const absences = getAbsenceCount(student);
+                const threshold = getMakeupThreshold(student);
+                return `
+                    <tr class="hover:bg-rose-50/40 transition">
+                        <td class="px-6 py-4">
+                            <div class="font-medium text-slate-900">${studentName}</div>
+                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                        </td>
+                        <td class="px-6 py-4 text-slate-700">${packageName}</td>
+                        <td class="px-6 py-4 font-semibold text-rose-600">${absences}</td>
+                        <td class="px-6 py-4 text-slate-600">${threshold} absence${threshold === 1 ? '' : 's'}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 leading-6">${escapeHtml(getNextSessionLabel(student))}</td>
+                        <td class="px-6 py-4"><span class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700">Make-Up Required</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderAttendanceTable() {
+            const tbody = document.getElementById('attendanceTableBody');
+            if (!tbody) return;
+
+            if (!attendanceRows.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                            <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
+                            <p>No active enrolled students found for this branch.</p>
+                        </td>
+                    </tr>
+                `;
+                updateAttendanceSummary([]);
+                renderMakeupTable();
+                return;
+            }
+
+            tbody.innerHTML = attendanceRows.map(student => {
+                const packageName = escapeHtml(student.package_name || '—');
+                const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim();
+                const completedCount = getCompletedCount(student);
+                const totalSessions = Number(student.sessions || 0);
+                const absenceCount = getAbsenceCount(student);
+                const remainingCount = getRemainingCount(student);
+
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="px-6 py-4">
+                            <div class="font-medium text-slate-900">${studentName || 'Student'}</div>
+                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                        </td>
+                        <td class="px-6 py-4 text-slate-700">${packageName}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 leading-6">${getSessionDatesPreview(student)}</td>
+                        <td class="px-6 py-4 text-slate-700 font-medium">${completedCount} / ${totalSessions || '—'}</td>
+                        <td class="px-6 py-4 font-medium ${absenceCount > 0 ? 'text-rose-600' : 'text-slate-500'}">${absenceCount}</td>
+                        <td class="px-6 py-4 font-medium ${remainingCount > 0 ? 'text-amber-600' : 'text-emerald-600'}">${remainingCount}</td>
+                        <td class="px-6 py-4">
+                            <button type="button" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold" onclick="openAttendanceDetails(${Number(student.enrollment_id)})">
+                                View Details
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            updateAttendanceSummary(attendanceRows);
+            renderMakeupTable();
+        }
+
+        function getStatusBadge(status) {
+            const normalized = String(status || '').toLowerCase();
+            if (normalized === 'completed' || normalized === 'present') {
+                return '<span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">Completed</span>';
+            }
+            if (normalized === 'late') {
+                return '<span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">Late</span>';
+            }
+            if (normalized === 'scheduled') {
+                return '<span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-bold text-sky-700">Scheduled</span>';
+            }
+            if (normalized === 'cancelled_by_teacher') {
+                return '<span class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700">Cancelled</span>';
+            }
+            return `<span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">${escapeHtml(status || 'Unscheduled')}</span>`;
+        }
+
+        function openAttendanceDetails(enrollmentId) {
+            const student = attendanceRows.find(row => Number(row.enrollment_id) === Number(enrollmentId));
+            if (!student) {
+                showMessage('Attendance details not found.', 'error');
+                return;
+            }
+
+            const sessionsList = Array.isArray(student.sessions_list) ? student.sessions_list : [];
+            const totalSessions = Number(student.sessions || 0);
+            const absenceCount = getAbsenceCount(student);
+            const nextSessionLabel = getNextSessionLabel(student);
+            const rows = [];
+
+            for (let sessionNumber = 1; sessionNumber <= totalSessions; sessionNumber += 1) {
+                const slots = sessionsList.filter(slot => Number(slot.session_number) === sessionNumber);
+                const slotHtml = slots.length
+                    ? slots.map(slot => {
+                        const dateText = slot.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
+                        const timeText = slot.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : '—';
+                        const roomText = slot.room_name ? ` • ${escapeHtml(slot.room_name)}` : '';
+                        return `
+                            <div class="rounded-lg border border-slate-200 bg-white px-3 py-3">
+                                <div class="flex flex-wrap items-center gap-2 mb-2">${getStatusBadge(slot.status)}</div>
+                                <div class="text-sm text-slate-700">${escapeHtml(dateText)} • ${escapeHtml(timeText)}${roomText}</div>
+                            </div>
+                        `;
+                    }).join('')
+                    : '<div class="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-sm text-slate-400">No date scheduled yet</div>';
+
+                rows.push(`
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div class="text-sm font-semibold text-slate-800 mb-3">Session ${sessionNumber}</div>
+                        <div class="space-y-2">${slotHtml}</div>
+                    </div>
+                `);
+            }
+
+            Swal.fire({
+                title: `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Attendance Details',
+                width: 900,
+                confirmButtonText: 'Close',
+                html: `
+                    <div class="text-left">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5 text-sm text-slate-700">
+                            <div><span class="font-semibold text-slate-900">Package:</span> ${escapeHtml(student.package_name || '—')}</div>
+                            <div><span class="font-semibold text-slate-900">Completed:</span> ${getCompletedCount(student)} / ${Number(student.sessions || 0)}</div>
+                            <div><span class="font-semibold text-slate-900">Remaining:</span> ${getRemainingCount(student)}</div>
+                            <div><span class="font-semibold text-slate-900">Absences:</span> <span class="${absenceCount > 0 ? 'text-rose-600 font-semibold' : ''}">${absenceCount}</span></div>
+                            <div><span class="font-semibold text-slate-900">Make-Up Threshold:</span> ${getMakeupThreshold(student)}</div>
+                            <div><span class="font-semibold text-slate-900">Next Session:</span> ${escapeHtml(nextSessionLabel)}</div>
+                        </div>
+                        <div class="space-y-3 max-h-[58vh] overflow-y-auto pr-1">${rows.join('')}</div>
+                    </div>
+                `
+            });
+        }
+
+        async function loadAttendanceHistory(studentId) {
+            const response = await axios.get(`${baseApiUrl}/attendance.php?action=get-student-attendance&student_id=${encodeURIComponent(studentId)}&limit=200`);
+            const rows = response?.data?.success && Array.isArray(response.data.attendance) ? response.data.attendance : [];
+            const attendedKeys = new Set();
+            const excusedKeys = new Set();
+
+            rows.forEach(row => {
+                const status = String(row?.status || '').toLowerCase();
+                const dateKey = normalizeDateKey(row?.session_date || row?.attended_at);
+                if (!dateKey) return;
+                if (status === 'present' || status === 'late') attendedKeys.add(dateKey);
+                if (status === 'excused') excusedKeys.add(dateKey);
+            });
+
+            return { rows, attendedKeys, excusedKeys };
+        }
+
+        async function loadAttendanceRows() {
+            const tbody = document.getElementById('attendanceTableBody');
+            if (!tbody) return;
+
+            try {
+                let url = `${baseApiUrl}/students.php?action=get-active-enrollments`;
+                if (deskBranchId > 0) {
+                    url += `&branch_id=${encodeURIComponent(deskBranchId)}`;
+                }
+                const response = await axios.get(url);
+                const data = response.data || {};
+                attendanceRows = data.success && Array.isArray(data.enrollments) ? data.enrollments : [];
+                const historyEntries = await Promise.all(attendanceRows.map(async student => {
+                    const studentId = Number(student.student_id || 0);
+                    if (studentId < 1) return [studentId, { rows: [], attendedKeys: new Set(), excusedKeys: new Set() }];
+                    try {
+                        return [studentId, await loadAttendanceHistory(studentId)];
+                    } catch (_) {
+                        return [studentId, { rows: [], attendedKeys: new Set(), excusedKeys: new Set() }];
+                    }
+                }));
+                attendanceByStudentId = Object.fromEntries(historyEntries);
+                renderAttendanceTable();
+            } catch (error) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>Failed to load attendance data. Please try again.</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const role = String(user?.role_name || '').toLowerCase();
+            const isDeskRole = ['staff', 'desk', 'front desk'].includes(role);
+
+            if (!user || !isDeskRole) {
+                showMessage('Access denied. Desk only.', 'error');
+                setTimeout(() => {
+                    window.location.href = '../../index.html';
+                }, 900);
+                return;
+            }
+
+            deskBranchId = Number(user.branch_id || 0);
+            const branchName = user.branch_name || '—';
+            const sidebarBranch = document.getElementById('deskBranchNameSidebar');
+            const pillBranch = document.getElementById('deskBranchNamePill');
+            if (sidebarBranch) sidebarBranch.textContent = branchName;
+            if (pillBranch) pillBranch.textContent = branchName;
+
+            await loadAttendanceRows();
+        });
+
+        window.openAttendanceDetails = openAttendanceDetails;
+    </script>
+</body>
+</html>
