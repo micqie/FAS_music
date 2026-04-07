@@ -80,6 +80,254 @@ class AttendanceApi
         return $this->tableExists('tbl_attendance');
     }
 
+    private function formatLongDate($dateYmd)
+    {
+        $timestamp = strtotime((string)$dateYmd);
+        return $timestamp ? date('F j, Y', $timestamp) : (string)$dateYmd;
+    }
+
+    private function getBranchNameById($branchId)
+    {
+        $branchId = (int)$branchId;
+        if ($branchId < 1 || !$this->tableExists('tbl_branches')) {
+            return null;
+        }
+        try {
+            $stmt = $this->conn->prepare("SELECT branch_name FROM tbl_branches WHERE branch_id = ? LIMIT 1");
+            $stmt->execute([$branchId]);
+            $name = $stmt->fetchColumn();
+            return $name !== false ? $name : null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+
+    private function getStudentById($studentId)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT s.student_id, s.first_name, s.last_name, s.email, s.branch_id, b.branch_name
+            FROM tbl_students s
+            LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
+            WHERE s.student_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([(int)$studentId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    private function getStudentByEmail($email)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT s.student_id, s.first_name, s.last_name, s.email, s.branch_id, b.branch_name
+            FROM tbl_students s
+            LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
+            WHERE LOWER(TRIM(s.email)) = LOWER(?)
+            LIMIT 1
+        ");
+        $stmt->execute([trim((string)$email)]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    private function getStudentAttendanceForDate($studentId, $dateYmd)
+    {
+        if (!$this->ensureAttendanceTable()) {
+            return null;
+        }
+        $stmt = $this->conn->prepare("
+            SELECT attendance_id, attended_at, status, source, notes
+            FROM tbl_attendance
+            WHERE student_id = ?
+              AND DATE(attended_at) = ?
+              AND status IN ('Present', 'Late', 'Excused')
+            ORDER BY attended_at DESC, attendance_id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([(int)$studentId, $dateYmd]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    private function getStudentSessionRows($studentId)
+    {
+        if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_enrollments')) {
+            return [];
+        }
+        $stmt = $this->conn->prepare("
+            SELECT
+                ts.session_id,
+                ts.enrollment_id,
+                ts.session_number,
+                ts.session_date,
+                ts.start_time,
+                ts.end_time,
+                ts.status,
+                ts.notes,
+                ts.attendance_notes,
+                e.status AS enrollment_status
+            FROM tbl_sessions ts
+            INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+            WHERE e.student_id = ?
+              AND e.status = 'Active'
+              AND ts.status <> 'cancelled_by_teacher'
+            ORDER BY ts.session_date ASC, ts.session_number ASC, ts.session_id ASC
+        ");
+        $stmt->execute([(int)$studentId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    private function markPastScheduledSessionsAsMissed($studentId, $todayYmd)
+    {
+        if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_enrollments')) {
+            return;
+        }
+        $stmt = $this->conn->prepare("
+            UPDATE tbl_sessions ts
+            INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+            SET
+                ts.status = 'No Show',
+                ts.attendance_notes = CASE
+                    WHEN ts.attendance_notes IS NULL OR TRIM(ts.attendance_notes) = ''
+                        THEN 'Automatically marked missed based on scheduled date.'
+                    ELSE CONCAT(ts.attendance_notes, ' | Automatically marked missed based on scheduled date.')
+                END
+            WHERE te.student_id = ?
+              AND te.status = 'Active'
+              AND ts.session_date < ?
+              AND ts.status = 'Scheduled'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM tbl_attendance ta
+                  WHERE ta.student_id = te.student_id
+                    AND DATE(ta.attended_at) = ts.session_date
+                    AND ta.status IN ('Present', 'Late', 'Excused')
+              )
+        ");
+        $stmt->execute([(int)$studentId, $todayYmd]);
+    }
+
+    private function markScheduledSessionCompleted($studentId, $dateYmd, $sourceLabel = 'Attendance recorded')
+    {
+        if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_enrollments')) {
+            return;
+        }
+
+        $stmt = $this->conn->prepare("
+            SELECT ts.session_id
+            FROM tbl_sessions ts
+            INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+            WHERE te.student_id = ?
+              AND te.status = 'Active'
+              AND ts.session_date = ?
+              AND ts.status IN ('Scheduled', 'No Show')
+            ORDER BY ts.session_number ASC, ts.session_id ASC
+            LIMIT 1
+        ");
+        $stmt->execute([(int)$studentId, $dateYmd]);
+        $sessionId = (int)($stmt->fetchColumn() ?: 0);
+        if ($sessionId < 1) {
+            return;
+        }
+
+        $stmtUpdate = $this->conn->prepare("
+            UPDATE tbl_sessions
+            SET
+                status = 'Completed',
+                attendance_notes = CASE
+                    WHEN attendance_notes IS NULL OR TRIM(attendance_notes) = ''
+                        THEN ?
+                    ELSE CONCAT(attendance_notes, ' | ', ?)
+                END
+            WHERE session_id = ?
+        ");
+        $note = trim((string)$sourceLabel) !== '' ? trim((string)$sourceLabel) : 'Attendance recorded';
+        $stmtUpdate->execute([$note, $note, $sessionId]);
+    }
+
+    private function buildQrStatus($studentId, $todayYmd = null)
+    {
+        $todayYmd = $todayYmd ?: date('Y-m-d');
+        $this->markPastScheduledSessionsAsMissed($studentId, $todayYmd);
+
+        $sessions = $this->getStudentSessionRows($studentId);
+        $attendanceToday = $this->getStudentAttendanceForDate($studentId, $todayYmd);
+        if ($attendanceToday) {
+            $this->markScheduledSessionCompleted($studentId, $todayYmd, 'Completed from attendance check-in');
+            $sessions = $this->getStudentSessionRows($studentId);
+        }
+
+        $todaySessions = array_values(array_filter($sessions, function ($row) use ($todayYmd) {
+            return (string)($row['session_date'] ?? '') === $todayYmd;
+        }));
+        $futureSessions = array_values(array_filter($sessions, function ($row) use ($todayYmd) {
+            return (string)($row['session_date'] ?? '') > $todayYmd
+                && !in_array((string)($row['status'] ?? ''), ['Completed', 'Late', 'Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled'], true);
+        }));
+        $missedSessions = array_values(array_filter($sessions, function ($row) use ($todayYmd) {
+            return (string)($row['session_date'] ?? '') < $todayYmd
+                && in_array((string)($row['status'] ?? ''), ['No Show', 'Cancelled'], true);
+        }));
+
+        $todaySession = $todaySessions[0] ?? null;
+        $nextSession = $futureSessions[0] ?? null;
+        $latestMissed = !empty($missedSessions) ? $missedSessions[count($missedSessions) - 1] : null;
+
+        if ($attendanceToday || array_filter($todaySessions, function ($row) {
+            return in_array((string)($row['status'] ?? ''), ['Completed', 'Late'], true);
+        })) {
+            return [
+                'code' => 'completed',
+                'allow_attendance' => false,
+                'message' => 'You have already completed your session.',
+                'scheduled_date' => $todayYmd,
+                'next_session_date' => $nextSession['session_date'] ?? null,
+                'attendance' => $attendanceToday
+            ];
+        }
+
+        if ($todaySession && in_array((string)($todaySession['status'] ?? ''), ['Scheduled'], true)) {
+            return [
+                'code' => 'valid_today',
+                'allow_attendance' => true,
+                'message' => 'QR is valid for today. Attendance may be recorded.',
+                'scheduled_date' => $todayYmd,
+                'next_session_date' => $nextSession['session_date'] ?? null,
+                'attendance' => $attendanceToday
+            ];
+        }
+
+        if ($latestMissed) {
+            $missedDate = (string)$latestMissed['session_date'];
+            return [
+                'code' => 'missed',
+                'allow_attendance' => false,
+                'message' => 'You missed your session scheduled on ' . $this->formatLongDate($missedDate) . '. Please wait for a make-up schedule.',
+                'scheduled_date' => $missedDate,
+                'next_session_date' => $nextSession['session_date'] ?? null,
+                'attendance' => $attendanceToday
+            ];
+        }
+
+        if ($nextSession) {
+            $nextDate = (string)$nextSession['session_date'];
+            return [
+                'code' => 'early',
+                'allow_attendance' => false,
+                'message' => 'Your session is on ' . $this->formatLongDate($nextDate) . '. Please return on your scheduled date. You do not have a session today.',
+                'scheduled_date' => $nextDate,
+                'next_session_date' => $nextDate,
+                'attendance' => $attendanceToday
+            ];
+        }
+
+        return [
+            'code' => 'no_session',
+            'allow_attendance' => false,
+            'message' => 'You do not have a session today.',
+            'scheduled_date' => null,
+            'next_session_date' => null,
+            'attendance' => $attendanceToday
+        ];
+    }
+
     public function getSummary()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -394,15 +642,7 @@ class AttendanceApi
         $deskBranchId = (int) ($data['desk_branch_id'] ?? 0);
 
         try {
-            $stmt = $this->conn->prepare("
-                SELECT s.student_id, s.first_name, s.last_name, s.email, s.branch_id, b.branch_name
-                FROM tbl_students s
-                LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
-                WHERE s.student_id = ?
-                LIMIT 1
-            ");
-            $stmt->execute([$studentId]);
-            $student = $stmt->fetch(PDO::FETCH_ASSOC);
+            $student = $this->getStudentById($studentId);
             if (!$student || strcasecmp(trim($student['email'] ?? ''), $email) !== 0) {
                 $this->sendJSON(['error' => 'Student not found for this QR'], 404);
             }
@@ -424,14 +664,7 @@ class AttendanceApi
             }
             if ($studentBranchId > 0 && $deskBranchId !== $studentBranchId) {
                 $studentBranchName = trim($student['branch_name'] ?? '') ?: 'their enrolled branch';
-                $deskBranchName = null;
-                try {
-                    $branchStmt = $this->conn->prepare("SELECT branch_name FROM tbl_branches WHERE branch_id = ? LIMIT 1");
-                    $branchStmt->execute([$deskBranchId]);
-                    $deskBranchName = $branchStmt->fetchColumn() ?: 'this branch';
-                } catch (PDOException $e) {
-                    $deskBranchName = 'this branch';
-                }
+                $deskBranchName = $this->getBranchNameById($deskBranchId) ?: 'this branch';
                 $this->sendJSON([
                     'success' => false,
                     'error_code' => 'BRANCH_MISMATCH',
@@ -443,20 +676,15 @@ class AttendanceApi
                 ], 400);
             }
 
-            $dupStmt = $this->conn->prepare("
-                SELECT attendance_id, attended_at, status
-                FROM tbl_attendance
-                WHERE student_id = ? AND DATE(attended_at) = CURDATE()
-                ORDER BY attended_at DESC, attendance_id DESC
-                LIMIT 1
-            ");
-            $dupStmt->execute([$studentId]);
-            $existing = $dupStmt->fetch(PDO::FETCH_ASSOC);
-            if ($existing) {
+            $todayYmd = date('Y-m-d');
+            $qrStatus = $this->buildQrStatus($studentId, $todayYmd);
+            if (($qrStatus['code'] ?? '') === 'completed') {
+                $existing = $this->getStudentAttendanceForDate($studentId, $todayYmd);
                 $this->sendJSON([
                     'success' => true,
                     'already_checked_in' => true,
                     'attendance' => $existing,
+                    'qr_status' => $qrStatus,
                     'student' => [
                         'student_id' => (int) $student['student_id'],
                         'first_name' => $student['first_name'],
@@ -467,6 +695,22 @@ class AttendanceApi
                     ]
                 ]);
             }
+            if (($qrStatus['code'] ?? '') !== 'valid_today') {
+                $this->sendJSON([
+                    'success' => false,
+                    'error_code' => strtoupper((string)($qrStatus['code'] ?? 'NO_SESSION')),
+                    'error' => $qrStatus['message'] ?? 'You do not have a session today.',
+                    'qr_status' => $qrStatus,
+                    'student' => [
+                        'student_id' => (int) $student['student_id'],
+                        'first_name' => $student['first_name'],
+                        'last_name' => $student['last_name'],
+                        'email' => $student['email'],
+                        'branch_id' => $studentBranchId,
+                        'branch_name' => $student['branch_name'] ?? null
+                    ]
+                ], 400);
+            }
 
             $status = 'Present';
             $source = 'QR';
@@ -475,6 +719,7 @@ class AttendanceApi
                 VALUES (?, ?, ?, ?, ?)
             ");
             $stmt->execute([$studentId, $studentBranchId > 0 ? $studentBranchId : null, $status, $source, null]);
+            $this->markScheduledSessionCompleted($studentId, $todayYmd, 'Completed from QR attendance');
 
             $id = (int) $this->conn->lastInsertId();
             $fetch = $this->conn->prepare("SELECT attendance_id, attended_at, status FROM tbl_attendance WHERE attendance_id = ? LIMIT 1");
@@ -485,6 +730,7 @@ class AttendanceApi
                 'success' => true,
                 'already_checked_in' => false,
                 'attendance' => $attendance,
+                'qr_status' => $this->buildQrStatus($studentId, $todayYmd),
                 'student' => [
                     'student_id' => (int) $student['student_id'],
                     'first_name' => $student['first_name'],
@@ -518,15 +764,7 @@ class AttendanceApi
         }
 
         try {
-            $stmt = $this->conn->prepare("
-                SELECT s.student_id, s.first_name, s.last_name, s.email, s.branch_id, b.branch_name
-                FROM tbl_students s
-                LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
-                WHERE LOWER(TRIM(s.email)) = LOWER(?)
-                LIMIT 1
-            ");
-            $stmt->execute([$email]);
-            $student = $stmt->fetch(PDO::FETCH_ASSOC);
+            $student = $this->getStudentByEmail($email);
             if (!$student) {
                 $this->sendJSON(['success' => false, 'error' => 'Student not found for this email.'], 404);
             }
@@ -548,14 +786,7 @@ class AttendanceApi
             }
             if ($studentBranchId > 0 && $deskBranchId > 0 && $deskBranchId !== $studentBranchId) {
                 $studentBranchName = trim($student['branch_name'] ?? '') ?: 'their enrolled branch';
-                $deskBranchName = null;
-                try {
-                    $branchStmt = $this->conn->prepare("SELECT branch_name FROM tbl_branches WHERE branch_id = ? LIMIT 1");
-                    $branchStmt->execute([$deskBranchId]);
-                    $deskBranchName = $branchStmt->fetchColumn() ?: 'this branch';
-                } catch (PDOException $e) {
-                    $deskBranchName = 'this branch';
-                }
+                $deskBranchName = $this->getBranchNameById($deskBranchId) ?: 'this branch';
                 $this->sendJSON([
                     'success' => false,
                     'error_code' => 'BRANCH_MISMATCH',
@@ -565,21 +796,18 @@ class AttendanceApi
                 ], 400);
             }
 
-            $dupStmt = $this->conn->prepare("
-                SELECT attendance_id, attended_at, status
-                FROM tbl_attendance
-                WHERE student_id = ? AND DATE(attended_at) = CURDATE()
-                ORDER BY attended_at DESC LIMIT 1
-            ");
-            $dupStmt->execute([$student['student_id']]);
-            $existing = $dupStmt->fetch(PDO::FETCH_ASSOC);
-            if ($existing) {
+            $todayYmd = date('Y-m-d');
+            $studentId = (int)$student['student_id'];
+            $qrStatus = $this->buildQrStatus($studentId, $todayYmd);
+            if (($qrStatus['code'] ?? '') === 'completed') {
+                $existing = $this->getStudentAttendanceForDate($studentId, $todayYmd);
                 $this->sendJSON([
                     'success' => true,
                     'already_checked_in' => true,
                     'attendance' => $existing,
+                    'qr_status' => $qrStatus,
                     'student' => [
-                        'student_id' => (int) $student['student_id'],
+                        'student_id' => $studentId,
                         'first_name' => $student['first_name'],
                         'last_name' => $student['last_name'],
                         'email' => $student['email'],
@@ -587,12 +815,29 @@ class AttendanceApi
                     ]
                 ]);
             }
+            if (($qrStatus['code'] ?? '') !== 'valid_today') {
+                $this->sendJSON([
+                    'success' => false,
+                    'error_code' => strtoupper((string)($qrStatus['code'] ?? 'NO_SESSION')),
+                    'error' => $qrStatus['message'] ?? 'You do not have a session today.',
+                    'qr_status' => $qrStatus,
+                    'student' => [
+                        'student_id' => $studentId,
+                        'first_name' => $student['first_name'],
+                        'last_name' => $student['last_name'],
+                        'email' => $student['email'],
+                        'branch_id' => $studentBranchId,
+                        'branch_name' => $student['branch_name'] ?? null
+                    ]
+                ], 400);
+            }
 
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_attendance (student_id, branch_id, status, source, notes)
                 VALUES (?, ?, 'Present', 'Manual', ?)
             ");
-            $stmt->execute([$student['student_id'], $studentBranchId > 0 ? $studentBranchId : null, null]);
+            $stmt->execute([$studentId, $studentBranchId > 0 ? $studentBranchId : null, null]);
+            $this->markScheduledSessionCompleted($studentId, $todayYmd, 'Completed from manual attendance');
 
             $id = (int) $this->conn->lastInsertId();
             $fetch = $this->conn->prepare("SELECT attendance_id, attended_at, status FROM tbl_attendance WHERE attendance_id = ? LIMIT 1");
@@ -603,8 +848,9 @@ class AttendanceApi
                 'success' => true,
                 'already_checked_in' => false,
                 'attendance' => $attendance,
+                'qr_status' => $this->buildQrStatus($studentId, $todayYmd),
                 'student' => [
-                    'student_id' => (int) $student['student_id'],
+                    'student_id' => $studentId,
                     'first_name' => $student['first_name'],
                     'last_name' => $student['last_name'],
                     'email' => $student['email'],
@@ -614,6 +860,48 @@ class AttendanceApi
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['success' => false, 'error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getQrStatus()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $studentId = (int)($_GET['student_id'] ?? 0);
+        $email = trim((string)($_GET['email'] ?? ''));
+
+        try {
+            $student = null;
+            if ($studentId > 0) {
+                $student = $this->getStudentById($studentId);
+            } elseif ($email !== '') {
+                $student = $this->getStudentByEmail($email);
+            }
+
+            if (!$student) {
+                $this->sendJSON(['error' => 'Student not found.'], 404);
+            }
+
+            $todayYmd = date('Y-m-d');
+            $status = $this->buildQrStatus((int)$student['student_id'], $todayYmd);
+
+            $this->sendJSON([
+                'success' => true,
+                'today' => $todayYmd,
+                'qr_status' => $status,
+                'student' => [
+                    'student_id' => (int)$student['student_id'],
+                    'first_name' => $student['first_name'],
+                    'last_name' => $student['last_name'],
+                    'email' => $student['email'],
+                    'branch_id' => (int)($student['branch_id'] ?? 0),
+                    'branch_name' => $student['branch_name'] ?? null
+                ]
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }
 
@@ -719,6 +1007,9 @@ switch ($action) {
         break;
     case 'record-by-email':
         $api->recordByEmail();
+        break;
+    case 'qr-status':
+        $api->getQrStatus();
         break;
     case 'desk-summary':
         $api->getDeskSummary();

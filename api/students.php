@@ -3033,8 +3033,8 @@ class StudentsApi
         $sessionNumber = (int)($data['session_number'] ?? 0);
         $requestedTeacherId = (int)($data['teacher_id'] ?? 0);
         $sessionDate = trim((string)($data['session_date'] ?? ''));
-        $startTime = trim((string)($data['start_time'] ?? ''));
-        $endTime = trim((string)($data['end_time'] ?? ''));
+        $startTime = trim((string)($data['start_time'] ?? '09:00:00'));
+        $endTime = trim((string)($data['end_time'] ?? '10:00:00'));
         $roomName = trim((string)($data['room_name'] ?? ''));
 
         if ($enrollmentId < 1) {
@@ -3043,9 +3043,11 @@ class StudentsApi
         if ($sessionNumber < 1) {
             $this->sendJSON(['error' => 'session_number is required'], 400);
         }
-        if ($sessionDate === '' || $startTime === '' || $endTime === '') {
-            $this->sendJSON(['error' => 'session_date, start_time, and end_time are required'], 400);
+        if ($sessionDate === '') {
+            $this->sendJSON(['error' => 'session_date is required'], 400);
         }
+        if ($startTime === '') $startTime = '09:00:00';
+        if ($endTime === '') $endTime = '10:00:00';
         if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $startTime) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $endTime)) {
             $this->sendJSON(['error' => 'Invalid time format'], 400);
         }
@@ -3053,9 +3055,6 @@ class StudentsApi
         $endTs = strtotime($endTime);
         if ($startTs === false || $endTs === false || $endTs <= $startTs) {
             $this->sendJSON(['error' => 'End time must be later than start time'], 400);
-        }
-        if (($endTs - $startTs) !== 3600) {
-            $this->sendJSON(['error' => 'Assigned schedule must be exactly 1 hour per session'], 400);
         }
         if (!$this->tableExists('tbl_sessions')) {
             $this->sendJSON(['error' => 'tbl_sessions table not found'], 500);
@@ -3110,10 +3109,6 @@ class StudentsApi
             if ($requestedTeacherId > 0 && $requestedTeacherId !== $teacherId) {
                 $this->sendJSON(['error' => 'Teacher is fixed for this package and cannot be changed here'], 400);
             }
-            if (!$this->teacherHasAvailabilityForSlot($teacherId, $sessionDate, $startTime, $endTime)) {
-                $this->sendJSON(['error' => 'Selected time is outside the fixed teacher availability'], 400);
-            }
-
             $branchId = (int)($enrollment['branch_id'] ?? 0);
             $roomId = null;
             if ($roomName !== '') {
@@ -3123,14 +3118,25 @@ class StudentsApi
                 }
             }
 
-            if ($this->hasTeacherScheduleConflict($teacherId, $sessionDate, $startTime, $endTime)) {
-                $this->sendJSON(['error' => 'Selected teacher is not available at this time'], 400);
-            }
-            if ($this->hasStudentScheduleConflict((int)$enrollment['student_id'], $sessionDate, $startTime, $endTime)) {
-                $this->sendJSON(['error' => 'Student already has another session at this time'], 400);
-            }
-            if ($roomId !== null && $this->hasRoomScheduleConflict($roomId, $sessionDate, $startTime, $endTime)) {
-                $this->sendJSON(['error' => 'Selected room is not available at this time'], 400);
+            $stmtSameDate = $this->conn->prepare("
+                SELECT ts.session_id
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+                WHERE te.student_id = ?
+                  AND te.status = 'Active'
+                  AND ts.session_date = ?
+                  AND ts.status <> 'cancelled_by_teacher'
+                  AND NOT (ts.enrollment_id = ? AND ts.session_number = ?)
+                LIMIT 1
+            ");
+            $stmtSameDate->execute([
+                (int)$enrollment['student_id'],
+                $sessionDate,
+                $enrollmentId,
+                $sessionNumber
+            ]);
+            if ($stmtSameDate->fetchColumn()) {
+                $this->sendJSON(['error' => 'Student already has an active session scheduled on this date'], 400);
             }
 
             $instrumentId = (int)($enrollment['instrument_id'] ?? 0);

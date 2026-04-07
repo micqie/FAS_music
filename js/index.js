@@ -1709,6 +1709,43 @@ function buildStudentQrPayload(student) {
     return `FAS_ATTENDANCE|STUDENT|${sid}|${email}|${bid}`;
 }
 
+async function fetchStudentQrStatus(studentId, email = '') {
+    const params = studentId > 0
+        ? `student_id=${encodeURIComponent(studentId)}`
+        : `email=${encodeURIComponent(email)}`;
+    const url = `${baseApiUrl}/attendance.php?action=qr-status&${params}`;
+    const res = await axios.get(url);
+    return res.data;
+}
+
+function renderStudentQrStatus(status) {
+    const code = String(status?.code || 'no_session');
+    const titleMap = {
+        valid_today: 'QR Ready For Today',
+        early: 'Not Yet Available',
+        missed: 'Session Missed',
+        completed: 'Session Completed',
+        no_session: 'No Session Today'
+    };
+    const banner = document.getElementById('qrStatusBanner');
+    const titleEl = document.getElementById('studentQrStatusTitle');
+    const messageEl = document.getElementById('studentQrStatusMessage');
+    const styles = {
+        valid_today: 'block border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+        early: 'block border-amber-500/30 bg-amber-500/10 text-amber-200',
+        missed: 'block border-rose-500/30 bg-rose-500/10 text-rose-200',
+        completed: 'block border-sky-500/30 bg-sky-500/10 text-sky-200',
+        no_session: 'block border-zinc-500/30 bg-zinc-500/10 text-zinc-200'
+    };
+
+    if (titleEl) titleEl.textContent = titleMap[code] || 'QR Status';
+    if (messageEl) messageEl.textContent = status?.message || 'Please check back later.';
+    if (banner) {
+        banner.className = `w-full mb-4 rounded-2xl border px-4 py-3 text-sm font-medium ${styles[code] || styles.no_session}`;
+        banner.textContent = status?.message || 'Please check back later.';
+    }
+}
+
 function renderQrCode(targetElId, payload) {
     const target = document.getElementById(targetElId);
     if (!target) return;
@@ -3272,14 +3309,36 @@ async function initStudentQrPage() {
 
     const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     if (!enrollmentApproved) {
+        renderStudentQrStatus({ code: 'no_session', message: 'QR locked until admin approves your enrollment.' });
         setHtml('qrCodeBox', '<div class="text-sm text-zinc-400 text-center">QR locked until admin approves your enrollment.</div>');
         setText('qrPayloadText', 'Locked — approval required');
         return;
     }
 
-    const payload = buildStudentQrPayload(s);
-    setText('qrPayloadText', payload);
-    renderQrCode('qrCodeBox', payload);
+    try {
+        const qrStatusRes = await fetchStudentQrStatus(Number(s.student_id || 0), s.email || '');
+        const qrStatus = qrStatusRes?.qr_status || { code: 'no_session', message: 'You do not have a session today.' };
+        renderStudentQrStatus(qrStatus);
+
+        if (qrStatus.code === 'valid_today') {
+            const payload = buildStudentQrPayload(s);
+            setText('qrPayloadText', payload);
+            renderQrCode('qrCodeBox', payload);
+        } else {
+            setText('qrPayloadText', qrStatus.message || 'QR unavailable');
+            setHtml('qrCodeBox', `<div class="text-sm text-zinc-300 text-center">${escapeHtml(qrStatus.message || 'QR unavailable for today.')}</div>`);
+        }
+    } catch (error) {
+        renderStudentQrStatus({ code: 'no_session', message: 'Unable to verify your QR status right now.' });
+        setText('qrPayloadText', 'QR status unavailable');
+        setHtml('qrCodeBox', '<div class="text-sm text-zinc-300 text-center">Unable to verify your QR status right now.</div>');
+    }
+
+    if (!window.__studentQrRefreshTimer) {
+        window.__studentQrRefreshTimer = window.setInterval(() => {
+            if (document.visibilityState === 'visible') initStudentQrPage();
+        }, 60000);
+    }
 }
 
 async function initStudentSessionsPage() {

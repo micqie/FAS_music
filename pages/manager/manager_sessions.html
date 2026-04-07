@@ -207,16 +207,9 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">Start Time *</label>
-                                <input type="time" id="scheduleStart" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">End Time *</label>
-                                <input type="time" id="scheduleEnd" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            </div>
-                        </div>
+                        <input type="hidden" id="scheduleStart" value="09:00">
+                        <input type="hidden" id="scheduleEnd" value="10:00">
+                        <div class="text-xs text-slate-500">Date-only scheduling is active. The saved date controls QR attendance and session validity.</div>
                         <div class="flex items-center justify-end gap-3">
                             <button type="button" id="cancelAddScheduleBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition">
                                 Cancel
@@ -1620,9 +1613,7 @@
                 const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
                 const roomName = escapeHtml(student.assigned_room || '—');
                 const sessionDate = student.first_session_date ? new Date(student.first_session_date).toLocaleDateString() : '—';
-                const startTime = formatTime12Hour(student.first_start_time);
-                const endTime = formatTime12Hour(student.first_end_time);
-                const sessionTime = student.first_session_date ? `${sessionDate} • ${startTime} - ${endTime}` : '—';
+                const sessionTime = student.first_session_date ? `${sessionDate}` : '—';
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
@@ -1698,7 +1689,6 @@
                     const slotHtml = slotHistory.length
                         ? slotHistory.map(slot => {
                             const dateText = slot?.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
-                            const timeText = slot?.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : '—';
                             const roomText = slot?.room_name ? ` • ${escapeHtml(slot.room_name)}` : '';
                             const slotTeacherName = slot?.teacher_first_name || slot?.teacher_last_name
                                 ? `${escapeHtml(slot.teacher_first_name || '')} ${escapeHtml(slot.teacher_last_name || '')}`.trim()
@@ -1711,7 +1701,7 @@
                                 <div class="rounded-lg border border-white/70 bg-white px-3 py-2">
                                     <div class="flex flex-wrap items-center gap-2">
                                         ${getSessionStatusBadge(slot.status)}
-                                        <div>${escapeHtml(dateText)} • ${escapeHtml(timeText)}${roomText}${teacherText}</div>
+                                        <div>${escapeHtml(dateText)}${roomText}${teacherText}</div>
                                     </div>
                                     ${reasonText}
                                 </div>
@@ -1737,8 +1727,8 @@
             const startInput = document.getElementById('scheduleStart');
             const endInput = document.getElementById('scheduleEnd');
             if (dateInput) dateInput.value = '';
-            if (startInput) startInput.value = '';
-            if (endInput) endInput.value = '';
+            if (startInput) startInput.value = '09:00';
+            if (endInput) endInput.value = '10:00';
             if (hint) {
                 hint.textContent = nextUnscheduled
                     ? `Session ${nextUnscheduled} is the next open slot for this enrollment.`
@@ -1787,12 +1777,8 @@
             const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
             const roomName = document.getElementById('scheduleRoom')?.value || '';
 
-            if (!enrollmentId || !sessionNumber || !sessionDate || !startTime || !endTime) {
-                showMessage('Please complete date and time before saving.', 'error');
-                return;
-            }
-            if (startTime >= endTime) {
-                showMessage('End time must be later than start time.', 'error');
+            if (!enrollmentId || !sessionNumber || !sessionDate) {
+                showMessage('Please select a date before saving.', 'error');
                 return;
             }
 

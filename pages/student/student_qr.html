@@ -141,6 +141,7 @@
                     </div>
 
                     <div class="mt-6 rounded-3xl bg-obsidian/60 border border-gold-500/25 p-6 flex flex-col items-center justify-center">
+                        <div id="qrStatusBanner" class="hidden w-full mb-4 rounded-2xl border px-4 py-3 text-sm font-medium"></div>
                         <div id="qrCodeBox" class="p-2"></div>
                         <div class="mt-4 text-xs text-zinc-500 text-center max-w-md">
                             If scanning fails, ask staff to verify your email or student ID.
@@ -159,11 +160,17 @@
                     <div class="text-sm text-zinc-300 mt-1" id="studentEmail">—</div>
 
                     <div class="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Today&apos;s Status</div>
+                        <div id="studentQrStatusTitle" class="mt-3 text-lg font-bold text-white">Checking your session...</div>
+                        <div id="studentQrStatusMessage" class="mt-2 text-sm text-zinc-300">Please wait while we verify your scheduled date.</div>
+                    </div>
+
+                    <div class="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
                         <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">How to use</div>
                         <ol class="mt-3 space-y-2 text-sm text-zinc-200 list-decimal list-inside">
-                            <li>Open this page when you arrive.</li>
-                            <li>Show the QR to the staff scanner.</li>
-                            <li>Wait for confirmation.</li>
+                            <li>Open this page on your scheduled session date.</li>
+                            <li>Show the QR only when the status says it is valid for today.</li>
+                            <li>If you missed a date, wait for your make-up schedule.</li>
                         </ol>
                     </div>
                 </div>

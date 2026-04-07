@@ -179,13 +179,16 @@ async function postRecordByEmail(email) {
 
 function handleApiResponse(data, parsed, payload, isManual) {
     if (!data.success) {
-        invalidScanCount += 1;
+        const statusErrorCodes = ['EARLY', 'MISSED', 'NO_SESSION'];
+        if (!statusErrorCodes.includes(String(data.error_code || '').toUpperCase())) {
+            invalidScanCount += 1;
+        }
         let html = `<p class="text-left text-slate-600 mb-2">${escapeHtml(data.error || 'Invalid')}</p>`;
         if (!isManual && payload) html += `<div class="text-left text-xs bg-slate-50 p-3 rounded-lg mt-2 font-mono text-slate-600 break-all">QR: ${escapeHtml(payload)}</div>`;
         if (data.student_branch_name) html += `<p class="text-left text-sm mt-2">Student branch: <strong>${escapeHtml(data.student_branch_name)}</strong></p>`;
         if (data.desk_branch_name) html += `<p class="text-left text-sm">Desk branch: <strong>${escapeHtml(data.desk_branch_name)}</strong></p>`;
         setStatus(data.error || 'Invalid', 'warn');
-        showScanAlert('Check-in Failed', html, 'warning');
+        showScanAlert(statusErrorCodes.includes(String(data.error_code || '').toUpperCase()) ? 'Attendance Not Allowed Today' : 'Check-in Failed', html, 'warning');
         fetchDeskSummary();
         return;
     }
