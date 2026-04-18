@@ -243,8 +243,8 @@
     </div>
 
     <!-- Assign Request Modal -->
-    <div id="assignRequestModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-4xl p-6 relative">
+    <div id="assignRequestModal" class="fixed inset-0 z-50 hidden items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-[96rem] max-h-[94vh] overflow-y-auto p-5 sm:p-6 lg:p-8 relative">
             <button id="closeAssignRequestModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
                 <i class="fas fa-times text-xl"></i>
             </button>
@@ -272,43 +272,58 @@
 
             <form id="assignRequestForm" class="mt-5 space-y-4">
                 <input type="hidden" id="assignRequestId" value="">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="relative">
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Teacher *</label>
-                        <input type="hidden" id="assignRequestTeacherSelect" value="">
-                        <input type="text" id="assignRequestTeacherSearch" placeholder="Search teacher or specialization..." class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                        <div id="assignRequestTeacherSearchHelp" class="mt-2 text-xs text-slate-500">Recommended teachers will appear here based on the student's requested instrument.</div>
-                        <div id="assignRequestTeacherSuggestions" class="hidden absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl max-h-64 overflow-y-auto"></div>
+                <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_minmax(420px,1fr)] gap-6 items-start">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="relative">
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Teacher *</label>
+                                <input type="hidden" id="assignRequestTeacherSelect" value="">
+                                <input type="text" id="assignRequestTeacherSearch" placeholder="Search teacher or specialization..." class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                                <div id="assignRequestTeacherSearchHelp" class="mt-2 text-xs text-slate-500">Recommended teachers will appear here based on the student's requested instrument.</div>
+                                <div id="assignRequestTeacherSuggestions" class="hidden absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl max-h-64 overflow-y-auto"></div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Date *</label>
+                                <input type="date" id="assignRequestDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Day *</label>
+                                <input type="text" id="assignRequestDay" readonly class="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700" placeholder="Auto from date">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Start Time *</label>
+                                <input type="time" id="assignRequestStartTime" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">End Time *</label>
+                                <input type="time" id="assignRequestEndTime" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Room / Location</label>
+                                <select id="assignRequestRoom" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                                    <option value="">Select room...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Notes</label>
+                                <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                            </div>
+                        </div>
+                        <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+                            <div class="text-sm font-semibold text-emerald-900">Weekly Assignment Rule</div>
+                            <div id="assignRequestRecurringSummary" class="text-xs text-emerald-800 mt-1">Choose a one-hour slot. Once assigned, that instructor time becomes reserved weekly for this student to avoid conflicts.</div>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Date *</label>
-                        <input type="date" id="assignRequestDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Day *</label>
-                        <input type="text" id="assignRequestDay" readonly class="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700" placeholder="Auto from date">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Start Time *</label>
-                        <input type="time" id="assignRequestStartTime" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">End Time *</label>
-                        <input type="time" id="assignRequestEndTime" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Room / Location</label>
-                        <select id="assignRequestRoom" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            <option value="">Select room...</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Notes</label>
-                        <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:p-5">
+                            <div class="text-sm font-semibold text-slate-800">Instructor Availability</div>
+                            <div id="assignRequestAvailabilityHint" class="text-xs text-slate-500 mt-1">Choose an instructor to see their available one-hour weekly slots and avoid conflicts.</div>
+                        <div id="assignRequestAvailabilityList" class="mt-3 space-y-2 max-h-[52vh] overflow-y-auto pr-1">
+                            <div class="text-sm text-slate-500">No instructor selected yet.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="text-xs text-slate-500">Session must be exactly 1 hour.</div>
@@ -587,6 +602,7 @@
         let uiIsDesk = false;
         let managerPageMode = 'enrollments';
         let assignRequestTeacherCandidates = [];
+        let activeAssignRequest = null;
         let walkinStudents = [];
         let walkinMeta = null;
         let walkinStudentLookup = new Map();
@@ -1284,6 +1300,30 @@
             return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] || '';
         }
 
+        function getTimeMinutes(value) {
+            const raw = String(value || '').trim();
+            if (!/^\d{2}:\d{2}(:\d{2})?$/.test(raw)) return NaN;
+            const [hours, minutes] = raw.split(':');
+            return (Number(hours || 0) * 60) + Number(minutes || 0);
+        }
+
+        function updateAssignRequestRecurringSummary() {
+            const summaryEl = document.getElementById('assignRequestRecurringSummary');
+            const day = document.getElementById('assignRequestDay')?.value || '';
+            const start = document.getElementById('assignRequestStartTime')?.value || '';
+            const end = document.getElementById('assignRequestEndTime')?.value || '';
+            const room = document.getElementById('assignRequestRoom')?.value || '';
+            if (!summaryEl) return;
+
+            if (!day || !start || !end) {
+                summaryEl.textContent = 'Choose a one-hour slot. Once assigned, that instructor time becomes reserved weekly for this student to avoid conflicts.';
+                return;
+            }
+
+            const roomText = room ? ` in ${room}` : '';
+            summaryEl.textContent = `Reserved weekly every ${day}, ${formatTime12Hour(start)} - ${formatTime12Hour(end)}${roomText}. Other students will no longer be offered this recurring slot.`;
+        }
+
         function setAssignRequestTeacherSelection(teacherId) {
             const hiddenInput = document.getElementById('assignRequestTeacherSelect');
             const searchInput = document.getElementById('assignRequestTeacherSearch');
@@ -1299,10 +1339,11 @@
             }
             if (helpEl && !selected) {
                 helpEl.textContent = assignRequestTeacherCandidates.length
-                    ? 'Recommended teachers will appear here based on the student\'s requested instrument.'
-                    : 'No teacher suggestions found yet for this request.';
+                    ? 'Only instructors that match the student\'s instrument are listed here.'
+                    : 'No instructor with a matching specialization is available for this request.';
             }
             if (suggestionsEl) suggestionsEl.classList.add('hidden');
+            loadAssignRequestAvailability();
         }
 
         function renderAssignRequestTeacherSuggestions(query = '') {
@@ -1315,7 +1356,7 @@
                 return !q || teacherName.includes(q) || specialization.includes(q);
             });
             if (!rows.length) {
-                suggestionsEl.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">No matching teachers found.</div>';
+                suggestionsEl.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">No matching instrument-focused instructors found.</div>';
                 suggestionsEl.classList.remove('hidden');
                 return;
             }
@@ -1338,6 +1379,86 @@
                 const withinSearch = event.target.closest('#assignRequestTeacherSuggestions') || event.target.closest('#assignRequestTeacherSearch');
                 if (!withinSearch) suggestionsEl.classList.add('hidden');
             });
+        }
+
+        function renderAssignRequestAvailability(slots, selectedDate = '') {
+            const listEl = document.getElementById('assignRequestAvailabilityList');
+            const hintEl = document.getElementById('assignRequestAvailabilityHint');
+            if (!listEl || !hintEl) return;
+
+            if (!Array.isArray(slots) || !slots.length) {
+                hintEl.textContent = 'No conflict-free recurring one-hour slots were found for the selected instructor and date range.';
+                listEl.innerHTML = '<div class="text-sm text-slate-500">No available slots found.</div>';
+                return;
+            }
+
+            hintEl.textContent = selectedDate
+                ? `Showing available recurring one-hour slots from ${selectedDate} onward. Click a slot to auto-fill the weekly assignment.`
+                : 'Showing the next available recurring one-hour slots. Click a slot to auto-fill the weekly assignment.';
+
+            listEl.innerHTML = slots.slice(0, 18).map(slot => {
+                const dateLabel = slot.session_date ? new Date(slot.session_date).toLocaleDateString() : '—';
+                const timeLabel = `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`;
+                const isPreferredDate = selectedDate && slot.session_date === selectedDate;
+                return `
+                    <button
+                        type="button"
+                        class="w-full text-left rounded-xl border px-3 py-3 transition ${isPreferredDate ? 'border-gold-300 bg-gold-50 hover:bg-gold-100' : 'border-slate-200 bg-white hover:bg-slate-50'}"
+                        onclick="applyAssignRequestAvailabilitySlot('${escapeHtml(String(slot.session_date || ''))}','${escapeHtml(String(slot.day_of_week || ''))}','${escapeHtml(String(slot.start_time || ''))}','${escapeHtml(String(slot.end_time || ''))}')"
+                    >
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-sm font-semibold text-slate-900">${escapeHtml(dateLabel)}</div>
+                                <div class="text-xs text-slate-500 mt-1">${escapeHtml(slot.day_of_week || '')} • Weekly recurring</div>
+                            </div>
+                            <div class="text-sm font-semibold text-emerald-700">${escapeHtml(timeLabel)}</div>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function applyAssignRequestAvailabilitySlot(sessionDate, dayOfWeek, startTime, endTime) {
+            const dateEl = document.getElementById('assignRequestDate');
+            const dayEl = document.getElementById('assignRequestDay');
+            const startEl = document.getElementById('assignRequestStartTime');
+            const endEl = document.getElementById('assignRequestEndTime');
+            if (dateEl) dateEl.value = sessionDate || '';
+            if (dayEl) dayEl.value = dayOfWeek || getDayNameFromDate(sessionDate || '');
+            if (startEl) startEl.value = String(startTime || '').slice(0, 5);
+            if (endEl) endEl.value = String(endTime || '').slice(0, 5);
+            updateAssignRequestRecurringSummary();
+        }
+
+        async function loadAssignRequestAvailability() {
+            const listEl = document.getElementById('assignRequestAvailabilityList');
+            const hintEl = document.getElementById('assignRequestAvailabilityHint');
+            const teacherId = Number(document.getElementById('assignRequestTeacherSelect')?.value || 0);
+            const startDate = document.getElementById('assignRequestDate')?.value || '';
+            const roomName = document.getElementById('assignRequestRoom')?.value || '';
+            if (!listEl || !hintEl) return;
+
+            if (!activeAssignRequest || !teacherId) {
+                hintEl.textContent = activeAssignRequest
+                    ? 'Choose an instructor to see their available one-hour slots and avoid conflicts.'
+                    : 'Open a student request first.';
+                listEl.innerHTML = '<div class="text-sm text-slate-500">No instructor selected yet.</div>';
+                return;
+            }
+
+            listEl.innerHTML = '<div class="text-sm text-slate-500">Loading available slots...</div>';
+
+            try {
+                let url = `${baseApiUrl}/students.php?action=get-teacher-available-slots&teacher_id=${encodeURIComponent(teacherId)}&branch_id=${encodeURIComponent(activeAssignRequest.branch_id || managerBranchId || 0)}&student_id=${encodeURIComponent(activeAssignRequest.student_id || 0)}`;
+                if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+                if (roomName) url += `&room_name=${encodeURIComponent(roomName)}`;
+                const response = await axios.get(url);
+                const data = response.data || {};
+                renderAssignRequestAvailability(Array.isArray(data.slots) ? data.slots : [], startDate);
+            } catch (error) {
+                hintEl.textContent = 'Unable to load instructor availability right now.';
+                listEl.innerHTML = '<div class="text-sm text-red-500">Failed to load available slots.</div>';
+            }
         }
 
         async function openAssignRequestModal(requestId) {
@@ -1380,14 +1501,15 @@
             if (studentPackageEl) studentPackageEl.textContent = req.package_name || 'Package';
             if (studentInstrumentEl) studentInstrumentEl.innerHTML = instrumentSummary;
             requestIdEl.value = String(requestId);
+            activeAssignRequest = req;
 
             assignRequestTeacherCandidates = Array.isArray(req.teacher_candidates) ? req.teacher_candidates : [];
             teacherSelect.value = '';
             if (teacherSearch) teacherSearch.value = '';
             if (teacherHelp) {
                 teacherHelp.textContent = assignRequestTeacherCandidates.length
-                    ? 'Recommended teachers will appear here based on the student\'s requested instrument.'
-                    : 'No teacher suggestions found yet for this request.';
+                    ? 'Only instructors that match the student\'s instrument are listed here.'
+                    : 'No instructor with a matching specialization is available for this request.';
             }
             if (assignRequestTeacherCandidates.length) {
                 setAssignRequestTeacherSelection(assignRequestTeacherCandidates[0].teacher_id);
@@ -1402,6 +1524,8 @@
             await populateAssignRoomDropdown(req);
             roomEl.value = '';
             notesEl.value = '';
+            updateAssignRequestRecurringSummary();
+            await loadAssignRequestAvailability();
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -1410,6 +1534,7 @@
         function closeAssignRequestModal() {
             const modal = document.getElementById('assignRequestModal');
             if (!modal) return;
+            activeAssignRequest = null;
             modal.classList.add('hidden');
             modal.classList.remove('flex');
         }
@@ -1450,6 +1575,10 @@
                 showMessage('End time must be later than start time.', 'error');
                 return;
             }
+            if ((getTimeMinutes(assignedEnd) - getTimeMinutes(assignedStart)) !== 60) {
+                showMessage('Assigned schedule must be exactly 1 hour.', 'error');
+                return;
+            }
 
             await approveStudentRequest({
                 action: 'approve-package-request',
@@ -1459,6 +1588,12 @@
                 assigned_day_of_week: assignedDay,
                 assigned_start_time: assignedStart,
                 assigned_end_time: assignedEnd,
+                assigned_slots: [{
+                    day_of_week: assignedDay,
+                    start_time: assignedStart,
+                    end_time: assignedEnd,
+                    room_name: assignedRoom
+                }],
                 assigned_room: assignedRoom,
                 admin_notes: adminNotes,
                 branch_id: managerBranchId
@@ -1788,8 +1923,18 @@
                 if (!dayEl) return;
                 const d = getDayNameFromDate(e.target.value || '');
                 dayEl.value = d || '';
+                updateAssignRequestRecurringSummary();
+                loadAssignRequestAvailability();
             });
+            document.getElementById('assignRequestRoom')?.addEventListener('change', () => {
+                updateAssignRequestRecurringSummary();
+                loadAssignRequestAvailability();
+            });
+            document.getElementById('assignRequestStartTime')?.addEventListener('change', updateAssignRequestRecurringSummary);
+            document.getElementById('assignRequestEndTime')?.addEventListener('change', updateAssignRequestRecurringSummary);
         });
+
+        window.applyAssignRequestAvailabilitySlot = applyAssignRequestAvailabilitySlot;
     </script>
 </body>
 </html>

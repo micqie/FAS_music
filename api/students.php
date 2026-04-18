@@ -702,19 +702,6 @@ class StudentsApi
                 ];
             }
 
-            // Fallback: if strict filtering yields no match, allow desk/admin to manually choose any active teacher.
-            if (empty($candidates) && !empty($teachers)) {
-                foreach ($teachers as $t) {
-                    $teacherId = (int)($t['teacher_id'] ?? 0);
-                    if ($teacherId < 1) continue;
-                    $specializationRaw = trim((string)($t['specialization'] ?? ''));
-                    $candidates[] = [
-                        'teacher_id' => $teacherId,
-                        'teacher_name' => trim(($t['first_name'] ?? '') . ' ' . ($t['last_name'] ?? '')),
-                        'specialization' => $specializationRaw !== '' ? $specializationRaw : 'General'
-                    ];
-                }
-            }
         } catch (PDOException $e) {
             return [];
         }
@@ -866,11 +853,12 @@ class StudentsApi
         return implode(' | ', $parts);
     }
 
-    private function normalizeAssignedScheduleSlots($slotsInput, $teacherId, $branchId, $fallbackRoomName = '')
+    private function normalizeAssignedScheduleSlots($slotsInput, $teacherId, $branchId, $fallbackRoomName = '', $studentId = 0, $excludeEnrollmentIds = [])
     {
         $validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $teacherId = (int)$teacherId;
         $branchId = (int)$branchId;
+        $studentId = (int)$studentId;
         $fallbackRoomName = trim((string)$fallbackRoomName);
         $rows = [];
 
@@ -915,6 +903,15 @@ class StudentsApi
 
             if (!$this->teacherHasAvailabilityForSlot($teacherId, $this->nextDateForDayOfWeek(date('Y-m-d'), $day), $start, $end)) {
                 throw new InvalidArgumentException("Teacher is not available for {$day} {$start}-{$end}");
+            }
+            if ($this->hasTeacherRecurringScheduleConflict($teacherId, $day, $start, $end, $excludeEnrollmentIds)) {
+                throw new InvalidArgumentException("Teacher already has a weekly schedule conflict for {$day} {$start}-{$end}");
+            }
+            if ($studentId > 0 && $this->hasStudentRecurringScheduleConflict($studentId, $day, $start, $end, $excludeEnrollmentIds)) {
+                throw new InvalidArgumentException("Student already has a weekly schedule conflict for {$day} {$start}-{$end}");
+            }
+            if ($roomId !== null && $roomId > 0 && $this->hasRoomRecurringScheduleConflict($roomId, $day, $start, $end, $excludeEnrollmentIds)) {
+                throw new InvalidArgumentException("Room already has a weekly schedule conflict for {$day} {$start}-{$end}");
             }
 
             $rows[$slotKey] = [
@@ -1395,6 +1392,105 @@ class StudentsApi
         }
     }
 
+    private function hasTeacherRecurringScheduleConflict($teacherId, $dayOfWeek, $startTime, $endTime, $excludeEnrollmentIds = [])
+    {
+        if ($teacherId < 1 || !$this->tableExists('tbl_enrollment_schedule_slots') || !$this->tableExists('tbl_enrollments')) {
+            return false;
+        }
+
+        try {
+            $sql = "
+                SELECT COUNT(*) AS conflict_count
+                FROM tbl_enrollment_schedule_slots ess
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ess.enrollment_id
+                WHERE ess.teacher_id = ?
+                  AND ess.day_of_week = ?
+                  AND ess.status = 'Active'
+                  AND e.status = 'Active'
+                  AND ess.start_time < ?
+                  AND ess.end_time > ?
+            ";
+            $params = [(int)$teacherId, $dayOfWeek, $endTime, $startTime];
+            $excludeIds = $this->normalizeExcludedIds($excludeEnrollmentIds);
+            if (!empty($excludeIds)) {
+                $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
+                $sql .= " AND ess.enrollment_id NOT IN ({$placeholders})";
+                $params = array_merge($params, $excludeIds);
+            }
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            return ((int)$stmt->fetchColumn()) > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function hasRoomRecurringScheduleConflict($roomId, $dayOfWeek, $startTime, $endTime, $excludeEnrollmentIds = [])
+    {
+        if ($roomId === null || $roomId < 1 || !$this->tableExists('tbl_enrollment_schedule_slots') || !$this->tableExists('tbl_enrollments')) {
+            return false;
+        }
+
+        try {
+            $sql = "
+                SELECT COUNT(*) AS conflict_count
+                FROM tbl_enrollment_schedule_slots ess
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ess.enrollment_id
+                WHERE ess.room_id = ?
+                  AND ess.day_of_week = ?
+                  AND ess.status = 'Active'
+                  AND e.status = 'Active'
+                  AND ess.start_time < ?
+                  AND ess.end_time > ?
+            ";
+            $params = [(int)$roomId, $dayOfWeek, $endTime, $startTime];
+            $excludeIds = $this->normalizeExcludedIds($excludeEnrollmentIds);
+            if (!empty($excludeIds)) {
+                $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
+                $sql .= " AND ess.enrollment_id NOT IN ({$placeholders})";
+                $params = array_merge($params, $excludeIds);
+            }
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            return ((int)$stmt->fetchColumn()) > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function hasStudentRecurringScheduleConflict($studentId, $dayOfWeek, $startTime, $endTime, $excludeEnrollmentIds = [])
+    {
+        if ($studentId < 1 || !$this->tableExists('tbl_enrollment_schedule_slots') || !$this->tableExists('tbl_enrollments')) {
+            return false;
+        }
+
+        try {
+            $sql = "
+                SELECT COUNT(*) AS conflict_count
+                FROM tbl_enrollment_schedule_slots ess
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ess.enrollment_id
+                WHERE e.student_id = ?
+                  AND ess.day_of_week = ?
+                  AND ess.status = 'Active'
+                  AND e.status = 'Active'
+                  AND ess.start_time < ?
+                  AND ess.end_time > ?
+            ";
+            $params = [(int)$studentId, $dayOfWeek, $endTime, $startTime];
+            $excludeIds = $this->normalizeExcludedIds($excludeEnrollmentIds);
+            if (!empty($excludeIds)) {
+                $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
+                $sql .= " AND ess.enrollment_id NOT IN ({$placeholders})";
+                $params = array_merge($params, $excludeIds);
+            }
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            return ((int)$stmt->fetchColumn()) > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     private function buildTeacherAvailableSlots($teacherId, $branchId, $studentId, $roomId = null, $excludeSessionIds = [], $daysAhead = 30)
     {
         $teacherId = (int)$teacherId;
@@ -1467,11 +1563,23 @@ class StudentsApi
                             $cursor += 3600;
                             continue;
                         }
+                        if ($this->hasTeacherRecurringScheduleConflict($teacherId, $dayOfWeek, $slotStart, $slotEnd)) {
+                            $cursor += 3600;
+                            continue;
+                        }
                         if ($studentId > 0 && $this->hasStudentScheduleConflict($studentId, $slotDate, $slotStart, $slotEnd, $excludeSessionIds)) {
                             $cursor += 3600;
                             continue;
                         }
+                        if ($studentId > 0 && $this->hasStudentRecurringScheduleConflict($studentId, $dayOfWeek, $slotStart, $slotEnd)) {
+                            $cursor += 3600;
+                            continue;
+                        }
                         if ($roomId !== null && $roomId > 0 && $this->hasRoomScheduleConflict($roomId, $slotDate, $slotStart, $slotEnd, $excludeSessionIds)) {
+                            $cursor += 3600;
+                            continue;
+                        }
+                        if ($roomId !== null && $roomId > 0 && $this->hasRoomRecurringScheduleConflict($roomId, $dayOfWeek, $slotStart, $slotEnd)) {
                             $cursor += 3600;
                             continue;
                         }
@@ -1493,6 +1601,43 @@ class StudentsApi
         } catch (PDOException $e) {
             return [];
         }
+    }
+
+    public function getTeacherAvailableSlots()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $teacherId = (int)($_GET['teacher_id'] ?? 0);
+        $branchId = (int)($_GET['branch_id'] ?? 0);
+        $studentId = (int)($_GET['student_id'] ?? 0);
+        $roomName = trim((string)($_GET['room_name'] ?? ''));
+        $startDate = trim((string)($_GET['start_date'] ?? ''));
+        $daysAhead = (int)($_GET['days_ahead'] ?? 21);
+
+        if ($teacherId < 1) {
+            $this->sendJSON(['error' => 'teacher_id is required'], 400);
+        }
+
+        $roomId = null;
+        if ($branchId > 0 && $roomName !== '') {
+            $resolvedRoomId = $this->resolveRoomIdByName($branchId, $roomName);
+            if ($resolvedRoomId > 0) $roomId = $resolvedRoomId;
+        }
+
+        $slots = $this->buildTeacherAvailableSlots($teacherId, $branchId, $studentId, $roomId, [], $daysAhead);
+        if ($startDate !== '') {
+            $slots = array_values(array_filter($slots, function ($slot) use ($startDate) {
+                return !empty($slot['session_date']) && strcmp((string)$slot['session_date'], $startDate) >= 0;
+            }));
+        }
+
+        $this->sendJSON([
+            'success' => true,
+            'teacher_id' => $teacherId,
+            'slots' => $slots
+        ]);
     }
 
     /** Check whether a table exists in current DB */
@@ -3971,7 +4116,13 @@ class StudentsApi
             }
 
             try {
-                $normalizedAssignedSlots = $this->normalizeAssignedScheduleSlots($assignedSlotsInput, $teacherId, (int)$req['branch_id'], $assignedRoom);
+                $normalizedAssignedSlots = $this->normalizeAssignedScheduleSlots(
+                    $assignedSlotsInput,
+                    $teacherId,
+                    (int)$req['branch_id'],
+                    $assignedRoom,
+                    (int)$req['student_id']
+                );
             } catch (InvalidArgumentException $e) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => $e->getMessage()], 400);
@@ -4372,6 +4523,9 @@ switch ($action) {
         break;
     case 'get-available-rooms':
         $studentsApi->getAvailableRooms();
+        break;
+    case 'get-teacher-available-slots':
+        $studentsApi->getTeacherAvailableSlots();
         break;
     case 'get-cancelled-sessions':
         $studentsApi->getCancelledSessions();
