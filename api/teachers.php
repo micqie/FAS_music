@@ -479,6 +479,10 @@ class TeachersApi
         $userId = (int)($_GET['user_id'] ?? 0);
         $status = trim((string)($_GET['status'] ?? ''));
 
+        if ($teacherId < 1 && $userId > 0) {
+            $teacherId = $this->resolveTeacherId(0, $userId);
+        }
+
         try {
             $sql = "
                 SELECT
@@ -511,7 +515,7 @@ class TeachersApi
                 $sql .= " AND t.teacher_id = ? ";
                 $params[] = $teacherId;
             }
-            if ($userId > 0) {
+            if ($userId > 0 && $teacherId < 1) {
                 $sql .= " AND t.user_id = ? ";
                 $params[] = $userId;
             }
@@ -1045,15 +1049,15 @@ class TeachersApi
                 $linkedUser = $stmtUser->fetch(PDO::FETCH_ASSOC);
                 if ($linkedUser) {
                     $currentUsername = trim((string)($linkedUser['username'] ?? ''));
-                    $currentEmail = trim((string)($linkedUser['email'] ?? ''));
                     $newUsername = $currentUsername;
 
-                    if ($email !== '' && ($currentUsername === '' || strcasecmp($currentUsername, $currentEmail) === 0)) {
+                    if ($email !== '') {
                         $newUsername = $email;
                     }
 
                     if ($newUsername !== $currentUsername && $this->usernameExists($newUsername)) {
-                        $newUsername = $currentUsername;
+                        $this->conn->rollBack();
+                        $this->sendJSON(['error' => 'Email is already used by another login account'], 400);
                     }
 
                     $stmtUpdateUser = $this->conn->prepare("

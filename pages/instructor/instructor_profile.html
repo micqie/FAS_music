@@ -6,6 +6,7 @@
     <title>Instructor Profile | Father & Sons</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -110,7 +111,7 @@
         <div class="max-w-7xl mx-auto space-y-8">
             <div>
                 <h1 class="text-3xl font-black text-slate-900 tracking-tight">Instructor Profile</h1>
-                <p class="text-slate-500 mt-1">Manage your personal details and teaching preferences.</p>
+                <p class="text-slate-500 mt-1">View your personal details and teaching assignment information.</p>
             </div>
 
             <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -121,20 +122,20 @@
                         </div>
                         <h2 id="profileName" class="mt-4 text-lg font-bold text-slate-900">Instructor</h2>
                         <p id="profileEmail" class="text-sm text-slate-500">instructor@fas.edu</p>
-                        <div class="mt-4 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">Active</div>
+                        <div id="profileStatus" class="mt-4 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">Active</div>
                     </div>
                     <div class="mt-6 space-y-3 text-sm text-slate-600">
                         <div class="flex items-center gap-3">
                             <i class="fas fa-guitar text-gold-500"></i>
-                            <span>Primary: Guitar, Piano</span>
+                            <span id="profileSpecialization">Primary: —</span>
                         </div>
                         <div class="flex items-center gap-3">
                             <i class="fas fa-map-marker-alt text-gold-500"></i>
-                            <span>Manila Main Branch</span>
+                            <span id="profileBranch">—</span>
                         </div>
                         <div class="flex items-center gap-3">
                             <i class="fas fa-star text-gold-500"></i>
-                            <span>8 years teaching</span>
+                            <span id="profileEmploymentType">—</span>
                         </div>
                     </div>
                 </div>
@@ -144,55 +145,62 @@
                     <form class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">First Name</label>
-                            <input type="text" value="Maria" class="mt-2 w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                            <input id="profileFirstName" type="text" readonly class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Name</label>
-                            <input type="text" value="Dela Cruz" class="mt-2 w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                            <input id="profileLastName" type="text" readonly class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</label>
-                            <input type="email" value="maria.delacruz@fas.edu" class="mt-2 w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                            <input id="profileEmailInput" type="email" readonly class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Phone</label>
-                            <input type="text" value="+63 912 345 6789" class="mt-2 w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                            <input id="profilePhone" type="text" readonly class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Branch</label>
+                            <input id="profileBranchInput" type="text" readonly class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Employment Type</label>
+                            <input id="profileEmploymentTypeInput" type="text" readonly class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:outline-none">
                         </div>
                         <div class="md:col-span-2">
-                            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Bio</label>
-                            <textarea class="mt-2 w-full rounded-xl border border-slate-200 p-3 text-sm h-28 focus:outline-none focus:ring-2 focus:ring-gold-400/40">I focus on technique, stage confidence, and creative expression for all levels.</textarea>
+                            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Specialization</label>
+                            <textarea id="profileSpecializationInput" readonly class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm h-28 text-slate-700 focus:outline-none"></textarea>
                         </div>
                     </form>
-                    <div class="mt-5 flex flex-wrap gap-3">
-                        <button class="px-5 py-2.5 rounded-xl bg-obsidian text-white text-sm font-semibold hover:bg-black transition">Save Changes</button>
-                        <button class="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition">Reset</button>
+                    <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        Profile details are managed by admin. If anything is incorrect, please ask admin to update your teacher record.
                     </div>
                 </div>
             </section>
 
             <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
-                    <h2 class="text-lg font-bold text-slate-900">Teaching Preferences</h2>
+                    <h2 class="text-lg font-bold text-slate-900">Teaching Details</h2>
                     <div class="mt-4 space-y-3 text-sm text-slate-500">
                         <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                            <span>Allow student reschedules</span>
-                            <input type="checkbox" checked class="h-4 w-4">
+                            <span>Status</span>
+                            <span id="profileStatusInline" class="font-semibold text-slate-700">—</span>
                         </div>
                         <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                            <span>Enable lesson reminders</span>
-                            <input type="checkbox" checked class="h-4 w-4">
+                            <span>Linked login email</span>
+                            <span id="profileLoginEmail" class="font-semibold text-slate-700">—</span>
                         </div>
                         <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                            <span>Share progress updates</span>
-                            <input type="checkbox" class="h-4 w-4">
+                            <span>Teacher ID</span>
+                            <span id="profileTeacherId" class="font-semibold text-slate-700">—</span>
                         </div>
                     </div>
                 </div>
                 <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
                     <h2 class="text-lg font-bold text-slate-900">Security</h2>
                     <div class="mt-4 space-y-3 text-sm text-slate-500">
-                        <p>Update your password to keep your account secure.</p>
-                        <button class="w-full px-4 py-3 rounded-2xl bg-obsidian text-white text-sm font-semibold hover:bg-black transition">Change Password</button>
+                        <p>Your login uses the email assigned by admin. If your email changes, your login email should change too.</p>
+                        <div class="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold">Use the account password change flow from the login page when needed.</div>
                     </div>
                 </div>
             </section>
@@ -217,11 +225,27 @@
             const nameEl = document.getElementById('instructorNameNav');
             const profileName = document.getElementById('profileName');
             const profileEmail = document.getElementById('profileEmail');
+            const profileStatus = document.getElementById('profileStatus');
+            const profileSpecialization = document.getElementById('profileSpecialization');
+            const profileBranch = document.getElementById('profileBranch');
+            const profileEmploymentType = document.getElementById('profileEmploymentType');
+            const profileFirstName = document.getElementById('profileFirstName');
+            const profileLastName = document.getElementById('profileLastName');
+            const profileEmailInput = document.getElementById('profileEmailInput');
+            const profilePhone = document.getElementById('profilePhone');
+            const profileBranchInput = document.getElementById('profileBranchInput');
+            const profileEmploymentTypeInput = document.getElementById('profileEmploymentTypeInput');
+            const profileSpecializationInput = document.getElementById('profileSpecializationInput');
+            const profileStatusInline = document.getElementById('profileStatusInline');
+            const profileLoginEmail = document.getElementById('profileLoginEmail');
+            const profileTeacherId = document.getElementById('profileTeacherId');
 
             const fallbackName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || user.username || user.email || 'Instructor';
             if (nameEl) nameEl.textContent = fallbackName;
             if (profileName) profileName.textContent = fallbackName;
             if (profileEmail) profileEmail.textContent = user.email || 'instructor@fas.edu';
+            if (profileEmailInput) profileEmailInput.value = user.email || '';
+            if (profileLoginEmail) profileLoginEmail.textContent = user.email || '—';
 
             try {
                 const userId = Number(user.user_id || 0);
@@ -232,9 +256,32 @@
                 if (!teacher) return;
 
                 const liveName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || fallbackName;
+                const statusText = teacher.status || '—';
+                const specializationText = teacher.specialization || 'General';
+                const branchText = teacher.branch_name || '—';
+                const employmentTypeText = teacher.employment_type || '—';
+                const teacherEmail = teacher.email || user.email || '';
+
                 if (nameEl) nameEl.textContent = liveName;
                 if (profileName) profileName.textContent = liveName;
-                if (profileEmail) profileEmail.textContent = teacher.email || user.email || 'instructor@fas.edu';
+                if (profileEmail) profileEmail.textContent = teacherEmail || 'instructor@fas.edu';
+                if (profileStatus) {
+                    profileStatus.textContent = statusText;
+                    profileStatus.className = `mt-4 px-3 py-1 rounded-full text-xs font-semibold ${statusText === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`;
+                }
+                if (profileSpecialization) profileSpecialization.textContent = `Primary: ${specializationText}`;
+                if (profileBranch) profileBranch.textContent = branchText;
+                if (profileEmploymentType) profileEmploymentType.textContent = employmentTypeText;
+                if (profileFirstName) profileFirstName.value = teacher.first_name || '';
+                if (profileLastName) profileLastName.value = teacher.last_name || '';
+                if (profileEmailInput) profileEmailInput.value = teacherEmail;
+                if (profilePhone) profilePhone.value = teacher.phone || '';
+                if (profileBranchInput) profileBranchInput.value = branchText;
+                if (profileEmploymentTypeInput) profileEmploymentTypeInput.value = employmentTypeText;
+                if (profileSpecializationInput) profileSpecializationInput.value = specializationText;
+                if (profileStatusInline) profileStatusInline.textContent = statusText;
+                if (profileLoginEmail) profileLoginEmail.textContent = teacherEmail || '—';
+                if (profileTeacherId) profileTeacherId.textContent = String(teacher.teacher_id || '—');
             } catch (error) {
                 console.error('Failed to load live teacher profile:', error);
             }
