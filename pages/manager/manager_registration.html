@@ -76,12 +76,13 @@
                     <a id="navDashboardLink" href="manager_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-chart-line mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
                     </a>
+                        <a href="manager_teachers.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-chalkboard-teacher mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branch Teachers
+                    </a>
                     <a href="manager_registration.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
                         <i class="fas fa-id-card mr-3"></i> Registrations
                     </a>
-                    <a href="manager_teachers.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-chalkboard-teacher mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branch Teachers
-                    </a>
+
                     <details class="group/dropdown">
                         <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
@@ -412,10 +413,82 @@
         </div>
     </div>
 
+    <div id="scheduleModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-6xl p-6 relative max-h-[92vh] overflow-hidden">
+            <button id="closeScheduleModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <h3 class="text-2xl font-bold text-slate-900">Session Schedule</h3>
+            <p id="scheduleModalMeta" class="text-slate-500 text-sm mt-1">Loading schedule...</p>
+
+            <div class="mt-5 grid grid-cols-1 xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)] gap-6 items-start">
+                <div class="space-y-4 xl:sticky xl:top-0">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <div class="text-sm font-semibold text-slate-800">Session Summary</div>
+                                <div id="nextSessionHint" class="text-xs text-slate-500 mt-1">Review past sessions and add the next schedule for this student.</div>
+                            </div>
+                            <button type="button" id="toggleAddScheduleBtn" class="px-4 py-2 rounded-lg bg-gold-500 text-white hover:bg-gold-600 text-sm font-semibold transition">
+                                Schedule Session
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="addScheduleForm" class="hidden rounded-2xl border border-slate-200 bg-white p-4 space-y-4 shadow-sm">
+                        <input type="hidden" id="scheduleEnrollmentId" value="">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Session #</label>
+                                <input type="number" id="scheduleSessionNumber" min="1" readonly class="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Teacher</label>
+                                <input type="hidden" id="scheduleTeacher" value="">
+                                <input type="text" id="scheduleTeacherLabel" readonly class="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Date *</label>
+                                <input type="date" id="scheduleDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Room / Location</label>
+                                <select id="scheduleRoom" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                                    <option value="">Select room...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <input type="hidden" id="scheduleStart" value="09:00">
+                        <input type="hidden" id="scheduleEnd" value="10:00">
+                        <div class="text-xs text-slate-500">Date-only scheduling is active. The saved date controls QR attendance and session validity.</div>
+                        <div class="flex items-center justify-end gap-3">
+                            <button type="button" id="cancelAddScheduleBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition">
+                                Cancel
+                            </button>
+                            <button type="submit" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition">
+                                Save Session
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/40 p-4">
+                    <div class="text-sm font-semibold text-slate-800 mb-3">Schedule List</div>
+                    <div id="scheduleModalBody" class="space-y-2 max-h-[62vh] overflow-y-auto pr-1">
+                        <div class="text-slate-500 text-sm">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/index.js"></script>
     <script>
+        let registrationScheduleRows = [];
+        let registrationScheduleRoomsByBranch = {};
+
         function getManagerBranchId() {
             try {
                 const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
@@ -424,6 +497,255 @@
                 return 0;
             }
         }
+
+        function formatDateShort(dateString) {
+            if (!dateString) return '—';
+            const date = new Date(dateString);
+            if (Number.isNaN(date.getTime())) return String(dateString);
+            return date.toLocaleDateString();
+        }
+
+        function buildFixedScheduleText(student) {
+            const summary = String(student?.schedule_summary || '').trim();
+            if (summary) return summary;
+            const scheduleSlots = Array.isArray(student?.schedule_slots) ? student.schedule_slots : [];
+            if (scheduleSlots.length) {
+                return scheduleSlots.map(slot => {
+                    const day = String(slot.day_of_week || '').trim();
+                    const start = String(slot.start_time || '').trim();
+                    const end = String(slot.end_time || '').trim();
+                    return day && start && end ? `${day} • ${formatTime12Hour(start)} - ${formatTime12Hour(end)}` : '';
+                }).filter(Boolean).join(' | ');
+            }
+            const day = String(student?.fixed_day_of_week || '').trim();
+            const start = String(student?.fixed_start_time || '').trim();
+            const end = String(student?.fixed_end_time || '').trim();
+            if (day && start && end) return `${day} • ${formatTime12Hour(start)} - ${formatTime12Hour(end)}`;
+            if (student?.first_session_date) return formatDateShort(student.first_session_date);
+            return '—';
+        }
+
+        function getSessionStatusBadge(status) {
+            const normalized = String(status || '').toLowerCase();
+            if (normalized === 'completed') return '<span class="inline-flex items-center px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-semibold">Completed</span>';
+            if (normalized === 'cancelled') return '<span class="inline-flex items-center px-2 py-1 rounded-full bg-rose-100 text-rose-700 text-[11px] font-semibold">Cancelled</span>';
+            if (normalized === 'rescheduled') return '<span class="inline-flex items-center px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-[11px] font-semibold">Rescheduled</span>';
+            if (normalized === 'scheduled') return '<span class="inline-flex items-center px-2 py-1 rounded-full bg-sky-100 text-sky-700 text-[11px] font-semibold">Scheduled</span>';
+            return `<span class="inline-flex items-center px-2 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">${escapeHtml(status || 'Unknown')}</span>`;
+        }
+
+        async function fetchRegistrationScheduleRows(forceRefresh = false) {
+            if (!forceRefresh && registrationScheduleRows.length) return registrationScheduleRows;
+            const branchId = getManagerBranchId();
+            let url = `${baseApiUrl}/students.php?action=get-active-enrollments`;
+            if (branchId > 0) url += `&branch_id=${encodeURIComponent(branchId)}`;
+            const response = await axios.get(url);
+            const data = response.data || {};
+            registrationScheduleRows = data.success && Array.isArray(data.enrollments) ? data.enrollments : [];
+            return registrationScheduleRows;
+        }
+
+        async function fetchRegistrationRoomsForBranch(branchId) {
+            const key = Number(branchId || 0);
+            if (key > 0 && Array.isArray(registrationScheduleRoomsByBranch[key])) {
+                return registrationScheduleRoomsByBranch[key];
+            }
+            try {
+                let url = `${baseApiUrl}/students.php?action=get-available-rooms`;
+                if (key > 0) url += `&branch_id=${key}`;
+                const response = await axios.get(url);
+                const data = response.data || {};
+                const rooms = data.success && Array.isArray(data.rooms) ? data.rooms : [];
+                registrationScheduleRoomsByBranch[key] = rooms;
+                return rooms;
+            } catch (error) {
+                console.error('Failed to load rooms:', error);
+                return [];
+            }
+        }
+
+        async function populateRegistrationScheduleRoomDropdown(branchId, selectedRoomName = '') {
+            const roomSelect = document.getElementById('scheduleRoom');
+            if (!roomSelect) return;
+
+            const rooms = await fetchRegistrationRoomsForBranch(branchId);
+            if (!rooms.length) {
+                roomSelect.innerHTML = '<option value="">No available rooms in this branch</option>';
+                return;
+            }
+
+            roomSelect.innerHTML = '<option value="">Select room...</option>' + rooms.map(room => {
+                const roomName = String(room.room_name || '').trim();
+                const label = `${escapeHtml(roomName || 'Room')} (${escapeHtml(room.room_type || 'Room')}, cap ${Number(room.capacity || 1)})`;
+                const selectedAttr = selectedRoomName && roomName === selectedRoomName ? ' selected' : '';
+                return `<option value="${escapeHtml(roomName)}"${selectedAttr}>${label}</option>`;
+            }).join('');
+        }
+
+        async function openRegistrationScheduleModal(studentId) {
+            const rows = await fetchRegistrationScheduleRows();
+            const row = rows.find(item => Number(item.student_id) === Number(studentId));
+            if (!row) {
+                showMessage('No active enrollment found for this student yet.', 'error');
+                return;
+            }
+            openSessionScheduleModal(Number(row.enrollment_id));
+        }
+
+        function openSessionScheduleModal(enrollmentId) {
+            const modal = document.getElementById('scheduleModal');
+            const body = document.getElementById('scheduleModalBody');
+            const meta = document.getElementById('scheduleModalMeta');
+            const hint = document.getElementById('nextSessionHint');
+            const toggleBtn = document.getElementById('toggleAddScheduleBtn');
+            const form = document.getElementById('addScheduleForm');
+            const enrollmentInput = document.getElementById('scheduleEnrollmentId');
+            const sessionInput = document.getElementById('scheduleSessionNumber');
+            const teacherInput = document.getElementById('scheduleTeacher');
+            const teacherLabel = document.getElementById('scheduleTeacherLabel');
+            const roomSelect = document.getElementById('scheduleRoom');
+            if (!modal || !body || !meta) return;
+
+            const row = registrationScheduleRows.find(r => Number(r.enrollment_id) === Number(enrollmentId));
+            if (!row) {
+                showMessage('Enrollment not found.', 'error');
+                return;
+            }
+
+            const studentName = `${escapeHtml(row.first_name || '')} ${escapeHtml(row.last_name || '')}`.trim() || 'Student';
+            meta.textContent = `${studentName} • ${escapeHtml(row.package_name || 'Package')} • ${Number(row.sessions || 0)} sessions`;
+
+            const sessionsList = Array.isArray(row.sessions_list) ? row.sessions_list : [];
+            const sessionsTotal = Number(row.sessions || 0);
+            const rowsHtml = [];
+            let nextUnscheduled = 0;
+
+            if (sessionsTotal > 0) {
+                for (let i = 1; i <= sessionsTotal; i += 1) {
+                    const slotHistory = sessionsList.filter(s => Number(s.session_number) === i);
+                    if (!slotHistory.length && nextUnscheduled === 0) nextUnscheduled = i;
+                    const slotHtml = slotHistory.length
+                        ? slotHistory.map(slot => {
+                            const dateText = slot?.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
+                            const roomText = slot?.room_name ? ` • ${escapeHtml(slot.room_name)}` : '';
+                            const slotTeacherName = slot?.teacher_first_name || slot?.teacher_last_name
+                                ? `${escapeHtml(slot.teacher_first_name || '')} ${escapeHtml(slot.teacher_last_name || '')}`.trim()
+                                : '';
+                            const teacherText = slotTeacherName ? ` • ${slotTeacherName}` : '';
+                            const reasonText = slot?.cancellation_reason
+                                ? `<div class="text-[11px] text-slate-500 mt-1">Reason: ${escapeHtml(slot.cancellation_reason)}</div>`
+                                : '';
+                            return `
+                                <div class="rounded-lg border border-white/70 bg-white px-3 py-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        ${getSessionStatusBadge(slot.status)}
+                                        <div>${escapeHtml(dateText)}${roomText}${teacherText}</div>
+                                    </div>
+                                    ${reasonText}
+                                </div>
+                            `;
+                        }).join('')
+                        : '<div class="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-slate-400">Unscheduled</div>';
+                    rowsHtml.push(`
+                        <div class="rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-3 text-xs text-slate-600">
+                            <div class="font-semibold text-slate-700 mb-2">Session ${i}</div>
+                            <div class="space-y-2">${slotHtml}</div>
+                        </div>
+                    `);
+                }
+            } else {
+                rowsHtml.push('<div class="text-sm text-slate-500">No session count found for this package.</div>');
+            }
+
+            body.innerHTML = rowsHtml.join('');
+            if (form) form.classList.add('hidden');
+            if (enrollmentInput) enrollmentInput.value = String(enrollmentId);
+            if (sessionInput) sessionInput.value = String(nextUnscheduled || 1);
+            const dateInput = document.getElementById('scheduleDate');
+            const startInput = document.getElementById('scheduleStart');
+            const endInput = document.getElementById('scheduleEnd');
+            if (dateInput) dateInput.value = '';
+            if (startInput) startInput.value = '09:00';
+            if (endInput) endInput.value = '10:00';
+            if (hint) {
+                hint.textContent = nextUnscheduled
+                    ? `Session ${nextUnscheduled} is the next open slot for this enrollment.`
+                    : 'All session slots already have saved schedules. You can still review the history here.';
+            }
+            if (toggleBtn) {
+                toggleBtn.textContent = nextUnscheduled ? `Schedule Session ${nextUnscheduled}` : 'All Sessions Scheduled';
+                toggleBtn.disabled = !nextUnscheduled;
+                toggleBtn.classList.toggle('opacity-50', !nextUnscheduled);
+                toggleBtn.classList.toggle('cursor-not-allowed', !nextUnscheduled);
+            }
+
+            const assignedTeacherName = `${escapeHtml(row.teacher_first_name || '')} ${escapeHtml(row.teacher_last_name || '')}`.trim() || 'No fixed teacher assigned';
+            if (teacherInput) teacherInput.value = String(Number(row.assigned_teacher_id || 0));
+            if (teacherLabel) teacherLabel.value = assignedTeacherName;
+            if (roomSelect) roomSelect.innerHTML = '<option value="">Loading rooms...</option>';
+
+            populateRegistrationScheduleRoomDropdown(row.branch_id, row.assigned_room || '');
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeScheduleModal() {
+            const modal = document.getElementById('scheduleModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function toggleAddScheduleForm() {
+            const form = document.getElementById('addScheduleForm');
+            const toggleBtn = document.getElementById('toggleAddScheduleBtn');
+            if (!form || !toggleBtn || toggleBtn.disabled) return;
+            form.classList.toggle('hidden');
+        }
+
+        async function submitAddScheduleForm(e) {
+            e.preventDefault();
+            const enrollmentId = Number(document.getElementById('scheduleEnrollmentId')?.value || 0);
+            const sessionNumber = Number(document.getElementById('scheduleSessionNumber')?.value || 0);
+            const sessionDate = document.getElementById('scheduleDate')?.value || '';
+            const startTime = document.getElementById('scheduleStart')?.value || '';
+            const endTime = document.getElementById('scheduleEnd')?.value || '';
+            const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
+            const roomName = document.getElementById('scheduleRoom')?.value || '';
+
+            if (!enrollmentId || !sessionNumber || !sessionDate) {
+                showMessage('Please select a date before saving.', 'error');
+                return;
+            }
+
+            try {
+                const response = await axios.post(`${baseApiUrl}/students.php?action=schedule-session`, {
+                    enrollment_id: enrollmentId,
+                    session_number: sessionNumber,
+                    session_date: sessionDate,
+                    start_time: startTime,
+                    end_time: endTime,
+                    teacher_id: teacherId,
+                    room_name: roomName
+                });
+                const data = response.data || {};
+                if (data.success) {
+                    showMessage(data.message || 'Session scheduled.', 'success');
+                    await fetchRegistrationScheduleRows(true);
+                    openSessionScheduleModal(enrollmentId);
+                } else {
+                    showMessage(data.error || 'Failed to schedule session.', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.', 'error');
+            }
+        }
+
+        window.openRegistrationScheduleModal = openRegistrationScheduleModal;
+        window.openSessionScheduleModal = openSessionScheduleModal;
+        window.closeScheduleModal = closeScheduleModal;
 
         async function loadManagerPendingRegistrations() {
             const branchId = getManagerBranchId();
@@ -572,6 +894,14 @@
                 lockManagerBranch();
             }
 
+            document.getElementById('closeScheduleModalBtn')?.addEventListener('click', closeScheduleModal);
+            document.getElementById('toggleAddScheduleBtn')?.addEventListener('click', toggleAddScheduleForm);
+            document.getElementById('cancelAddScheduleBtn')?.addEventListener('click', toggleAddScheduleForm);
+            document.getElementById('addScheduleForm')?.addEventListener('submit', submitAddScheduleForm);
+            document.getElementById('scheduleModal')?.addEventListener('click', (event) => {
+                if (event.target?.id === 'scheduleModal') closeScheduleModal();
+            });
+
             const hash = (window.location.hash || '').replace('#', '').toLowerCase();
             setActiveMode(hash === 'active' ? 'active' : 'pending');
 
@@ -583,6 +913,3 @@
     </script>
 </body>
 </html>
-
-
-

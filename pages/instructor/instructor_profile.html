@@ -211,16 +211,32 @@
             icon.classList.toggle('fa-times', isHidden);
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            if (typeof Auth !== 'undefined' && Auth.getUser) {
-                const user = Auth.getUser() || {};
-                const displayName = user.username || user.email || 'Instructor';
-                const nameEl = document.getElementById('instructorNameNav');
-                const profileName = document.getElementById('profileName');
-                const profileEmail = document.getElementById('profileEmail');
-                if (nameEl) nameEl.textContent = displayName;
-                if (profileName) profileName.textContent = displayName;
-                if (profileEmail) profileEmail.textContent = user.email || 'instructor@fas.edu';
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!(typeof Auth !== 'undefined' && Auth.getUser)) return;
+            const user = Auth.getUser() || {};
+            const nameEl = document.getElementById('instructorNameNav');
+            const profileName = document.getElementById('profileName');
+            const profileEmail = document.getElementById('profileEmail');
+
+            const fallbackName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || user.username || user.email || 'Instructor';
+            if (nameEl) nameEl.textContent = fallbackName;
+            if (profileName) profileName.textContent = fallbackName;
+            if (profileEmail) profileEmail.textContent = user.email || 'instructor@fas.edu';
+
+            try {
+                const userId = Number(user.user_id || 0);
+                if (userId < 1) return;
+                const response = await axios.get(`${baseApiUrl}/teachers.php?action=get-teachers&user_id=${encodeURIComponent(userId)}`);
+                const teachers = response?.data?.success && Array.isArray(response.data.teachers) ? response.data.teachers : [];
+                const teacher = teachers[0] || null;
+                if (!teacher) return;
+
+                const liveName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || fallbackName;
+                if (nameEl) nameEl.textContent = liveName;
+                if (profileName) profileName.textContent = liveName;
+                if (profileEmail) profileEmail.textContent = teacher.email || user.email || 'instructor@fas.edu';
+            } catch (error) {
+                console.error('Failed to load live teacher profile:', error);
             }
         });
     </script>

@@ -28,6 +28,10 @@ class StudentsApi
     {
         $this->conn = $pdo;
         $this->ensureEnrollmentAssignedTeacherColumn();
+        $this->ensureEnrollmentFixedScheduleColumns();
+        $this->ensureEnrollmentScheduleSlotsTable();
+        $this->ensureSessionSchedulingColumns();
+        $this->ensureScheduleOperationLookupTable();
         $this->ensureSessionRescheduleWorkflow();
     }
 
@@ -488,6 +492,146 @@ class StudentsApi
         ]);
     }
 
+    private function ensureEnrollmentFixedScheduleColumns()
+    {
+        if (!$this->tableExists('tbl_enrollments')) {
+            return;
+        }
+
+        $columnSql = [
+            'fixed_day_of_week' => "ALTER TABLE tbl_enrollments ADD COLUMN fixed_day_of_week ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NULL AFTER assigned_teacher_id",
+            'fixed_start_time' => "ALTER TABLE tbl_enrollments ADD COLUMN fixed_start_time TIME NULL AFTER fixed_day_of_week",
+            'fixed_end_time' => "ALTER TABLE tbl_enrollments ADD COLUMN fixed_end_time TIME NULL AFTER fixed_start_time",
+            'fixed_room_id' => "ALTER TABLE tbl_enrollments ADD COLUMN fixed_room_id INT NULL AFTER fixed_end_time",
+            'schedule_status' => "ALTER TABLE tbl_enrollments ADD COLUMN schedule_status ENUM('Active','Frozen','Ended') NOT NULL DEFAULT 'Active' AFTER status",
+            'allowed_absences' => "ALTER TABLE tbl_enrollments ADD COLUMN allowed_absences INT NOT NULL DEFAULT 0 AFTER total_sessions",
+            'used_absences' => "ALTER TABLE tbl_enrollments ADD COLUMN used_absences INT NOT NULL DEFAULT 0 AFTER allowed_absences",
+            'consecutive_absences' => "ALTER TABLE tbl_enrollments ADD COLUMN consecutive_absences INT NOT NULL DEFAULT 0 AFTER used_absences",
+            'auto_generated_until' => "ALTER TABLE tbl_enrollments ADD COLUMN auto_generated_until DATE NULL AFTER consecutive_absences",
+            'fixed_schedule_locked' => "ALTER TABLE tbl_enrollments ADD COLUMN fixed_schedule_locked TINYINT(1) NOT NULL DEFAULT 1 AFTER auto_generated_until",
+            'current_operation_id' => "ALTER TABLE tbl_enrollments ADD COLUMN current_operation_id INT NULL AFTER fixed_schedule_locked"
+        ];
+
+        foreach ($columnSql as $column => $sql) {
+            try {
+                if (!$this->tableHasColumn('tbl_enrollments', $column)) {
+                    $this->conn->exec($sql);
+                }
+            } catch (PDOException $e) {
+                // Keep API working even if the migration cannot be applied.
+            }
+        }
+    }
+
+    private function ensureEnrollmentScheduleSlotsTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_enrollment_schedule_slots (
+                    slot_id INT AUTO_INCREMENT PRIMARY KEY,
+                    enrollment_id INT NOT NULL,
+                    teacher_id INT NOT NULL,
+                    day_of_week ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NOT NULL,
+                    start_time TIME NOT NULL,
+                    end_time TIME NOT NULL,
+                    room_id INT NULL,
+                    room_name VARCHAR(100) NULL,
+                    sort_order INT NOT NULL DEFAULT 1,
+                    status ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ");
+            try { $this->conn->exec("CREATE INDEX idx_enrollment_schedule_slots_enrollment ON tbl_enrollment_schedule_slots(enrollment_id, status, sort_order)"); } catch (PDOException $e) {}
+            try { $this->conn->exec("CREATE INDEX idx_enrollment_schedule_slots_teacher ON tbl_enrollment_schedule_slots(teacher_id, day_of_week, start_time, end_time)"); } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+            // Ignore migration failures to keep existing API behavior available.
+        }
+    }
+
+    private function ensureSessionSchedulingColumns()
+    {
+        if (!$this->tableExists('tbl_sessions')) {
+            return;
+        }
+
+        $columnSql = [
+            'operation_id' => "ALTER TABLE tbl_sessions ADD COLUMN operation_id INT NULL AFTER room_id",
+            'attendance_status' => "ALTER TABLE tbl_sessions ADD COLUMN attendance_status ENUM('Pending','Present','Absent','Late','Excused','CI','Teacher Absent') NOT NULL DEFAULT 'Pending' AFTER status",
+            'absence_notice' => "ALTER TABLE tbl_sessions ADD COLUMN absence_notice ENUM('None','Prior','NoNotice','Teacher') NOT NULL DEFAULT 'None' AFTER attendance_status",
+            'counted_in' => "ALTER TABLE tbl_sessions ADD COLUMN counted_in TINYINT(1) NOT NULL DEFAULT 0 AFTER absence_notice",
+            'makeup_eligible' => "ALTER TABLE tbl_sessions ADD COLUMN makeup_eligible TINYINT(1) NOT NULL DEFAULT 0 AFTER counted_in",
+            'makeup_required' => "ALTER TABLE tbl_sessions ADD COLUMN makeup_required TINYINT(1) NOT NULL DEFAULT 0 AFTER makeup_eligible"
+        ];
+
+        foreach ($columnSql as $column => $sql) {
+            try {
+                if (!$this->tableHasColumn('tbl_sessions', $column)) {
+                    $this->conn->exec($sql);
+                }
+            } catch (PDOException $e) {
+                // Ignore column migration issues in older environments.
+            }
+        }
+    }
+
+    private function ensureScheduleOperationLookupTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_schedule_operation_lookup (
+                    operation_id INT AUTO_INCREMENT PRIMARY KEY,
+                    operation_code VARCHAR(50) NOT NULL UNIQUE,
+                    operation_name VARCHAR(100) NOT NULL,
+                    applies_to ENUM('Enrollment','Session','Attendance','Request') NOT NULL,
+                    counts_as_absence TINYINT(1) NOT NULL DEFAULT 0,
+                    counts_as_consumed_session TINYINT(1) NOT NULL DEFAULT 0,
+                    allows_makeup TINYINT(1) NOT NULL DEFAULT 0,
+                    requires_admin_approval TINYINT(1) NOT NULL DEFAULT 0,
+                    freezes_schedule TINYINT(1) NOT NULL DEFAULT 0,
+                    requires_holding_fee TINYINT(1) NOT NULL DEFAULT 0,
+                    description VARCHAR(255) NULL,
+                    status ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ");
+
+            $rows = [
+                ['REGULAR_SESSION', 'Regular Fixed Session', 'Session', 0, 0, 0, 0, 0, 0, 'Normal weekly generated session'],
+                ['STUDENT_ABSENT_NOTICE', 'Student Absent With Notice', 'Attendance', 1, 0, 1, 0, 0, 0, 'Absent within allowed policy, makeup may be allowed'],
+                ['STUDENT_ABSENT_NO_NOTICE', 'Student Absent No Notice / CI', 'Attendance', 1, 1, 0, 0, 0, 0, 'Session is counted-in and consumed'],
+                ['TEACHER_ABSENT', 'Teacher Absent', 'Attendance', 0, 0, 1, 0, 0, 0, 'Does not count against student, makeup required'],
+                ['MAKEUP_SESSION', 'Makeup Session', 'Session', 0, 0, 0, 0, 0, 0, 'Extra scheduled replacement lesson'],
+                ['SCHEDULE_FREEZE', 'Schedule Freeze', 'Enrollment', 0, 0, 0, 0, 1, 1, 'Applied after consecutive absences']
+            ];
+
+            $stmt = $this->conn->prepare("
+                INSERT INTO tbl_schedule_operation_lookup (
+                    operation_code, operation_name, applies_to, counts_as_absence,
+                    counts_as_consumed_session, allows_makeup, requires_admin_approval,
+                    freezes_schedule, requires_holding_fee, description, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+                ON DUPLICATE KEY UPDATE
+                    operation_name = VALUES(operation_name),
+                    applies_to = VALUES(applies_to),
+                    counts_as_absence = VALUES(counts_as_absence),
+                    counts_as_consumed_session = VALUES(counts_as_consumed_session),
+                    allows_makeup = VALUES(allows_makeup),
+                    requires_admin_approval = VALUES(requires_admin_approval),
+                    freezes_schedule = VALUES(freezes_schedule),
+                    requires_holding_fee = VALUES(requires_holding_fee),
+                    description = VALUES(description),
+                    status = 'Active'
+            ");
+            foreach ($rows as $row) {
+                $stmt->execute($row);
+            }
+        } catch (PDOException $e) {
+            // Do not break the API when the lookup migration fails.
+        }
+    }
+
     private function buildTeacherCandidates($branchId, $instrumentIds = [], $instrumentKeywords = [])
     {
         $candidates = [];
@@ -606,6 +750,475 @@ class StudentsApi
         } catch (PDOException $e) {
             return null;
         }
+    }
+
+    private function getAllowedAbsencesForSessionCount($sessionCount)
+    {
+        $sessionCount = max(0, (int)$sessionCount);
+        if ($sessionCount <= 0) {
+            return 0;
+        }
+
+        if ($this->tableExists('tbl_schedule_policy_lookup')) {
+            try {
+                $stmt = $this->conn->prepare("
+                    SELECT allowed_absences
+                    FROM tbl_schedule_policy_lookup
+                    WHERE package_sessions = ?
+                      AND status = 'Active'
+                    LIMIT 1
+                ");
+                $stmt->execute([$sessionCount]);
+                $value = $stmt->fetchColumn();
+                if ($value !== false) {
+                    return max(0, (int)$value);
+                }
+            } catch (PDOException $e) {
+                // Fall through to defaults.
+            }
+        }
+
+        if ($sessionCount === 12) return 2;
+        if ($sessionCount === 20) return 3;
+        if ($sessionCount > 20) return 3;
+        return 0;
+    }
+
+    private function getScheduleOperationIdByCode($operationCode)
+    {
+        $operationCode = trim((string)$operationCode);
+        if ($operationCode === '' || !$this->tableExists('tbl_schedule_operation_lookup')) {
+            return null;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT operation_id
+                FROM tbl_schedule_operation_lookup
+                WHERE operation_code = ?
+                  AND status = 'Active'
+                LIMIT 1
+            ");
+            $stmt->execute([$operationCode]);
+            $value = $stmt->fetchColumn();
+            return $value !== false ? (int)$value : null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+
+    private function buildFixedScheduleLabel($dayOfWeek, $startTime, $endTime)
+    {
+        $parts = [];
+        $day = trim((string)$dayOfWeek);
+        if ($day !== '') {
+            $parts[] = $day;
+        }
+        $start = trim((string)$startTime);
+        $end = trim((string)$endTime);
+        if ($start !== '' && $end !== '') {
+            $parts[] = $start . '-' . $end;
+        }
+        return implode(' ', $parts);
+    }
+
+    private function getEnrollmentScheduleSlots($enrollmentId)
+    {
+        $enrollmentId = (int)$enrollmentId;
+        if ($enrollmentId < 1 || !$this->tableExists('tbl_enrollment_schedule_slots')) {
+            return [];
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    slot_id,
+                    enrollment_id,
+                    teacher_id,
+                    day_of_week,
+                    start_time,
+                    end_time,
+                    room_id,
+                    room_name,
+                    sort_order,
+                    status
+                FROM tbl_enrollment_schedule_slots
+                WHERE enrollment_id = ?
+                  AND status = 'Active'
+                ORDER BY sort_order ASC, FIELD(day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'), start_time ASC, slot_id ASC
+            ");
+            $stmt->execute([$enrollmentId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            return [];
+        }
+    }
+
+    private function formatScheduleSlotsSummary($slots)
+    {
+        $parts = [];
+        foreach ((array)$slots as $slot) {
+            $text = $this->buildFixedScheduleLabel($slot['day_of_week'] ?? '', $slot['start_time'] ?? '', $slot['end_time'] ?? '');
+            if ($text !== '') {
+                $parts[] = $text;
+            }
+        }
+        return implode(' | ', $parts);
+    }
+
+    private function normalizeAssignedScheduleSlots($slotsInput, $teacherId, $branchId, $fallbackRoomName = '')
+    {
+        $validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        $teacherId = (int)$teacherId;
+        $branchId = (int)$branchId;
+        $fallbackRoomName = trim((string)$fallbackRoomName);
+        $rows = [];
+
+        foreach ((array)$slotsInput as $index => $slot) {
+            if (!is_array($slot)) {
+                continue;
+            }
+            $day = trim((string)($slot['day_of_week'] ?? ''));
+            $start = trim((string)($slot['start_time'] ?? ''));
+            $end = trim((string)($slot['end_time'] ?? ''));
+            $roomName = trim((string)($slot['room_name'] ?? $fallbackRoomName));
+            if ($day === '' || $start === '' || $end === '') {
+                continue;
+            }
+            if (!in_array($day, $validDays, true)) {
+                throw new InvalidArgumentException("Invalid day selected: {$day}");
+            }
+            if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $start) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $end)) {
+                throw new InvalidArgumentException("Invalid time format for {$day}");
+            }
+            $start = strlen($start) === 5 ? $start . ':00' : $start;
+            $end = strlen($end) === 5 ? $end . ':00' : $end;
+            if (strtotime($end) <= strtotime($start)) {
+                throw new InvalidArgumentException("End time must be later than start time for {$day}");
+            }
+            if ((strtotime($end) - strtotime($start)) !== 3600) {
+                throw new InvalidArgumentException("Each weekly slot must be exactly 1 hour for {$day}");
+            }
+
+            $slotKey = $day . '|' . $start . '|' . $end;
+            if (isset($rows[$slotKey])) {
+                continue;
+            }
+
+            $roomId = null;
+            if ($roomName !== '') {
+                $roomId = $this->resolveRoomIdByName($branchId, $roomName);
+                if ($roomId === null) {
+                    throw new InvalidArgumentException("Selected room {$roomName} is not available in this branch");
+                }
+            }
+
+            if (!$this->teacherHasAvailabilityForSlot($teacherId, $this->nextDateForDayOfWeek(date('Y-m-d'), $day), $start, $end)) {
+                throw new InvalidArgumentException("Teacher is not available for {$day} {$start}-{$end}");
+            }
+
+            $rows[$slotKey] = [
+                'teacher_id' => $teacherId,
+                'day_of_week' => $day,
+                'start_time' => $start,
+                'end_time' => $end,
+                'room_id' => $roomId,
+                'room_name' => $roomName !== '' ? $roomName : null,
+                'sort_order' => count($rows) + 1
+            ];
+        }
+
+        return array_values($rows);
+    }
+
+    private function saveEnrollmentScheduleSlots($enrollmentId, $slots)
+    {
+        $enrollmentId = (int)$enrollmentId;
+        if ($enrollmentId < 1 || !$this->tableExists('tbl_enrollment_schedule_slots')) {
+            return;
+        }
+
+        $stmtDelete = $this->conn->prepare("DELETE FROM tbl_enrollment_schedule_slots WHERE enrollment_id = ?");
+        $stmtDelete->execute([$enrollmentId]);
+
+        if (empty($slots)) {
+            return;
+        }
+
+        $stmtInsert = $this->conn->prepare("
+            INSERT INTO tbl_enrollment_schedule_slots (
+                enrollment_id, teacher_id, day_of_week, start_time, end_time, room_id, room_name, sort_order, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+        ");
+
+        foreach ($slots as $slot) {
+            $stmtInsert->execute([
+                $enrollmentId,
+                (int)($slot['teacher_id'] ?? 0),
+                $slot['day_of_week'] ?? '',
+                $slot['start_time'] ?? '',
+                $slot['end_time'] ?? '',
+                $slot['room_id'] ?? null,
+                $slot['room_name'] ?? null,
+                (int)($slot['sort_order'] ?? 1)
+            ]);
+        }
+    }
+
+    private function nextDateForDayOfWeek($startDate, $dayOfWeek)
+    {
+        $dayOfWeek = trim((string)$dayOfWeek);
+        if ($dayOfWeek === '') {
+            return null;
+        }
+
+        try {
+            $date = new DateTimeImmutable((string)$startDate ?: 'today');
+        } catch (Exception $e) {
+            return null;
+        }
+
+        for ($i = 0; $i < 7; $i++) {
+            $candidate = $date->modify('+' . $i . ' day');
+            if ($candidate && $candidate->format('l') === $dayOfWeek) {
+                return $candidate->format('Y-m-d');
+            }
+        }
+
+        return null;
+    }
+
+    private function generateFixedScheduleSessions($enrollmentId)
+    {
+        $enrollmentId = (int)$enrollmentId;
+        if ($enrollmentId < 1 || !$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_enrollments')) {
+            return ['created' => 0, 'updated' => 0];
+        }
+
+        $stmt = $this->conn->prepare("
+            SELECT
+                e.enrollment_id,
+                e.student_id,
+                e.instrument_id,
+                e.assigned_teacher_id,
+                e.start_date,
+                e.total_sessions,
+                e.fixed_day_of_week,
+                e.fixed_start_time,
+                e.fixed_end_time,
+                e.fixed_room_id,
+                e.schedule_status,
+                s.branch_id
+            FROM tbl_enrollments e
+            INNER JOIN tbl_students s ON s.student_id = e.student_id
+            WHERE e.enrollment_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$enrollmentId]);
+        $enrollment = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$enrollment) {
+            return ['created' => 0, 'updated' => 0];
+        }
+
+        $teacherId = (int)($enrollment['assigned_teacher_id'] ?? 0);
+        $studentId = (int)($enrollment['student_id'] ?? 0);
+        $instrumentId = (int)($enrollment['instrument_id'] ?? 0);
+        $totalSessions = max(0, (int)($enrollment['total_sessions'] ?? 0));
+        $branchId = (int)($enrollment['branch_id'] ?? 0);
+        $scheduleStatus = trim((string)($enrollment['schedule_status'] ?? 'Active'));
+        $startDate = trim((string)($enrollment['start_date'] ?? ''));
+        if ($teacherId < 1 || $studentId < 1 || $totalSessions < 1 || $scheduleStatus === 'Frozen') {
+            return ['created' => 0, 'updated' => 0];
+        }
+
+        if ($instrumentId < 1 && $this->tableExists('tbl_student_instruments')) {
+            $stmtInst = $this->conn->prepare("
+                SELECT instrument_id
+                FROM tbl_student_instruments
+                WHERE student_id = ?
+                ORDER BY priority_order ASC, student_instrument_id ASC
+                LIMIT 1
+            ");
+            $stmtInst->execute([$studentId]);
+            $instrumentId = (int)($stmtInst->fetchColumn() ?: 0);
+        }
+
+        $slots = $this->getEnrollmentScheduleSlots($enrollmentId);
+        if (empty($slots)) {
+            $legacyDay = trim((string)($enrollment['fixed_day_of_week'] ?? ''));
+            $legacyStart = trim((string)($enrollment['fixed_start_time'] ?? ''));
+            $legacyEnd = trim((string)($enrollment['fixed_end_time'] ?? ''));
+            $legacyRoomId = !empty($enrollment['fixed_room_id']) ? (int)$enrollment['fixed_room_id'] : null;
+            if ($legacyDay !== '' && $legacyStart !== '' && $legacyEnd !== '') {
+                $legacyRoomName = null;
+                if ($legacyRoomId !== null && $legacyRoomId > 0 && $this->tableExists('tbl_rooms')) {
+                    try {
+                        $stmtRoom = $this->conn->prepare("SELECT room_name FROM tbl_rooms WHERE room_id = ? LIMIT 1");
+                        $stmtRoom->execute([$legacyRoomId]);
+                        $legacyRoomName = $stmtRoom->fetchColumn() ?: null;
+                    } catch (PDOException $e) {
+                        $legacyRoomName = null;
+                    }
+                }
+                $slots = [[
+                    'teacher_id' => $teacherId,
+                    'day_of_week' => $legacyDay,
+                    'start_time' => $legacyStart,
+                    'end_time' => $legacyEnd,
+                    'room_id' => $legacyRoomId,
+                    'room_name' => $legacyRoomName,
+                    'sort_order' => 1
+                ]];
+            }
+        }
+
+        if (empty($slots)) {
+            return ['created' => 0, 'updated' => 0];
+        }
+
+        $operationId = $this->getScheduleOperationIdByCode('REGULAR_SESSION');
+        $startBase = $startDate !== '' ? $startDate : date('Y-m-d');
+        $slotQueue = [];
+        foreach ($slots as $slot) {
+            $firstDate = $this->nextDateForDayOfWeek($startBase, $slot['day_of_week'] ?? '');
+            if ($firstDate === null) {
+                continue;
+            }
+            $slot['next_date'] = $firstDate;
+            $slotQueue[] = $slot;
+        }
+        if (empty($slotQueue)) {
+            return ['created' => 0, 'updated' => 0];
+        }
+
+        $stmtExisting = $this->conn->prepare("
+            SELECT session_id
+            FROM tbl_sessions
+            WHERE enrollment_id = ?
+              AND session_number = ?
+              AND status <> 'cancelled_by_teacher'
+            ORDER BY session_id DESC
+            LIMIT 1
+        ");
+
+        $stmtUpdate = $this->conn->prepare("
+            UPDATE tbl_sessions
+            SET teacher_id = ?,
+                session_date = ?,
+                start_time = ?,
+                end_time = ?,
+                session_type = 'Regular',
+                instrument_id = ?,
+                room_id = ?,
+                status = 'Scheduled',
+                notes = ?,
+                operation_id = COALESCE(?, operation_id)
+            WHERE session_id = ?
+        ");
+
+        $stmtInsert = $this->conn->prepare("
+            INSERT INTO tbl_sessions (
+                enrollment_id,
+                teacher_id,
+                session_number,
+                session_date,
+                start_time,
+                end_time,
+                session_type,
+                instrument_id,
+                room_id,
+                status,
+                notes,
+                operation_id
+            ) VALUES (?, ?, ?, ?, ?, ?, 'Regular', ?, ?, 'Scheduled', ?, ?)
+        ");
+
+        $created = 0;
+        $updated = 0;
+        $sessionNumber = 1;
+        $safety = 0;
+        $lastGeneratedDate = null;
+        while ($sessionNumber <= $totalSessions && $safety < ($totalSessions * 50)) {
+            usort($slotQueue, function ($a, $b) {
+                $cmpDate = strcmp((string)($a['next_date'] ?? ''), (string)($b['next_date'] ?? ''));
+                if ($cmpDate !== 0) return $cmpDate;
+                $cmpTime = strcmp((string)($a['start_time'] ?? ''), (string)($b['start_time'] ?? ''));
+                if ($cmpTime !== 0) return $cmpTime;
+                return ((int)($a['sort_order'] ?? 0)) <=> ((int)($b['sort_order'] ?? 0));
+            });
+            $slot = $slotQueue[0];
+            $sessionDate = (string)($slot['next_date'] ?? '');
+            $startTime = (string)($slot['start_time'] ?? '');
+            $endTime = (string)($slot['end_time'] ?? '');
+            $roomId = isset($slot['room_id']) && $slot['room_id'] !== null ? (int)$slot['room_id'] : null;
+            $roomName = $slot['room_name'] ?? null;
+            if ($sessionDate === '' || $startTime === '' || $endTime === '') {
+                break;
+            }
+
+            $stmtExisting->execute([$enrollmentId, $sessionNumber]);
+            $existingSessionId = (int)($stmtExisting->fetchColumn() ?: 0);
+
+            $excludeIds = $existingSessionId > 0 ? [$existingSessionId] : [];
+            $isValid = $this->teacherHasAvailabilityForSlot($teacherId, $sessionDate, $startTime, $endTime)
+                && !$this->hasTeacherScheduleConflict($teacherId, $sessionDate, $startTime, $endTime, $excludeIds)
+                && !$this->hasStudentScheduleConflict($studentId, $sessionDate, $startTime, $endTime, $excludeIds)
+                && !($roomId !== null && $roomId > 0 && $this->hasRoomScheduleConflict($roomId, $sessionDate, $startTime, $endTime, $excludeIds));
+
+            if ($isValid) {
+                if ($existingSessionId > 0) {
+                    $stmtUpdate->execute([
+                        $teacherId,
+                        $sessionDate,
+                        $startTime,
+                        $endTime,
+                        $instrumentId > 0 ? $instrumentId : null,
+                        $roomId,
+                        $roomName,
+                        $operationId,
+                        $existingSessionId
+                    ]);
+                    $updated++;
+                } else {
+                    $stmtInsert->execute([
+                        $enrollmentId,
+                        $teacherId,
+                        $sessionNumber,
+                        $sessionDate,
+                        $startTime,
+                        $endTime,
+                        $instrumentId > 0 ? $instrumentId : null,
+                        $roomId,
+                        $roomName,
+                        $operationId
+                    ]);
+                    $created++;
+                }
+                $sessionNumber++;
+                $lastGeneratedDate = $sessionDate;
+            }
+
+            $slotQueue[0]['next_date'] = date('Y-m-d', strtotime($sessionDate . ' +7 days'));
+            $safety++;
+        }
+
+        try {
+            if ($this->tableHasColumn('tbl_enrollments', 'auto_generated_until')) {
+                if ($lastGeneratedDate === null) {
+                    $lastGeneratedDate = $startBase;
+                }
+                $stmtGenerated = $this->conn->prepare("
+                    UPDATE tbl_enrollments
+                    SET auto_generated_until = ?
+                    WHERE enrollment_id = ?
+                ");
+                $stmtGenerated->execute([$lastGeneratedDate, $enrollmentId]);
+            }
+        } catch (PDOException $e) {
+            // Ignore post-generation metadata update failures.
+        }
+
+        return ['created' => $created, 'updated' => $updated];
     }
 
     private function normalizeExcludedIds($excludeSessionIds)
@@ -2505,6 +3118,14 @@ class StudentsApi
                     COALESCE(pay.payment_type, '—') AS payment_type,
                     e.status,
                     e.assigned_teacher_id,
+                    e.fixed_day_of_week,
+                    e.fixed_start_time,
+                    e.fixed_end_time,
+                    e.fixed_room_id,
+                    e.schedule_status,
+                    e.allowed_absences,
+                    e.used_absences,
+                    e.consecutive_absences,
                     e.start_date,
                     e.end_date,
                     e.created_at,
@@ -2545,7 +3166,7 @@ class StudentsApi
                 ) pay ON pay.enrollment_id = e.enrollment_id
                 LEFT JOIN tbl_teachers t ON t.teacher_id = fs.teacher_id
                 LEFT JOIN tbl_teachers at ON at.teacher_id = e.assigned_teacher_id
-                LEFT JOIN tbl_rooms rm ON rm.room_id = fs.room_id
+                LEFT JOIN tbl_rooms rm ON rm.room_id = COALESCE(e.fixed_room_id, fs.room_id)
                 WHERE e.status = 'Active'
             ";
             $params = [];
@@ -2606,6 +3227,16 @@ class StudentsApi
                     }
                     unset($row);
                 }
+            }
+
+            if (!empty($rows) && $this->tableExists('tbl_enrollment_schedule_slots')) {
+                foreach ($rows as &$row) {
+                    $eid = (int)($row['enrollment_id'] ?? 0);
+                    $slots = $this->getEnrollmentScheduleSlots($eid);
+                    $row['schedule_slots'] = $slots;
+                    $row['schedule_summary'] = $this->formatScheduleSlotsSummary($slots);
+                }
+                unset($row);
             }
 
             $this->sendJSON(['success' => true, 'enrollments' => $rows]);
@@ -3083,6 +3714,39 @@ class StudentsApi
             if ((string)($enrollment['status'] ?? '') !== 'Active') {
                 $this->sendJSON(['error' => 'Enrollment is not active'], 400);
             }
+            $hasMultiSlots = !empty($this->getEnrollmentScheduleSlots($enrollmentId));
+            if (
+                ($hasMultiSlots || (
+                    $this->tableHasColumn('tbl_enrollments', 'fixed_day_of_week') &&
+                    $this->tableHasColumn('tbl_enrollments', 'fixed_start_time') &&
+                    $this->tableHasColumn('tbl_enrollments', 'fixed_end_time')
+                )) &&
+                !empty($enrollment['assigned_teacher_id'])
+            ) {
+                $stmtFixed = $this->conn->prepare("
+                    SELECT fixed_day_of_week, fixed_start_time, fixed_end_time, fixed_schedule_locked
+                    FROM tbl_enrollments
+                    WHERE enrollment_id = ?
+                    LIMIT 1
+                ");
+                $stmtFixed->execute([$enrollmentId]);
+                $fixed = $stmtFixed->fetch(PDO::FETCH_ASSOC) ?: [];
+                if (
+                    ($hasMultiSlots || (
+                        !empty($fixed['fixed_day_of_week']) &&
+                        !empty($fixed['fixed_start_time']) &&
+                        !empty($fixed['fixed_end_time'])
+                    )) &&
+                    (int)($fixed['fixed_schedule_locked'] ?? 1) === 1
+                ) {
+                    $result = $this->generateFixedScheduleSessions($enrollmentId);
+                    $this->sendJSON([
+                        'success' => true,
+                        'message' => 'Fixed weekly schedule is active. Sessions were refreshed automatically.',
+                        'auto_generated' => $result
+                    ]);
+                }
+            }
             $totalSessions = (int)($enrollment['total_sessions'] ?? 0);
             if ($totalSessions > 0 && $sessionNumber > $totalSessions) {
                 $this->sendJSON(['error' => 'Session number exceeds package total sessions'], 400);
@@ -3234,10 +3898,8 @@ class StudentsApi
         $teacherId = (int) ($data['teacher_id'] ?? 0);
         $deskBranchId = (int) ($data['branch_id'] ?? $data['desk_branch_id'] ?? 0);
         $assignedDate = trim($data['assigned_date'] ?? '');
-        $assignedDay = trim($data['assigned_day_of_week'] ?? '');
-        $assignedStart = trim($data['assigned_start_time'] ?? '');
-        $assignedEnd = trim($data['assigned_end_time'] ?? '');
         $assignedRoom = trim($data['assigned_room'] ?? '');
+        $assignedSlotsInput = is_array($data['assigned_slots'] ?? null) ? $data['assigned_slots'] : [];
         $adminNotes = trim($data['admin_notes'] ?? '');
         if ($requestId < 1) {
             $this->sendJSON(['error' => 'request_id is required'], 400);
@@ -3245,29 +3907,12 @@ class StudentsApi
         if ($teacherId < 1) {
             $this->sendJSON(['error' => 'teacher_id is required'], 400);
         }
-        if ($assignedDate === '' || $assignedStart === '' || $assignedEnd === '') {
-            $this->sendJSON(['error' => 'assigned_date, assigned_start_time, and assigned_end_time are required'], 400);
+        if ($assignedDate === '') {
+            $this->sendJSON(['error' => 'assigned_date is required'], 400);
         }
         $computedAssignedDay = $this->dayOfWeekFromDate($assignedDate);
         if ($computedAssignedDay === '') {
             $this->sendJSON(['error' => 'Invalid assigned_date'], 400);
-        }
-        $assignedDay = $computedAssignedDay;
-        $validDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-        if (!in_array($assignedDay, $validDays, true)) {
-            $this->sendJSON(['error' => 'Invalid assigned_day_of_week'], 400);
-        }
-        if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $assignedStart) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $assignedEnd)) {
-            $this->sendJSON(['error' => 'Invalid assigned time format'], 400);
-        }
-        $startTs = strtotime($assignedStart);
-        $endTs = strtotime($assignedEnd);
-        if ($startTs === false || $endTs === false || $endTs <= $startTs) {
-            $this->sendJSON(['error' => 'Assigned end time must be later than start time'], 400);
-        }
-        // Business rule: 1 hour per session
-        if (($endTs - $startTs) !== 3600) {
-            $this->sendJSON(['error' => 'Assigned schedule must be exactly 1 hour per session'], 400);
         }
 
         $this->ensureSessionPackageColumn();
@@ -3312,22 +3957,29 @@ class StudentsApi
                 $this->sendJSON(['error' => 'Request does not belong to your branch'], 403);
             }
 
-            $resolvedRoomId = null;
-            if ($assignedRoom !== '') {
-                $resolvedRoomId = $this->resolveRoomIdByName((int)$req['branch_id'], $assignedRoom);
-                if ($resolvedRoomId === null) {
-                    $this->conn->rollBack();
-                    $this->sendJSON(['error' => 'Selected room is not available in this branch'], 400);
+            if (empty($assignedSlotsInput)) {
+                $legacyStart = trim((string)($data['assigned_start_time'] ?? ''));
+                $legacyEnd = trim((string)($data['assigned_end_time'] ?? ''));
+                if ($legacyStart !== '' && $legacyEnd !== '') {
+                    $assignedSlotsInput = [[
+                        'day_of_week' => $computedAssignedDay,
+                        'start_time' => $legacyStart,
+                        'end_time' => $legacyEnd,
+                        'room_name' => $assignedRoom
+                    ]];
                 }
             }
 
-            if ($this->hasTeacherScheduleConflict($teacherId, $assignedDate, $assignedStart, $assignedEnd)) {
+            try {
+                $normalizedAssignedSlots = $this->normalizeAssignedScheduleSlots($assignedSlotsInput, $teacherId, (int)$req['branch_id'], $assignedRoom);
+            } catch (InvalidArgumentException $e) {
                 $this->conn->rollBack();
-                $this->sendJSON(['error' => 'Selected teacher is not available at this time'], 400);
+                $this->sendJSON(['error' => $e->getMessage()], 400);
             }
-            if ($resolvedRoomId !== null && $this->hasRoomScheduleConflict($resolvedRoomId, $assignedDate, $assignedStart, $assignedEnd)) {
+
+            if (empty($normalizedAssignedSlots)) {
                 $this->conn->rollBack();
-                $this->sendJSON(['error' => 'Selected room is not available at this time'], 400);
+                $this->sendJSON(['error' => 'Add at least one weekly schedule slot before approval'], 400);
             }
 
             $instrumentIds = [];
@@ -3420,7 +4072,9 @@ class StudentsApi
 
             $endDate = $assignedDate;
             if ($packageSessions > 0) {
-                $endDate = date('Y-m-d', strtotime($assignedDate . ' +' . max(0, ($packageSessions - 1) * 7) . ' days'));
+                $slotsPerWeek = max(1, count($normalizedAssignedSlots));
+                $weeksNeeded = (int)ceil(max(0, $packageSessions - 1) / $slotsPerWeek);
+                $endDate = date('Y-m-d', strtotime($assignedDate . ' +' . max(0, $weeksNeeded * 7) . ' days'));
             }
 
             $requestMeta = [];
@@ -3460,14 +4114,23 @@ class StudentsApi
             $requestMeta['payment_proof_path'] = $paymentProofPath;
             $enrollmentHasPaymentType = $this->tableHasColumn('tbl_enrollments', 'payment_type');
             $paymentTypeSql = $enrollmentHasPaymentType ? "payment_type = ?," : "";
+            $allowedAbsences = $this->getAllowedAbsencesForSessionCount((int)$packageSessions);
+            $firstSlot = $normalizedAssignedSlots[0];
+            $fixedScheduleLabel = $this->formatScheduleSlotsSummary($normalizedAssignedSlots);
+            $fixedRoomId = $firstSlot['room_id'] ?? null;
             $updateParams = [
                 $primaryInstrumentId,
                 (int)$teacherId,
-                trim($assignedDay . ' ' . $assignedStart . '-' . $assignedEnd),
+                ($fixedScheduleLabel !== '' ? $fixedScheduleLabel : null),
                 json_encode($requestMeta),
                 $assignedDate,
                 $endDate,
                 max(1, (int)$packageSessions),
+                $firstSlot['day_of_week'],
+                $firstSlot['start_time'],
+                $firstSlot['end_time'],
+                $fixedRoomId,
+                $allowedAbsences,
             ];
             if ($enrollmentHasPaymentType) {
                 $updateParams[] = $paymentType;
@@ -3482,6 +4145,15 @@ class StudentsApi
                     start_date = ?,
                     end_date = ?,
                     total_sessions = ?,
+                    fixed_day_of_week = ?,
+                    fixed_start_time = ?,
+                    fixed_end_time = ?,
+                    fixed_room_id = ?,
+                    allowed_absences = ?,
+                    used_absences = 0,
+                    consecutive_absences = 0,
+                    schedule_status = 'Active',
+                    fixed_schedule_locked = 1,
                     completed_sessions = 0,
                     {$paymentTypeSql}
                     status = 'Active'
@@ -3556,17 +4228,8 @@ class StudentsApi
                 ]);
             }
 
-            // Keep the assigned first schedule visible to students after approval.
-            $this->upsertFirstSessionSchedule(
-                $newEnrollmentId,
-                (int)$teacherId,
-                (int)$primaryInstrumentId,
-                $assignedDate,
-                $assignedStart,
-                $assignedEnd,
-                $assignedRoom,
-                (int)$req['branch_id']
-            );
+            $this->saveEnrollmentScheduleSlots($newEnrollmentId, $normalizedAssignedSlots);
+            $this->generateFixedScheduleSessions($newEnrollmentId);
 
             $this->conn->commit();
 

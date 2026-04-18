@@ -128,6 +128,37 @@
             </div>
         </div>
 
+        <!-- Pending Sessions Table -->
+        <div id="pendingSessionsSection" class="hidden mb-6 bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+                <h3 id="pendingSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Student Requests</h3>
+                <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingRequestsTable" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading pending requests...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Active Sessions Table -->
         <div id="activeSessionsSection" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
             <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
@@ -138,13 +169,13 @@
                 <table class="w-full">
                     <thead class="bg-slate-50">
                         <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Schedule</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                            <th id="activeColStudent" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th id="activeColBranch" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
+                            <th id="activeColPackage" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                            <th id="activeColFour" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Schedule</th>
+                            <th id="activeColFive" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
+                            <th id="activeColSix" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
+                            <th id="activeColSeven" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="studentsTable" class="divide-y divide-slate-100">
@@ -306,23 +337,21 @@
                         <div id="assignRequestTeacherSuggestions" class="hidden absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl max-h-64 overflow-y-auto"></div>
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Date *</label>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Schedule Start Date *</label>
                         <input type="date" id="assignRequestDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
                     </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Day *</label>
-                        <input type="text" id="assignRequestDay" readonly class="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700" placeholder="Auto from date">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700">Weekly Fixed Slots *</label>
+                            <div class="text-xs text-slate-500 mt-1">Add one or more recurring slots like Monday, Wednesday, Friday for the same teacher.</div>
+                        </div>
+                        <button type="button" id="addAssignRequestSlotBtn" class="px-3 py-2 rounded-lg bg-gold-500 text-white hover:bg-gold-600 text-xs font-semibold">
+                            Add Slot
+                        </button>
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Start Time *</label>
-                        <input type="time" id="assignRequestStartTime" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">End Time *</label>
-                        <input type="time" id="assignRequestEndTime" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                    </div>
+                    <div id="assignRequestSlotsContainer" class="space-y-3"></div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -336,7 +365,7 @@
                         <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
                     </div>
                 </div>
-                <div class="text-xs text-slate-500">Session must be exactly 1 hour.</div>
+                <div class="text-xs text-slate-500">Each slot must be exactly 1 hour and must fit the selected teacher's availability.</div>
                 <div class="flex items-center justify-end gap-3 pt-2">
                     <button type="button" id="cancelAssignRequestBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold">
                         Cancel
@@ -665,6 +694,45 @@
             if (enrollmentsGroup) enrollmentsGroup.open = managerPageMode === 'enrollments';
         }
 
+        function updateActiveTableHeaders() {
+            const isEnrollmentPage = managerPageMode === 'enrollments';
+            const labels = isEnrollmentPage
+                ? ['Student', 'Branch', 'Package', 'Payment Type', 'Package Amount', 'Paid / Balance', 'Status']
+                : ['Student', 'Branch', 'Package', 'Schedule', 'Teacher', 'Room', 'Actions'];
+            const ids = [
+                'activeColStudent',
+                'activeColBranch',
+                'activeColPackage',
+                'activeColFour',
+                'activeColFive',
+                'activeColSix',
+                'activeColSeven'
+            ];
+            ids.forEach((id, index) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = labels[index] || '';
+            });
+        }
+
+        function getEnrollmentPaymentState(student) {
+            const totalAmount = Number(student?.total_amount || 0);
+            const paidAmount = Number(student?.paid_amount || 0);
+            if (totalAmount > 0 && paidAmount >= totalAmount) return 'Paid';
+            if (paidAmount > 0) return 'Partial';
+            return 'Unpaid';
+        }
+
+        function getEnrollmentPaymentBadge(state) {
+            const normalized = String(state || '').toLowerCase();
+            if (normalized === 'paid') {
+                return '<span class="inline-flex items-center px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">Paid</span>';
+            }
+            if (normalized === 'partial') {
+                return '<span class="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">Partial</span>';
+            }
+            return '<span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">Unpaid</span>';
+        }
+
         function applyManagerPageMode() {
             const params = new URLSearchParams(window.location.search);
             managerPageMode = String(params.get('page') || 'sessions').toLowerCase() === 'enrollments' ? 'enrollments' : 'sessions';
@@ -678,13 +746,13 @@
             if (managerPageMode === 'enrollments') {
                 document.title = 'Manager - Enrollments';
                 if (pageTitle) pageTitle.textContent = 'Enrollments';
-                if (pageSubtitle) pageSubtitle.textContent = 'Manage branch enrollments and send students into scheduling.';
+                if (pageSubtitle) pageSubtitle.textContent = 'Manage branch enrollments and review student payment progress.';
                 if (branchScopeLabel) branchScopeLabel.textContent = 'Enrollments are locked to your branch:';
                 if (pendingTitle) pendingTitle.innerHTML = '<i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Enrollments';
-                if (activeTitle) activeTitle.innerHTML = '<i class="fas fa-user-check mr-2 text-gold-500"></i>Active Enrollments';
+                if (activeTitle) activeTitle.innerHTML = '<i class="fas fa-wallet mr-2 text-gold-500"></i>Enrollment Payments';
                 window.pendingRequestActionLabel = 'Schedule Sessions';
                 window.onPendingRequestAssignClick = function(requestId) {
-                    window.location.href = `manager_sessions.html?page=sessions&view=pending&assign_request_id=${requestId}`;
+                    openAssignRequestModal(requestId);
                 };
             } else {
                 document.title = 'Manager - Sessions';
@@ -698,6 +766,7 @@
             }
 
             applyManagerSidebarMode();
+            updateActiveTableHeaders();
         }
 
         function applySessionView() {
@@ -711,15 +780,15 @@
             const enrollmentMode = uiIsDesk || managerPageMode === 'enrollments';
             const baseLabel = enrollmentMode ? 'Enrollments' : 'Sessions';
             const pendingLabel = enrollmentMode ? 'Pending Enrollments' : 'Pending Sessions';
-            const activeLabel = enrollmentMode ? 'Active Enrollments' : 'Active Sessions';
+            const activeLabel = enrollmentMode ? 'Enrollment Payments' : 'Active Sessions';
             const pendingSub = enrollmentMode
                 ? 'Review and assign pending enrollment requests'
                 : 'Review and assign pending session requests';
             const activeSub = enrollmentMode
-                ? 'Manage active student enrollment assignments'
+                ? 'Review package payment type, paid amount, and remaining balance for active enrollments'
                 : 'Manage active student session assignments';
             const baseSub = enrollmentMode
-                ? 'Manage pending and active enrollments'
+                ? 'Manage pending enrollments and track payment progress'
                 : 'View and manage active enrolled students in your branch.';
 
             if (managerPageMode === 'sessions') {
@@ -1135,6 +1204,30 @@
             return date.toLocaleDateString();
         }
 
+        function buildFixedScheduleText(student) {
+            const summary = String(student?.schedule_summary || '').trim();
+            if (summary) return summary;
+            const scheduleSlots = Array.isArray(student?.schedule_slots) ? student.schedule_slots : [];
+            if (scheduleSlots.length) {
+                return scheduleSlots.map(slot => {
+                    const day = String(slot.day_of_week || '').trim();
+                    const start = String(slot.start_time || '').trim();
+                    const end = String(slot.end_time || '').trim();
+                    return day && start && end ? `${day} • ${formatTime12Hour(start)} - ${formatTime12Hour(end)}` : '';
+                }).filter(Boolean).join(' | ');
+            }
+            const day = String(student?.fixed_day_of_week || '').trim();
+            const start = String(student?.fixed_start_time || '').trim();
+            const end = String(student?.fixed_end_time || '').trim();
+            if (day && start && end) {
+                return `${day} • ${formatTime12Hour(start)} - ${formatTime12Hour(end)}`;
+            }
+            if (student?.first_session_date) {
+                return formatDateShort(student.first_session_date);
+            }
+            return '—';
+        }
+
         function getSessionStatusBadge(status) {
             const normalized = String(status || '').toLowerCase();
             if (normalized === 'completed') {
@@ -1343,6 +1436,69 @@
             return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] || '';
         }
 
+        function renderAssignRequestSlotRow(slot = {}) {
+            const day = String(slot.day_of_week || '').trim();
+            const start = String(slot.start_time || '').slice(0, 5);
+            const end = String(slot.end_time || '').slice(0, 5);
+            const dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                .map(option => `<option value="${option}"${option === day ? ' selected' : ''}>${option}</option>`)
+                .join('');
+
+            return `
+                <div class="assign-request-slot grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr_auto] gap-3 items-end rounded-xl border border-slate-200 bg-white p-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Day</label>
+                        <select class="assign-request-slot-day w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                            <option value="">Select day...</option>
+                            ${dayOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Start</label>
+                        <input type="time" class="assign-request-slot-start w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500" value="${escapeHtml(start)}">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">End</label>
+                        <input type="time" class="assign-request-slot-end w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500" value="${escapeHtml(end)}">
+                    </div>
+                    <button type="button" class="assign-request-slot-remove px-3 py-2 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-semibold">Remove</button>
+                </div>
+            `;
+        }
+
+        function bindAssignRequestSlotRemoveHandlers() {
+            document.querySelectorAll('.assign-request-slot-remove').forEach(button => {
+                if (button.dataset.bound === '1') return;
+                button.dataset.bound = '1';
+                button.addEventListener('click', () => {
+                    const container = document.getElementById('assignRequestSlotsContainer');
+                    const row = button.closest('.assign-request-slot');
+                    if (!container || !row) return;
+                    if (container.children.length <= 1) {
+                        showMessage('At least one weekly slot is required.', 'error');
+                        return;
+                    }
+                    row.remove();
+                });
+            });
+        }
+
+        function addAssignRequestSlot(slot = {}) {
+            const container = document.getElementById('assignRequestSlotsContainer');
+            if (!container) return;
+            container.insertAdjacentHTML('beforeend', renderAssignRequestSlotRow(slot));
+            bindAssignRequestSlotRemoveHandlers();
+        }
+
+        function collectAssignRequestSlots() {
+            const rows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot'));
+            return rows.map(row => ({
+                day_of_week: row.querySelector('.assign-request-slot-day')?.value || '',
+                start_time: row.querySelector('.assign-request-slot-start')?.value || '',
+                end_time: row.querySelector('.assign-request-slot-end')?.value || ''
+            })).filter(slot => slot.day_of_week && slot.start_time && slot.end_time);
+        }
+
         function setAssignRequestTeacherSelection(teacherId) {
             const hiddenInput = document.getElementById('assignRequestTeacherSelect');
             const searchInput = document.getElementById('assignRequestTeacherSearch');
@@ -1417,13 +1573,11 @@
             const teacherSearch = document.getElementById('assignRequestTeacherSearch');
             const teacherHelp = document.getElementById('assignRequestTeacherSearchHelp');
             const dateEl = document.getElementById('assignRequestDate');
-            const dayEl = document.getElementById('assignRequestDay');
-            const startEl = document.getElementById('assignRequestStartTime');
-            const endEl = document.getElementById('assignRequestEndTime');
+            const slotsContainer = document.getElementById('assignRequestSlotsContainer');
             const roomEl = document.getElementById('assignRequestRoom');
             const notesEl = document.getElementById('assignRequestNotes');
 
-            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !dayEl || !startEl || !endEl || !roomEl || !notesEl) return;
+            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !roomEl || !notesEl) return;
 
             const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
             const instrumentSummary = Array.isArray(req.instruments) && req.instruments.length
@@ -1455,9 +1609,12 @@
             }
 
             dateEl.value = req.preferred_date || '';
-            dayEl.value = getDayNameFromDate(dateEl.value || '') || req.preferred_day_of_week || '';
-            startEl.value = '';
-            endEl.value = '';
+            slotsContainer.innerHTML = '';
+            addAssignRequestSlot({
+                day_of_week: req.preferred_day_of_week || getDayNameFromDate(dateEl.value || ''),
+                start_time: '',
+                end_time: ''
+            });
             await populateAssignRoomDropdown(req);
             roomEl.value = '';
             notesEl.value = '';
@@ -1495,18 +1652,17 @@
             const requestId = Number(document.getElementById('assignRequestId')?.value || 0);
             const teacherId = Number(document.getElementById('assignRequestTeacherSelect')?.value || 0);
             const assignedDate = document.getElementById('assignRequestDate')?.value || '';
-            const assignedDay = getDayNameFromDate(assignedDate);
-            const assignedStart = document.getElementById('assignRequestStartTime')?.value || '';
-            const assignedEnd = document.getElementById('assignRequestEndTime')?.value || '';
+            const assignedSlots = collectAssignRequestSlots();
             const assignedRoom = document.getElementById('assignRequestRoom')?.value?.trim() || '';
             const adminNotes = document.getElementById('assignRequestNotes')?.value?.trim() || '';
 
-            if (!requestId || !teacherId || !assignedDate || !assignedDay || !assignedStart || !assignedEnd) {
-                showMessage('Please complete teacher, date, start time, and end time.', 'error');
+            if (!requestId || !teacherId || !assignedDate || !assignedSlots.length) {
+                showMessage('Please complete teacher, start date, and at least one weekly slot.', 'error');
                 return;
             }
-            if (assignedStart >= assignedEnd) {
-                showMessage('End time must be later than start time.', 'error');
+            const invalidSlot = assignedSlots.find(slot => !slot.day_of_week || !slot.start_time || !slot.end_time || slot.start_time >= slot.end_time);
+            if (invalidSlot) {
+                showMessage('Each weekly slot needs a valid day, start time, and end time.', 'error');
                 return;
             }
 
@@ -1515,14 +1671,16 @@
                 request_id: requestId,
                 teacher_id: teacherId,
                 assigned_date: assignedDate,
-                assigned_day_of_week: assignedDay,
-                assigned_start_time: assignedStart,
-                assigned_end_time: assignedEnd,
+                assigned_slots: assignedSlots,
                 assigned_room: assignedRoom,
                 admin_notes: adminNotes,
                 branch_id: managerBranchId
             });
         }
+
+        window.openAssignRequestModal = openAssignRequestModal;
+        window.closeAssignRequestModal = closeAssignRequestModal;
+        window.setAssignRequestTeacherSelection = setAssignRequestTeacherSelection;
 
         async function rejectStudentRequest(requestId) {
             if (!requestId) return;
@@ -1579,7 +1737,7 @@
                         <tr>
                             <td colspan="7" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                                <p>${uiIsDesk ? 'No active enrollments found.' : 'No active sessions found.'}</p>
+                                <p>${managerPageMode === 'enrollments' || uiIsDesk ? 'No active enrollments found.' : 'No active sessions found.'}</p>
                             </td>
                         </tr>`;
                     if (countEl) countEl.textContent = '0 active';
@@ -1590,7 +1748,7 @@
                     <tr>
                         <td colspan="7" class="px-6 py-8 text-center text-red-500">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                            <p>${uiIsDesk ? 'Failed to load active enrollments. Please try again.' : 'Failed to load active sessions. Please try again.'}</p>
+                            <p>${managerPageMode === 'enrollments' || uiIsDesk ? 'Failed to load active enrollments. Please try again.' : 'Failed to load active sessions. Please try again.'}</p>
                         </td>
                     </tr>`;
             }
@@ -1602,9 +1760,39 @@
                     <tr>
                         <td colspan="7" class="px-6 py-8 text-center text-slate-500">
                             <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                            <p>${uiIsDesk ? 'No active enrollments found.' : 'No active sessions found.'}</p>
+                            <p>${managerPageMode === 'enrollments' || uiIsDesk ? 'No active enrollments found.' : 'No active sessions found.'}</p>
                         </td>
                     </tr>`;
+                return;
+            }
+
+            if (managerPageMode === 'enrollments') {
+                tableBody.innerHTML = allStudents.map(student => {
+                    const totalAmount = Number(student.total_amount || 0);
+                    const paidAmount = Number(student.paid_amount || 0);
+                    const balanceAmount = Math.max(0, totalAmount - paidAmount);
+                    const paymentState = getEnrollmentPaymentState(student);
+
+                    return `
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="px-6 py-4">
+                                <div class="font-medium text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
+                                <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                            </td>
+                            <td class="px-6 py-4 text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
+                            <td class="px-6 py-4 text-slate-700">${escapeHtml(student.package_name || '—')}</td>
+                            <td class="px-6 py-4 text-slate-700">
+                                <div class="font-medium text-slate-800">${escapeHtml(student.payment_type || '—')}</div>
+                            </td>
+                            <td class="px-6 py-4 text-slate-700 font-medium">${formatCurrencyPHP(totalAmount)}</td>
+                            <td class="px-6 py-4 text-slate-700">
+                                <div class="font-medium text-green-700">${formatCurrencyPHP(paidAmount)} paid</div>
+                                <div class="text-xs text-slate-500 mt-1">${formatCurrencyPHP(balanceAmount)} balance</div>
+                            </td>
+                            <td class="px-6 py-4">${getEnrollmentPaymentBadge(paymentState)}</td>
+                        </tr>
+                    `;
+                }).join('');
                 return;
             }
 
@@ -1612,8 +1800,8 @@
                 const packageName = student.package_name || '—';
                 const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
                 const roomName = escapeHtml(student.assigned_room || '—');
-                const sessionDate = student.first_session_date ? new Date(student.first_session_date).toLocaleDateString() : '—';
-                const sessionTime = student.first_session_date ? `${sessionDate}` : '—';
+                const scheduleText = buildFixedScheduleText(student);
+                const nextDate = student.first_session_date ? formatDateShort(student.first_session_date) : '—';
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
@@ -1623,12 +1811,15 @@
                         </td>
                         <td class="px-6 py-4 text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
                         <td class="px-6 py-4 text-slate-700">${escapeHtml(packageName)}</td>
-                        <td class="px-6 py-4 text-slate-700">${sessionTime}</td>
+                        <td class="px-6 py-4 text-slate-700">
+                            <div>${escapeHtml(scheduleText)}</div>
+                            <div class="text-xs text-slate-500 mt-1">Starts: ${escapeHtml(nextDate)}</div>
+                        </td>
                         <td class="px-6 py-4 text-slate-700">${teacherName}</td>
                         <td class="px-6 py-4 text-slate-700">${roomName}</td>
                         <td class="px-6 py-4">
                             <button type="button" class="px-3 py-1.5 rounded-lg bg-gold-500/15 text-gold-700 hover:bg-gold-500/25 text-xs font-bold" onclick="openSessionScheduleModal(${Number(student.enrollment_id)})">
-                                ${student.first_session_date ? 'Add Session' : 'Schedule Session'}
+                                View Schedule
                             </button>
                         </td>
                     </tr>
@@ -1675,7 +1866,8 @@
             }
 
             const studentName = `${escapeHtml(row.first_name || '')} ${escapeHtml(row.last_name || '')}`.trim() || 'Student';
-            meta.textContent = `${studentName} • ${escapeHtml(row.package_name || 'Package')} • ${Number(row.sessions || 0)} sessions`;
+            const fixedScheduleText = buildFixedScheduleText(row);
+            meta.textContent = `${studentName} • ${escapeHtml(row.package_name || 'Package')} • ${Number(row.sessions || 0)} sessions • ${escapeHtml(fixedScheduleText)}`;
 
             const sessionsList = Array.isArray(row.sessions_list) ? row.sessions_list : [];
             const sessionsTotal = Number(row.sessions || 0);
@@ -1730,21 +1922,21 @@
             if (startInput) startInput.value = '09:00';
             if (endInput) endInput.value = '10:00';
             if (hint) {
-                hint.textContent = nextUnscheduled
-                    ? `Session ${nextUnscheduled} is the next open slot for this enrollment.`
-                    : 'All session slots already have saved schedules. You can still review the history here.';
+                hint.textContent = 'This enrollment uses a fixed weekly schedule. Sessions are generated automatically from the assigned slot.';
             }
             if (toggleBtn) {
-                toggleBtn.textContent = nextUnscheduled ? `Schedule Session ${nextUnscheduled}` : 'All Sessions Scheduled';
-                toggleBtn.disabled = !nextUnscheduled;
-                toggleBtn.classList.toggle('opacity-50', !nextUnscheduled);
-                toggleBtn.classList.toggle('cursor-not-allowed', !nextUnscheduled);
+                toggleBtn.textContent = 'Auto-Generated';
+                toggleBtn.disabled = true;
+                toggleBtn.classList.add('opacity-50', 'cursor-not-allowed');
             }
 
             const assignedTeacherName = `${escapeHtml(row.teacher_first_name || '')} ${escapeHtml(row.teacher_last_name || '')}`.trim() || 'No fixed teacher assigned';
             if (teacherInput) teacherInput.value = String(Number(row.assigned_teacher_id || 0));
             if (teacherLabel) teacherLabel.value = assignedTeacherName;
             if (roomSelect) roomSelect.innerHTML = '<option value="">Loading rooms...</option>';
+            if (dateInput) dateInput.value = row.first_session_date || '';
+            if (startInput) startInput.value = String(row.fixed_start_time || '09:00').slice(0, 5);
+            if (endInput) endInput.value = String(row.fixed_end_time || '10:00').slice(0, 5);
 
             populateScheduleRoomDropdown(row.branch_id, row.assigned_room || '');
 
@@ -1979,12 +2171,7 @@
                 document.getElementById('walkinPaymentType')?.addEventListener('change', updateWalkinPackageUI);
                 document.getElementById('walkinPreferredDate')?.addEventListener('change', updateWalkinPreferredDay);
             }
-            document.getElementById('assignRequestDate')?.addEventListener('change', (e) => {
-                const dayEl = document.getElementById('assignRequestDay');
-                if (!dayEl) return;
-                const d = getDayNameFromDate(e.target.value || '');
-                dayEl.value = d || '';
-            });
+            document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
         });
     </script>
 </body>

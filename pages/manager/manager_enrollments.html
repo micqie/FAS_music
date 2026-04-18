@@ -659,7 +659,7 @@
                 if (activeTitle) activeTitle.innerHTML = '<i class="fas fa-user-check mr-2 text-gold-500"></i>Active Enrollments';
                 window.pendingRequestActionLabel = 'Schedule Sessions';
                 window.onPendingRequestAssignClick = function(requestId) {
-                    window.location.href = `manager_sessions.html?page=sessions&view=pending&assign_request_id=${requestId}`;
+                    openAssignRequestModal(requestId);
                 };
             } else {
                 document.title = 'Manager - Sessions';
@@ -1465,6 +1465,10 @@
                 branch_id: managerBranchId
             });
         }
+
+        window.openAssignRequestModal = openAssignRequestModal;
+        window.closeAssignRequestModal = closeAssignRequestModal;
+        window.setAssignRequestTeacherSelection = setAssignRequestTeacherSelection;
 
         async function rejectStudentRequest(requestId) {
             if (!requestId) return;

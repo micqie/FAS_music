@@ -4598,6 +4598,12 @@ function renderRegistrationsTable() {
                             class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-sm transition">
                             <i class="fas fa-eye"></i>
                         </button>
+                        ${['Fee Paid', 'Approved'].includes(String(reg.registration_status || '')) && typeof window.openRegistrationScheduleModal === 'function' ? `
+                            <button onclick="openRegistrationScheduleModal(${Number(reg.student_id)})"
+                                class="px-3 py-1 bg-gold-100 hover:bg-gold-200 text-gold-700 rounded text-sm font-semibold transition">
+                                <i class="fas fa-calendar-plus"></i>
+                            </button>
+                        ` : ''}
                         ${reg.registration_status === 'Pending' ? `
                             <button onclick="openPaymentModal(${reg.student_id})"
                                 class="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-sm transition">

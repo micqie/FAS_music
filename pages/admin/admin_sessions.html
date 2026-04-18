@@ -1363,6 +1363,11 @@
                 loadCancelledSessions()
             ]);
 
+            await Promise.all([
+                maybeAutoOpenAssignPackageModalFromUrl(),
+                maybeAutoOpenAssignRequestModalFromUrl()
+            ]);
+
             document.getElementById('branchFilter')?.addEventListener('change', () => {
                 loadActiveStudents();
                 loadCancelledSessions();
@@ -1372,6 +1377,3 @@
     </script>
 </body>
 </html>
-
-
-

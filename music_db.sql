@@ -1397,6 +1397,40 @@ ALTER TABLE `tbl_users`
   ADD CONSTRAINT `tbl_users_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `tbl_roles` (`role_id`);
 COMMIT;
 
+CREATE TABLE IF NOT EXISTS tbl_schedule_operation_lookup (
+    operation_id INT AUTO_INCREMENT PRIMARY KEY,
+    operation_code VARCHAR(50) NOT NULL UNIQUE,
+    operation_name VARCHAR(100) NOT NULL,
+    applies_to ENUM('Enrollment','Session','Attendance','Request') NOT NULL,
+    counts_as_absence TINYINT(1) NOT NULL DEFAULT 0,
+    counts_as_consumed_session TINYINT(1) NOT NULL DEFAULT 0,
+    allows_makeup TINYINT(1) NOT NULL DEFAULT 0,
+    requires_admin_approval TINYINT(1) NOT NULL DEFAULT 0,
+    freezes_schedule TINYINT(1) NOT NULL DEFAULT 0,
+    requires_holding_fee TINYINT(1) NOT NULL DEFAULT 0,
+    description VARCHAR(255) NULL,
+    status ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO tbl_schedule_operation_lookup
+(operation_code, operation_name, applies_to, counts_as_absence, counts_as_consumed_session, allows_makeup, requires_admin_approval, freezes_schedule, requires_holding_fee, description)
+VALUES
+('REGULAR_SESSION', 'Regular Fixed Session', 'Session', 0, 0, 0, 0, 0, 0, 'Normal weekly generated session'),
+('STUDENT_ABSENT_NOTICE', 'Student Absent With Notice', 'Attendance', 1, 0, 1, 0, 0, 0, 'Absent within allowed policy, makeup may be allowed'),
+('STUDENT_ABSENT_NO_NOTICE', 'Student Absent No Notice / CI', 'Attendance', 1, 1, 0, 0, 0, 0, 'Session is counted-in and consumed'),
+('TEACHER_ABSENT', 'Teacher Absent', 'Attendance', 0, 0, 1, 0, 0, 0, 'Does not count against student, makeup required'),
+('TEACHER_RESCHEDULE_REQUEST', 'Teacher Reschedule Request', 'Request', 0, 0, 0, 1, 0, 0, 'Teacher cannot directly edit schedule'),
+('STUDENT_SCHEDULE_CHANGE_REQUEST', 'Student Schedule Change Request', 'Request', 0, 0, 0, 1, 0, 0, 'Student cannot directly edit fixed schedule'),
+('MAKEUP_SESSION', 'Makeup Session', 'Session', 0, 0, 0, 0, 0, 0, 'Extra scheduled replacement lesson'),
+('SCHEDULE_FREEZE', 'Schedule Freeze', 'Enrollment', 0, 0, 0, 0, 1, 1, 'Applied after 3 consecutive absences');
+
+ALTER TABLE tbl_sessions
+ADD COLUMN operation_id INT NULL;
+
+ALTER TABLE tbl_enrollments
+ADD COLUMN current_operation_id INT NULL;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

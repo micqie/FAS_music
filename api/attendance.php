@@ -15,6 +15,7 @@ class AttendanceApi
     public function __construct($pdo)
     {
         $this->conn = $pdo;
+        $this->ensureSessionPolicyColumns();
     }
 
     public function sendJSON($data, $status = 200)
@@ -78,6 +79,48 @@ class AttendanceApi
             return false;
         }
         return $this->tableExists('tbl_attendance');
+    }
+
+    private function ensureSessionPolicyColumns()
+    {
+        if ($this->tableExists('tbl_enrollments')) {
+            $enrollmentColumns = [
+                'allowed_absences' => "ALTER TABLE tbl_enrollments ADD COLUMN allowed_absences INT NOT NULL DEFAULT 0 AFTER total_sessions",
+                'used_absences' => "ALTER TABLE tbl_enrollments ADD COLUMN used_absences INT NOT NULL DEFAULT 0 AFTER allowed_absences",
+                'consecutive_absences' => "ALTER TABLE tbl_enrollments ADD COLUMN consecutive_absences INT NOT NULL DEFAULT 0 AFTER used_absences",
+                'schedule_status' => "ALTER TABLE tbl_enrollments ADD COLUMN schedule_status ENUM('Active','Frozen','Ended') NOT NULL DEFAULT 'Active' AFTER status",
+                'current_operation_id' => "ALTER TABLE tbl_enrollments ADD COLUMN current_operation_id INT NULL AFTER fixed_schedule_locked"
+            ];
+            foreach ($enrollmentColumns as $column => $sql) {
+                try {
+                    if (!$this->tableHasColumn('tbl_enrollments', $column)) {
+                        $this->conn->exec($sql);
+                    }
+                } catch (PDOException $e) {
+                    // Keep API working even if migrations fail.
+                }
+            }
+        }
+
+        if ($this->tableExists('tbl_sessions')) {
+            $sessionColumns = [
+                'operation_id' => "ALTER TABLE tbl_sessions ADD COLUMN operation_id INT NULL AFTER room_id",
+                'attendance_status' => "ALTER TABLE tbl_sessions ADD COLUMN attendance_status ENUM('Pending','Present','Absent','Late','Excused','CI','Teacher Absent') NOT NULL DEFAULT 'Pending' AFTER status",
+                'absence_notice' => "ALTER TABLE tbl_sessions ADD COLUMN absence_notice ENUM('None','Prior','NoNotice','Teacher') NOT NULL DEFAULT 'None' AFTER attendance_status",
+                'counted_in' => "ALTER TABLE tbl_sessions ADD COLUMN counted_in TINYINT(1) NOT NULL DEFAULT 0 AFTER absence_notice",
+                'makeup_eligible' => "ALTER TABLE tbl_sessions ADD COLUMN makeup_eligible TINYINT(1) NOT NULL DEFAULT 0 AFTER counted_in",
+                'makeup_required' => "ALTER TABLE tbl_sessions ADD COLUMN makeup_required TINYINT(1) NOT NULL DEFAULT 0 AFTER makeup_eligible"
+            ];
+            foreach ($sessionColumns as $column => $sql) {
+                try {
+                    if (!$this->tableHasColumn('tbl_sessions', $column)) {
+                        $this->conn->exec($sql);
+                    }
+                } catch (PDOException $e) {
+                    // Ignore schema upgrade failures.
+                }
+            }
+        }
     }
 
     private function formatLongDate($dateYmd)
@@ -160,6 +203,11 @@ class AttendanceApi
                 ts.start_time,
                 ts.end_time,
                 ts.status,
+                ts.attendance_status,
+                ts.absence_notice,
+                ts.counted_in,
+                ts.makeup_eligible,
+                ts.makeup_required,
                 ts.notes,
                 ts.attendance_notes,
                 e.status AS enrollment_status
@@ -174,21 +222,337 @@ class AttendanceApi
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    private function getAllowedAbsencesForEnrollment($enrollment)
+    {
+        $allowed = (int)($enrollment['allowed_absences'] ?? 0);
+        if ($allowed > 0) {
+            return $allowed;
+        }
+
+        $totalSessions = max(0, (int)($enrollment['total_sessions'] ?? 0));
+        if ($totalSessions === 12) return 2;
+        if ($totalSessions === 20) return 3;
+        if ($totalSessions > 20) return 3;
+        return 0;
+    }
+
+    private function getScheduleOperationIdByCode($operationCode)
+    {
+        $operationCode = trim((string)$operationCode);
+        if ($operationCode === '' || !$this->tableExists('tbl_schedule_operation_lookup')) {
+            return null;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT operation_id
+                FROM tbl_schedule_operation_lookup
+                WHERE operation_code = ?
+                  AND status = 'Active'
+                LIMIT 1
+            ");
+            $stmt->execute([$operationCode]);
+            $value = $stmt->fetchColumn();
+            return $value !== false ? (int)$value : null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+
+    private function getStudentSessionForDate($studentId, $dateYmd, $forUpdate = false)
+    {
+        if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_enrollments')) {
+            return null;
+        }
+
+        $sql = "
+            SELECT
+                ts.*,
+                te.student_id,
+                te.total_sessions,
+                te.allowed_absences,
+                te.used_absences,
+                te.consecutive_absences,
+                te.schedule_status
+            FROM tbl_sessions ts
+            INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
+            WHERE te.student_id = ?
+              AND te.status = 'Active'
+              AND ts.session_date = ?
+              AND ts.status NOT IN ('cancelled_by_teacher', 'rescheduled')
+            ORDER BY ts.session_number ASC, ts.session_id ASC
+            LIMIT 1
+        ";
+        if ($forUpdate) {
+            $sql .= " FOR UPDATE";
+        }
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([(int)$studentId, $dateYmd]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    private function countStudentAbsencesBeforeSession($enrollmentId, $excludeSessionId = 0)
+    {
+        if (!$this->tableExists('tbl_sessions')) {
+            return 0;
+        }
+
+        $sql = "
+            SELECT COUNT(*)
+            FROM tbl_sessions
+            WHERE enrollment_id = ?
+              AND (
+                  attendance_status IN ('Absent', 'CI')
+                  OR status IN ('No Show', 'Cancelled')
+              )
+        ";
+        $params = [(int)$enrollmentId];
+        if ($excludeSessionId > 0) {
+            $sql .= " AND session_id <> ? ";
+            $params[] = (int)$excludeSessionId;
+        }
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return (int)($stmt->fetchColumn() ?: 0);
+    }
+
+    private function syncEnrollmentPolicyState($enrollmentId)
+    {
+        $enrollmentId = (int)$enrollmentId;
+        if ($enrollmentId < 1 || !$this->tableExists('tbl_enrollments') || !$this->tableExists('tbl_sessions')) {
+            return;
+        }
+
+        $stmtEnrollment = $this->conn->prepare("
+            SELECT enrollment_id, total_sessions, allowed_absences, status
+            FROM tbl_enrollments
+            WHERE enrollment_id = ?
+            LIMIT 1
+        ");
+        $stmtEnrollment->execute([$enrollmentId]);
+        $enrollment = $stmtEnrollment->fetch(PDO::FETCH_ASSOC);
+        if (!$enrollment) {
+            return;
+        }
+
+        $allowedAbsences = $this->getAllowedAbsencesForEnrollment($enrollment);
+        $freezeThreshold = 3;
+        $freezeTriggered = false;
+        $currentStreak = 0;
+        $usedAbsences = 0;
+
+        $stmtSessions = $this->conn->prepare("
+            SELECT session_date, session_number, status, attendance_status, absence_notice
+            FROM tbl_sessions
+            WHERE enrollment_id = ?
+            ORDER BY session_date ASC, session_number ASC, session_id ASC
+        ");
+        $stmtSessions->execute([$enrollmentId]);
+        $sessions = $stmtSessions->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $todayYmd = date('Y-m-d');
+
+        foreach ($sessions as $session) {
+            $sessionDate = (string)($session['session_date'] ?? '');
+            if ($sessionDate === '' || $sessionDate > $todayYmd) {
+                continue;
+            }
+
+            $status = strtolower(trim((string)($session['status'] ?? '')));
+            $attendanceStatus = strtolower(trim((string)($session['attendance_status'] ?? '')));
+
+            $isTeacherAbsent = ($status === 'cancelled_by_teacher') || ($attendanceStatus === 'teacher absent');
+            if ($isTeacherAbsent) {
+                continue;
+            }
+
+            $isStudentAbsent = in_array($attendanceStatus, ['absent', 'ci'], true) || in_array($status, ['no show', 'cancelled'], true);
+            $isPresent = in_array($attendanceStatus, ['present', 'late', 'excused'], true) || in_array($status, ['completed', 'late'], true);
+
+            if ($isStudentAbsent) {
+                $usedAbsences++;
+                $currentStreak++;
+                if ($currentStreak >= $freezeThreshold) {
+                    $freezeTriggered = true;
+                }
+                continue;
+            }
+
+            if ($isPresent) {
+                $currentStreak = 0;
+            }
+        }
+
+        $currentOperationId = $freezeTriggered ? $this->getScheduleOperationIdByCode('SCHEDULE_FREEZE') : null;
+        $scheduleStatus = $freezeTriggered ? 'Frozen' : 'Active';
+
+        $stmtUpdate = $this->conn->prepare("
+            UPDATE tbl_enrollments
+            SET allowed_absences = ?,
+                used_absences = ?,
+                consecutive_absences = ?,
+                schedule_status = ?,
+                current_operation_id = ?
+            WHERE enrollment_id = ?
+        ");
+        $stmtUpdate->execute([
+            $allowedAbsences,
+            $usedAbsences,
+            $currentStreak,
+            $scheduleStatus,
+            $currentOperationId,
+            $enrollmentId
+        ]);
+    }
+
+    private function ensureMakeupSessionLink($session, $teacherId)
+    {
+        if (!$this->tableExists('tbl_makeup_sessions')) {
+            return;
+        }
+
+        $sessionId = (int)($session['session_id'] ?? 0);
+        if ($sessionId < 1) {
+            return;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                INSERT INTO tbl_makeup_sessions (original_session_id, teacher_id, status)
+                VALUES (?, ?, 'Scheduled')
+                ON DUPLICATE KEY UPDATE teacher_id = VALUES(teacher_id), status = VALUES(status)
+            ");
+            $stmt->execute([$sessionId, (int)$teacherId]);
+        } catch (PDOException $e) {
+            // Ignore if the table does not yet have a unique constraint.
+        }
+    }
+
+    private function applySessionAttendanceOutcome($studentId, $dateYmd, $mode, $options = [])
+    {
+        $studentId = (int)$studentId;
+        if ($studentId < 1) {
+            return null;
+        }
+
+        $session = $this->getStudentSessionForDate($studentId, $dateYmd, true);
+        if (!$session) {
+            return null;
+        }
+
+        $sessionId = (int)($session['session_id'] ?? 0);
+        $enrollmentId = (int)($session['enrollment_id'] ?? 0);
+        $teacherId = (int)($session['teacher_id'] ?? 0);
+        $allowedAbsences = $this->getAllowedAbsencesForEnrollment($session);
+        $note = trim((string)($options['note'] ?? ''));
+
+        $status = 'Scheduled';
+        $attendanceStatus = 'Pending';
+        $absenceNotice = 'None';
+        $countedIn = 0;
+        $makeupEligible = 0;
+        $makeupRequired = 0;
+        $operationCode = 'REGULAR_SESSION';
+
+        if ($mode === 'present') {
+            $status = 'Completed';
+            $attendanceStatus = 'Present';
+            $countedIn = 1;
+        } elseif ($mode === 'late') {
+            $status = 'Late';
+            $attendanceStatus = 'Late';
+            $countedIn = 1;
+        } elseif ($mode === 'student_absent_notice') {
+            $priorAbsences = $this->countStudentAbsencesBeforeSession($enrollmentId, $sessionId);
+            $withinLimit = ($priorAbsences + 1) <= $allowedAbsences;
+            $status = 'Cancelled';
+            $attendanceStatus = 'Absent';
+            $absenceNotice = 'Prior';
+            $countedIn = $withinLimit ? 0 : 1;
+            $makeupEligible = $withinLimit ? 1 : 0;
+            $makeupRequired = $withinLimit ? 1 : 0;
+            $operationCode = 'STUDENT_ABSENT_NOTICE';
+        } elseif ($mode === 'student_absent_no_notice') {
+            $status = 'No Show';
+            $attendanceStatus = 'CI';
+            $absenceNotice = 'NoNotice';
+            $countedIn = 1;
+            $operationCode = 'STUDENT_ABSENT_NO_NOTICE';
+        } elseif ($mode === 'teacher_absent') {
+            $status = 'cancelled_by_teacher';
+            $attendanceStatus = 'Teacher Absent';
+            $absenceNotice = 'Teacher';
+            $countedIn = 0;
+            $makeupEligible = 1;
+            $makeupRequired = 1;
+            $operationCode = 'TEACHER_ABSENT';
+        } else {
+            return null;
+        }
+
+        $operationId = $this->getScheduleOperationIdByCode($operationCode);
+        $stmtUpdate = $this->conn->prepare("
+            UPDATE tbl_sessions
+            SET status = ?,
+                attendance_status = ?,
+                absence_notice = ?,
+                counted_in = ?,
+                makeup_eligible = ?,
+                makeup_required = ?,
+                operation_id = ?,
+                attendance_notes = CASE
+                    WHEN ? = '' THEN attendance_notes
+                    WHEN attendance_notes IS NULL OR TRIM(attendance_notes) = '' THEN ?
+                    ELSE CONCAT(attendance_notes, ' | ', ?)
+                END
+            WHERE session_id = ?
+        ");
+        $stmtUpdate->execute([
+            $status,
+            $attendanceStatus,
+            $absenceNotice,
+            $countedIn,
+            $makeupEligible,
+            $makeupRequired,
+            $operationId,
+            $note,
+            $note,
+            $note,
+            $sessionId
+        ]);
+
+        if ($mode === 'teacher_absent') {
+            $needsRescheduling = $this->tableHasColumn('tbl_sessions', 'needs_rescheduling');
+            if ($needsRescheduling) {
+                $stmtReschedule = $this->conn->prepare("
+                    UPDATE tbl_sessions
+                    SET needs_rescheduling = 1,
+                        cancellation_reason = CASE
+                            WHEN ? = '' THEN COALESCE(cancellation_reason, 'Teacher absent')
+                            ELSE ?
+                        END,
+                        cancelled_by_teacher_at = NOW()
+                    WHERE session_id = ?
+                ");
+                $stmtReschedule->execute([$note, $note, $sessionId]);
+            }
+            $this->ensureMakeupSessionLink($session, $teacherId);
+        }
+
+        $this->syncEnrollmentPolicyState($enrollmentId);
+        return $this->getStudentSessionForDate($studentId, $dateYmd, false);
+    }
+
     private function markPastScheduledSessionsAsMissed($studentId, $todayYmd)
     {
         if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_enrollments')) {
             return;
         }
         $stmt = $this->conn->prepare("
-            UPDATE tbl_sessions ts
+            SELECT ts.session_date
+            FROM tbl_sessions ts
             INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
-            SET
-                ts.status = 'No Show',
-                ts.attendance_notes = CASE
-                    WHEN ts.attendance_notes IS NULL OR TRIM(ts.attendance_notes) = ''
-                        THEN 'Automatically marked missed based on scheduled date.'
-                    ELSE CONCAT(ts.attendance_notes, ' | Automatically marked missed based on scheduled date.')
-                END
             WHERE te.student_id = ?
               AND te.status = 'Active'
               AND ts.session_date < ?
@@ -200,8 +564,18 @@ class AttendanceApi
                     AND DATE(ta.attended_at) = ts.session_date
                     AND ta.status IN ('Present', 'Late', 'Excused')
               )
+            ORDER BY ts.session_date ASC, ts.session_number ASC, ts.session_id ASC
         ");
         $stmt->execute([(int)$studentId, $todayYmd]);
+        $missedDates = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        foreach ($missedDates as $missedDate) {
+            $this->applySessionAttendanceOutcome(
+                (int)$studentId,
+                (string)$missedDate,
+                'student_absent_no_notice',
+                ['note' => 'Automatically marked missed based on scheduled date.']
+            );
+        }
     }
 
     private function markScheduledSessionCompleted($studentId, $dateYmd, $sourceLabel = 'Attendance recorded')
@@ -209,37 +583,8 @@ class AttendanceApi
         if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_enrollments')) {
             return;
         }
-
-        $stmt = $this->conn->prepare("
-            SELECT ts.session_id
-            FROM tbl_sessions ts
-            INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
-            WHERE te.student_id = ?
-              AND te.status = 'Active'
-              AND ts.session_date = ?
-              AND ts.status IN ('Scheduled', 'No Show')
-            ORDER BY ts.session_number ASC, ts.session_id ASC
-            LIMIT 1
-        ");
-        $stmt->execute([(int)$studentId, $dateYmd]);
-        $sessionId = (int)($stmt->fetchColumn() ?: 0);
-        if ($sessionId < 1) {
-            return;
-        }
-
-        $stmtUpdate = $this->conn->prepare("
-            UPDATE tbl_sessions
-            SET
-                status = 'Completed',
-                attendance_notes = CASE
-                    WHEN attendance_notes IS NULL OR TRIM(attendance_notes) = ''
-                        THEN ?
-                    ELSE CONCAT(attendance_notes, ' | ', ?)
-                END
-            WHERE session_id = ?
-        ");
         $note = trim((string)$sourceLabel) !== '' ? trim((string)$sourceLabel) : 'Attendance recorded';
-        $stmtUpdate->execute([$note, $note, $sessionId]);
+        $this->applySessionAttendanceOutcome((int)$studentId, $dateYmd, 'present', ['note' => $note]);
     }
 
     private function buildQrStatus($studentId, $todayYmd = null)
@@ -363,7 +708,7 @@ class AttendanceApi
                             SUM(ts.status = 'Completed') AS present_count,
                             SUM(ts.status = 'Late') AS late_count,
                             0 AS excused_count,
-                            SUM(ts.status IN ('Cancelled', 'No Show')) AS absent_count,
+                            SUM(ts.status IN ('Cancelled', 'No Show') AND COALESCE(ts.attendance_status, '') <> 'Teacher Absent') AS absent_count,
                             MAX(
                                 CASE
                                     WHEN ts.status IN ('Completed', 'Late')
@@ -398,12 +743,12 @@ class AttendanceApi
                 $stmt->execute([$studentId, $studentId]);
             } elseif ($hasSessions) {
                 $stmt = $this->conn->prepare("
-                    SELECT
-                        COUNT(*) AS total_records,
-                        SUM(ts.status = 'Completed') AS present_count,
-                        SUM(ts.status = 'Late') AS late_count,
-                        0 AS excused_count,
-                        SUM(ts.status IN ('Cancelled', 'No Show')) AS absent_count,
+                        SELECT
+                            COUNT(*) AS total_records,
+                            SUM(ts.status = 'Completed') AS present_count,
+                            SUM(ts.status = 'Late') AS late_count,
+                            0 AS excused_count,
+                            SUM(ts.status IN ('Cancelled', 'No Show') AND COALESCE(ts.attendance_status, '') <> 'Teacher Absent') AS absent_count,
                         MAX(
                             CASE
                                 WHEN ts.status IN ('Completed', 'Late')
@@ -483,6 +828,8 @@ class AttendanceApi
                             ts.session_type AS source,
                             COALESCE(ts.attendance_notes, ts.notes) AS notes,
                             CASE
+                                WHEN ts.attendance_status = 'Teacher Absent' THEN 'Teacher Absent'
+                                WHEN ts.attendance_status = 'CI' THEN 'CI'
                                 WHEN ts.status = 'Completed' THEN 'Present'
                                 WHEN ts.status = 'Late' THEN 'Late'
                                 WHEN ts.status IN ('Cancelled', 'No Show') THEN 'Absent'
@@ -540,6 +887,8 @@ class AttendanceApi
                         ts.session_type AS source,
                         COALESCE(ts.attendance_notes, ts.notes) AS notes,
                         CASE
+                            WHEN ts.attendance_status = 'Teacher Absent' THEN 'Teacher Absent'
+                            WHEN ts.attendance_status = 'CI' THEN 'CI'
                             WHEN ts.status = 'Completed' THEN 'Present'
                             WHEN ts.status = 'Late' THEN 'Late'
                             WHEN ts.status IN ('Cancelled', 'No Show') THEN 'Absent'
@@ -586,26 +935,54 @@ class AttendanceApi
         }
 
         $status = $data['status'] ?? 'Present';
-        $allowed = ['Present','Absent','Late','Excused'];
+        $allowed = ['Present','Absent','Late','Excused','CI','Teacher Absent'];
         if (!in_array($status, $allowed, true)) {
             $this->sendJSON(['error' => 'Invalid status'], 400);
         }
 
         $source = isset($data['source']) ? substr(trim((string)$data['source']), 0, 30) : null;
         $notes = isset($data['notes']) ? substr(trim((string)$data['notes']), 0, 255) : null;
+        $dateYmd = trim((string)($data['session_date'] ?? date('Y-m-d')));
+        $priorNotice = !empty($data['prior_notice']);
 
         try {
             if (!$this->ensureAttendanceTable()) {
                 $this->sendJSON(['error' => 'Attendance write endpoint is unavailable on this schema'], 400);
             }
-            $stmt = $this->conn->prepare("
-                INSERT INTO tbl_attendance (student_id, status, source, notes)
-                VALUES (?, ?, ?, ?)
-            ");
-            $stmt->execute([$studentId, $status, $source ?: null, $notes ?: null]);
 
-            $this->sendJSON(['success' => true, 'attendance_id' => (int)$this->conn->lastInsertId()]);
+            $this->conn->beginTransaction();
+
+            $attendanceId = null;
+            if (in_array($status, ['Present', 'Late', 'Excused'], true)) {
+                $stmt = $this->conn->prepare("
+                    INSERT INTO tbl_attendance (student_id, status, source, notes)
+                    VALUES (?, ?, ?, ?)
+                ");
+                $stmt->execute([$studentId, $status, $source ?: null, $notes ?: null]);
+                $attendanceId = (int)$this->conn->lastInsertId();
+            }
+
+            if ($status === 'Present') {
+                $this->applySessionAttendanceOutcome($studentId, $dateYmd, 'present', ['note' => $notes ?: 'Attendance recorded']);
+            } elseif ($status === 'Late') {
+                $this->applySessionAttendanceOutcome($studentId, $dateYmd, 'late', ['note' => $notes ?: 'Marked late']);
+            } elseif ($status === 'Absent') {
+                $mode = $priorNotice ? 'student_absent_notice' : 'student_absent_no_notice';
+                $this->applySessionAttendanceOutcome($studentId, $dateYmd, $mode, ['note' => $notes ?: ($priorNotice ? 'Marked absent with prior notice' : 'Marked absent without prior notice')]);
+            } elseif ($status === 'CI') {
+                $this->applySessionAttendanceOutcome($studentId, $dateYmd, 'student_absent_no_notice', ['note' => $notes ?: 'Marked counted-in']);
+            } elseif ($status === 'Teacher Absent') {
+                $this->applySessionAttendanceOutcome($studentId, $dateYmd, 'teacher_absent', ['note' => $notes ?: 'Teacher absent']);
+            } elseif ($status === 'Excused') {
+                $this->applySessionAttendanceOutcome($studentId, $dateYmd, 'student_absent_notice', ['note' => $notes ?: 'Excused absence']);
+            }
+
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'attendance_id' => $attendanceId]);
         } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }

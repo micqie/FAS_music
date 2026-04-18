@@ -475,6 +475,8 @@ class TeachersApi
         }
 
         $branchId = (int)($_GET['branch_id'] ?? 0);
+        $teacherId = (int)($_GET['teacher_id'] ?? 0);
+        $userId = (int)($_GET['user_id'] ?? 0);
         $status = trim((string)($_GET['status'] ?? ''));
 
         try {
@@ -504,6 +506,14 @@ class TeachersApi
             if ($branchId > 0) {
                 $sql .= " AND t.branch_id = ? ";
                 $params[] = $branchId;
+            }
+            if ($teacherId > 0) {
+                $sql .= " AND t.teacher_id = ? ";
+                $params[] = $teacherId;
+            }
+            if ($userId > 0) {
+                $sql .= " AND t.user_id = ? ";
+                $params[] = $userId;
             }
             if ($status !== '' && in_array($status, ['Active', 'Inactive'], true)) {
                 $sql .= " AND t.status = ? ";
@@ -944,6 +954,58 @@ class TeachersApi
         try {
             $this->conn->beginTransaction();
 
+            $stmtExisting = $this->conn->prepare("
+                SELECT teacher_id, user_id, email
+                FROM tbl_teachers
+                WHERE teacher_id = ?
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $stmtExisting->execute([$teacherId]);
+            $existingTeacher = $stmtExisting->fetch(PDO::FETCH_ASSOC);
+            if (!$existingTeacher) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Teacher not found'], 404);
+            }
+
+            $existingUserId = (int)($existingTeacher['user_id'] ?? 0);
+            if ($userId === null || $userId < 1) {
+                $userId = $existingUserId > 0 ? $existingUserId : null;
+            }
+
+            if ($email !== '') {
+                $dupTeacher = $this->conn->prepare("
+                    SELECT teacher_id
+                    FROM tbl_teachers
+                    WHERE email = ?
+                      AND teacher_id <> ?
+                    LIMIT 1
+                ");
+                $dupTeacher->execute([$email, $teacherId]);
+                if ($dupTeacher->fetchColumn()) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'Email is already used by another teacher'], 400);
+                }
+            }
+
+            if ($userId !== null && $userId > 0) {
+                $dupUser = $this->conn->prepare("
+                    SELECT user_id
+                    FROM tbl_users
+                    WHERE (
+                        (email IS NOT NULL AND email <> '' AND email = ?)
+                        OR username = ?
+                    )
+                      AND user_id <> ?
+                    LIMIT 1
+                ");
+                $dupUser->execute([$email, $email, $userId]);
+                if ($email !== '' && $dupUser->fetchColumn()) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'Email is already used by another user account'], 400);
+                }
+            }
+
             $stmt = $this->conn->prepare("
                 UPDATE tbl_teachers
                 SET user_id = ?, branch_id = ?, first_name = ?, last_name = ?,
@@ -968,6 +1030,51 @@ class TeachersApi
                 if (!$check->fetchColumn()) {
                     $this->conn->rollBack();
                     $this->sendJSON(['error' => 'Teacher not found'], 404);
+                }
+            }
+
+            if ($userId !== null && $userId > 0) {
+                $stmtUser = $this->conn->prepare("
+                    SELECT user_id, username, email
+                    FROM tbl_users
+                    WHERE user_id = ?
+                    LIMIT 1
+                    FOR UPDATE
+                ");
+                $stmtUser->execute([$userId]);
+                $linkedUser = $stmtUser->fetch(PDO::FETCH_ASSOC);
+                if ($linkedUser) {
+                    $currentUsername = trim((string)($linkedUser['username'] ?? ''));
+                    $currentEmail = trim((string)($linkedUser['email'] ?? ''));
+                    $newUsername = $currentUsername;
+
+                    if ($email !== '' && ($currentUsername === '' || strcasecmp($currentUsername, $currentEmail) === 0)) {
+                        $newUsername = $email;
+                    }
+
+                    if ($newUsername !== $currentUsername && $this->usernameExists($newUsername)) {
+                        $newUsername = $currentUsername;
+                    }
+
+                    $stmtUpdateUser = $this->conn->prepare("
+                        UPDATE tbl_users
+                        SET username = ?,
+                            first_name = ?,
+                            last_name = ?,
+                            email = ?,
+                            phone = ?,
+                            status = ?
+                        WHERE user_id = ?
+                    ");
+                    $stmtUpdateUser->execute([
+                        $newUsername,
+                        $firstName,
+                        $lastName,
+                        ($email !== '' ? $email : null),
+                        ($phone !== '' ? $phone : null),
+                        $status,
+                        $userId
+                    ]);
                 }
             }
 
@@ -1010,6 +1117,10 @@ class TeachersApi
         }
 
         try {
+            $stmtTeacher = $this->conn->prepare("SELECT user_id FROM tbl_teachers WHERE teacher_id = ? LIMIT 1");
+            $stmtTeacher->execute([$teacherId]);
+            $linkedUserId = (int)($stmtTeacher->fetchColumn() ?: 0);
+
             $stmt = $this->conn->prepare("UPDATE tbl_teachers SET status = ? WHERE teacher_id = ?");
             $stmt->execute([$status, $teacherId]);
             if ($stmt->rowCount() === 0) {
@@ -1018,6 +1129,11 @@ class TeachersApi
                 if (!$check->fetchColumn()) {
                     $this->sendJSON(['error' => 'Teacher not found'], 404);
                 }
+            }
+
+            if ($linkedUserId > 0) {
+                $stmtUser = $this->conn->prepare("UPDATE tbl_users SET status = ? WHERE user_id = ?");
+                $stmtUser->execute([$status, $linkedUserId]);
             }
             $this->sendJSON(['success' => true]);
         } catch (PDOException $e) {
