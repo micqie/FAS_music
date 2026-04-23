@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 19, 2026 at 12:18 PM
+-- Generation Time: Apr 23, 2026 at 05:26 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -1291,7 +1291,7 @@ ALTER TABLE `tbl_instruments`
 -- AUTO_INCREMENT for table `tbl_instrument_types`
 --
 ALTER TABLE `tbl_instrument_types`
-  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=64;
+  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=72;
 
 --
 -- AUTO_INCREMENT for table `tbl_makeup_sessions`
@@ -1363,7 +1363,7 @@ ALTER TABLE `tbl_schedule`
 -- AUTO_INCREMENT for table `tbl_schedule_operation_lookup`
 --
 ALTER TABLE `tbl_schedule_operation_lookup`
-  MODIFY `operation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3867;
+  MODIFY `operation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4149;
 
 --
 -- AUTO_INCREMENT for table `tbl_school_instruments`
