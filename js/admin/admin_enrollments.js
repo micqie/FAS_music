@@ -234,14 +234,6 @@
             if (instrumentsContainer) instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
         }
 
-        function updateWalkinPreferredDay() {
-            const dateEl = document.getElementById('walkinPreferredDate');
-            const dayEl = document.getElementById('walkinPreferredDay');
-            if (!dateEl || !dayEl) return;
-            const dayName = getDayNameFromDate(dateEl.value || '');
-            dayEl.value = dayName || '';
-        }
-
         function updateWalkinPackageUI() {
             const packageSelect = document.getElementById('walkinPackageSelect');
             const paymentTypeEl = document.getElementById('walkinPaymentType');
@@ -324,17 +316,13 @@
             const packageSelect = document.getElementById('walkinPackageSelect');
             const paymentTypeEl = document.getElementById('walkinPaymentType');
             const paymentMethodEl = document.getElementById('walkinPaymentMethod');
-            const preferredDateEl = document.getElementById('walkinPreferredDate');
-            const preferredDayEl = document.getElementById('walkinPreferredDay');
             const paymentProofEl = document.getElementById('walkinPaymentProof');
-            if (!studentSearch || !studentSelect || !packageSelect || !paymentTypeEl || !paymentMethodEl || !preferredDateEl || !preferredDayEl) return;
+            if (!studentSearch || !studentSelect || !packageSelect || !paymentTypeEl || !paymentMethodEl) return;
 
             const selectedStudent = resolveWalkinSelectedStudent();
             const email = studentSelect.value || '';
             const studentId = Number(selectedStudent?.student_id || 0);
             const packageId = parseInt(packageSelect.value, 10);
-            const preferredDate = preferredDateEl.value || '';
-            const preferredDay = preferredDayEl.value || '';
             const paymentType = String(paymentTypeEl.value || '').trim();
             const paymentMethod = String(paymentMethodEl.value || '').trim();
             const instrumentIds = Array.from(document.querySelectorAll('#walkinInstrumentsContainer .student-request-instrument'))
@@ -342,8 +330,8 @@
                 .filter(v => !Number.isNaN(v) && v > 0);
             const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
 
-            if (!email || !studentId || !packageId || !preferredDate || !preferredDay || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
-                showMessage('Please complete student, package, instruments, preferred date/day, payment type, and payment method.', 'error');
+            if (!email || !studentId || !packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
+                showMessage('Please complete student, package, instruments, payment type, and payment method.', 'error');
                 return;
             }
             if (!['Full Payment', 'Partial Payment', 'Installment'].includes(paymentType)) {
@@ -373,8 +361,6 @@
                 requestFormData.append('package_id', String(packageId));
                 requestFormData.append('payment_type', paymentType);
                 requestFormData.append('payment_method', paymentMethod);
-                requestFormData.append('preferred_date', preferredDate);
-                requestFormData.append('preferred_day_of_week', preferredDay);
                 requestFormData.append('instrument_ids_json', JSON.stringify(uniqueInstrumentIds));
                 if (paymentProofFile) {
                     requestFormData.append('package_payment_proof_file', paymentProofFile);
@@ -442,5 +428,4 @@
             document.getElementById('walkinStudentSearch')?.addEventListener('change', handleWalkinStudentChange);
             document.getElementById('walkinPackageSelect')?.addEventListener('change', updateWalkinPackageUI);
             document.getElementById('walkinPaymentType')?.addEventListener('change', updateWalkinPackageUI);
-            document.getElementById('walkinPreferredDate')?.addEventListener('change', updateWalkinPreferredDay);
         });

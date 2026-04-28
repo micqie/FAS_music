@@ -163,6 +163,20 @@ class Admin
         }
     }
 
+    private function ensureStudentAgeVerificationProofColumn()
+    {
+        if ($this->hasStudentColumn('age_verification_proof_path')) return;
+        try {
+            if ($this->hasStudentColumn('registration_proof_path')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN age_verification_proof_path VARCHAR(255) NULL AFTER registration_proof_path");
+            } else {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN age_verification_proof_path VARCHAR(255) NULL");
+            }
+        } catch (PDOException $e) {
+            // Keep API working even if alter fails
+        }
+    }
+
     private function extractRegistrationProofPathFromNotes($notes)
     {
         $raw = trim((string)($notes ?? ''));
@@ -214,8 +228,10 @@ class Admin
     public function getPendingRegistrations()
     {
         $this->ensureStudentRegistrationProofColumn();
+        $this->ensureStudentAgeVerificationProofColumn();
         $this->ensureStudentRegistrationSourceColumn();
         $hasProofCol = $this->hasStudentColumn('registration_proof_path');
+        $hasAgeProofCol = $this->hasStudentColumn('age_verification_proof_path');
         $hasSourceCol = $this->hasStudentColumn('registration_source');
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
         $branchSql = $branchId > 0 ? " AND s.branch_id = ?" : "";
@@ -234,6 +250,7 @@ class Admin
                       AND rp.status = 'Paid'
                 ), 0.00) AS registration_fee_paid,
                 " . ($hasProofCol ? "s.registration_proof_path" : "NULL") . " AS registration_proof_path,
+                " . ($hasAgeProofCol ? "s.age_verification_proof_path" : "NULL") . " AS age_verification_proof_path,
                 " . ($hasSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                 'Pending' AS registration_status,
                 s.created_at AS created_at,
@@ -271,8 +288,10 @@ class Admin
     public function getAllRegistrations()
     {
         $this->ensureStudentRegistrationProofColumn();
+        $this->ensureStudentAgeVerificationProofColumn();
         $this->ensureStudentRegistrationSourceColumn();
         $hasProofCol = $this->hasStudentColumn('registration_proof_path');
+        $hasAgeProofCol = $this->hasStudentColumn('age_verification_proof_path');
         $hasSourceCol = $this->hasStudentColumn('registration_source');
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
         $branchSql = $branchId > 0 ? " AND s.branch_id = ?" : "";
@@ -291,6 +310,7 @@ class Admin
                       AND rp.status = 'Paid'
                 ), 0.00) AS registration_fee_paid,
                 " . ($hasProofCol ? "s.registration_proof_path" : "NULL") . " AS registration_proof_path,
+                " . ($hasAgeProofCol ? "s.age_verification_proof_path" : "NULL") . " AS age_verification_proof_path,
                 " . ($hasSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                 CASE
                     WHEN EXISTS (
@@ -749,8 +769,10 @@ class Admin
 
         try {
             $this->ensureStudentRegistrationProofColumn();
+            $this->ensureStudentAgeVerificationProofColumn();
             $this->ensureStudentRegistrationSourceColumn();
             $hasProofCol = $this->hasStudentColumn('registration_proof_path');
+            $hasAgeProofCol = $this->hasStudentColumn('age_verification_proof_path');
             $hasSourceCol = $this->hasStudentColumn('registration_source');
             $branchSql = $branchId > 0 ? " AND s.branch_id = ?" : "";
             $stmt = $this->conn->prepare("
@@ -801,6 +823,7 @@ class Admin
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
             if (!$hasProofCol) $student['registration_proof_path'] = null;
+            if (!$hasAgeProofCol) $student['age_verification_proof_path'] = null;
 
             // Get guardians
             $stmtGuardians = $this->conn->prepare("

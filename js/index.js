@@ -1265,10 +1265,6 @@ async function loadPendingRequests() {
             const instruments = Array.isArray(r.instruments) && r.instruments.length
                 ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
                 : '—';
-            const schedule = r.preferred_day_of_week
-                ? `${escapeHtml(r.preferred_day_of_week)}`
-                : '—';
-            const prefDate = r.preferred_date ? new Date(r.preferred_date).toLocaleDateString() : '—';
             const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
             const paymentMethod = escapeHtml(r.payment_method || '—');
             const payableNow = Number(r.payable_now || 0);
@@ -1292,10 +1288,7 @@ async function loadPendingRequests() {
                     </td>
                     <td class="px-6 py-4 text-sm text-slate-700">${pkg}</td>
                     <td class="px-6 py-4 text-sm text-slate-700">${instruments}</td>
-                    <td class="px-6 py-4 text-sm text-slate-700">
-                        <div>${schedule}</div>
-                        <div class="text-xs text-slate-500 mt-1">Date: ${prefDate}</div>
-                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-700">Based on instructor availability</td>
                     <td class="px-6 py-4 text-sm text-slate-700">${paymentCellHtml}</td>
                     <td class="px-6 py-4 text-sm font-semibold text-gold-600">${formatCurrencyPHP(payableNow)}</td>
                     <td class="px-6 py-4">
@@ -1345,8 +1338,6 @@ function openPendingRequestViewModal(requestId) {
             return typeName ? `${instrumentName} (${typeName})` : instrumentName;
         }).join(', ')
         : '—';
-    const preferredDay = escapeHtml(req.preferred_day_of_week || '—');
-    const preferredDate = req.preferred_date ? new Date(req.preferred_date).toLocaleDateString() : '—';
     const paymentType = escapeHtml(req.payment_type || 'Partial Payment');
     const paymentMethod = escapeHtml(req.payment_method || '—');
     const payableNow = Number(req.payable_now || 0);
@@ -1366,8 +1357,7 @@ function openPendingRequestViewModal(requestId) {
                     <div><span class="font-semibold text-slate-900">Branch:</span> ${escapeHtml(req.branch_name || '—')}</div>
                     <div><span class="font-semibold text-slate-900">Package:</span> ${escapeHtml(req.package_name || '—')}</div>
                     <div><span class="font-semibold text-slate-900">Selected Instrument:</span> ${instruments}</div>
-                    <div><span class="font-semibold text-slate-900">Preferred Day:</span> ${preferredDay}</div>
-                    <div><span class="font-semibold text-slate-900">Preferred Date:</span> ${preferredDate}</div>
+                    <div><span class="font-semibold text-slate-900">Schedule Basis:</span> Instructor availability</div>
                     <div><span class="font-semibold text-slate-900">Payment Type:</span> ${paymentType}</div>
                     <div><span class="font-semibold text-slate-900">Payment Method:</span> ${paymentMethod}</div>
                     <div><span class="font-semibold text-slate-900">Amount Paid:</span> ${formatCurrencyPHP(payableNow)}</div>
@@ -2530,11 +2520,10 @@ function initStudentRequestSection(student, requestMeta) {
     const availabilityCalendar = document.getElementById('studentAvailabilityCalendar');
     const form = document.getElementById('studentPackageRequestForm');
     const submitBtn = document.getElementById('studentSubmitRequestBtn');
-    const preferredDateEl = document.getElementById('studentRequestPreferredDate');
     const paymentProofEl = document.getElementById('studentRequestPaymentProof');
     const autoDayEl = document.getElementById('studentRequestAutoDay');
 
-    if (!statusEl || !packageSelect || !amountEl || !instrumentsContainer || !paymentModeEl || !paymentMethodEl || !availabilityCalendar || !form || !submitBtn || !preferredDateEl) {
+    if (!statusEl || !packageSelect || !amountEl || !instrumentsContainer || !paymentModeEl || !paymentMethodEl || !availabilityCalendar || !form || !submitBtn) {
         return;
     }
 
@@ -2597,17 +2586,9 @@ function initStudentRequestSection(student, requestMeta) {
     paymentModeEl.onchange = updateRequestPackageUI;
     updateRequestPackageUI();
 
-    const today = new Date();
-    preferredDateEl.min = today.toISOString().split('T')[0];
-    const updateAutoDay = () => {
-        const day = getDayOfWeekFromDate(preferredDateEl.value || '');
-        if (autoDayEl) {
-            autoDayEl.textContent = day ? `Selected day: ${day}` : 'Day will appear here after you choose a date.';
-        }
-    };
-    preferredDateEl.addEventListener('change', updateAutoDay);
-    preferredDateEl.addEventListener('input', updateAutoDay);
-    updateAutoDay();
+    if (autoDayEl) {
+        autoDayEl.textContent = 'Final schedule will be based on instructor availability and branch assignment.';
+    }
 
     const regStatus = String(student.registration_status || 'Pending');
     const profileComplete = isRegistrationProfileComplete(student);
@@ -2638,8 +2619,6 @@ function initStudentRequestSection(student, requestMeta) {
         if (submitBtn.disabled) return;
 
         const packageId = parseInt(packageSelect.value, 10);
-        const preferredDate = preferredDateEl.value || '';
-        const preferredDay = getDayOfWeekFromDate(preferredDate);
         const paymentType = String(paymentModeEl.value || '').trim();
         const paymentMethod = String(paymentMethodEl.value || '').trim();
         const instrumentIds = Array.from(document.querySelectorAll('.student-request-instrument'))
@@ -2647,8 +2626,8 @@ function initStudentRequestSection(student, requestMeta) {
             .filter(v => !Number.isNaN(v) && v > 0);
         const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
 
-        if (!packageId || !preferredDate || !preferredDay || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
-            showMessage('Please complete package, instruments, preferred date, payment mode, and payment method.', 'error');
+        if (!packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
+            showMessage('Please complete package, instruments, payment mode, and payment method.', 'error');
             return;
         }
         if (!['Full Payment', 'Partial Payment', 'Installment'].includes(paymentType)) {
@@ -2679,8 +2658,6 @@ function initStudentRequestSection(student, requestMeta) {
             requestFormData.append('package_id', String(packageId));
             requestFormData.append('payment_type', paymentType);
             requestFormData.append('payment_method', paymentMethod);
-            requestFormData.append('preferred_date', preferredDate);
-            requestFormData.append('preferred_day_of_week', preferredDay);
             requestFormData.append('instrument_ids_json', JSON.stringify(uniqueInstrumentIds));
             if (paymentProofFile) {
                 requestFormData.append('package_payment_proof_file', paymentProofFile);
@@ -2824,17 +2801,9 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                     <!-- Guardian -->
                     <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
                         <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">1. Guardian</div>
-                        <div class="space-y-3">
-                            <label class="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-200 font-semibold">
-                                <input type="radio" id="guardianModeWith" name="guardian_mode" value="With Guardian" class="accent-gold-500">
-                                With Guardian (Recommended for minors)
-                            </label>
-                            <label class="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-200 font-semibold">
-                                <input type="radio" id="guardianModeWithout" name="guardian_mode" value="Without Guardian" class="accent-gold-500">
-                                Without Guardian
-                            </label>
+                        <div id="guardianAutoStatus" class="rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
+                            Select the student's date of birth to check if guardian details are required.
                         </div>
-
                         <div id="guardianInputs" class="mt-4 space-y-3 hidden">
                             <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200">Guardian Email *</label>
                             <div class="flex gap-2">
@@ -2865,7 +2834,7 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                             </div>
                         </div>
                         <div class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-                            If you already have a guardian account, use the email above to link it. If no guardian account exists yet, the system will create one using the guardian email with temporary password <span class="font-semibold text-zinc-700 dark:text-zinc-200">fasmusic@2020</span>.
+                            Guardian details are required automatically for students aged 18 and below. If a guardian account does not exist yet, the system will create one using the guardian email with temporary password <span class="font-semibold text-zinc-700 dark:text-zinc-200">fasmusic@2020</span>.
                         </div>
                     </div>
 
@@ -2948,6 +2917,11 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                                 <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
                                 <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">Upload JPG/PNG/WEBP/PDF for admin verification.</div>
                             </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof ID *</label>
+                                <input type="file" id="regAgeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
+                                <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">Upload a valid ID or document showing the student's birth date. Required for online registration only.</div>
+                            </div>
                             <div id="regPayStatus" class="text-xs text-zinc-500 dark:text-zinc-300"></div>
                         </form>
                     </div>
@@ -2966,8 +2940,7 @@ function renderStudentOnboardingSteps(student, meta, portal) {
 }
 
 function wireStudentOnboardingActions(student, meta, portal) {
-    const guardianModeWith = document.getElementById('guardianModeWith');
-    const guardianModeWithout = document.getElementById('guardianModeWithout');
+    const guardianAutoStatus = document.getElementById('guardianAutoStatus');
     const guardianInputs = document.getElementById('guardianInputs');
     const guardianFirstNameInput = document.getElementById('guardianFirstNameInput');
     const guardianLastNameInput = document.getElementById('guardianLastNameInput');
@@ -2981,15 +2954,30 @@ function wireStudentOnboardingActions(student, meta, portal) {
     const paymentForm = document.getElementById('registrationPaymentForm');
     const regPayStatus = document.getElementById('regPayStatus');
     const regPayProof = document.getElementById('regPayProof');
+    const regAgeProof = document.getElementById('regAgeProof');
     const submitAllBtn = document.getElementById('submitRegistrationRequestBtn');
     const submitAllStatus = document.getElementById('submitRegistrationStatus');
 
     const hasGuardian = Array.isArray(portal?.guardians) && portal.guardians.length > 0;
-    const toggleGuardianInputs = () => {
-        const withGuardian = guardianModeWith?.checked;
-        if (guardianInputs) guardianInputs.classList.toggle('hidden', !withGuardian);
-        if (guardianInfoBox) guardianInfoBox.classList.toggle('hidden', !withGuardian);
-        if (!withGuardian) {
+    const getCurrentAge = () => computeAgeFromDob(document.getElementById('regDob')?.value || '');
+    const isGuardianRequired = () => {
+        const age = getCurrentAge();
+        return age !== null && age <= 18;
+    };
+    const syncGuardianState = () => {
+        const mustHaveGuardian = isGuardianRequired();
+        if (guardianInputs) guardianInputs.classList.toggle('hidden', !mustHaveGuardian);
+        if (guardianInfoBox) guardianInfoBox.classList.toggle('hidden', !mustHaveGuardian);
+        if (guardianAutoStatus) {
+            if (mustHaveGuardian) {
+                guardianAutoStatus.textContent = 'Guardian details are required because the student is 18 years old or below.';
+            } else if (getCurrentAge() === null) {
+                guardianAutoStatus.textContent = "Select the student's date of birth to check if guardian details are required.";
+            } else {
+                guardianAutoStatus.textContent = 'Guardian details are not required because the student is above 18 years old.';
+            }
+        }
+        if (!mustHaveGuardian) {
             if (guardianEmailInput) guardianEmailInput.value = '';
             if (guardianFirstNameInput) guardianFirstNameInput.value = '';
             if (guardianLastNameInput) guardianLastNameInput.value = '';
@@ -2999,16 +2987,6 @@ function wireStudentOnboardingActions(student, meta, portal) {
         }
     };
 
-    if (guardianModeWith && guardianModeWithout) {
-        if (hasGuardian) {
-            guardianModeWith.checked = true;
-        } else {
-            guardianModeWithout.checked = true;
-        }
-        toggleGuardianInputs();
-        guardianModeWith.addEventListener('change', toggleGuardianInputs);
-        guardianModeWithout.addEventListener('change', toggleGuardianInputs);
-    }
     if (guardianEmailInput && portal?.guardians?.[0]?.email) {
         const g = portal.guardians[0];
         guardianEmailInput.value = g.email || '';
@@ -3067,10 +3045,13 @@ function wireStudentOnboardingActions(student, meta, portal) {
         const updateAge = () => {
             const age = computeAgeFromDob(regDob.value || '');
             regAge.value = age === null ? '' : String(age);
+            syncGuardianState();
         };
         regDob.addEventListener('change', updateAge);
         regDob.addEventListener('input', updateAge);
         updateAge();
+    } else {
+        syncGuardianState();
     }
 
     if (paymentForm) {
@@ -3079,13 +3060,8 @@ function wireStudentOnboardingActions(student, meta, portal) {
 
     if (submitAllBtn) {
         submitAllBtn.onclick = async () => {
-            const mode = guardianModeWith?.checked ? 'With Guardian' : (guardianModeWithout?.checked ? 'Without Guardian' : '');
-            if (!mode) {
-                showMessage('Please choose a guardian option.', 'error');
-                return;
-            }
-
-            if (mode === 'With Guardian') {
+            const guardianRequired = isGuardianRequired();
+            if (guardianRequired) {
                 if (!guardianEmailInput?.value?.trim()) {
                     showMessage('Guardian email is required.', 'error');
                     return;
@@ -3112,6 +3088,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
             const amount = 1000;
             const method = document.getElementById('regPayMethod')?.value || 'Other';
             const proofFile = regPayProof?.files && regPayProof.files[0] ? regPayProof.files[0] : null;
+            const ageProofFile = regAgeProof?.files && regAgeProof.files[0] ? regAgeProof.files[0] : null;
 
             if (!isRegistrationProfileComplete(payload)) {
                 showMessage('Please complete all required registration details.', 'error');
@@ -3121,6 +3098,10 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 showMessage('Upload proof of payment for admin approval.', 'error');
                 return;
             }
+            if (!ageProofFile) {
+                showMessage('Upload proof ID for age verification.', 'error');
+                return;
+            }
 
             submitAllBtn.disabled = true;
             submitAllBtn.textContent = 'Submitting...';
@@ -3128,16 +3109,20 @@ function wireStudentOnboardingActions(student, meta, portal) {
             if (regPayStatus) regPayStatus.textContent = '';
 
             try {
-                const details = {
-                    first_name: guardianFirstNameInput?.value?.trim() || '',
-                    last_name: guardianLastNameInput?.value?.trim() || '',
-                    phone: guardianPhoneInput?.value?.trim() || '',
-                    relationship: guardianRelationshipInput?.value?.trim() || ''
-                };
+                if (guardianRequired) {
+                    const details = {
+                        first_name: guardianFirstNameInput?.value?.trim() || '',
+                        last_name: guardianLastNameInput?.value?.trim() || '',
+                        phone: guardianPhoneInput?.value?.trim() || '',
+                        relationship: guardianRelationshipInput?.value?.trim() || ''
+                    };
 
-                const resGuardian = await setGuardianMode(student.student_id, mode, guardianEmailInput?.value?.trim() || '', details);
-                if (!resGuardian?.success) {
-                    throw new Error(resGuardian?.error || 'Failed to save guardian details.');
+                    const resGuardian = await setGuardianMode(student.student_id, 'With Guardian', guardianEmailInput?.value?.trim() || '', details);
+                    if (!resGuardian?.success) {
+                        throw new Error(resGuardian?.error || 'Failed to save guardian details.');
+                    }
+                } else if (hasGuardian) {
+                    // Preserve existing guardian links for adult students unless staff changes them manually.
                 }
 
                 const resReg = await axios.post(`${baseApiUrl}/students.php`, payload);
@@ -3150,6 +3135,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 formData.append('amount', String(amount));
                 formData.append('payment_method', String(method));
                 formData.append('registration_proof_file', proofFile);
+                formData.append('age_verification_proof_file', ageProofFile);
 
                 const resPay = await axios.post(`${baseApiUrl}/users.php?action=pay-registration-fee`, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
@@ -4046,26 +4032,6 @@ function updateWalkinPackageDetails() {
     `;
 }
 
-function updateWalkinPreferredDay() {
-    const dateEl = document.getElementById('walkinPreferredDate');
-    const dayEl = document.getElementById('walkinPreferredDay');
-    if (!dateEl || !dayEl) return;
-
-    const dateValue = dateEl.value || '';
-    if (!dateValue) {
-        dayEl.value = '';
-        return;
-    }
-
-    const selectedDate = new Date(`${dateValue}T00:00:00`);
-    if (Number.isNaN(selectedDate.getTime())) {
-        dayEl.value = '';
-        return;
-    }
-
-    dayEl.value = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
-}
-
 function getWalkinSelectedInstrumentIds() {
     return Array.from(document.querySelectorAll('#walkin_instrumentsContainer select[name="instruments[]"]'))
         .map(select => parseInt(select.value, 10))
@@ -4076,24 +4042,20 @@ function getWalkinSelectedInstrumentIds() {
 function getWalkinEnrollmentPayload() {
     const packageSelect = document.getElementById('walkinSessionPackageId');
     const paymentTypeEl = document.getElementById('walkin_paymentType');
-    const preferredDateEl = document.getElementById('walkinPreferredDate');
-    const preferredDayEl = document.getElementById('walkinPreferredDay');
     const paymentProofEl = document.getElementById('walkinPackagePaymentProof');
 
-    if (!packageSelect || !paymentTypeEl || !preferredDateEl || !preferredDayEl) {
+    if (!packageSelect || !paymentTypeEl) {
         return null;
     }
 
     const packageId = parseInt(packageSelect.value, 10);
     const paymentType = String(paymentTypeEl.value || '').trim();
-    const preferredDate = preferredDateEl.value || '';
-    const preferredDay = preferredDayEl.value || '';
     const instrumentIds = getWalkinSelectedInstrumentIds();
     const selectedOption = packageSelect.options[packageSelect.selectedIndex];
     const maxInstruments = Number(selectedOption?.getAttribute('data-max-instruments') || 1);
 
-    if (!packageId || !paymentType || !preferredDate || !preferredDay || instrumentIds.length < 1) {
-        return { error: 'Please complete package, payment type, instruments, preferred date, and preferred day.' };
+    if (!packageId || !paymentType || instrumentIds.length < 1) {
+        return { error: 'Please complete package, payment type, and instruments.' };
     }
 
     if (!['Full Payment', 'Partial Payment', 'Installment'].includes(paymentType)) {
@@ -4107,8 +4069,6 @@ function getWalkinEnrollmentPayload() {
     return {
         packageId,
         paymentType,
-        preferredDate,
-        preferredDay,
         instrumentIds,
         paymentProofFile: paymentProofEl && paymentProofEl.files && paymentProofEl.files[0] ? paymentProofEl.files[0] : null
     };
@@ -4125,8 +4085,6 @@ async function submitWalkinEnrollmentRequest(studentId) {
     requestFormData.append('student_id', String(Number(studentId)));
     requestFormData.append('package_id', String(enrollment.packageId));
     requestFormData.append('payment_type', enrollment.paymentType);
-    requestFormData.append('preferred_date', enrollment.preferredDate);
-    requestFormData.append('preferred_day_of_week', enrollment.preferredDay);
     requestFormData.append('instrument_ids_json', JSON.stringify(enrollment.instrumentIds));
     if (enrollment.paymentProofFile) {
         requestFormData.append('package_payment_proof_file', enrollment.paymentProofFile);
@@ -4139,8 +4097,6 @@ function setupWalkinEnrollmentForm() {
     const branchSelect = document.getElementById('walkin_branch_id');
     const packageSelect = document.getElementById('walkinSessionPackageId');
     const paymentTypeEl = document.getElementById('walkin_paymentType');
-    const preferredDateEl = document.getElementById('walkinPreferredDate');
-
     if (branchSelect && !branchSelect.dataset.walkinEnrollmentBound) {
         branchSelect.addEventListener('change', async function () {
             const branchId = Number(this.value || 0);
@@ -4166,11 +4122,6 @@ function setupWalkinEnrollmentForm() {
         paymentTypeEl.dataset.walkinEnrollmentBound = '1';
     }
 
-    if (preferredDateEl && !preferredDateEl.dataset.walkinEnrollmentBound) {
-        preferredDateEl.addEventListener('change', updateWalkinPreferredDay);
-        preferredDateEl.dataset.walkinEnrollmentBound = '1';
-    }
-
     const activeBranchId = Number(branchSelect?.value || 0);
     if (activeBranchId > 0) {
         loadWalkinPackages(activeBranchId);
@@ -4179,7 +4130,6 @@ function setupWalkinEnrollmentForm() {
         loadWalkinPackages();
     }
     updateWalkinPackageDetails();
-    updateWalkinPreferredDay();
     calculateWalkinTotalFee();
 }
 
@@ -4562,10 +4512,15 @@ function renderRegistrationsTable() {
             : 'bg-sky-100 text-sky-700';
         const sourceLabel = registrationSource === 'walkin' ? 'Walk-In' : 'Online';
         const registrationProofLink = reg.registration_proof_path
-            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 underline mt-1"><i class="fas fa-file-alt"></i>Proof</a>`
+            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 underline mt-1"><i class="fas fa-file-alt"></i>Payment proof</a>`
             : (registrationSource === 'walkin'
                 ? '<div class="text-xs text-slate-500 mt-1">Walk-in payment handled at the branch</div>'
                 : '<div class="text-xs text-slate-500 mt-1">No proof uploaded</div>');
+        const ageProofLink = reg.age_verification_proof_path
+            ? `<a href="${buildPublicFileUrl(reg.age_verification_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-800 underline mt-1"><i class="fas fa-id-card"></i>Proof ID</a>`
+            : (registrationSource === 'walkin'
+                ? '<div class="text-xs text-slate-500 mt-1">Proof ID not required for walk-in</div>'
+                : '<div class="text-xs text-slate-500 mt-1">No proof ID uploaded</div>');
 
         return `
             <tr class="hover:bg-gold-500/5 transition">
@@ -4583,6 +4538,7 @@ function renderRegistrationsTable() {
                     <div class="text-slate-900 font-medium" style="color:#0f172a;">₱${parseFloat(reg.registration_fee_amount || 0).toFixed(2)}</div>
                     ${remaining > 0 ? `<div class="text-sm text-red-600">Remaining: ₱${remaining.toFixed(2)}</div>` : ''}
                     ${registrationProofLink}
+                    ${ageProofLink}
                 </td>
                 <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded text-xs font-semibold ${statusClass}">
@@ -4697,6 +4653,7 @@ async function viewDetails(studentId) {
                             <p><span class="text-zinc-400">Paid Amount:</span> <span class="text-white">₱${parseFloat(student.registration_fee_paid || 0).toFixed(2)}</span></p>
                             <p><span class="text-zinc-400">Remaining:</span> <span class="text-white">₱${(parseFloat(student.registration_fee_amount || 0) - parseFloat(student.registration_fee_paid || 0)).toFixed(2)}</span></p>
                             <p><span class="text-zinc-400">Payment Proof:</span> <span class="text-white">${student.registration_proof_path ? `<a class="text-gold-300 underline" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.registration_proof_path)}">View file</a>` : (String(student.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A')}</span></p>
+                            <p><span class="text-zinc-400">Proof ID:</span> <span class="text-white">${student.age_verification_proof_path ? `<a class="text-gold-300 underline" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.age_verification_proof_path)}">View file</a>` : (String(student.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A')}</span></p>
                         </div>
                     </div>
                 </div>
@@ -5043,4 +5000,3 @@ document.addEventListener('DOMContentLoaded', () => {
         initGuardianStudentsPage();
     }
 });
-

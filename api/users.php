@@ -105,6 +105,20 @@ class User
         }
     }
 
+    private function ensureStudentAgeVerificationProofColumn()
+    {
+        if ($this->hasStudentColumn('age_verification_proof_path')) return;
+        try {
+            if ($this->hasStudentColumn('registration_proof_path')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN age_verification_proof_path VARCHAR(255) NULL AFTER registration_proof_path");
+            } else {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN age_verification_proof_path VARCHAR(255) NULL");
+            }
+        } catch (PDOException $e) {
+            // Keep API working even if alter fails
+        }
+    }
+
     private function getRegistrationPaidAmount($studentId)
     {
         $stmt = $this->conn->prepare("
@@ -220,6 +234,47 @@ class User
         $targetPath = $baseDir . DIRECTORY_SEPARATOR . $safeName;
         if (!move_uploaded_file($tmpName, $targetPath)) {
             throw new Exception('Unable to save payment proof file.');
+        }
+
+        return 'uploads/payment_proofs/' . $scope . '/' . $safeName;
+    }
+
+    private function storeVerificationProofUpload($file, $scope = 'age_verification')
+    {
+        if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+            throw new Exception('Failed to upload ID proof file.');
+        }
+
+        $maxBytes = 5 * 1024 * 1024;
+        $size = (int)($file['size'] ?? 0);
+        if ($size < 1 || $size > $maxBytes) {
+            throw new Exception('ID proof file must be between 1 byte and 5MB.');
+        }
+
+        $tmpName = $file['tmp_name'] ?? '';
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+            throw new Exception('Invalid uploaded ID proof file.');
+        }
+
+        $allowedExt = ['jpg', 'jpeg', 'png', 'pdf', 'webp'];
+        $originalName = (string)($file['name'] ?? '');
+        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowedExt, true)) {
+            throw new Exception('ID proof must be JPG, JPEG, PNG, WEBP, or PDF.');
+        }
+
+        $baseDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'payment_proofs' . DIRECTORY_SEPARATOR . $scope;
+        if (!is_dir($baseDir) && !mkdir($baseDir, 0777, true) && !is_dir($baseDir)) {
+            throw new Exception('Unable to create upload directory.');
+        }
+
+        $safeName = date('YmdHis') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+        $targetPath = $baseDir . DIRECTORY_SEPARATOR . $safeName;
+        if (!move_uploaded_file($tmpName, $targetPath)) {
+            throw new Exception('Unable to save ID proof file.');
         }
 
         return 'uploads/payment_proofs/' . $scope . '/' . $safeName;
@@ -660,6 +715,7 @@ class User
         $data['registration_fee_amount'] = 1000;
 
         $registrationProofPath = null;
+        $ageVerificationProofPath = null;
         if ($isMultipart && isset($_FILES['registration_proof_file'])) {
             try {
                 $registrationProofPath = $this->storePaymentProofUpload($_FILES['registration_proof_file'], 'registration');
@@ -667,12 +723,23 @@ class User
                 $this->sendJSON(['error' => $e->getMessage()], 400);
             }
         }
+        if ($isMultipart && isset($_FILES['age_verification_proof_file'])) {
+            try {
+                $ageVerificationProofPath = $this->storeVerificationProofUpload($_FILES['age_verification_proof_file'], 'age_verification');
+            } catch (Exception $e) {
+                $this->sendJSON(['error' => $e->getMessage()], 400);
+            }
+        }
         if (!$isAdminRegistration && empty($registrationProofPath)) {
             $this->sendJSON(['error' => 'Registration payment proof is required.'], 400);
+        }
+        if (!$isAdminRegistration && empty($ageVerificationProofPath)) {
+            $this->sendJSON(['error' => 'Proof ID is required for online registration age verification.'], 400);
         }
 
         try {
             $this->ensureStudentRegistrationProofColumn();
+            $this->ensureStudentAgeVerificationProofColumn();
             $this->ensureStudentRegistrationColumns();
             $this->ensureStudentRegistrationSourceColumn();
             $this->conn->beginTransaction();
@@ -748,6 +815,14 @@ class User
                     WHERE student_id = ?
                 ");
                 $stmtProof->execute([$registrationProofPath, $studentId]);
+            }
+            if ($ageVerificationProofPath && $this->hasStudentColumn('age_verification_proof_path')) {
+                $stmtAgeProof = $this->conn->prepare("
+                    UPDATE tbl_students
+                    SET age_verification_proof_path = ?
+                    WHERE student_id = ?
+                ");
+                $stmtAgeProof->execute([$ageVerificationProofPath, $studentId]);
             }
             if ($isAdminRegistration) {
                 $stmtRegPayment = $this->conn->prepare("
@@ -886,6 +961,7 @@ class User
                 'registration_status' => $regStatus,
                 'registration_fee_amount' => $data['registration_fee_amount'],
                 'registration_proof_path' => $registrationProofPath,
+                'age_verification_proof_path' => $ageVerificationProofPath,
                 'account_status' => $isAdminRegistration ? 'Active - Can log in' : 'Inactive - Pending Admin Approval'
             ]);
 
@@ -956,11 +1032,13 @@ class User
         }
 
         try {
+            $this->ensureStudentAgeVerificationProofColumn();
             $this->conn->beginTransaction();
 
             $stmtStudent = $this->conn->prepare("
                 SELECT student_id, email, status,
-                       first_name, last_name, phone, branch_id, date_of_birth, address
+                       first_name, last_name, phone, branch_id, date_of_birth, address,
+                       registration_source, age_verification_proof_path
                  FROM tbl_students
                  WHERE student_id = ?
                  LIMIT 1
@@ -980,9 +1058,17 @@ class User
             }
 
             $registrationProofPath = null;
+            $ageVerificationProofPath = null;
             if ($isMultipart && isset($_FILES['registration_proof_file'])) {
                 try {
                     $registrationProofPath = $this->storePaymentProofUpload($_FILES['registration_proof_file'], 'registration');
+                } catch (Exception $e) {
+                    $this->sendJSON(['error' => $e->getMessage()], 400);
+                }
+            }
+            if ($isMultipart && isset($_FILES['age_verification_proof_file'])) {
+                try {
+                    $ageVerificationProofPath = $this->storeVerificationProofUpload($_FILES['age_verification_proof_file'], 'age_verification');
                 } catch (Exception $e) {
                     $this->sendJSON(['error' => $e->getMessage()], 400);
                 }
@@ -991,6 +1077,12 @@ class User
             $paidSoFar = $this->getRegistrationPaidAmount((int)$data['student_id']);
             if ($paidSoFar >= 1000.0) {
                 throw new Exception("Registration fee already paid");
+            }
+
+            $registrationSource = strtolower(trim((string)($student['registration_source'] ?? 'online')));
+            $isWalkInRegistration = $registrationSource === 'walkin';
+            if (!$isWalkInRegistration && !$ageVerificationProofPath && empty($student['age_verification_proof_path'])) {
+                throw new Exception("Proof ID is required for online registration age verification.");
             }
 
             $newPaid = $paidSoFar + (float)$data['amount'];
@@ -1019,6 +1111,17 @@ class User
                     $stmtProof->execute([$registrationProofPath, (int)$data['student_id']]);
                 }
             }
+            if ($ageVerificationProofPath) {
+                $this->ensureStudentAgeVerificationProofColumn();
+                if ($this->hasStudentColumn('age_verification_proof_path')) {
+                    $stmtAgeProof = $this->conn->prepare("
+                        UPDATE tbl_students
+                        SET age_verification_proof_path = ?
+                        WHERE student_id = ?
+                    ");
+                    $stmtAgeProof->execute([$ageVerificationProofPath, (int)$data['student_id']]);
+                }
+            }
 
             $this->conn->commit();
 
@@ -1029,7 +1132,8 @@ class User
                 'remaining_amount' => max(0, $remaining),
                 'registration_status' => $newStatus,
                 'receipt_number' => $receipt,
-                'registration_proof_path' => $registrationProofPath
+                'registration_proof_path' => $registrationProofPath,
+                'age_verification_proof_path' => $ageVerificationProofPath
             ]);
 
         } catch (Exception $e) {

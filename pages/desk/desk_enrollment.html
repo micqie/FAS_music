@@ -73,11 +73,14 @@
             </div>
         </div>
         <nav class="mt-10 space-y-2">
+              <a href="desk_attendance.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-clipboard-check text-slate-400"></i> Attendance
+                </a>
+                <a href="desk_makeup.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-triangle-exclamation text-slate-400"></i> Make-Up List
+                </a>
             <a id="navDashboardLink" href="desk_scanner.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
                 <i class="fas fa-qrcode text-slate-400"></i> Scanner
-            </a>
-            <a href="desk_makeup.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
-                <i class="fas fa-triangle-exclamation text-slate-400"></i> Make-Up List
             </a>
             <a href="desk_enrollment.html?view=pending" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600/30 text-white border border-blue-500/40">
                 <i class="fas fa-user-graduate text-blue-200"></i> Enrollments
@@ -553,15 +556,8 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Preferred Date *</label>
-                        <input type="date" id="walkinPreferredDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Preferred Day *</label>
-                        <input type="text" id="walkinPreferredDay" readonly class="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700" placeholder="Auto from date">
-                    </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    Final schedule will be based on instructor availability.
                 </div>
 
                 <div>
@@ -603,6 +599,9 @@
         let managerPageMode = 'enrollments';
         let assignRequestTeacherCandidates = [];
         let activeAssignRequest = null;
+        let assignRequestAvailabilitySlots = [];
+        let assignRequestAvailabilityMonth = '';
+        let assignRequestAvailabilitySelectedDate = '';
         let walkinStudents = [];
         let walkinMeta = null;
         let walkinStudentLookup = new Map();
@@ -979,17 +978,13 @@
             const packageSelect = document.getElementById('walkinPackageSelect');
             const paymentTypeEl = document.getElementById('walkinPaymentType');
             const paymentMethodEl = document.getElementById('walkinPaymentMethod');
-            const preferredDateEl = document.getElementById('walkinPreferredDate');
-            const preferredDayEl = document.getElementById('walkinPreferredDay');
             const paymentProofEl = document.getElementById('walkinPaymentProof');
-            if (!studentSelect || !packageSelect || !paymentTypeEl || !paymentMethodEl || !preferredDateEl || !preferredDayEl) return;
+            if (!studentSelect || !packageSelect || !paymentTypeEl || !paymentMethodEl) return;
 
             const selectedStudent = resolveWalkinSelectedStudent();
             const email = studentSelect.value || '';
             const studentId = Number(selectedStudent?.student_id || 0);
             const packageId = parseInt(packageSelect.value, 10);
-            const preferredDate = preferredDateEl.value || '';
-            const preferredDay = preferredDayEl.value || '';
             const paymentType = String(paymentTypeEl.value || '').trim();
             const paymentMethod = String(paymentMethodEl.value || '').trim();
             const instrumentIds = Array.from(document.querySelectorAll('#walkinInstrumentsContainer .student-request-instrument'))
@@ -997,8 +992,8 @@
                 .filter(value => !Number.isNaN(value) && value > 0);
             const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
 
-            if (!email || !studentId || !packageId || !preferredDate || !preferredDay || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
-                showMessage('Please complete student, package, instruments, preferred date/day, payment type, and payment method.', 'error');
+            if (!email || !studentId || !packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
+                showMessage('Please complete student, package, instruments, payment type, and payment method.', 'error');
                 return;
             }
 
@@ -1025,8 +1020,6 @@
                 requestFormData.append('package_id', String(packageId));
                 requestFormData.append('payment_type', paymentType);
                 requestFormData.append('payment_method', paymentMethod);
-                requestFormData.append('preferred_date', preferredDate);
-                requestFormData.append('preferred_day_of_week', preferredDay);
                 requestFormData.append('instrument_ids_json', JSON.stringify(uniqueInstrumentIds));
                 if (paymentProofFile) {
                     requestFormData.append('package_payment_proof_file', paymentProofFile);
@@ -1180,10 +1173,6 @@
                     const instruments = Array.isArray(r.instruments) && r.instruments.length
                         ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
                         : '—';
-                    const schedule = r.preferred_day_of_week
-                        ? `${escapeHtml(r.preferred_day_of_week)}`
-                        : '—';
-                    const prefDate = r.preferred_date ? new Date(r.preferred_date).toLocaleDateString() : '—';
                     const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
                     const paymentMethod = escapeHtml(r.payment_method || '—');
                     const payableNow = Number(r.payable_now || 0);
@@ -1199,10 +1188,7 @@
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-700">${pkg}</td>
                             <td class="px-6 py-4 text-sm text-slate-700">${instruments}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">
-                                <div>${schedule}</div>
-                                <div class="text-xs text-slate-500 mt-1">Date: ${prefDate}</div>
-                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-700">Based on instructor availability</td>
                             <td class="px-6 py-4 text-sm text-slate-700">
                                 <div class="font-semibold text-slate-800">${paymentType}</div>
                                 <div class="text-xs text-slate-500 mt-1">Method: ${paymentMethod}</div>
@@ -1253,8 +1239,6 @@
                     return typeName ? `${instrumentName} (${typeName})` : instrumentName;
                 }).join(', ')
                 : '—';
-            const preferredDay = escapeHtml(req.preferred_day_of_week || '—');
-            const preferredDate = req.preferred_date ? new Date(req.preferred_date).toLocaleDateString() : '—';
             const paymentType = escapeHtml(req.payment_type || 'Partial Payment');
             const paymentMethod = escapeHtml(req.payment_method || '—');
             const payableNow = Number(req.payable_now || 0);
@@ -1274,8 +1258,7 @@
                             <div><span class="font-semibold text-slate-900">Branch:</span> ${escapeHtml(req.branch_name || '—')}</div>
                             <div><span class="font-semibold text-slate-900">Package:</span> ${escapeHtml(req.package_name || '—')}</div>
                             <div><span class="font-semibold text-slate-900">Selected Instrument:</span> ${instruments}</div>
-                            <div><span class="font-semibold text-slate-900">Preferred Day:</span> ${preferredDay}</div>
-                            <div><span class="font-semibold text-slate-900">Preferred Date:</span> ${preferredDate}</div>
+                            <div><span class="font-semibold text-slate-900">Schedule Basis:</span> Instructor availability</div>
                             <div><span class="font-semibold text-slate-900">Payment Type:</span> ${paymentType}</div>
                             <div><span class="font-semibold text-slate-900">Payment Method:</span> ${paymentMethod}</div>
                             <div><span class="font-semibold text-slate-900">Amount Paid:</span> ${formatCurrencyPHP(payableNow)}</div>
@@ -1381,41 +1364,152 @@
             });
         }
 
+        function formatAssignAvailabilityMonthLabel(monthKey) {
+            if (!monthKey) return '';
+            const parts = String(monthKey).split('-');
+            if (parts.length !== 2) return monthKey;
+            const year = Number(parts[0]);
+            const month = Number(parts[1]);
+            const dt = new Date(year, month - 1, 1);
+            return Number.isNaN(dt.getTime())
+                ? monthKey
+                : dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        }
+
+        function shiftAssignAvailabilityMonth(monthKey, delta) {
+            const parts = String(monthKey || '').split('-');
+            const year = Number(parts[0] || 0);
+            const month = Number(parts[1] || 0);
+            const base = !Number.isNaN(year) && !Number.isNaN(month) && month >= 1 && month <= 12
+                ? new Date(year, month - 1, 1)
+                : new Date();
+            base.setMonth(base.getMonth() + delta);
+            return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        function setAssignRequestAvailabilityMonth(monthKey) {
+            assignRequestAvailabilityMonth = monthKey || '';
+            renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate);
+        }
+
+        function selectAssignRequestAvailabilityDate(dateKey) {
+            assignRequestAvailabilitySelectedDate = dateKey || '';
+            renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate);
+        }
+
         function renderAssignRequestAvailability(slots, selectedDate = '') {
             const listEl = document.getElementById('assignRequestAvailabilityList');
             const hintEl = document.getElementById('assignRequestAvailabilityHint');
             if (!listEl || !hintEl) return;
 
+            assignRequestAvailabilitySlots = Array.isArray(slots) ? slots.slice() : [];
+            if (selectedDate) {
+                assignRequestAvailabilitySelectedDate = selectedDate;
+            }
+
             if (!Array.isArray(slots) || !slots.length) {
+                assignRequestAvailabilityMonth = '';
+                assignRequestAvailabilitySelectedDate = '';
                 hintEl.textContent = 'No conflict-free recurring one-hour slots were found for the selected instructor and date range.';
                 listEl.innerHTML = '<div class="text-sm text-slate-500">No available slots found.</div>';
                 return;
             }
 
-            hintEl.textContent = selectedDate
-                ? `Showing available recurring one-hour slots from ${selectedDate} onward. Click a slot to auto-fill the weekly assignment.`
-                : 'Showing the next available recurring one-hour slots. Click a slot to auto-fill the weekly assignment.';
+            const grouped = {};
+            slots.forEach((slot) => {
+                const dateKey = String(slot.session_date || '').trim();
+                if (!dateKey) return;
+                if (!grouped[dateKey]) grouped[dateKey] = [];
+                grouped[dateKey].push(slot);
+            });
 
-            listEl.innerHTML = slots.slice(0, 18).map(slot => {
-                const dateLabel = slot.session_date ? new Date(slot.session_date).toLocaleDateString() : '—';
-                const timeLabel = `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`;
-                const isPreferredDate = selectedDate && slot.session_date === selectedDate;
-                return `
+            const availableDates = Object.keys(grouped).sort();
+            const resolvedSelectedDate = grouped[assignRequestAvailabilitySelectedDate]
+                ? assignRequestAvailabilitySelectedDate
+                : (availableDates.includes(selectedDate) ? selectedDate : availableDates[0]);
+            assignRequestAvailabilitySelectedDate = resolvedSelectedDate;
+
+            const monthSource = assignRequestAvailabilityMonth || resolvedSelectedDate || availableDates[0];
+            const monthParts = String(monthSource).slice(0, 7).split('-');
+            const monthDate = new Date(Number(monthParts[0]), Number(monthParts[1]) - 1, 1);
+            if (Number.isNaN(monthDate.getTime())) {
+                listEl.innerHTML = '<div class="text-sm text-slate-500">No available slots found.</div>';
+                return;
+            }
+            const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+            assignRequestAvailabilityMonth = monthKey;
+
+            hintEl.textContent = 'Pick a highlighted date, then choose a recurring one-hour slot to fill the weekly assignment.';
+
+            const firstWeekday = monthDate.getDay();
+            const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+            const cells = [];
+            for (let i = 0; i < firstWeekday; i += 1) {
+                cells.push('<div class="h-20 rounded-xl border border-transparent bg-transparent"></div>');
+            }
+            for (let day = 1; day <= daysInMonth; day += 1) {
+                const dateKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const daySlots = grouped[dateKey] || [];
+                const isSelected = dateKey === resolvedSelectedDate;
+                const hasSlots = daySlots.length > 0;
+                const baseClass = hasSlots
+                    ? (isSelected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-200 bg-white hover:border-emerald-300 hover:bg-emerald-50')
+                    : 'border-slate-200 bg-slate-50 text-slate-300';
+                cells.push(`
                     <button
                         type="button"
-                        class="w-full text-left rounded-xl border px-3 py-3 transition ${isPreferredDate ? 'border-gold-300 bg-gold-50 hover:bg-gold-100' : 'border-slate-200 bg-white hover:bg-slate-50'}"
-                        onclick="applyAssignRequestAvailabilitySlot('${escapeHtml(String(slot.session_date || ''))}','${escapeHtml(String(slot.day_of_week || ''))}','${escapeHtml(String(slot.start_time || ''))}','${escapeHtml(String(slot.end_time || ''))}')"
+                        ${hasSlots ? `onclick="selectAssignRequestAvailabilityDate('${dateKey}')"` : 'disabled'}
+                        class="h-20 rounded-xl border p-2 text-left transition ${baseClass} ${hasSlots ? '' : 'cursor-not-allowed'}"
                     >
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="text-sm font-semibold ${hasSlots ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
+                            ${hasSlots ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${daySlots.length} slot${daySlots.length > 1 ? 's' : ''}</span>` : ''}
+                        </div>
+                        <div class="mt-2 text-[11px] ${hasSlots ? 'text-slate-500' : 'text-slate-400'}">${hasSlots ? `${escapeHtml(daySlots[0].day_of_week || '')} recurring` : 'Unavailable'}</div>
+                    </button>
+                `);
+            }
+
+            const selectedSlots = grouped[resolvedSelectedDate] || [];
+            listEl.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <button type="button" onclick="setAssignRequestAvailabilityMonth('${shiftAssignAvailabilityMonth(monthKey, -1)}')" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                            <i class="fas fa-chevron-left mr-2 text-[10px]"></i>Prev
+                        </button>
+                        <div class="text-sm font-semibold text-slate-900">${escapeHtml(formatAssignAvailabilityMonthLabel(monthKey))}</div>
+                        <button type="button" onclick="setAssignRequestAvailabilityMonth('${shiftAssignAvailabilityMonth(monthKey, 1)}')" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                            Next<i class="fas fa-chevron-right ml-2 text-[10px]"></i>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-7 gap-2 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-2">
+                        ${cells.join('')}
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-3">
                         <div class="flex items-center justify-between gap-3">
                             <div>
-                                <div class="text-sm font-semibold text-slate-900">${escapeHtml(dateLabel)}</div>
-                                <div class="text-xs text-slate-500 mt-1">${escapeHtml(slot.day_of_week || '')} • Weekly recurring</div>
+                                <div class="text-sm font-semibold text-slate-900">${escapeHtml(formatDateLong(resolvedSelectedDate) || resolvedSelectedDate)}</div>
+                                <div class="text-xs text-slate-500 mt-1">${selectedSlots.length ? `${selectedSlots.length} recurring slot${selectedSlots.length > 1 ? 's' : ''}` : 'No available slots on this date.'}</div>
                             </div>
-                            <div class="text-sm font-semibold text-emerald-700">${escapeHtml(timeLabel)}</div>
                         </div>
-                    </button>
-                `;
-            }).join('');
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            ${selectedSlots.map(slot => `
+                                <button
+                                    type="button"
+                                    class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100"
+                                    onclick="applyAssignRequestAvailabilitySlot('${escapeHtml(String(slot.session_date || ''))}','${escapeHtml(String(slot.day_of_week || ''))}','${escapeHtml(String(slot.start_time || ''))}','${escapeHtml(String(slot.end_time || ''))}')"
+                                >
+                                    <div class="text-sm font-semibold text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div>
+                                    <div class="mt-1 text-xs text-slate-500">${escapeHtml(slot.day_of_week || '')} • Weekly recurring</div>
+                                </button>
+                            `).join('') || '<div class="text-sm text-slate-500">No available slots on this date.</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         function applyAssignRequestAvailabilitySlot(sessionDate, dayOfWeek, startTime, endTime) {
@@ -1439,6 +1533,9 @@
             if (!listEl || !hintEl) return;
 
             if (!activeAssignRequest || !teacherId) {
+                assignRequestAvailabilitySlots = [];
+                assignRequestAvailabilityMonth = '';
+                assignRequestAvailabilitySelectedDate = '';
                 hintEl.textContent = activeAssignRequest
                     ? 'Choose an instructor to see their available one-hour slots and avoid conflicts.'
                     : 'Open a student request first.';
@@ -1495,13 +1592,16 @@
                     return typeName ? `${instrumentName} (${typeName})` : instrumentName;
                 }).join(', ')
                 : '—';
-            info.textContent = `Preferred schedule: ${req.preferred_day_of_week || '—'} / ${req.preferred_date || '—'}`;
+            info.textContent = 'Assign a schedule based on instructor availability.';
             if (studentNameEl) studentNameEl.textContent = studentName || 'Student';
             if (studentBranchEl) studentBranchEl.textContent = req.branch_name || 'No branch';
             if (studentPackageEl) studentPackageEl.textContent = req.package_name || 'Package';
             if (studentInstrumentEl) studentInstrumentEl.innerHTML = instrumentSummary;
             requestIdEl.value = String(requestId);
             activeAssignRequest = req;
+            assignRequestAvailabilitySlots = [];
+            assignRequestAvailabilityMonth = '';
+            assignRequestAvailabilitySelectedDate = '';
 
             assignRequestTeacherCandidates = Array.isArray(req.teacher_candidates) ? req.teacher_candidates : [];
             teacherSelect.value = '';
@@ -1517,8 +1617,8 @@
                 setAssignRequestTeacherSelection('');
             }
 
-            dateEl.value = req.preferred_date || '';
-            dayEl.value = getDayNameFromDate(dateEl.value || '') || req.preferred_day_of_week || '';
+            dateEl.value = '';
+            dayEl.value = '';
             startEl.value = '';
             endEl.value = '';
             await populateAssignRoomDropdown(req);
@@ -1917,7 +2017,6 @@
             document.getElementById('walkinStudentSearch')?.addEventListener('change', handleWalkinStudentChange);
             document.getElementById('walkinPackageSelect')?.addEventListener('change', updateWalkinPackageUI);
             document.getElementById('walkinPaymentType')?.addEventListener('change', updateWalkinPackageUI);
-            document.getElementById('walkinPreferredDate')?.addEventListener('change', updateWalkinPreferredDay);
             document.getElementById('assignRequestDate')?.addEventListener('change', (e) => {
                 const dayEl = document.getElementById('assignRequestDay');
                 if (!dayEl) return;
@@ -1935,9 +2034,8 @@
         });
 
         window.applyAssignRequestAvailabilitySlot = applyAssignRequestAvailabilitySlot;
+        window.selectAssignRequestAvailabilityDate = selectAssignRequestAvailabilityDate;
+        window.setAssignRequestAvailabilityMonth = setAssignRequestAvailabilityMonth;
     </script>
 </body>
 </html>
-
-
-

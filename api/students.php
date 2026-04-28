@@ -48,6 +48,17 @@ class StudentsApi
         return stripos((string)$contentType, 'multipart/form-data') !== false;
     }
 
+    private function hasStudentColumn($columnName)
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW COLUMNS FROM tbl_students LIKE ?");
+            $stmt->execute([$columnName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     private function storePaymentProofUpload($file, $scope = 'package_requests')
     {
         if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
@@ -1218,6 +1229,157 @@ class StudentsApi
         return ['created' => $created, 'updated' => $updated];
     }
 
+    private function canEditEnrollmentScheduleBeforeFirstWeek($enrollmentId)
+    {
+        $enrollmentId = (int)$enrollmentId;
+        if ($enrollmentId < 1 || !$this->tableExists('tbl_enrollments')) {
+            return false;
+        }
+
+        $earliestDate = '';
+        if ($this->tableExists('tbl_sessions')) {
+            try {
+                $stmt = $this->conn->prepare("
+                    SELECT MIN(session_date)
+                    FROM tbl_sessions
+                    WHERE enrollment_id = ?
+                      AND session_date IS NOT NULL
+                      AND session_date <> ''
+                      AND status NOT IN ('cancelled_by_teacher', 'rescheduled')
+                ");
+                $stmt->execute([$enrollmentId]);
+                $earliestDate = (string)($stmt->fetchColumn() ?: '');
+            } catch (PDOException $e) {
+                $earliestDate = '';
+            }
+        }
+
+        if ($earliestDate === '') {
+            try {
+                $stmt = $this->conn->prepare("
+                    SELECT start_date
+                    FROM tbl_enrollments
+                    WHERE enrollment_id = ?
+                    LIMIT 1
+                ");
+                $stmt->execute([$enrollmentId]);
+                $earliestDate = (string)($stmt->fetchColumn() ?: '');
+            } catch (PDOException $e) {
+                $earliestDate = '';
+            }
+        }
+
+        if ($earliestDate === '') {
+            return false;
+        }
+
+        try {
+            $today = new DateTimeImmutable('today');
+            $firstDate = new DateTimeImmutable($earliestDate);
+            return $today < $firstDate;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    private function updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime, $roomName)
+    {
+        $enrollmentId = (int)($enrollment['enrollment_id'] ?? 0);
+        $teacherId = (int)($enrollment['assigned_teacher_id'] ?? 0);
+        $branchId = (int)($enrollment['branch_id'] ?? 0);
+        $studentId = (int)($enrollment['student_id'] ?? 0);
+        $startBase = trim((string)($enrollment['start_date'] ?? ''));
+        $slots = $this->getEnrollmentScheduleSlots($enrollmentId);
+
+        if ($enrollmentId < 1 || $teacherId < 1 || empty($slots)) {
+            throw new InvalidArgumentException('Fixed weekly schedule was not found for this enrollment.');
+        }
+        if (!$this->canEditEnrollmentScheduleBeforeFirstWeek($enrollmentId)) {
+            throw new InvalidArgumentException('Schedule can only be edited before the first scheduled week starts.');
+        }
+
+        $orderedSlots = [];
+        foreach ($slots as $index => $slot) {
+            $firstDate = $this->nextDateForDayOfWeek($startBase !== '' ? $startBase : date('Y-m-d'), $slot['day_of_week'] ?? '');
+            $slot['_original_index'] = $index;
+            $slot['_first_date'] = $firstDate ?: '9999-12-31';
+            $orderedSlots[] = $slot;
+        }
+
+        usort($orderedSlots, function ($a, $b) {
+            $cmpDate = strcmp((string)($a['_first_date'] ?? ''), (string)($b['_first_date'] ?? ''));
+            if ($cmpDate !== 0) return $cmpDate;
+            $cmpTime = strcmp((string)($a['start_time'] ?? ''), (string)($b['start_time'] ?? ''));
+            if ($cmpTime !== 0) return $cmpTime;
+            return ((int)($a['sort_order'] ?? 0)) <=> ((int)($b['sort_order'] ?? 0));
+        });
+
+        if ($sessionNumber < 1 || $sessionNumber > count($orderedSlots)) {
+            throw new InvalidArgumentException('Only first-week recurring schedule slots can be edited before classes start.');
+        }
+
+        $targetOriginalIndex = (int)$orderedSlots[$sessionNumber - 1]['_original_index'];
+        $newDay = date('l', strtotime($sessionDate));
+        if ($newDay === '' || !strtotime($sessionDate)) {
+            throw new InvalidArgumentException('Invalid edited session date.');
+        }
+
+        $slots[$targetOriginalIndex]['day_of_week'] = $newDay;
+        $slots[$targetOriginalIndex]['start_time'] = $startTime;
+        $slots[$targetOriginalIndex]['end_time'] = $endTime;
+        $slots[$targetOriginalIndex]['room_name'] = $roomName !== '' ? $roomName : null;
+
+        $slotsInput = [];
+        foreach ($slots as $slot) {
+            $slotsInput[] = [
+                'day_of_week' => $slot['day_of_week'] ?? '',
+                'start_time' => $slot['start_time'] ?? '',
+                'end_time' => $slot['end_time'] ?? '',
+                'room_name' => $slot['room_name'] ?? ''
+            ];
+        }
+
+        $normalizedSlots = $this->normalizeAssignedScheduleSlots(
+            $slotsInput,
+            $teacherId,
+            $branchId,
+            '',
+            $studentId,
+            [$enrollmentId]
+        );
+
+        if (count($normalizedSlots) !== count($slotsInput)) {
+            throw new InvalidArgumentException('Edited schedule produced duplicate or invalid recurring slots.');
+        }
+
+        $this->saveEnrollmentScheduleSlots($enrollmentId, $normalizedSlots);
+
+        $firstSlot = $normalizedSlots[0] ?? null;
+        if ($firstSlot && $this->tableExists('tbl_enrollments')) {
+            $fixedRoomId = isset($firstSlot['room_id']) && $firstSlot['room_id'] !== null ? (int)$firstSlot['room_id'] : null;
+            $summary = $this->formatScheduleSlotsSummary($normalizedSlots);
+            $stmt = $this->conn->prepare("
+                UPDATE tbl_enrollments
+                SET fixed_day_of_week = ?,
+                    fixed_start_time = ?,
+                    fixed_end_time = ?,
+                    fixed_room_id = ?,
+                    preferred_schedule = ?
+                WHERE enrollment_id = ?
+            ");
+            $stmt->execute([
+                $firstSlot['day_of_week'] ?? null,
+                $firstSlot['start_time'] ?? null,
+                $firstSlot['end_time'] ?? null,
+                $fixedRoomId,
+                $summary !== '' ? $summary : null,
+                $enrollmentId
+            ]);
+        }
+
+        return $this->generateFixedScheduleSessions($enrollmentId);
+    }
+
     private function normalizeExcludedIds($excludeSessionIds)
     {
         $values = is_array($excludeSessionIds) ? $excludeSessionIds : [$excludeSessionIds];
@@ -2046,6 +2208,7 @@ class StudentsApi
         $this->ensureStudentRegistrationFeesTable();
         $this->ensureStudentInstrumentsTable();
         $this->ensureStudentRegistrationFeesTable();
+        $this->ensureStudentAgeVerificationProofColumn();
 
         $stmtStudent = $this->conn->prepare("
             SELECT
@@ -2925,12 +3088,6 @@ class StudentsApi
         $paymentMethod = $this->normalizeEnrollmentPaymentMethod($paymentMethodRaw);
         $preferredDate = !empty($data['preferred_date']) ? $data['preferred_date'] : null;
         $preferredDay = trim($data['preferred_day_of_week'] ?? '');
-        if ($preferredDay === '' && $preferredDate) {
-            $timestamp = strtotime((string)$preferredDate);
-            if ($timestamp !== false) {
-                $preferredDay = date('l', $timestamp);
-            }
-        }
         if (!empty($data['instrument_ids_json'])) {
             $decoded = json_decode((string)$data['instrument_ids_json'], true);
             $instrumentIds = is_array($decoded) ? $decoded : [];
@@ -2944,9 +3101,6 @@ class StudentsApi
             $this->sendJSON(['error' => 'student_id and package_id are required'], 400);
         }
         $validDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-        if (!$preferredDate || !in_array($preferredDay, $validDays, true)) {
-            $this->sendJSON(['error' => 'preferred_date is required'], 400);
-        }
         if ($paymentType === '') {
             // Backward-compatible fallback for cached clients/forms.
             $paymentType = 'Partial Payment';
@@ -3071,7 +3225,10 @@ class StudentsApi
             if ($paymentMethod !== 'Cash' && !$paymentProofPath) {
                 $this->sendJSON(['error' => 'Upload proof of payment for this enrollment request.'], 400);
             }
-            $preferredSchedule = trim($preferredDay . '|' . $preferredDate);
+            $preferredSchedule = null;
+            if ($preferredDay !== '' && in_array($preferredDay, $validDays, true)) {
+                $preferredSchedule = $preferredDay;
+            }
             $requestMeta = json_encode([
                 'payment_type' => $paymentType,
                 'payment_method' => $paymentMethod,
@@ -3812,6 +3969,7 @@ class StudentsApi
         $startTime = trim((string)($data['start_time'] ?? '09:00:00'));
         $endTime = trim((string)($data['end_time'] ?? '10:00:00'));
         $roomName = trim((string)($data['room_name'] ?? ''));
+        $isEditingExisting = filter_var(($data['edit_existing'] ?? false), FILTER_VALIDATE_BOOLEAN);
 
         if ($enrollmentId < 1) {
             $this->sendJSON(['error' => 'enrollment_id is required'], 400);
@@ -3844,6 +4002,7 @@ class StudentsApi
                     e.instrument_id,
                     e.assigned_teacher_id,
                     e.total_sessions,
+                    e.start_date,
                     e.status,
                     s.branch_id
                 FROM tbl_enrollments e
@@ -3859,6 +4018,19 @@ class StudentsApi
             if ((string)($enrollment['status'] ?? '') !== 'Active') {
                 $this->sendJSON(['error' => 'Enrollment is not active'], 400);
             }
+
+            $stmtCheck = $this->conn->prepare("
+                SELECT session_id
+                FROM tbl_sessions
+                WHERE enrollment_id = ?
+                  AND session_number = ?
+                  AND status <> 'cancelled_by_teacher'
+                ORDER BY session_id DESC
+                LIMIT 1
+            ");
+            $stmtCheck->execute([$enrollmentId, $sessionNumber]);
+            $existingSessionId = (int)$stmtCheck->fetchColumn();
+
             $hasMultiSlots = !empty($this->getEnrollmentScheduleSlots($enrollmentId));
             if (
                 ($hasMultiSlots || (
@@ -3884,6 +4056,15 @@ class StudentsApi
                     )) &&
                     (int)($fixed['fixed_schedule_locked'] ?? 1) === 1
                 ) {
+                    if ($isEditingExisting && $existingSessionId > 0) {
+                        $result = $this->updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime, $roomName);
+                        $this->sendJSON([
+                            'success' => true,
+                            'message' => 'Recurring schedule updated successfully before classes started.',
+                            'auto_generated' => $result
+                        ]);
+                    }
+
                     $result = $this->generateFixedScheduleSessions($enrollmentId);
                     $this->sendJSON([
                         'success' => true,
@@ -3961,17 +4142,12 @@ class StudentsApi
                 $instrumentId = (int)($stmtInst->fetchColumn() ?: 0);
             }
 
-            $stmtCheck = $this->conn->prepare("
-                SELECT session_id
-                FROM tbl_sessions
-                WHERE enrollment_id = ?
-                  AND session_number = ?
-                  AND status <> 'cancelled_by_teacher'
-                ORDER BY session_id DESC
-                LIMIT 1
-            ");
-            $stmtCheck->execute([$enrollmentId, $sessionNumber]);
-            $existingSessionId = (int)$stmtCheck->fetchColumn();
+            if ($isEditingExisting && $existingSessionId <= 0) {
+                $this->sendJSON(['error' => 'Scheduled session not found for editing'], 404);
+            }
+            if ($isEditingExisting && !$this->canEditEnrollmentScheduleBeforeFirstWeek($enrollmentId)) {
+                $this->sendJSON(['error' => 'Schedule can only be edited before the first scheduled week starts.'], 400);
+            }
 
             if ($existingSessionId > 0) {
                 $stmtUpdate = $this->conn->prepare("
@@ -4464,6 +4640,20 @@ class StudentsApi
     {
         // Registration fee state now comes from tbl_registration_payments.
         return;
+    }
+
+    private function ensureStudentAgeVerificationProofColumn()
+    {
+        if ($this->hasStudentColumn('age_verification_proof_path')) return;
+        try {
+            if ($this->hasStudentColumn('registration_proof_path')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN age_verification_proof_path VARCHAR(255) NULL AFTER registration_proof_path");
+            } else {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN age_verification_proof_path VARCHAR(255) NULL");
+            }
+        } catch (PDOException $e) {
+            // Keep API working even if alter fails
+        }
     }
 }
 
