@@ -79,6 +79,16 @@
                     <a href="admin_registration.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-id-card mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Registrations
                     </a>
+                    <details class="group/dropdown" open>
+                        <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group w-full list-none cursor-pointer">
+                            <span class="flex items-center"><i class="fas fa-wallet mr-3"></i> Payments</span>
+                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
+                        </summary>
+                        <div class="mt-2 space-y-1">
+                            <a href="admin_registration.html#pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Registration Payments</a>
+                            <a href="admin_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm font-semibold text-white bg-white/10 rounded-lg transition-all">Enrollment Payments</a>
+                        </div>
+                    </details>
                     <a href="admin_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Students
                     </a>
@@ -142,8 +152,8 @@
                 <p class="text-xs text-slate-500 mt-1">Branch managers handle enrollment approval and session scheduling.</p>
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <div class="inline-flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-                        <button id="enrollNavPending" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Pending</button>
-                        <button id="enrollNavActive" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Active</button>
+                        <button id="enrollNavPending" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Pending Enrollments</button>
+                        <button id="enrollNavActive" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Enrollment Payments</button>
                     </div>
                     <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/20 transition">
                         <i class="fas fa-list-check mr-2"></i>

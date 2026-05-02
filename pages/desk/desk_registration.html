@@ -562,17 +562,17 @@
             }).join('');
         }
 
-        async function openRegistrationScheduleModal(studentId) {
+        async function openRegistrationScheduleModal(studentId, options = {}) {
             const rows = await fetchRegistrationScheduleRows();
             const row = rows.find(item => Number(item.student_id) === Number(studentId));
             if (!row) {
                 showMessage('No active enrollment found for this student yet.', 'error');
                 return;
             }
-            openSessionScheduleModal(Number(row.enrollment_id));
+            openSessionScheduleModal(Number(row.enrollment_id), options);
         }
 
-        function openSessionScheduleModal(enrollmentId) {
+        function openSessionScheduleModal(enrollmentId, options = {}) {
             const modal = document.getElementById('scheduleModal');
             const body = document.getElementById('scheduleModalBody');
             const meta = document.getElementById('scheduleModalMeta');
@@ -600,15 +600,7 @@
             const sessionsTotal = Number(row.sessions || 0);
             const rowsHtml = [];
             let nextUnscheduled = 0;
-            const earliestScheduledDate = sessionsList
-                .map(slot => String(slot?.session_date || '').trim())
-                .filter(Boolean)
-                .sort()[0] || '';
-            const canEditBeforeStart = earliestScheduledDate
-                ? new Date().setHours(0, 0, 0, 0) < new Date(`${earliestScheduledDate}T00:00:00`).setHours(0, 0, 0, 0)
-                : false;
-            const recurringSlotCount = Array.isArray(row.schedule_slots) ? row.schedule_slots.length : 0;
-
+            const todayMs = new Date().setHours(0, 0, 0, 0);
             if (sessionsTotal > 0) {
                 for (let i = 1; i <= sessionsTotal; i += 1) {
                     const slotHistory = sessionsList.filter(s => Number(s.session_number) === i);
@@ -622,9 +614,13 @@
                                 : '';
                             const teacherText = slotTeacherName ? ` • ${slotTeacherName}` : '';
                             const normalizedStatus = String(slot?.status || '').toLowerCase();
-                            const editableThisSlot = canEditBeforeStart && normalizedStatus === 'scheduled' && (!recurringSlotCount || i <= recurringSlotCount);
+                            const slotDateMs = slot?.session_date ? new Date(`${slot.session_date}T00:00:00`).setHours(0, 0, 0, 0) : NaN;
+                            const editableThisSlot = normalizedStatus === 'scheduled' && !Number.isNaN(slotDateMs) && slotDateMs >= todayMs;
                             const editBtn = editableThisSlot
-                                ? `<button type="button" class="edit-schedule-btn ml-auto px-2.5 py-1 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-800 text-[11px] font-semibold transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}" data-room-name="${escapeHtml(slot?.room_name || '')}">Edit schedule</button>`
+                                ? `<button type="button" class="edit-schedule-btn ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold shadow-sm transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}" data-room-name="${escapeHtml(slot?.room_name || '')}"><i class="fas fa-pen"></i><span>Edit Schedule</span></button>`
+                                : '';
+                            const rescheduleBtn = editableThisSlot && Number(slot?.session_id || 0) > 0
+                                ? `<button type="button" class="reschedule-session-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-sky-500 hover:bg-sky-600 text-white text-[11px] font-bold shadow-sm transition" data-session-id="${Number(slot?.session_id || 0)}"><i class="fas fa-calendar-day"></i><span>Reschedule</span></button>`
                                 : '';
                             const reasonText = slot?.cancellation_reason
                                 ? `<div class="text-[11px] text-slate-500 mt-1">Reason: ${escapeHtml(slot.cancellation_reason)}</div>`
@@ -634,6 +630,7 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         ${getSessionStatusBadge(slot.status)}
                                         <div>${escapeHtml(dateText)}${roomText}${teacherText}</div>
+                                        ${rescheduleBtn}
                                         ${editBtn}
                                     </div>
                                     ${reasonText}
@@ -667,10 +664,8 @@
             if (saveBtn) saveBtn.textContent = 'Save Session';
             if (hint) {
                 hint.textContent = nextUnscheduled
-                    ? `Session ${nextUnscheduled} is the next open slot for this enrollment.${canEditBeforeStart ? ' Scheduled sessions can still be edited before the first week starts.' : ''}`
-                    : (canEditBeforeStart
-                        ? 'All session slots already have saved schedules. You can review or edit the first-week schedule before classes start.'
-                        : 'All session slots already have saved schedules. Editing closes once the first scheduled week starts.');
+                    ? `Session ${nextUnscheduled} is the next open slot for this enrollment. Future scheduled sessions can also be edited here.`
+                    : 'All session slots already have saved schedules. You can still edit future scheduled sessions here.';
             }
             if (toggleBtn) {
                 toggleBtn.textContent = nextUnscheduled ? `Schedule Session ${nextUnscheduled}` : 'All Sessions Scheduled';
@@ -686,7 +681,8 @@
 
             populateRegistrationScheduleRoomDropdown(row.branch_id, row.assigned_room || '');
 
-            body.querySelectorAll('.edit-schedule-btn').forEach((btn) => {
+            const editButtons = Array.from(body.querySelectorAll('.edit-schedule-btn'));
+            editButtons.forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     if (!form || !dateInput || !startInput || !endInput) return;
                     if (sessionInput) sessionInput.value = String(btn.dataset.sessionNumber || '');
@@ -700,9 +696,84 @@
                     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 });
             });
+            body.querySelectorAll('.reschedule-session-btn').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const sessionId = Number(btn.dataset.sessionId || 0);
+                    if (!sessionId) return;
+                    await openStudentReschedulePicker(sessionId, enrollmentId);
+                });
+            });
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+
+            if (options?.autoEditFirst) {
+                const firstEditBtn = editButtons[0];
+                if (firstEditBtn) {
+                    firstEditBtn.click();
+                } else if (nextUnscheduled && toggleBtn && !toggleBtn.disabled) {
+                    toggleAddScheduleForm();
+                } else {
+                    showMessage('No editable future scheduled session was found for this student.', 'error');
+                }
+            }
+        }
+
+        async function openStudentReschedulePicker(sessionId, enrollmentId) {
+            try {
+                const response = await axios.get(`${baseApiUrl}/students.php?action=get-reschedule-slots&session_id=${encodeURIComponent(sessionId)}`);
+                const data = response.data || {};
+                const slots = Array.isArray(data.slots) ? data.slots : [];
+                if (!data.success) {
+                    showMessage(data.error || 'Failed to load available slots.', 'error');
+                    return;
+                }
+                if (!slots.length) {
+                    showMessage('No available slots found for this teacher right now.', 'error');
+                    return;
+                }
+                const inputOptions = {};
+                slots.forEach((slot, index) => {
+                    inputOptions[String(index)] = `${formatDateShort(slot.session_date)} • ${slot.day_of_week} • ${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`;
+                });
+                const result = await Swal.fire({
+                    icon: 'info',
+                    title: 'Reschedule Student Session',
+                    text: 'Use this when a student needs to move the class because of an emergency.',
+                    input: 'select',
+                    inputOptions,
+                    inputPlaceholder: 'Select an available slot',
+                    inputValue: '',
+                    showCancelButton: true,
+                    confirmButtonText: 'Reschedule',
+                    cancelButtonText: 'Close',
+                    confirmButtonColor: '#0ea5e9',
+                    inputValidator: value => value === '' || value == null ? 'Please select a slot.' : null
+                });
+                if (!result.isConfirmed) return;
+                const chosen = slots[Number(result.value)];
+                if (!chosen) {
+                    showMessage('Selected slot is invalid.', 'error');
+                    return;
+                }
+                const saveRes = await axios.post(`${baseApiUrl}/students.php?action=reschedule-session`, {
+                    session_id: sessionId,
+                    session_date: chosen.session_date,
+                    start_time: chosen.start_time,
+                    end_time: chosen.end_time,
+                    reason: 'Student emergency reschedule'
+                });
+                const saveData = saveRes.data || {};
+                if (saveData.success) {
+                    showMessage(saveData.message || 'Session rescheduled.', 'success');
+                    await fetchRegistrationScheduleRows();
+                    openSessionScheduleModal(Number(enrollmentId));
+                } else {
+                    showMessage(saveData.error || 'Failed to reschedule session.', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error while rescheduling session.', 'error');
+            }
         }
 
         function closeScheduleModal() {
@@ -734,6 +805,8 @@
             const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
             const roomName = document.getElementById('scheduleRoom')?.value || '';
             const editExisting = document.getElementById('scheduleEditExisting')?.value === '1';
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const editorRole = String(user?.role_name || '');
 
             if (!enrollmentId || !sessionNumber || !sessionDate) {
                 showMessage('Please select a date before saving.', 'error');
@@ -749,7 +822,9 @@
                     end_time: endTime,
                     teacher_id: teacherId,
                     room_name: roomName,
-                    edit_existing: editExisting
+                    edit_existing: editExisting,
+                    branch_id: getManagerBranchId() || undefined,
+                    editor_role: editorRole || undefined
                 });
                 const data = response.data || {};
                 if (data.success) {
@@ -765,6 +840,7 @@
         }
 
         window.openRegistrationScheduleModal = openRegistrationScheduleModal;
+        window.openRegistrationScheduleEditor = (studentId) => openRegistrationScheduleModal(studentId, { autoEditFirst: true });
         window.openSessionScheduleModal = openSessionScheduleModal;
         window.closeScheduleModal = closeScheduleModal;
 

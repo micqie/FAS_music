@@ -4556,9 +4556,17 @@ function renderRegistrationsTable() {
                         </button>
                         ${['Fee Paid', 'Approved'].includes(String(reg.registration_status || '')) && typeof window.openRegistrationScheduleModal === 'function' ? `
                             <button onclick="openRegistrationScheduleModal(${Number(reg.student_id)})"
-                                class="px-3 py-1 bg-gold-100 hover:bg-gold-200 text-gold-700 rounded text-sm font-semibold transition">
-                                <i class="fas fa-calendar-plus"></i>
+                                class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-sm font-semibold transition"
+                                title="View schedule">
+                                <i class="fas fa-eye"></i>
                             </button>
+                            ${typeof window.openRegistrationScheduleEditor === 'function' ? `
+                                <button onclick="openRegistrationScheduleEditor(${Number(reg.student_id)})"
+                                    class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm font-semibold shadow-sm transition"
+                                    title="Edit schedule">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                            ` : ''}
                         ` : ''}
                         ${reg.registration_status === 'Pending' ? `
                             <button onclick="openPaymentModal(${reg.student_id})"

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Availability | Father & Sons</title>
     <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
         tailwind.config = {
@@ -230,42 +231,79 @@
             }));
         }
 
-        async function saveAvailability() {
-            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
-            if (!user?.user_id) {
-                showAvailabilityStatus('Teacher session not found. Please log in again.', 'error');
-                return;
-            }
+       async function saveAvailability() {
+    const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
 
-            const payload = collectAvailabilityPayload();
-            for (const row of payload) {
-                if (!row.enabled) continue;
-                if (!row.start_time || !row.end_time) {
-                    showAvailabilityStatus(`Please complete the time range for ${row.day_of_week}.`, 'error');
-                    return;
-                }
-                if (row.end_time <= row.start_time) {
-                    showAvailabilityStatus(`End time must be later than start time for ${row.day_of_week}.`, 'error');
-                    return;
-                }
-            }
+    if (!user?.user_id) {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Session Error',
+            text: 'Teacher session not found. Please log in again.',
+            confirmButtonColor: '#d33'
+        });
+        return;
+    }
 
-            try {
-                const response = await axios.post(`${baseApiUrl}/teachers.php?action=save-teacher-availability`, {
-                    action: 'save-teacher-availability',
-                    user_id: Number(user.user_id),
-                    availability: payload
-                });
-                if (response.data?.success) {
-                    showAvailabilityStatus('Availability saved. Admin scheduling will now follow these day and time limits.', 'success');
-                    await loadAvailability();
-                } else {
-                    showAvailabilityStatus(response.data?.error || 'Failed to save availability.', 'error');
-                }
-            } catch (error) {
-                showAvailabilityStatus(error.response?.data?.error || 'Network error while saving availability.', 'error');
-            }
+    const payload = collectAvailabilityPayload();
+
+    for (const row of payload) {
+        if (!row.enabled) continue;
+
+        if (!row.start_time || !row.end_time) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Incomplete Time',
+                text: `Please complete the time range for ${row.day_of_week}.`,
+                confirmButtonColor: '#d33'
+            });
+            return;
         }
+
+        if (row.end_time <= row.start_time) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Invalid Time',
+                text: `End time must be later than start time for ${row.day_of_week}.`,
+                confirmButtonColor: '#d33'
+            });
+            return;
+        }
+    }
+
+    try {
+        const response = await axios.post(`${baseApiUrl}/teachers.php?action=save-teacher-availability`, {
+            action: 'save-teacher-availability',
+            user_id: Number(user.user_id),
+            availability: payload
+        });
+
+        if (response.data?.success) {
+            await Swal.fire({
+                icon: 'success',
+                title: 'Saved!',
+                text: 'Availability saved. Admin scheduling will now follow these day and time limits.',
+                confirmButtonColor: '#3085d6'
+            });
+
+            await loadAvailability();
+        } else {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Oops...',
+                text: response.data?.error || 'Failed to save availability.',
+                confirmButtonColor: '#d33'
+            });
+        }
+
+    } catch (error) {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Network Error',
+            text: error.response?.data?.error || 'Network error while saving availability.',
+            confirmButtonColor: '#d33'
+        });
+    }
+}
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (typeof Auth !== 'undefined' && Auth.getUser) {

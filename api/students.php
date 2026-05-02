@@ -42,6 +42,23 @@ class StudentsApi
         exit;
     }
 
+    private function validateScheduleBranchAccess($enrollmentBranchId, $scopeBranchId, $roleName = '')
+    {
+        $normalizedRole = strtolower(trim((string)$roleName));
+        $branchScopedRoles = ['staff', 'desk', 'front desk', 'manager', 'branch manager'];
+        if (!in_array($normalizedRole, $branchScopedRoles, true)) {
+            return;
+        }
+
+        if ($scopeBranchId < 1) {
+            $this->sendJSON(['error' => 'Assigned branch is required for desk or manager schedule editing'], 403);
+        }
+
+        if ((int)$enrollmentBranchId !== (int)$scopeBranchId) {
+            $this->sendJSON(['error' => 'Student schedule does not belong to your branch'], 403);
+        }
+    }
+
     private function isMultipartRequest()
     {
         $contentType = $_SERVER['CONTENT_TYPE'] ?? ($_SERVER['HTTP_CONTENT_TYPE'] ?? '');
@@ -1282,6 +1299,39 @@ class StudentsApi
         }
     }
 
+    private function canEditScheduledSession($sessionDate, $sessionStatus = '')
+    {
+        $dateText = trim((string)$sessionDate);
+        $status = strtolower(trim((string)$sessionStatus));
+        if ($dateText === '' || $status !== 'scheduled') {
+            return false;
+        }
+
+        try {
+            $today = new DateTimeImmutable('today');
+            $targetDate = new DateTimeImmutable($dateText);
+            return $targetDate >= $today;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    private function isFutureOrTodayDate($dateText)
+    {
+        $value = trim((string)$dateText);
+        if ($value === '') {
+            return false;
+        }
+
+        try {
+            $today = new DateTimeImmutable('today');
+            $target = new DateTimeImmutable($value);
+            return $target >= $today;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
     private function updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime, $roomName)
     {
         $enrollmentId = (int)($enrollment['enrollment_id'] ?? 0);
@@ -1295,7 +1345,7 @@ class StudentsApi
             throw new InvalidArgumentException('Fixed weekly schedule was not found for this enrollment.');
         }
         if (!$this->canEditEnrollmentScheduleBeforeFirstWeek($enrollmentId)) {
-            throw new InvalidArgumentException('Schedule can only be edited before the first scheduled week starts.');
+            throw new InvalidArgumentException('Recurring schedule pattern can only be edited before the first scheduled week starts.');
         }
 
         $orderedSlots = [];
@@ -3787,10 +3837,13 @@ class StudentsApi
             $stmt->execute([$sessionId]);
             $session = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$session) {
-                $this->sendJSON(['error' => 'Cancelled session not found'], 404);
+                $this->sendJSON(['error' => 'Session not found'], 404);
             }
-            if ((string)($session['status'] ?? '') !== 'cancelled_by_teacher' || (int)($session['needs_rescheduling'] ?? 0) !== 1) {
-                $this->sendJSON(['error' => 'This session is not waiting for admin rescheduling'], 400);
+            $status = (string)($session['status'] ?? '');
+            $isTeacherCancelled = $status === 'cancelled_by_teacher' && (int)($session['needs_rescheduling'] ?? 0) === 1;
+            $isStudentEmergencyReschedulable = $status === 'Scheduled' && $this->isFutureOrTodayDate((string)($session['session_date'] ?? ''));
+            if (!$isTeacherCancelled && !$isStudentEmergencyReschedulable) {
+                $this->sendJSON(['error' => 'This session cannot be rescheduled right now'], 400);
             }
 
             $teacherId = (int)($session['assigned_teacher_id'] ?? 0);
@@ -3970,6 +4023,8 @@ class StudentsApi
         $endTime = trim((string)($data['end_time'] ?? '10:00:00'));
         $roomName = trim((string)($data['room_name'] ?? ''));
         $isEditingExisting = filter_var(($data['edit_existing'] ?? false), FILTER_VALIDATE_BOOLEAN);
+        $scopeBranchId = (int)($data['branch_id'] ?? $data['desk_branch_id'] ?? $data['manager_branch_id'] ?? 0);
+        $editorRoleName = trim((string)($data['editor_role'] ?? ''));
 
         if ($enrollmentId < 1) {
             $this->sendJSON(['error' => 'enrollment_id is required'], 400);
@@ -4018,9 +4073,10 @@ class StudentsApi
             if ((string)($enrollment['status'] ?? '') !== 'Active') {
                 $this->sendJSON(['error' => 'Enrollment is not active'], 400);
             }
+            $this->validateScheduleBranchAccess((int)($enrollment['branch_id'] ?? 0), $scopeBranchId, $editorRoleName);
 
             $stmtCheck = $this->conn->prepare("
-                SELECT session_id
+                SELECT session_id, session_date, status
                 FROM tbl_sessions
                 WHERE enrollment_id = ?
                   AND session_number = ?
@@ -4029,9 +4085,13 @@ class StudentsApi
                 LIMIT 1
             ");
             $stmtCheck->execute([$enrollmentId, $sessionNumber]);
-            $existingSessionId = (int)$stmtCheck->fetchColumn();
+            $existingSession = $stmtCheck->fetch(PDO::FETCH_ASSOC) ?: [];
+            $existingSessionId = (int)($existingSession['session_id'] ?? 0);
+            $existingSessionDate = (string)($existingSession['session_date'] ?? '');
+            $existingSessionStatus = (string)($existingSession['status'] ?? '');
 
             $hasMultiSlots = !empty($this->getEnrollmentScheduleSlots($enrollmentId));
+            $canEditRecurringPattern = $this->canEditEnrollmentScheduleBeforeFirstWeek($enrollmentId);
             if (
                 ($hasMultiSlots || (
                     $this->tableHasColumn('tbl_enrollments', 'fixed_day_of_week') &&
@@ -4056,7 +4116,7 @@ class StudentsApi
                     )) &&
                     (int)($fixed['fixed_schedule_locked'] ?? 1) === 1
                 ) {
-                    if ($isEditingExisting && $existingSessionId > 0) {
+                    if ($isEditingExisting && $existingSessionId > 0 && $canEditRecurringPattern) {
                         $result = $this->updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime, $roomName);
                         $this->sendJSON([
                             'success' => true,
@@ -4065,12 +4125,14 @@ class StudentsApi
                         ]);
                     }
 
-                    $result = $this->generateFixedScheduleSessions($enrollmentId);
-                    $this->sendJSON([
-                        'success' => true,
-                        'message' => 'Fixed weekly schedule is active. Sessions were refreshed automatically.',
-                        'auto_generated' => $result
-                    ]);
+                    if (!$isEditingExisting) {
+                        $result = $this->generateFixedScheduleSessions($enrollmentId);
+                        $this->sendJSON([
+                            'success' => true,
+                            'message' => 'Fixed weekly schedule is active. Sessions were refreshed automatically.',
+                            'auto_generated' => $result
+                        ]);
+                    }
                 }
             }
             $totalSessions = (int)($enrollment['total_sessions'] ?? 0);
@@ -4145,8 +4207,8 @@ class StudentsApi
             if ($isEditingExisting && $existingSessionId <= 0) {
                 $this->sendJSON(['error' => 'Scheduled session not found for editing'], 404);
             }
-            if ($isEditingExisting && !$this->canEditEnrollmentScheduleBeforeFirstWeek($enrollmentId)) {
-                $this->sendJSON(['error' => 'Schedule can only be edited before the first scheduled week starts.'], 400);
+            if ($isEditingExisting && !$this->canEditScheduledSession($existingSessionDate, $existingSessionStatus)) {
+                $this->sendJSON(['error' => 'Only future scheduled sessions can be edited.'], 400);
             }
 
             if ($existingSessionId > 0) {
@@ -4642,6 +4704,159 @@ class StudentsApi
         return;
     }
 
+    public function rescheduleSession()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $sessionId = (int)($data['session_id'] ?? 0);
+        $sessionDate = trim((string)($data['session_date'] ?? ''));
+        $startTime = trim((string)($data['start_time'] ?? ''));
+        $endTime = trim((string)($data['end_time'] ?? ''));
+        $reason = trim((string)($data['reason'] ?? 'Student emergency reschedule'));
+
+        if ($sessionId < 1 || $sessionDate === '' || $startTime === '' || $endTime === '') {
+            $this->sendJSON(['error' => 'session_id, session_date, start_time, and end_time are required'], 400);
+        }
+
+        try {
+            $this->conn->beginTransaction();
+
+            $stmt = $this->conn->prepare("
+                SELECT
+                    ts.*,
+                    e.student_id,
+                    e.assigned_teacher_id,
+                    s.branch_id
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                WHERE ts.session_id = ?
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $stmt->execute([$sessionId]);
+            $sourceSession = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$sourceSession) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Session not found'], 404);
+            }
+
+            $status = (string)($sourceSession['status'] ?? '');
+            $isTeacherCancelled = $status === 'cancelled_by_teacher' && (int)($sourceSession['needs_rescheduling'] ?? 0) === 1;
+            $isStudentEmergencyReschedulable = $status === 'Scheduled' && $this->isFutureOrTodayDate((string)($sourceSession['session_date'] ?? ''));
+            if (!$isTeacherCancelled && !$isStudentEmergencyReschedulable) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Only teacher-cancelled or future scheduled sessions can be rescheduled'], 400);
+            }
+
+            $teacherId = (int)($sourceSession['assigned_teacher_id'] ?? 0);
+            if ($teacherId < 1) {
+                $teacherId = (int)($sourceSession['teacher_id'] ?? 0);
+            }
+            if ($teacherId < 1) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'No fixed teacher is assigned to this enrollment'], 400);
+            }
+
+            if (!$this->teacherHasAvailabilityForSlot($teacherId, $sessionDate, $startTime, $endTime)) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Selected slot is outside the teacher availability'], 400);
+            }
+            if ($this->hasTeacherScheduleConflict($teacherId, $sessionDate, $startTime, $endTime, [$sessionId])) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Teacher already has another session at that time'], 400);
+            }
+            if ($this->hasStudentScheduleConflict((int)$sourceSession['student_id'], $sessionDate, $startTime, $endTime, [$sessionId])) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Student already has another session at that time'], 400);
+            }
+
+            $roomId = isset($sourceSession['room_id']) ? (int)$sourceSession['room_id'] : null;
+            if ($roomId !== null && $roomId > 0 && $this->hasRoomScheduleConflict($roomId, $sessionDate, $startTime, $endTime, [$sessionId])) {
+                $roomId = null;
+            }
+
+            $historyNote = 'Rescheduled from session #' . (int)$sourceSession['session_id'] . ($reason !== '' ? ' - ' . $reason : '');
+            $newStatus = $isTeacherCancelled ? 'rescheduled' : 'Scheduled';
+            $stmtInsert = $this->conn->prepare("
+                INSERT INTO tbl_sessions (
+                    enrollment_id,
+                    teacher_id,
+                    session_number,
+                    session_date,
+                    start_time,
+                    end_time,
+                    session_type,
+                    instrument_id,
+                    school_instrument_id,
+                    room_id,
+                    status,
+                    attendance_notes,
+                    notes,
+                    rescheduled_from_session_id,
+                    rescheduled_to_session_id,
+                    needs_rescheduling,
+                    cancellation_reason,
+                    cancelled_by_teacher_at,
+                    rescheduled_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, NULL, NULL, NOW())
+            ");
+            $stmtInsert->execute([
+                (int)$sourceSession['enrollment_id'],
+                $teacherId,
+                (int)$sourceSession['session_number'],
+                $sessionDate,
+                $startTime,
+                $endTime,
+                $sourceSession['session_type'] ?? 'Regular',
+                !empty($sourceSession['instrument_id']) ? (int)$sourceSession['instrument_id'] : null,
+                !empty($sourceSession['school_instrument_id']) ? (int)$sourceSession['school_instrument_id'] : null,
+                ($roomId !== null && $roomId > 0) ? $roomId : null,
+                $newStatus,
+                $sourceSession['attendance_notes'] ?? null,
+                $historyNote,
+                (int)$sourceSession['session_id']
+            ]);
+            $newSessionId = (int)$this->conn->lastInsertId();
+
+            if ($isTeacherCancelled) {
+                $stmtUpdate = $this->conn->prepare("
+                    UPDATE tbl_sessions
+                    SET needs_rescheduling = 0,
+                        rescheduled_to_session_id = ?,
+                        rescheduled_at = NOW()
+                    WHERE session_id = ?
+                ");
+                $stmtUpdate->execute([$newSessionId, $sessionId]);
+            } else {
+                $stmtUpdate = $this->conn->prepare("
+                    UPDATE tbl_sessions
+                    SET status = 'rescheduled',
+                        cancellation_reason = ?,
+                        rescheduled_to_session_id = ?,
+                        rescheduled_at = NOW()
+                    WHERE session_id = ?
+                ");
+                $stmtUpdate->execute([$reason !== '' ? $reason : 'Student emergency reschedule', $newSessionId, $sessionId]);
+            }
+
+            $this->conn->commit();
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Session rescheduled successfully.',
+                'new_session_id' => $newSessionId
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     private function ensureStudentAgeVerificationProofColumn()
     {
         if ($this->hasStudentColumn('age_verification_proof_path')) return;
@@ -4731,6 +4946,9 @@ switch ($action) {
         break;
     case 'schedule-session':
         $studentsApi->scheduleEnrollmentSession();
+        break;
+    case 'reschedule-session':
+        $studentsApi->rescheduleSession();
         break;
     case 'reschedule-cancelled-session':
         $studentsApi->rescheduleCancelledSession();

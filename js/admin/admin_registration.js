@@ -8,14 +8,14 @@
             const normalBtn = 'px-4 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-900 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white border border-gray-200 dark:border-white/10 font-semibold text-sm transition';
 
             if (mode === 'all') {
-                if (title) title.textContent = 'All Registrations';
+                if (title) title.textContent = 'All Registration Records';
                 if (subtitle) subtitle.textContent = 'Showing all registration records in the system.';
                 if (btnAll) btnAll.className = pendingActive;
                 if (btnPending) btnPending.className = normalBtn;
                 if (typeof loadAllRegistrations === 'function') loadAllRegistrations();
             } else {
-                if (title) title.textContent = 'Pending Registrations';
-                if (subtitle) subtitle.textContent = 'Showing records that are waiting for admin review/payment confirmation.';
+                if (title) title.textContent = 'Registration Payments';
+                if (subtitle) subtitle.textContent = 'Showing registrations that are waiting for admin review and payment confirmation.';
                 if (btnPending) btnPending.className = pendingActive;
                 if (btnAll) btnAll.className = normalBtn;
                 if (typeof loadPendingRegistrations === 'function') loadPendingRegistrations();

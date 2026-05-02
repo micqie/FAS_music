@@ -81,6 +81,16 @@
                     <a href="manager_registration.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-id-card mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Registrations
                     </a>
+                    <details id="navManagerPaymentsGroup" class="group/dropdown">
+                        <summary id="navManagerPaymentsSummary" class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all w-full list-none cursor-pointer">
+                            <span class="flex items-center"><i class="fas fa-wallet mr-3"></i> Payments</span>
+                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
+                        </summary>
+                        <div class="mt-2 space-y-1">
+                            <a id="navManagerRegistrationPayments" href="manager_registration.html#pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Registration Payments</a>
+                            <a id="navManagerEnrollmentPayments" href="manager_sessions.html?page=enrollments&view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Enrollment Payments</a>
+                        </div>
+                    </details>
                     <details id="navManagerEnrollmentsGroup" class="group/dropdown">
                         <summary id="navManagerEnrollmentsSummary" class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
@@ -685,23 +695,34 @@
 
             const pendingLink = document.getElementById('navEnrollmentPending');
             const activeLink = document.getElementById('navEnrollmentActive');
+            const paymentLink = document.getElementById('navManagerEnrollmentPayments');
             const baseClass = 'block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all';
             const activeClass = 'block ml-11 px-3 py-2 text-sm font-semibold text-white bg-white/10 rounded-lg';
             if (pendingLink) pendingLink.className = (view === 'pending') ? activeClass : baseClass;
             if (activeLink) activeLink.className = (view === 'active') ? activeClass : baseClass;
+            if (paymentLink) paymentLink.className = (view === 'active') ? activeClass : baseClass;
         }
 
         function applyManagerSidebarMode() {
             const enrollmentsSummary = document.getElementById('navManagerEnrollmentsSummary');
             const enrollmentsGroup = document.getElementById('navManagerEnrollmentsGroup');
             const sessionsLink = document.getElementById('navManagerSessionsLink');
+            const paymentsSummary = document.getElementById('navManagerPaymentsSummary');
+            const paymentsGroup = document.getElementById('navManagerPaymentsGroup');
+            const registrationPaymentsLink = document.getElementById('navManagerRegistrationPayments');
+            const enrollmentPaymentsLink = document.getElementById('navManagerEnrollmentPayments');
             const baseClass = 'flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all w-full list-none cursor-pointer';
             const activeClass = 'sidebar-item-active flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all w-full list-none cursor-pointer';
             const linkBaseClass = 'flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group';
             const linkActiveClass = 'sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all group';
+            const childBaseClass = 'block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all';
             if (enrollmentsSummary) enrollmentsSummary.className = managerPageMode === 'enrollments' ? activeClass : baseClass;
             if (sessionsLink) sessionsLink.className = managerPageMode === 'sessions' ? linkActiveClass : linkBaseClass;
             if (enrollmentsGroup) enrollmentsGroup.open = managerPageMode === 'enrollments';
+            if (paymentsSummary) paymentsSummary.className = managerPageMode === 'enrollments' ? activeClass : baseClass;
+            if (paymentsGroup) paymentsGroup.open = managerPageMode === 'enrollments';
+            if (registrationPaymentsLink) registrationPaymentsLink.className = childBaseClass;
+            if (enrollmentPaymentsLink && managerPageMode !== 'enrollments') enrollmentPaymentsLink.className = childBaseClass;
         }
 
         function updateActiveTableHeaders() {
@@ -2057,9 +2078,14 @@
                         <td class="px-6 py-4 text-slate-700">${teacherName}</td>
                         <td class="px-6 py-4 text-slate-700">${roomName}</td>
                         <td class="px-6 py-4">
-                            <button type="button" class="px-3 py-1.5 rounded-lg bg-gold-500/15 text-gold-700 hover:bg-gold-500/25 text-xs font-bold" onclick="openSessionScheduleModal(${Number(student.enrollment_id)})">
-                                View Schedule
-                            </button>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold border border-slate-200 transition" onclick="openSessionScheduleModal(${Number(student.enrollment_id)})">
+                                    View Schedule
+                                </button>
+                                <button type="button" class="px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 text-xs font-bold shadow-sm transition" onclick="openSessionScheduleModal(${Number(student.enrollment_id)}, { autoEditFirst: true })">
+                                    Edit Schedule
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -2084,7 +2110,7 @@
             }).join('');
         }
 
-        function openSessionScheduleModal(enrollmentId) {
+        function openSessionScheduleModal(enrollmentId, options = {}) {
             const modal = document.getElementById('scheduleModal');
             const body = document.getElementById('scheduleModalBody');
             const meta = document.getElementById('scheduleModalMeta');
@@ -2113,12 +2139,7 @@
             const sessionsTotal = Number(row.sessions || 0);
             const rows = [];
             let nextUnscheduled = 0;
-            const earliestScheduledDate = sessionsList.map(slot => String(slot?.session_date || '').trim()).filter(Boolean).sort()[0] || '';
-            const canEditBeforeStart = earliestScheduledDate
-                ? new Date().setHours(0, 0, 0, 0) < new Date(`${earliestScheduledDate}T00:00:00`).setHours(0, 0, 0, 0)
-                : false;
-            const recurringSlotCount = Array.isArray(row.schedule_slots) ? row.schedule_slots.length : 0;
-
+            const todayMs = new Date().setHours(0, 0, 0, 0);
             if (sessionsTotal > 0) {
                 for (let i = 1; i <= sessionsTotal; i += 1) {
                     const slotHistory = sessionsList.filter(s => Number(s.session_number) === i);
@@ -2132,9 +2153,13 @@
                                 : '';
                             const teacherText = slotTeacherName ? ` • ${slotTeacherName}` : '';
                             const normalizedStatus = String(slot?.status || '').toLowerCase();
-                            const editableThisSlot = canEditBeforeStart && normalizedStatus === 'scheduled' && (!recurringSlotCount || i <= recurringSlotCount);
+                            const slotDateMs = slot?.session_date ? new Date(`${slot.session_date}T00:00:00`).setHours(0, 0, 0, 0) : NaN;
+                            const editableThisSlot = normalizedStatus === 'scheduled' && !Number.isNaN(slotDateMs) && slotDateMs >= todayMs;
                             const editBtn = editableThisSlot
-                                ? `<button type="button" class="edit-schedule-btn ml-auto px-2.5 py-1 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-800 text-[11px] font-semibold transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}" data-room-name="${escapeHtml(slot?.room_name || '')}">Edit schedule</button>`
+                                ? `<button type="button" class="edit-schedule-btn ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold shadow-sm transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}" data-room-name="${escapeHtml(slot?.room_name || '')}"><i class="fas fa-pen"></i><span>Edit Schedule</span></button>`
+                                : '';
+                            const rescheduleBtn = editableThisSlot && Number(slot?.session_id || 0) > 0
+                                ? `<button type="button" class="reschedule-session-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-sky-500 hover:bg-sky-600 text-white text-[11px] font-bold shadow-sm transition" data-session-id="${Number(slot?.session_id || 0)}"><i class="fas fa-calendar-day"></i><span>Reschedule</span></button>`
                                 : '';
                             const reasonText = slot?.cancellation_reason
                                 ? `<div class="text-[11px] text-slate-500 mt-1">Reason: ${escapeHtml(slot.cancellation_reason)}</div>`
@@ -2144,6 +2169,7 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         ${getSessionStatusBadge(slot.status)}
                                         <div>${escapeHtml(dateText)}${roomText}${teacherText}</div>
+                                        ${rescheduleBtn}
                                         ${editBtn}
                                     </div>
                                     ${reasonText}
@@ -2175,9 +2201,7 @@
             if (startInput) startInput.value = '09:00';
             if (endInput) endInput.value = '10:00';
             if (hint) {
-                hint.textContent = canEditBeforeStart
-                    ? 'This enrollment uses a fixed weekly schedule. You can edit first-week scheduled sessions before classes start.'
-                    : 'This enrollment uses a fixed weekly schedule. Editing closes once the first scheduled week starts.';
+                hint.textContent = 'This enrollment uses a fixed weekly schedule. You can edit any future scheduled session here.';
             }
             if (toggleBtn) {
                 toggleBtn.textContent = nextUnscheduled ? `Schedule Session ${nextUnscheduled}` : 'Auto-Generated';
@@ -2197,7 +2221,8 @@
 
             populateScheduleRoomDropdown(row.branch_id, row.assigned_room || '');
 
-            body.querySelectorAll('.edit-schedule-btn').forEach((btn) => {
+            const editButtons = Array.from(body.querySelectorAll('.edit-schedule-btn'));
+            editButtons.forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     if (!form || !dateInput || !startInput || !endInput) return;
                     if (sessionInput) sessionInput.value = String(btn.dataset.sessionNumber || '');
@@ -2211,9 +2236,84 @@
                     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 });
             });
+            body.querySelectorAll('.reschedule-session-btn').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const sessionId = Number(btn.dataset.sessionId || 0);
+                    if (!sessionId) return;
+                    await openStudentReschedulePicker(sessionId, enrollmentId);
+                });
+            });
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+
+            if (options?.autoEditFirst) {
+                const firstEditBtn = editButtons[0];
+                if (firstEditBtn) {
+                    firstEditBtn.click();
+                } else if (nextUnscheduled && toggleBtn && !toggleBtn.disabled) {
+                    toggleAddScheduleForm();
+                } else {
+                    showMessage('No editable future scheduled session was found for this student.', 'error');
+                }
+            }
+        }
+
+        async function openStudentReschedulePicker(sessionId, enrollmentId) {
+            try {
+                const response = await axios.get(`${baseApiUrl}/students.php?action=get-reschedule-slots&session_id=${encodeURIComponent(sessionId)}`);
+                const data = response.data || {};
+                const slots = Array.isArray(data.slots) ? data.slots : [];
+                if (!data.success) {
+                    showMessage(data.error || 'Failed to load available slots.', 'error');
+                    return;
+                }
+                if (!slots.length) {
+                    showMessage('No available slots found for this teacher right now.', 'error');
+                    return;
+                }
+                const inputOptions = {};
+                slots.forEach((slot, index) => {
+                    inputOptions[String(index)] = `${formatDateShort(slot.session_date)} • ${slot.day_of_week} • ${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`;
+                });
+                const result = await Swal.fire({
+                    icon: 'info',
+                    title: 'Reschedule Student Session',
+                    text: 'Use this when a student needs to move the class because of an emergency.',
+                    input: 'select',
+                    inputOptions,
+                    inputPlaceholder: 'Select an available slot',
+                    inputValue: '',
+                    showCancelButton: true,
+                    confirmButtonText: 'Reschedule',
+                    cancelButtonText: 'Close',
+                    confirmButtonColor: '#0ea5e9',
+                    inputValidator: value => value === '' || value == null ? 'Please select a slot.' : null
+                });
+                if (!result.isConfirmed) return;
+                const chosen = slots[Number(result.value)];
+                if (!chosen) {
+                    showMessage('Selected slot is invalid.', 'error');
+                    return;
+                }
+                const saveRes = await axios.post(`${baseApiUrl}/students.php?action=reschedule-session`, {
+                    session_id: sessionId,
+                    session_date: chosen.session_date,
+                    start_time: chosen.start_time,
+                    end_time: chosen.end_time,
+                    reason: 'Student emergency reschedule'
+                });
+                const saveData = saveRes.data || {};
+                if (saveData.success) {
+                    showMessage(saveData.message || 'Session rescheduled.', 'success');
+                    await loadActiveStudents();
+                    openSessionScheduleModal(Number(enrollmentId));
+                } else {
+                    showMessage(saveData.error || 'Failed to reschedule session.', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error while rescheduling session.', 'error');
+            }
         }
 
         function closeScheduleModal() {
@@ -2245,6 +2345,8 @@
             const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
             const roomName = document.getElementById('scheduleRoom')?.value || '';
             const editExisting = document.getElementById('scheduleEditExisting')?.value === '1';
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const editorRole = String(user?.role_name || '');
 
             if (!enrollmentId || !sessionNumber || !sessionDate) {
                 showMessage('Please select a date before saving.', 'error');
@@ -2260,7 +2362,9 @@
                     end_time: endTime,
                     teacher_id: teacherId,
                     room_name: roomName,
-                    edit_existing: editExisting
+                    edit_existing: editExisting,
+                    branch_id: managerBranchId || undefined,
+                    editor_role: editorRole || undefined
                 });
                 const data = response.data || {};
                 if (data.success) {

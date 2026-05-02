@@ -81,6 +81,16 @@
                     <a href="manager_registration.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-id-card mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Registrations
                     </a>
+                    <details id="navManagerPaymentsGroup" class="group/dropdown">
+                        <summary id="navManagerPaymentsSummary" class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all w-full list-none cursor-pointer">
+                            <span class="flex items-center"><i class="fas fa-wallet mr-3"></i> Payments</span>
+                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
+                        </summary>
+                        <div class="mt-2 space-y-1">
+                            <a id="navManagerRegistrationPayments" href="manager_registration.html#pending" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Registration Payments</a>
+                            <a id="navManagerEnrollmentPayments" href="manager_enrollments.html?view=active" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Enrollment Payments</a>
+                        </div>
+                    </details>
                     <details id="navManagerEnrollmentsGroup" class="group/dropdown">
                         <summary id="navManagerEnrollmentsSummary" class="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all w-full list-none cursor-pointer">
                             <span class="flex items-center"><i class="fas fa-user-plus mr-3"></i> Enrollments</span>
@@ -629,16 +639,20 @@
 
             const pendingLink = document.getElementById('navEnrollmentPending');
             const activeLink = document.getElementById('navEnrollmentActive');
+            const paymentLink = document.getElementById('navManagerEnrollmentPayments');
             const baseClass = 'block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all';
             const activeClass = 'block ml-11 px-3 py-2 text-sm font-semibold text-white bg-white/10 rounded-lg';
             if (pendingLink) pendingLink.className = (view === 'pending') ? activeClass : baseClass;
             if (activeLink) activeLink.className = (view === 'active') ? activeClass : baseClass;
+            if (paymentLink) paymentLink.className = (view === 'active') ? activeClass : baseClass;
         }
 
         function applyManagerSidebarMode() {
             const enrollmentsSummary = document.getElementById('navManagerEnrollmentsSummary');
             const enrollmentsGroup = document.getElementById('navManagerEnrollmentsGroup');
             const sessionsLink = document.getElementById('navManagerSessionsLink');
+            const paymentsSummary = document.getElementById('navManagerPaymentsSummary');
+            const paymentsGroup = document.getElementById('navManagerPaymentsGroup');
             const baseClass = 'flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all w-full list-none cursor-pointer';
             const activeClass = 'sidebar-item-active flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all w-full list-none cursor-pointer';
             const linkBaseClass = 'flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group';
@@ -646,6 +660,8 @@
             if (enrollmentsSummary) enrollmentsSummary.className = managerPageMode === 'enrollments' ? activeClass : baseClass;
             if (sessionsLink) sessionsLink.className = managerPageMode === 'sessions' ? linkActiveClass : linkBaseClass;
             if (enrollmentsGroup) enrollmentsGroup.open = managerPageMode === 'enrollments';
+            if (paymentsSummary) paymentsSummary.className = managerPageMode === 'enrollments' ? activeClass : baseClass;
+            if (paymentsGroup) paymentsGroup.open = managerPageMode === 'enrollments';
         }
 
         function applyManagerPageMode() {
@@ -663,7 +679,7 @@
                 if (pageSubtitle) pageSubtitle.textContent = 'Manage branch enrollments and send students into scheduling.';
                 if (branchScopeLabel) branchScopeLabel.textContent = 'Enrollments are locked to your branch:';
                 if (pendingTitle) pendingTitle.innerHTML = '<i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Enrollments';
-                if (activeTitle) activeTitle.innerHTML = '<i class="fas fa-user-check mr-2 text-gold-500"></i>Active Enrollments';
+                if (activeTitle) activeTitle.innerHTML = '<i class="fas fa-wallet mr-2 text-gold-500"></i>Enrollment Payments';
                 window.pendingRequestActionLabel = 'Schedule Sessions';
                 window.onPendingRequestAssignClick = function(requestId) {
                     openAssignRequestModal(requestId);
@@ -693,15 +709,15 @@
             const enrollmentMode = uiIsDesk || managerPageMode === 'enrollments';
             const baseLabel = enrollmentMode ? 'Enrollments' : 'Sessions';
             const pendingLabel = enrollmentMode ? 'Pending Enrollments' : 'Pending Sessions';
-            const activeLabel = enrollmentMode ? 'Active Enrollments' : 'Active Sessions';
+            const activeLabel = enrollmentMode ? 'Enrollment Payments' : 'Active Sessions';
             const pendingSub = enrollmentMode
                 ? 'Review and assign pending enrollment requests'
                 : 'Review and assign pending session requests';
             const activeSub = enrollmentMode
-                ? 'Manage active student enrollment assignments'
+                ? 'Review package payment type, paid amount, and remaining balance for active enrollments'
                 : 'Manage active student session assignments';
             const baseSub = enrollmentMode
-                ? 'Manage pending and active enrollments'
+                ? 'Manage pending enrollments and track payment progress'
                 : 'Manage pending and active sessions';
 
             if (view === 'pending') {
