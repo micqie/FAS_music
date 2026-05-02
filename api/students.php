@@ -1332,6 +1332,13 @@ class StudentsApi
         }
     }
 
+    private function ensureFutureOrTodayDateOrFail($dateText, $message = 'Past dates are not allowed.')
+    {
+        if (!$this->isFutureOrTodayDate($dateText)) {
+            $this->sendJSON(['error' => $message], 400);
+        }
+    }
+
     private function updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime, $roomName)
     {
         $enrollmentId = (int)($enrollment['enrollment_id'] ?? 0);
@@ -3463,6 +3470,8 @@ class StudentsApi
                     s.branch_id,
                     b.branch_name,
                     e.package_id,
+                    e.instrument_id,
+                    COALESCE(inst.instrument_name, CONCAT('Instrument #', e.instrument_id)) AS instrument_name,
                     COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
                     COALESCE(sp.sessions, e.total_sessions, 0) AS sessions,
                     COALESCE(sp.price, 0) AS total_amount,
@@ -3490,6 +3499,7 @@ class StudentsApi
                 FROM tbl_enrollments e
                 INNER JOIN tbl_students s ON e.student_id = s.student_id
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
+                LEFT JOIN tbl_instruments inst ON inst.instrument_id = e.instrument_id
                 LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id
                 LEFT JOIN (
                     SELECT
@@ -3884,6 +3894,7 @@ class StudentsApi
         $sessionDate = trim((string)($data['session_date'] ?? ''));
         $startTime = trim((string)($data['start_time'] ?? ''));
         $endTime = trim((string)($data['end_time'] ?? ''));
+        $this->ensureFutureOrTodayDateOrFail($sessionDate, 'Reschedule date cannot be in the past.');
 
         if ($sessionId < 1 || $sessionDate === '' || $startTime === '' || $endTime === '') {
             $this->sendJSON(['error' => 'session_id, session_date, start_time, and end_time are required'], 400);
@@ -4035,6 +4046,7 @@ class StudentsApi
         if ($sessionDate === '') {
             $this->sendJSON(['error' => 'session_date is required'], 400);
         }
+        $this->ensureFutureOrTodayDateOrFail($sessionDate, 'Schedule date cannot be in the past.');
         if ($startTime === '') $startTime = '09:00:00';
         if ($endTime === '') $endTime = '10:00:00';
         if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $startTime) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $endTime)) {
@@ -4170,25 +4182,12 @@ class StudentsApi
                 }
             }
 
-            $stmtSameDate = $this->conn->prepare("
-                SELECT ts.session_id
-                FROM tbl_sessions ts
-                INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
-                WHERE te.student_id = ?
-                  AND te.status = 'Active'
-                  AND ts.session_date = ?
-                  AND ts.status <> 'cancelled_by_teacher'
-                  AND NOT (ts.enrollment_id = ? AND ts.session_number = ?)
-                LIMIT 1
-            ");
-            $stmtSameDate->execute([
-                (int)$enrollment['student_id'],
-                $sessionDate,
-                $enrollmentId,
-                $sessionNumber
-            ]);
-            if ($stmtSameDate->fetchColumn()) {
-                $this->sendJSON(['error' => 'Student already has an active session scheduled on this date'], 400);
+            $excludeSessionIds = [];
+            if ($existingSessionId > 0) {
+                $excludeSessionIds[] = $existingSessionId;
+            }
+            if ($this->hasStudentScheduleConflict((int)$enrollment['student_id'], $sessionDate, $startTime, $endTime, $excludeSessionIds)) {
+                $this->sendJSON(['error' => 'Student already has another overlapping session at that time'], 400);
             }
 
             $instrumentId = (int)($enrollment['instrument_id'] ?? 0);
@@ -4715,6 +4714,8 @@ class StudentsApi
         $sessionDate = trim((string)($data['session_date'] ?? ''));
         $startTime = trim((string)($data['start_time'] ?? ''));
         $endTime = trim((string)($data['end_time'] ?? ''));
+
+        $this->ensureFutureOrTodayDateOrFail($sessionDate, 'Reschedule date cannot be in the past.');
         $reason = trim((string)($data['reason'] ?? 'Student emergency reschedule'));
 
         if ($sessionId < 1 || $sessionDate === '' || $startTime === '' || $endTime === '') {

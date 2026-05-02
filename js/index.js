@@ -87,36 +87,111 @@ let currentPaymentSource = '';
 let currentRegistration = null;
 let pendingRequestsById = {};
 
+function normalizeRoleName(role) {
+    return String(role || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function getRoleCategory(role) {
+    const normalizedRole = normalizeRoleName(role);
+    if (['admin', 'superadmin', 'super admin', 'administrator'].includes(normalizedRole)) {
+        return 'admin';
+    }
+    if (['manager', 'branch manager'].includes(normalizedRole)) {
+        return 'manager';
+    }
+    if (['staff', 'desk', 'front desk'].includes(normalizedRole)) {
+        return 'staff';
+    }
+    if (['instructor', 'instructors', 'teacher', 'teachers'].includes(normalizedRole)) {
+        return 'instructor';
+    }
+    if (normalizedRole === 'student') {
+        return 'student';
+    }
+    if (['guardian', 'guardians'].includes(normalizedRole)) {
+        return 'guardian';
+    }
+    return normalizedRole;
+}
+
 // Authentication Utility (integrated) - with storage access protection
 const Auth = {
-    // Get current user from sessionStorage
-    getUser() {
+    readStoredUser() {
+        const storages = [];
         try {
-            const userStr = sessionStorage.getItem('user');
-            if (!userStr) return null;
-            return JSON.parse(userStr);
+            storages.push(sessionStorage);
         } catch (e) {
-            // Storage access blocked or parse error
-            return null;
+            // Ignore blocked sessionStorage
         }
+        try {
+            storages.push(localStorage);
+        } catch (e) {
+            // Ignore blocked localStorage
+        }
+
+        for (const storage of storages) {
+            try {
+                const userStr = storage.getItem('user');
+                if (!userStr) continue;
+                const parsedUser = JSON.parse(userStr);
+                if (parsedUser && typeof parsedUser === 'object') {
+                    return parsedUser;
+                }
+            } catch (e) {
+                // Ignore invalid data and keep checking other storage
+            }
+        }
+
+        return null;
     },
 
-    // Set user in sessionStorage
-    setUser(user) {
+    // Get current user from sessionStorage
+    getUser() {
+        const user = this.readStoredUser();
+        if (!user) {
+            return null;
+        }
+
+        // Rehydrate the session store when possible so current-tab reads stay fast.
         try {
             sessionStorage.setItem('user', JSON.stringify(user));
         } catch (e) {
-            // Storage access blocked - log warning but continue
-            console.warn('Unable to save user to sessionStorage. Browser tracking prevention may be enabled.');
+            // Ignore storage sync failures
+        }
+        return user;
+    },
+
+    // Set user in browser storage
+    setUser(user) {
+        let saved = false;
+        try {
+            sessionStorage.setItem('user', JSON.stringify(user));
+            saved = true;
+        } catch (e) {
+            // Ignore and try localStorage
+        }
+        try {
+            localStorage.setItem('user', JSON.stringify(user));
+            saved = true;
+        } catch (e) {
+            // Ignore and fall back to whatever store worked
+        }
+        if (!saved) {
+            console.warn('Unable to save user to browser storage. Storage access may be blocked.');
         }
     },
 
-    // Remove user from sessionStorage
+    // Remove user from browser storage
     logout() {
         try {
             sessionStorage.removeItem('user');
         } catch (e) {
-            // Storage access blocked - continue anyway
+            // Ignore
+        }
+        try {
+            localStorage.removeItem('user');
+        } catch (e) {
+            // Ignore
         }
         // Redirect to app root index from any nested page
         const appBase = (typeof appBaseUrl === 'string' && appBaseUrl)
@@ -136,7 +211,9 @@ const Auth = {
     hasRole(role) {
         const user = this.getUser();
         if (!user) return false;
-        return user.role_name === role || user.role_name === 'SuperAdmin';
+        const actualRole = getRoleCategory(user.role_name);
+        const targetRole = getRoleCategory(role);
+        return actualRole === targetRole || actualRole === 'admin';
     }
 };
 
@@ -393,19 +470,18 @@ function initLoginForm() {
 
                 // Redirect based on role
                 setTimeout(() => {
-                    const role = String(data.user.role_name || '').trim();
-                    const roleLower = role.toLowerCase();
-                    if (role === 'Admin' || role === 'SuperAdmin') {
+                    const roleCategory = getRoleCategory(data.user.role_name);
+                    if (roleCategory === 'admin') {
                         window.location.href = 'pages/admin/admin_dashboard.html';
-                    } else if (role === 'Manager' || role === 'Branch Manager') {
+                    } else if (roleCategory === 'manager') {
                         window.location.href = 'pages/manager/manager_dashboard.html';
-                    } else if (role === 'Staff') {
+                    } else if (roleCategory === 'staff') {
                         window.location.href = 'pages/desk/desk_scanner.html';
-                    } else if (roleLower === 'instructor' || roleLower === 'teacher' || roleLower === 'instructors' || roleLower === 'teachers') {
+                    } else if (roleCategory === 'instructor') {
                         window.location.href = 'pages/instructor/instructor_dashboard.html';
-                    } else if (role === 'Student') {
+                    } else if (roleCategory === 'student') {
                         window.location.href = 'pages/student/student_dashboard.html';
-                    } else if (data.user.role_name === 'Guardians') {
+                    } else if (roleCategory === 'guardian') {
                         window.location.href = 'pages/guardian/guardian_students.html';
                     } else {
                         window.location.href = 'index.html';
@@ -1526,7 +1602,7 @@ async function promptPasswordChange(user, currentPassword) {
 // Check authentication
 function checkAuth() {
     const user = Auth.getUser();
-    if (!user || (user.role_name !== 'Admin' && user.role_name !== 'SuperAdmin')) {
+    if (!user || getRoleCategory(user.role_name) !== 'admin') {
         Swal.fire({
             icon: 'warning',
             title: 'Access Denied',
@@ -1548,7 +1624,7 @@ function checkAuth() {
 
 function checkStudentAuth() {
     const user = Auth.getUser();
-    if (!user || user.role_name !== 'Student') {
+    if (!user || getRoleCategory(user.role_name) !== 'student') {
         Swal.fire({
             icon: 'warning',
             title: 'Access Denied',
@@ -1570,7 +1646,7 @@ function checkStudentAuth() {
 
 function checkGuardianAuth() {
     const user = Auth.getUser();
-    if (!user || user.role_name !== 'Guardians') {
+    if (!user || getRoleCategory(user.role_name) !== 'guardian') {
         Swal.fire({
             icon: 'warning',
             title: 'Access Denied',
@@ -1581,6 +1657,29 @@ function checkGuardianAuth() {
             const appBase = (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
                 ? baseApiUrl.slice(0, -4)
                 : `${window.location.origin}/FAS_music`;
+            window.location.href = `${appBase}/index.html`;
+        });
+        return false;
+    }
+    return true;
+}
+
+function checkBranchScopedAuth() {
+    const user = Auth.getUser();
+    const roleCategory = getRoleCategory(user?.role_name);
+    if (!user || (roleCategory !== 'manager' && roleCategory !== 'staff')) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Access Denied',
+            text: 'You must be logged in as branch staff or a branch manager to access this page.',
+            confirmButtonColor: '#b8860b',
+            confirmButtonText: 'Go to Login'
+        }).then(() => {
+            const appBase = (typeof appBaseUrl === 'string' && appBaseUrl)
+                ? appBaseUrl
+                : ((typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+                    ? baseApiUrl.slice(0, -4)
+                    : `${window.location.origin}/FAS_music`);
             window.location.href = `${appBase}/index.html`;
         });
         return false;

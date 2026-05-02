@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Desk - Sessions</title>
     <script src="https://cdn.tailwindcss.com"></script>
+ <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
         tailwind.config = {
@@ -1130,6 +1131,12 @@
             return date.toLocaleDateString();
         }
 
+        function getTodayInputDate() {
+            const now = new Date();
+            const offsetMs = now.getTimezoneOffset() * 60000;
+            return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+        }
+
         function getSessionStatusBadge(status) {
             const normalized = String(status || '').toLowerCase();
             if (normalized === 'completed') {
@@ -1938,6 +1945,7 @@
             const endInput = document.getElementById('scheduleEnd');
             const saveBtn = document.getElementById('saveScheduleBtn');
             if (dateInput) dateInput.value = '';
+            if (dateInput) dateInput.min = getTodayInputDate();
             if (startInput) startInput.value = '09:00';
             if (endInput) endInput.value = '10:00';
             if (saveBtn) saveBtn.textContent = 'Save Session';
@@ -1967,6 +1975,7 @@
                     if (sessionInput) sessionInput.value = String(btn.dataset.sessionNumber || '');
                     if (editExistingInput) editExistingInput.value = '1';
                     dateInput.value = btn.dataset.sessionDate || '';
+                    dateInput.min = getTodayInputDate();
                     startInput.value = (btn.dataset.startTime || '09:00:00').slice(0, 5);
                     endInput.value = (btn.dataset.endTime || '10:00:00').slice(0, 5);
                     if (saveBtn) saveBtn.textContent = `Update Session ${btn.dataset.sessionNumber || ''}`;

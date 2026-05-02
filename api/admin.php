@@ -201,6 +201,7 @@ class Admin
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
+                s.branch_id,
                 s.first_name,
                 s.last_name,
                 s.email,

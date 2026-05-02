@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Father & Sons Music Academy</title>
+    <title>Featured | Father & Sons Music Academy</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="css/style.css">
-   <link rel="icon" href="logo/android-chrome-512x512.png" type="image/x-icon" />
+    <link rel="icon" href="logo/android-chrome-512x512.png" type="image/x-icon" />
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -26,7 +26,6 @@
                 }
             }
         }
-        // Suppress Tailwind CDN warning
         if (typeof console !== 'undefined' && console.warn) {
             const originalWarn = console.warn;
             console.warn = function(...args) {
@@ -36,25 +35,18 @@
         }
     </script>
     <style>
-        /* Minimal Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 3px; }
-
-        /* Smooth section transitions */
         html { scroll-behavior: smooth; }
-
-        /* Readable login success SweetAlert */
         .login-success-popup {
             font-family: "Times New Roman", Georgia, serif;
         }
-
         .login-success-title {
             font-family: "Times New Roman", Georgia, serif;
             font-size: 2rem;
             letter-spacing: 0.04em;
         }
-
         .login-success-text {
             font-family: "Times New Roman", Georgia, serif;
             font-size: 1.1rem;
@@ -64,27 +56,25 @@
 </head>
 <body class="bg-white text-zinc-900 dark:bg-obsidian dark:text-zinc-100 selection:bg-gold-400 selection:text-white">
 
-    <!-- Navigation: Clean White Glassmorphism -->
     <nav class="fixed w-full z-50 bg-white/80 dark:bg-obsidian/90 backdrop-blur-lg border-b border-zinc-200 dark:border-zinc-800 px-6 md:px-12 py-4 flex justify-between items-center transition-all duration-300">
-        <a href="#home" class="flex items-center h-10 sm:h-12 md:h-14">
-            <!-- Assumption: Logo handles its own color. Added dark:brightness-200 for dark mode support -->
+        <a href="index.html#home" class="flex items-center h-10 sm:h-12 md:h-14">
             <img src="assets/fas-logo.png" alt="Father & Sons Music Academy"
             class="h-full w-auto object-left object-contain dark:brightness-0 dark:invert">
         </a>
 
         <div class="hidden md:flex space-x-10 items-center uppercase text-xs tracking-[0.2em] font-semibold">
-            <a href="#home" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">Home</a>
-            <a href="#about" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">About Us</a>
-            <a href="featured.html" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">Featured</a>
-            <a href="#courses" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">Courses</a>
+            <a href="index.html#home" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">Home</a>
+            <a href="index.html#about" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">About Us</a>
+            <a href="featured.html" class="text-gold-500 dark:text-gold-400 transition-colors">Featured</a>
+            <a href="index.html#courses" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">Courses</a>
             <div class="flex items-center gap-3">
-            <button onclick="toggleLoginModal(true)"
+                <button onclick="toggleLoginModal(true)"
 class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors border-2 border-zinc-900 px-5 py-2">
     Login
 </button>
-            <button onclick="toggleRegisterModal(true)" class="bg-black hover:bg-zinc-800 dark:bg-gold-500 dark:hover:bg-gold-400 text-white dark:text-black px-8 py-2.5 rounded-sm transition duration-300 font-bold shadow-lg hover:shadow-xl">
-                Register
-            </button>
+                <button onclick="toggleRegisterModal(true)" class="bg-black hover:bg-zinc-800 dark:bg-gold-500 dark:hover:bg-gold-400 text-white dark:text-black px-8 py-2.5 rounded-sm transition duration-300 font-bold shadow-lg hover:shadow-xl">
+                    Register
+                </button>
             </div>
         </div>
 
@@ -92,12 +82,11 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
             <i class="fas fa-bars" id="menu-icon"></i>
         </button>
 
-        <!-- Mobile Menu: Clean White Card -->
         <div id="mobile-menu" class="hidden absolute top-full left-0 w-full bg-white dark:bg-obsidian border-b border-zinc-200 dark:border-zinc-800 flex flex-col p-8 space-y-6 md:hidden shadow-2xl">
-            <a href="#home" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Home</a>
-            <a href="#about" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Our Story</a>
+            <a href="index.html#home" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Home</a>
+            <a href="index.html#about" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Our Story</a>
             <a href="featured.html" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Featured</a>
-            <a href="#courses" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Courses</a>
+            <a href="index.html#courses" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Courses</a>
             <button onclick="toggleLoginModal(true); toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2 text-left">Login</button>
             <button onclick="toggleRegisterModal(true); toggleMobileMenu()" class="bg-black dark:bg-gold-500 text-white dark:text-black px-6 py-4 rounded-sm font-bold uppercase text-sm tracking-widest text-center">
                 Register
@@ -105,160 +94,118 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
         </div>
     </nav>
 
-    <!-- Header: Minimalist Split Tone -->
-  <header id="home" class="relative min-h-screen flex items-center justify-start px-6 sm:px-8 md:px-12 lg:px-16 pt-24 md:pt-28 bg-white dark:bg-obsidian">
-        <!-- Background Image with White Wash -->
-        <div class="absolute inset-0 bg-[url('assets/piano_bg.avif')] bg-cover bg-center opacity-45 dark:opacity-10"></div>
-
-        <!-- Minimal Gradient Overlay for Text Readability -->
+    <header class="relative min-h-[55vh] flex items-center justify-start px-6 sm:px-8 md:px-12 lg:px-16 pt-24 md:pt-28 bg-white dark:bg-obsidian">
+        <div class="absolute inset-0 bg-[url('assets/piano_bg.avif')] bg-cover bg-center opacity-30 dark:opacity-10"></div>
         <div class="absolute inset-0 bg-gradient-to-r from-white via-white/95 to-transparent dark:from-obsidian dark:via-obsidian/95 dark:to-transparent"></div>
 
         <div class="relative z-10 text-left max-w-3xl">
-            <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold mb-4 block">Welcome to the Academy</span>
+            <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold mb-4 block">Featured</span>
             <h1 class="text-4xl sm:text-5xl md:text-7xl font-serif mb-6 text-zinc-900 dark:text-white leading-tight">
-                The Legacy <br>of <span class="italic text-gold-500">Sound</span>
+                Current <span class="italic text-gold-500">Updates</span>
             </h1>
             <p class="text-zinc-600 dark:text-zinc-400 max-w-xl mb-8 md:mb-10 text-base sm:text-lg leading-relaxed">
-                Empowering families through music. Join a tradition of excellence, mentorship, and artistic mastery.
+                Latest announcements, events, and featured moments from the academy.
             </p>
-            <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                <button onclick="toggleLoginModal(true)" class="w-full sm:w-auto border-2 border-zinc-900 dark:border-white text-zinc-900 dark:text-white hover:bg-zinc-900 hover:text-white dark:hover:bg-white dark:hover:text-black font-bold px-6 sm:px-8 py-3.5 sm:py-4 transition uppercase tracking-widest text-xs">
-                    Student Login
-                </button>
-                <button onclick="toggleRegisterModal(true)" class="w-full sm:w-auto bg-gold-500 text-white hover:bg-gold-600 font-bold px-8 sm:px-12 py-3.5 sm:py-4 transition uppercase tracking-widest text-xs shadow-lg shadow-gold-500/20">
-                    Register Now
-                </button>
-            </div>
+
         </div>
     </header>
 
-    <section class="py-20 md:py-24 px-6 md:px-8 bg-zinc-50 dark:bg-zinc-950">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex flex-col gap-6 md:flex-row md:items-end md:justify-between mb-10">
-                <div class="max-w-3xl">
-                    <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold mb-3 block">Featured Performance</span>
+    <main>
+        <section class="py-20 md:py-24 px-6 md:px-8 bg-zinc-50 dark:bg-zinc-950">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex flex-col gap-4 mb-8">
+                    <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold">Current Update</span>
+                    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <h2 class="text-3xl sm:text-4xl md:text-5xl font-serif text-zinc-900 dark:text-white">
+                                Main Academy Feature
+                            </h2>
+                            <p class="mt-3 text-zinc-600 dark:text-zinc-400 text-base sm:text-lg leading-relaxed max-w-2xl">
+                                Use this top section for the academy's latest update. You can replace the video with a new one anytime, or switch it to an image if needed.
+                            </p>
+                        </div>
+                        <div class="inline-flex items-center gap-2 rounded-full border border-gold-500/30 bg-gold-500/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.25em] text-gold-600 dark:text-gold-400">
+                            <i class="fas fa-bullhorn"></i>
+                            Latest Post
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr] gap-10 items-start">
+                    <div class="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-2xl shadow-zinc-900/10 dark:border-zinc-800">
+                        <video class="w-full h-[260px] sm:h-[380px] lg:h-[520px] object-cover" controls preload="metadata">
+                            <source src="assets/featured-video.mp4" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    <div class="rounded-3xl border border-zinc-200 bg-white p-8 shadow-xl shadow-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-900">
+                        <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold block mb-4">Update Details</span>
+                        <h3 class="text-2xl sm:text-3xl font-serif text-zinc-900 dark:text-white mb-4">
+                            Add your current academy news here
+                        </h3>
+                        <p class="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
+                            This area can describe the latest recital, class opening, event, promo, or school announcement.
+                        </p>
+                        <div class="space-y-3 text-sm tracking-wide text-zinc-700 dark:text-zinc-300">
+                            <div class="flex items-center"><i class="fas fa-check-circle mr-3 text-gold-500"></i> Top content for the newest update</div>
+                            <div class="flex items-center"><i class="fas fa-check-circle mr-3 text-gold-500"></i> Easy to replace with future content</div>
+                            <div class="flex items-center"><i class="fas fa-check-circle mr-3 text-gold-500"></i> Works for video or image-based announcements</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="py-20 md:py-24 px-6 md:px-8 bg-white dark:bg-obsidian">
+            <div class="max-w-7xl mx-auto">
+                <div class="max-w-3xl mb-12">
+                    <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold mb-3 block">School Videos</span>
                     <h2 class="text-3xl sm:text-4xl md:text-5xl font-serif text-zinc-900 dark:text-white mb-4">
-                        Showcase Your Academy
-                        <span class="italic text-gold-500">Video Here</span>
+                        Other Featured Videos
                     </h2>
                     <p class="text-zinc-600 dark:text-zinc-400 text-base sm:text-lg leading-relaxed">
-                        Your video can be uploaded later. This section is ready for a featured recital, studio highlight, or academy introduction.
+                        Add more school performances, recitals, and highlights below.
                     </p>
                 </div>
-                <a href="featured.html" class="inline-flex items-center justify-center self-start md:self-auto border-2 border-zinc-900 dark:border-white px-6 py-3 text-xs font-bold uppercase tracking-[0.3em] text-zinc-900 dark:text-white transition hover:bg-zinc-900 hover:text-white dark:hover:bg-white dark:hover:text-black">
-                    Featured
-                </a>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                    <article class="rounded-3xl border border-zinc-200 bg-zinc-50 p-5 shadow-lg shadow-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-900">
+                        <div class="overflow-hidden rounded-2xl bg-black mb-5">
+                            <video class="w-full h-56 object-cover" controls preload="metadata">
+                                <source src="assets/featured-video.mp4" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                        <h3 class="text-xl font-serif text-zinc-900 dark:text-white mb-2">Featured Video 1</h3>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Use this space for another school highlight.</p>
+                    </article>
+
+                    <article class="rounded-3xl border border-zinc-200 bg-zinc-50 p-5 shadow-lg shadow-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-900">
+                        <div class="overflow-hidden rounded-2xl bg-black mb-5">
+                            <video class="w-full h-56 object-cover" controls preload="metadata">
+                                <source src="assets/featured-video.mp4" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                        <h3 class="text-xl font-serif text-zinc-900 dark:text-white mb-2">Featured Video 2</h3>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Add another event, class, or recital video here.</p>
+                    </article>
+
+                    <article class="rounded-3xl border border-zinc-200 bg-zinc-50 p-5 shadow-lg shadow-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-900">
+                        <div class="overflow-hidden rounded-2xl bg-black mb-5">
+                            <video class="w-full h-56 object-cover" controls preload="metadata">
+                                <source src="assets/featured-video.mp4" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                        <h3 class="text-xl font-serif text-zinc-900 dark:text-white mb-2">Featured Video 3</h3>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Show more academy moments in this section.</p>
+                    </article>
+                </div>
             </div>
+        </section>
+    </main>
 
-            <div class="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-2xl shadow-zinc-900/10 dark:border-zinc-800">
-                <video class="w-full h-[260px] sm:h-[380px] lg:h-[520px] object-cover" controls preload="metadata">
-                    <source src="assets/featured-video.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            </div>
-        </div>
-    </section>
-
-    <!-- About Section: Clean White Space -->
-    <section id="about" class="py-20 md:py-28 px-6 md:px-8 max-w-7xl mx-auto bg-white dark:bg-obsidian">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 lg:gap-20 items-center">
-            <div class="relative scroll-animate">
-                <!-- Minimal Frame Accent -->
-                <div class="hidden sm:block absolute -top-6 -left-6 w-full h-full border-2 border-gold-400 rounded-sm z-0"></div>
-                <img src="https://images.unsplash.com/photo-1514119412350-e174d90d280e?q=80&w=1000" alt="About Music"
-                class="rounded-sm shadow-2xl relative z-10 w-full object-cover h-[320px] sm:h-[420px] md:h-[500px] brightness-90 hover:brightness-100 transition duration-700">
-            </div>
-            <div class="scroll-animate">
-                <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold mb-2 block">MUSIC HUB FOR ALL AGES!</span>
-                <h2 class="text-3xl sm:text-4xl md:text-5xl font-serif text-zinc-900 dark:text-white mb-6 md:mb-8">
-                    A Generation of Music
-Experience Prestige
-                </h2>
-                <p class="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed text-lg">
-                    Founded on the principle that music is a gift passed through generations, Father & Sons Music Academy has been a cornerstone of artistic growth for over two decades.
-                </p>
-                <p class="text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed">
-                    We specialize in a mentorship-first approach, ensuring that every student receives a personalized curriculum tailored to their unique pace and musical aspirations.
-                </p>
-                <ul class="space-y-4 text-sm tracking-wide text-zinc-700 dark:text-zinc-300">
-                    <li class="flex items-center"><i class="fas fa-check-circle mr-3 text-gold-500"></i> Professional Grade Recording Studios</li>
-                    <li class="flex items-center"><i class="fas fa-check-circle mr-3 text-gold-500"></i> Certified Master Instructors</li>
-                    <li class="flex items-center"><i class="fas fa-check-circle mr-3 text-gold-500"></i> Annual Grand Recitals</li>
-                </ul>
-            </div>
-        </div>
-    </section>
-
-    <section id="courses" class="py-20 md:py-28 px-6 md:px-8 bg-zinc-50 dark:bg-zinc-950">
-        <div class="max-w-7xl mx-auto">
-            <div class="max-w-3xl mb-12 md:mb-16">
-                <span class="text-xs uppercase tracking-[0.3em] text-gold-500 font-bold mb-3 block">Courses</span>
-                <h2 class="text-3xl sm:text-4xl md:text-5xl font-serif text-zinc-900 dark:text-white mb-5">
-                    Learn The Instrument
-                    <span class="italic text-gold-500">You Love</span>
-                </h2>
-                <p class="text-zinc-600 dark:text-zinc-400 text-base sm:text-lg leading-relaxed">
-                    Explore private music lessons designed for beginners, developing students, and aspiring performers.
-                </p>
-            </div>
-
-       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/guitar.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Guitar</span>
-    </div>
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/violin.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Violin</span>
-    </div>
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/cello.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Cello</span>
-    </div>
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/bass.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Bass Guitar</span>
-    </div>
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/ukelele.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Ukulele</span>
-    </div>
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/piano.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Piano</span>
-    </div>
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/drums.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Drums</span>
-    </div>
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/flute.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Flute</span>
-    </div>
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/saxophone.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Saxophone</span>
-    </div>
-
-    <div class="flex flex-col items-center p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <img src="assets/instruments/voice.png" class="w-16 h-16 object-contain mb-2">
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Voice</span>
-    </div>
-
-</div>
-        </div>
-    </section>
-
-    <!-- Footer: High Contrast -->
     <footer class="bg-zinc-900 text-white pt-16 md:pt-20 pb-8 px-6 md:px-8">
         <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-12 mb-12">
             <div class="col-span-1 md:col-span-1">
@@ -268,9 +215,8 @@ Experience Prestige
             <div>
                 <h4 class="text-white font-bold text-xs uppercase tracking-widest mb-6">Quick Links</h4>
                 <ul class="text-zinc-500 text-sm space-y-4">
-                    <li><a href="#" class="hover:text-gold-400 transition">Student Portal</a></li>
-                    <li><a href="#" class="hover:text-gold-400 transition">Faculty Directory</a></li>
-
+                    <li><a href="index.html" class="hover:text-gold-400 transition">Home</a></li>
+                    <li><a href="featured.html" class="hover:text-gold-400 transition">Featured</a></li>
                 </ul>
             </div>
             <div>
@@ -280,7 +226,7 @@ Experience Prestige
                     SM Uptown CDO<br>
                     Phone: 0927-120-8871
                 </p>
-                  <p class="text-zinc-500 text-sm leading-loose">
+                <p class="text-zinc-500 text-sm leading-loose">
                     5th level, SM Premier<br>
                     SM Downtown CDO<br>
                     Phone: 0927-718-3734
@@ -315,7 +261,6 @@ Experience Prestige
         </div>
     </footer>
 
-    <!-- Login Modal: Clean Minimal Card -->
     <div id="loginModal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/20 backdrop-blur-sm dark:bg-black/80">
         <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl w-full max-w-md p-6 sm:p-8 relative">
             <button onclick="toggleLoginModal(false)" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
@@ -370,7 +315,6 @@ Experience Prestige
         </div>
     </div>
 
-    <!-- Registration Modal: Clean Light UI -->
     <div id="registerModal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/20 backdrop-blur-sm dark:bg-black/80 overflow-y-auto">
         <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl w-full max-w-4xl p-5 sm:p-8 relative my-4 sm:my-8">
             <button onclick="toggleRegisterModal(false)" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white z-10">
@@ -386,7 +330,6 @@ Experience Prestige
 
             <form id="registerForm" data-mode="basic" class="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
                 <div>
-
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">First Name *</label>
@@ -491,9 +434,6 @@ Experience Prestige
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-
     <script src="js/index.js"></script>
-
-
 </body>
 </html>
