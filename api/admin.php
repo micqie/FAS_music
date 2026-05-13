@@ -239,6 +239,7 @@ class Admin
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
+                s.branch_id,
                 s.first_name,
                 s.last_name,
                 s.email,
@@ -299,6 +300,7 @@ class Admin
         $stmt = $this->conn->prepare("
             SELECT
                 s.student_id,
+                s.branch_id,
                 s.first_name,
                 s.last_name,
                 s.email,
@@ -779,6 +781,7 @@ class Admin
             $stmt = $this->conn->prepare("
                 SELECT
                     s.*,
+                    s.branch_id,
                     b.branch_name,
                     1000.00 AS registration_fee_amount,
                     COALESCE((

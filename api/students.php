@@ -31,6 +31,7 @@ class StudentsApi
         $this->ensureEnrollmentFixedScheduleColumns();
         $this->ensureEnrollmentScheduleSlotsTable();
         $this->ensureSessionSchedulingColumns();
+        $this->ensureStudentProgressTable();
         $this->ensureScheduleOperationLookupTable();
         $this->ensureSessionRescheduleWorkflow();
     }
@@ -600,6 +601,139 @@ class StudentsApi
             } catch (PDOException $e) {
                 // Ignore column migration issues in older environments.
             }
+        }
+    }
+
+    private function ensureStudentProgressTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_progress (
+                    progress_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    session_id INT NOT NULL,
+                    instrument_id INT NOT NULL,
+                    skill_level VARCHAR(50) NULL,
+                    remarks TEXT NULL,
+                    assessment_date DATE NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+        } catch (PDOException $e) {
+            return;
+        }
+
+        $columnSql = [
+            'performance_score' => "ALTER TABLE tbl_student_progress ADD COLUMN performance_score TINYINT UNSIGNED NULL AFTER skill_level",
+            'technique_score' => "ALTER TABLE tbl_student_progress ADD COLUMN technique_score TINYINT UNSIGNED NULL AFTER performance_score",
+            'rhythm_score' => "ALTER TABLE tbl_student_progress ADD COLUMN rhythm_score TINYINT UNSIGNED NULL AFTER technique_score",
+            'focus_score' => "ALTER TABLE tbl_student_progress ADD COLUMN focus_score TINYINT UNSIGNED NULL AFTER rhythm_score",
+            'assignment_score' => "ALTER TABLE tbl_student_progress ADD COLUMN assignment_score TINYINT UNSIGNED NULL AFTER focus_score",
+            'updated_at' => "ALTER TABLE tbl_student_progress ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"
+        ];
+
+        foreach ($columnSql as $column => $sql) {
+            try {
+                if (!$this->tableHasColumn('tbl_student_progress', $column)) {
+                    $this->conn->exec($sql);
+                }
+            } catch (PDOException $e) {
+                // Keep API available even if schema sync fails.
+            }
+        }
+
+        try { $this->conn->exec("CREATE INDEX idx_student_progress_session ON tbl_student_progress(session_id)"); } catch (PDOException $e) {}
+        try { $this->conn->exec("CREATE INDEX idx_student_progress_student ON tbl_student_progress(student_id)"); } catch (PDOException $e) {}
+    }
+
+    private function getStudentEnrollmentSessionGrades($studentId, $enrollmentId)
+    {
+        if ($studentId < 1 || $enrollmentId < 1 || !$this->tableExists('tbl_sessions')) {
+            return [];
+        }
+
+        try {
+            $packageJoin = $this->tableExists('tbl_session_packages')
+                ? "LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id"
+                : "";
+            $packageNameExpr = $this->tableExists('tbl_session_packages')
+                ? "COALESCE(sp.package_name, CONCAT('Package #', e.package_id))"
+                : "CONCAT('Package #', e.package_id)";
+            $roomJoin = $this->tableExists('tbl_rooms')
+                ? "LEFT JOIN tbl_rooms rm ON rm.room_id = ts.room_id"
+                : "";
+            $roomExpr = $this->tableExists('tbl_rooms')
+                ? "COALESCE(NULLIF(TRIM(rm.room_name), ''), NULLIF(TRIM(ts.notes), ''))"
+                : "NULLIF(TRIM(ts.notes), '')";
+
+            $stmt = $this->conn->prepare("
+                SELECT
+                    ts.session_id,
+                    ts.enrollment_id,
+                    ts.session_number,
+                    ts.session_date,
+                    ts.start_time,
+                    ts.end_time,
+                    ts.status,
+                    ts.attendance_status,
+                    ts.absence_notice,
+                    ts.attendance_notes,
+                    ts.notes,
+                    {$roomExpr} AS room_name,
+                    {$packageNameExpr} AS package_name,
+                    COALESCE(inst.instrument_name, CONCAT('Instrument #', COALESCE(ts.instrument_id, e.instrument_id))) AS instrument_name,
+                    CONCAT_WS(' ', t.first_name, t.last_name) AS teacher_name,
+                    prog.progress_id,
+                    prog.skill_level,
+                    prog.performance_score,
+                    prog.technique_score,
+                    prog.rhythm_score,
+                    prog.focus_score,
+                    prog.assignment_score,
+                    prog.remarks,
+                    COALESCE(
+                        NULLIF(TRIM(prog.remarks), ''),
+                        NULLIF(TRIM(ts.attendance_notes), ''),
+                        NULLIF(TRIM(ts.notes), '')
+                    ) AS teacher_remarks,
+                    prog.assessment_date,
+                    prog.updated_at
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                LEFT JOIN tbl_instruments inst ON inst.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
+                LEFT JOIN tbl_teachers t ON t.teacher_id = ts.teacher_id
+                {$packageJoin}
+                {$roomJoin}
+                LEFT JOIN tbl_student_progress prog
+                    ON prog.session_id = ts.session_id
+                   AND prog.student_id = e.student_id
+                WHERE e.student_id = ?
+                  AND ts.enrollment_id = ?
+                ORDER BY ts.session_date DESC, ts.start_time DESC, ts.session_id DESC
+            ");
+            $stmt->execute([(int)$studentId, (int)$enrollmentId]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            foreach ($rows as &$row) {
+                $scores = [
+                    $row['performance_score'] !== null ? (int)$row['performance_score'] : null,
+                    $row['technique_score'] !== null ? (int)$row['technique_score'] : null,
+                    $row['rhythm_score'] !== null ? (int)$row['rhythm_score'] : null,
+                    $row['focus_score'] !== null ? (int)$row['focus_score'] : null,
+                    $row['assignment_score'] !== null ? (int)$row['assignment_score'] : null
+                ];
+                $validScores = array_values(array_filter($scores, function ($value) {
+                    return $value !== null;
+                }));
+                $row['average_score'] = !empty($validScores)
+                    ? round(array_sum($validScores) / count($validScores), 2)
+                    : null;
+            }
+            unset($row);
+
+            return $rows;
+        } catch (PDOException $e) {
+            return [];
         }
     }
 
@@ -2357,6 +2491,7 @@ class StudentsApi
         // Enrollment timeline (current + history)
         $currentEnrollment = null;
         $enrollmentHistory = [];
+        $currentSessionGrades = [];
         try {
             $paymentsHasType = $this->tableExists('tbl_payments') && $this->tableHasColumn('tbl_payments', 'payment_type');
             $paySummaryPaymentTypeSelect = $paymentsHasType
@@ -2463,6 +2598,7 @@ class StudentsApi
                 $student['package_max_instruments'] = $currentEnrollment['package_max_instruments'] ?? null;
                 $student['package_price'] = (float)($currentEnrollment['total_amount'] ?? 0);
                 $student['balance_due'] = max(0, (float)$student['package_price'] - (float)($currentEnrollment['paid_amount'] ?? 0));
+                $currentSessionGrades = $this->getStudentEnrollmentSessionGrades((int)$student['student_id'], (int)($currentEnrollment['enrollment_id'] ?? 0));
                 foreach ($allEnrollments as $idx => $row) {
                     if ($idx === $currentIndex) continue;
                     $enrollmentHistory[] = $row;
@@ -2471,6 +2607,7 @@ class StudentsApi
         } catch (PDOException $e) {
             $currentEnrollment = null;
             $enrollmentHistory = [];
+            $currentSessionGrades = [];
         }
 
         return [
@@ -2479,7 +2616,8 @@ class StudentsApi
             'primary_guardian' => $primaryGuardian,
             'instruments' => $instruments,
             'current_enrollment' => $currentEnrollment,
-            'enrollment_history' => $enrollmentHistory
+            'enrollment_history' => $enrollmentHistory,
+            'current_session_grades' => $currentSessionGrades
         ];
     }
 

@@ -28,6 +28,7 @@ class TeachersApi
     {
         $this->conn = $pdo;
         $this->ensureSessionRescheduleWorkflow();
+        $this->ensureStudentProgressTable();
     }
 
     public function sendJSON($data, $status = 200)
@@ -185,6 +186,73 @@ class TeachersApi
         } catch (PDOException $e) {
             return 0;
         }
+    }
+
+    private function ensureStudentProgressTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_progress (
+                    progress_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    session_id INT NOT NULL,
+                    instrument_id INT NOT NULL,
+                    skill_level VARCHAR(50) DEFAULT NULL,
+                    remarks TEXT DEFAULT NULL,
+                    assessment_date DATE DEFAULT CURRENT_DATE,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+        } catch (PDOException $e) {
+            return;
+        }
+
+        $columns = [
+            'performance_score' => "ALTER TABLE tbl_student_progress ADD COLUMN performance_score TINYINT UNSIGNED NULL AFTER skill_level",
+            'technique_score' => "ALTER TABLE tbl_student_progress ADD COLUMN technique_score TINYINT UNSIGNED NULL AFTER performance_score",
+            'rhythm_score' => "ALTER TABLE tbl_student_progress ADD COLUMN rhythm_score TINYINT UNSIGNED NULL AFTER technique_score",
+            'focus_score' => "ALTER TABLE tbl_student_progress ADD COLUMN focus_score TINYINT UNSIGNED NULL AFTER rhythm_score",
+            'assignment_score' => "ALTER TABLE tbl_student_progress ADD COLUMN assignment_score TINYINT UNSIGNED NULL AFTER focus_score",
+            'updated_at' => "ALTER TABLE tbl_student_progress ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"
+        ];
+
+        foreach ($columns as $column => $sql) {
+            try {
+                if (!$this->tableHasColumn('tbl_student_progress', $column)) {
+                    $this->conn->exec($sql);
+                }
+            } catch (PDOException $e) {
+                // Ignore per-column failures so the rest of the API can still work.
+            }
+        }
+
+        try { $this->conn->exec("CREATE INDEX idx_student_progress_session ON tbl_student_progress(session_id)"); } catch (PDOException $e) {}
+        try { $this->conn->exec("CREATE INDEX idx_student_progress_student ON tbl_student_progress(student_id)"); } catch (PDOException $e) {}
+    }
+
+    private function normalizeProgressSkillLevel($value)
+    {
+        $raw = trim((string)$value);
+        if ($raw === '') return '';
+        $allowed = ['Needs Improvement', 'Developing', 'Good', 'Very Good', 'Excellent'];
+        foreach ($allowed as $item) {
+            if (strcasecmp($raw, $item) === 0) {
+                return $item;
+            }
+        }
+        return '';
+    }
+
+    private function normalizeProgressScore($value)
+    {
+        if ($value === '' || $value === null) {
+            return null;
+        }
+        $score = (int)$value;
+        if ($score < 1 || $score > 5) {
+            return null;
+        }
+        return $score;
     }
 
     private function branchExists($branchId)
@@ -1145,6 +1213,243 @@ class TeachersApi
         }
     }
 
+    public function getTeacherSessionGrades()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $teacherId = $this->resolveTeacherId((int)($_GET['teacher_id'] ?? 0), (int)($_GET['user_id'] ?? 0));
+        $filter = strtolower(trim((string)($_GET['filter'] ?? 'all')));
+        if ($teacherId < 1) {
+            $this->sendJSON(['error' => 'teacher_id or user_id is required'], 400);
+        }
+        if (!$this->tableExists('tbl_sessions')) {
+            $this->sendJSON(['success' => true, 'sessions' => []]);
+        }
+
+        try {
+            $sql = "
+                SELECT
+                    ts.session_id,
+                    ts.enrollment_id,
+                    ts.session_number,
+                    ts.session_date,
+                    ts.start_time,
+                    ts.end_time,
+                    ts.status,
+                    ts.notes,
+                    ts.attendance_notes,
+                    s.student_id,
+                    s.first_name AS student_first_name,
+                    s.last_name AS student_last_name,
+                    COALESCE(inst.instrument_name, CONCAT('Instrument #', ts.instrument_id)) AS instrument_name,
+                    COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
+                    COALESCE(rm.room_name, NULLIF(TRIM(ts.notes), '')) AS room_name,
+                    prog.progress_id,
+                    prog.skill_level,
+                    prog.performance_score,
+                    prog.technique_score,
+                    prog.rhythm_score,
+                    prog.focus_score,
+                    prog.assignment_score,
+                    prog.remarks,
+                    prog.assessment_date,
+                    prog.updated_at
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                LEFT JOIN tbl_instruments inst ON inst.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
+                LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
+                LEFT JOIN tbl_rooms rm ON rm.room_id = ts.room_id
+                LEFT JOIN tbl_student_progress prog ON prog.session_id = ts.session_id
+                WHERE ts.teacher_id = ?
+            ";
+            $params = [$teacherId];
+
+            if ($filter === 'completed') {
+                $sql .= " AND ts.status = 'Completed' ";
+            } elseif ($filter === 'upcoming') {
+                $sql .= " AND ts.session_date >= CURDATE() ";
+            } elseif ($filter === 'graded') {
+                $sql .= " AND prog.progress_id IS NOT NULL ";
+            } elseif ($filter === 'ungraded') {
+                $sql .= " AND prog.progress_id IS NULL ";
+            }
+
+            $sql .= " ORDER BY ts.session_date DESC, ts.start_time DESC, ts.session_id DESC ";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            foreach ($rows as &$row) {
+                $scores = [
+                    $row['performance_score'] !== null ? (int)$row['performance_score'] : null,
+                    $row['technique_score'] !== null ? (int)$row['technique_score'] : null,
+                    $row['rhythm_score'] !== null ? (int)$row['rhythm_score'] : null,
+                    $row['focus_score'] !== null ? (int)$row['focus_score'] : null,
+                    $row['assignment_score'] !== null ? (int)$row['assignment_score'] : null
+                ];
+                $validScores = array_values(array_filter($scores, function ($value) {
+                    return $value !== null;
+                }));
+                $row['average_score'] = !empty($validScores)
+                    ? round(array_sum($validScores) / count($validScores), 2)
+                    : null;
+            }
+            unset($row);
+
+            $this->sendJSON(['success' => true, 'sessions' => $rows]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function saveTeacherSessionGrade()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $sessionId = (int)($data['session_id'] ?? 0);
+        $skillLevel = $this->normalizeProgressSkillLevel($data['skill_level'] ?? '');
+        $performanceScore = $this->normalizeProgressScore($data['performance_score'] ?? null);
+        $techniqueScore = $this->normalizeProgressScore($data['technique_score'] ?? null);
+        $rhythmScore = $this->normalizeProgressScore($data['rhythm_score'] ?? null);
+        $focusScore = $this->normalizeProgressScore($data['focus_score'] ?? null);
+        $assignmentScore = $this->normalizeProgressScore($data['assignment_score'] ?? null);
+        $remarks = trim((string)($data['remarks'] ?? ''));
+        $assessmentDate = trim((string)($data['assessment_date'] ?? date('Y-m-d')));
+
+        if ($teacherId < 1 || $sessionId < 1) {
+            $this->sendJSON(['error' => 'teacher_id/user_id and session_id are required'], 400);
+        }
+        if ($skillLevel === '') {
+            $this->sendJSON(['error' => 'A valid skill level is required'], 400);
+        }
+        if ($performanceScore === null || $techniqueScore === null || $rhythmScore === null || $focusScore === null || $assignmentScore === null) {
+            $this->sendJSON(['error' => 'All five grading scores must be between 1 and 5'], 400);
+        }
+        if ($assessmentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $assessmentDate)) {
+            $this->sendJSON(['error' => 'assessment_date must be in YYYY-MM-DD format'], 400);
+        }
+
+        try {
+            $stmtSession = $this->conn->prepare("
+                SELECT
+                    ts.session_id,
+                    ts.teacher_id,
+                    ts.instrument_id,
+                    ts.session_date,
+                    e.student_id,
+                    e.instrument_id AS enrollment_instrument_id
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                WHERE ts.session_id = ?
+                  AND ts.teacher_id = ?
+                LIMIT 1
+            ");
+            $stmtSession->execute([$sessionId, $teacherId]);
+            $session = $stmtSession->fetch(PDO::FETCH_ASSOC);
+            if (!$session) {
+                $this->sendJSON(['error' => 'Session not found for this teacher'], 404);
+            }
+
+            $studentId = (int)($session['student_id'] ?? 0);
+            $instrumentId = (int)($session['instrument_id'] ?? 0);
+            if ($instrumentId < 1) {
+                $instrumentId = (int)($session['enrollment_instrument_id'] ?? 0);
+            }
+            if ($studentId < 1 || $instrumentId < 1) {
+                $this->sendJSON(['error' => 'This session is missing required student or instrument data'], 400);
+            }
+
+            $stmtExisting = $this->conn->prepare("
+                SELECT progress_id
+                FROM tbl_student_progress
+                WHERE session_id = ?
+                LIMIT 1
+            ");
+            $stmtExisting->execute([$sessionId]);
+            $progressId = (int)($stmtExisting->fetchColumn() ?: 0);
+
+            if ($progressId > 0) {
+                $stmtUpdate = $this->conn->prepare("
+                    UPDATE tbl_student_progress
+                    SET student_id = ?,
+                        instrument_id = ?,
+                        skill_level = ?,
+                        performance_score = ?,
+                        technique_score = ?,
+                        rhythm_score = ?,
+                        focus_score = ?,
+                        assignment_score = ?,
+                        remarks = ?,
+                        assessment_date = ?
+                    WHERE progress_id = ?
+                ");
+                $stmtUpdate->execute([
+                    $studentId,
+                    $instrumentId,
+                    $skillLevel,
+                    $performanceScore,
+                    $techniqueScore,
+                    $rhythmScore,
+                    $focusScore,
+                    $assignmentScore,
+                    ($remarks !== '' ? $remarks : null),
+                    $assessmentDate,
+                    $progressId
+                ]);
+            } else {
+                $stmtInsert = $this->conn->prepare("
+                    INSERT INTO tbl_student_progress (
+                        student_id,
+                        session_id,
+                        instrument_id,
+                        skill_level,
+                        performance_score,
+                        technique_score,
+                        rhythm_score,
+                        focus_score,
+                        assignment_score,
+                        remarks,
+                        assessment_date
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmtInsert->execute([
+                    $studentId,
+                    $sessionId,
+                    $instrumentId,
+                    $skillLevel,
+                    $performanceScore,
+                    $techniqueScore,
+                    $rhythmScore,
+                    $focusScore,
+                    $assignmentScore,
+                    ($remarks !== '' ? $remarks : null),
+                    $assessmentDate
+                ]);
+                $progressId = (int)$this->conn->lastInsertId();
+            }
+
+            $scores = [$performanceScore, $techniqueScore, $rhythmScore, $focusScore, $assignmentScore];
+            $averageScore = round(array_sum($scores) / count($scores), 2);
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Student performance grade saved successfully.',
+                'progress_id' => $progressId,
+                'average_score' => $averageScore
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function resetTeacherPassword()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1215,11 +1520,17 @@ switch ($action) {
     case 'get-teacher-sessions':
         $api->getTeacherSessions();
         break;
+    case 'get-teacher-session-grades':
+        $api->getTeacherSessionGrades();
+        break;
     case 'get-teacher-availability':
         $api->getTeacherAvailability();
         break;
     case 'save-teacher-availability':
         $api->saveTeacherAvailability();
+        break;
+    case 'save-session-grade':
+        $api->saveTeacherSessionGrade();
         break;
     case 'cancel-session':
         $api->cancelSessionByTeacher();

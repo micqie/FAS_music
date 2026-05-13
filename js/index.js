@@ -3439,55 +3439,70 @@ async function initStudentSessionsPage() {
     const s = portal.student;
     setText('packageName', s.package_name || 'Not assigned yet');
     setText('packageSessions', s.package_sessions ? `${s.package_sessions} sessions included` : '—');
+    setText('gradedSessionCount', '—');
+    setText('currentGradeAverage', '—');
 
     const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     let summaryRes = null;
     if (!enrollmentApproved) {
         setHtml('attendanceTableBody', `
             <tr>
-                <td colspan="4" class="px-6 py-10 text-center text-zinc-400">
+                <td colspan="5" class="px-6 py-10 text-center text-zinc-400">
                     <i class="fas fa-lock text-2xl mb-2"></i>
-                    <div class="font-semibold">Attendance is locked</div>
-                    <div class="text-xs text-zinc-500 mt-1">Your sessions will appear here after admin approves your enrollment.</div>
+                    <div class="font-semibold">Session tracking is locked</div>
+                    <div class="text-xs text-zinc-500 mt-1">Your session grades will appear here after admin approves your enrollment.</div>
                 </td>
             </tr>
         `);
     } else {
-        const listRes = await fetchAttendanceList(s.student_id, 100);
-        if (!listRes.success) {
+        const rows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
+        const gradedRows = rows.filter(r => Number(r.progress_id || 0) > 0 && Number(r.average_score || 0) > 0);
+        const averageGrade = gradedRows.length
+            ? (gradedRows.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / gradedRows.length).toFixed(2)
+            : null;
+
+        setText('gradedSessionCount', String(gradedRows.length));
+        setText('currentGradeAverage', averageGrade ? `${averageGrade}/5` : 'Pending');
+
+        if (rows.length === 0) {
             setHtml('attendanceTableBody', `
                 <tr>
-                    <td colspan="4" class="px-6 py-8 text-center text-zinc-400">Failed to load attendance records.</td>
+                    <td colspan="5" class="px-6 py-10 text-center text-zinc-400">
+                        <i class="fas fa-calendar-minus text-2xl mb-2"></i>
+                        <div class="font-semibold">No session records yet</div>
+                        <div class="text-xs text-zinc-500 mt-1">Your session tracker will fill in once your class schedule is generated.</div>
+                    </td>
                 </tr>
             `);
         } else {
-            const rows = Array.isArray(listRes.attendance) ? listRes.attendance : [];
-            if (rows.length === 0) {
-                setHtml('attendanceTableBody', `
-                    <tr>
-                        <td colspan="4" class="px-6 py-10 text-center text-zinc-400">
-                            <i class="fas fa-calendar-minus text-2xl mb-2"></i>
-                            <div class="font-semibold">No attendance records yet</div>
-                            <div class="text-xs text-zinc-500 mt-1">Your sessions will appear here once admin enrolls you and attendance is recorded.</div>
+            setHtml('attendanceTableBody', rows.map(r => {
+                const dateLabel = r.session_date ? formatDateLong(r.session_date) : 'Date pending';
+                const start = r.start_time ? formatTime12Hour(r.start_time) : '';
+                const end = r.end_time ? formatTime12Hour(r.end_time) : '';
+                const timeLabel = start && end ? `${start} - ${end}` : (start || 'Time pending');
+                const sessionNumber = r.session_number ? `Session ${escapeHtml(String(r.session_number))}` : 'Session';
+                const roomLabel = r.room_name || r.teacher_name
+                    ? [r.room_name || '', r.teacher_name ? `Teacher: ${r.teacher_name}` : ''].filter(Boolean).join(' • ')
+                    : (r.instrument_name || 'Instrument');
+                const attendanceLabel = r.attendance_status && r.attendance_status !== 'Pending'
+                    ? r.attendance_status
+                    : (r.status || 'Scheduled');
+                const remarks = escapeHtml(r.teacher_remarks || r.remarks || r.attendance_notes || r.notes || 'No teacher remarks yet.');
+                return `
+                    <tr class="border-t border-white/10 hover:bg-white/5 transition align-top">
+                        <td class="px-6 py-4 text-sm text-white">
+                            <div class="font-semibold">${escapeHtml(sessionNumber)}</div>
+                            <div class="text-zinc-300 mt-1">${escapeHtml(dateLabel)}</div>
+                            <div class="text-xs text-zinc-500 mt-1">${escapeHtml(timeLabel)}</div>
+                            <div class="text-xs text-zinc-500 mt-1">${escapeHtml(roomLabel)}</div>
                         </td>
+                        <td class="px-6 py-4 text-sm text-zinc-200">${renderAttendanceStatusBadge(attendanceLabel)}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-200">${renderStudentGradeBadge(r.average_score, r.progress_id)}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-300">${renderStudentSkillLevel(r.skill_level)}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-400">${remarks}</td>
                     </tr>
-                `);
-            } else {
-                setHtml('attendanceTableBody', rows.map(r => {
-                    const dt = r.attended_at ? new Date(r.attended_at).toLocaleString() : '—';
-                    const status = escapeHtml(r.status || 'Present');
-                    const source = escapeHtml(r.source || '—');
-                    const notes = escapeHtml(r.notes || '');
-                    return `
-                        <tr class="border-t border-white/10 hover:bg-white/5 transition">
-                            <td class="px-6 py-4 text-sm text-white">${dt}</td>
-                            <td class="px-6 py-4 text-sm text-zinc-200">${status}</td>
-                            <td class="px-6 py-4 text-sm text-zinc-300">${source}</td>
-                            <td class="px-6 py-4 text-sm text-zinc-400">${notes}</td>
-                        </tr>
-                    `;
-                }).join(''));
-            }
+                `;
+            }).join(''));
         }
     }
 
@@ -3514,6 +3529,144 @@ function renderAttendanceStatusBadge(status) {
                 ? 'bg-red-500/15 text-red-400 border border-red-500/25'
                 : 'bg-zinc-500/15 text-zinc-300 border border-zinc-500/25';
     return `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${cls}">${escapeHtml(value)}</span>`;
+}
+
+function renderStudentGradeBadge(averageScore, progressId) {
+    const hasGrade = Number(progressId || 0) > 0 && Number(averageScore || 0) > 0;
+    const label = hasGrade ? `${Number(averageScore).toFixed(2)}/5` : 'Pending';
+    const cls = hasGrade
+        ? 'bg-gold-500/15 text-gold-300 border border-gold-500/30'
+        : 'bg-zinc-500/15 text-zinc-300 border border-zinc-500/25';
+    return `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${cls}">${escapeHtml(label)}</span>`;
+}
+
+function renderStudentSkillLevel(skillLevel) {
+    if (!skillLevel) {
+        return '<span class="text-zinc-500">Not graded yet</span>';
+    }
+    return `<span class="font-semibold text-white">${escapeHtml(skillLevel)}</span>`;
+}
+
+async function initStudentGradesPage() {
+    const listEl = document.getElementById('studentGradesList');
+    if (!checkStudentAuth()) return;
+    const user = Auth.getUser();
+    setText('studentNavName', user.username || user.email || 'Student');
+
+    if (!listEl) return;
+
+    try {
+        const portal = await fetchStudentPortalDataByEmail(user.email);
+        if (!portal.success) {
+            listEl.innerHTML = `
+                <div class="rounded-3xl border border-dashed border-red-200 bg-red-50 px-6 py-12 text-center text-red-600">
+                    <div class="font-semibold">Failed to load grades</div>
+                    <div class="text-sm mt-2">${escapeHtml(portal.error || 'The portal did not return grade data.')}</div>
+                </div>
+            `;
+            return;
+        }
+
+        const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
+        const rows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
+        const gradedRows = rows.filter(row => Number(row.progress_id || 0) > 0);
+        const pendingRows = rows.filter(row => Number(row.progress_id || 0) < 1);
+        const averageValue = gradedRows.length
+            ? (gradedRows.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / gradedRows.length).toFixed(2)
+            : null;
+        const latestGraded = gradedRows.find(row => row.assessment_date || row.updated_at) || null;
+
+        setText('studentGradesPackage', portal.student?.package_name || 'No active package yet');
+        setText('studentGradesAverage', averageValue ? `${averageValue}/5` : 'Pending');
+        setText('studentGradesCompleted', String(gradedRows.length));
+        setText('studentGradesPending', String(pendingRows.length));
+        setText(
+            'studentGradesLatest',
+            latestGraded
+                ? formatDateLong(latestGraded.assessment_date || latestGraded.session_date || '')
+                : (enrollmentApproved ? 'No graded session yet' : 'Locked until approval')
+        );
+
+        if (!enrollmentApproved) {
+            listEl.innerHTML = `
+                <div class="rounded-3xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-6 py-12 text-center text-zinc-500 dark:text-zinc-400">
+                    <i class="fas fa-lock text-2xl mb-3"></i>
+                    <div class="font-semibold text-zinc-900 dark:text-white">Grades are locked for now</div>
+                    <div class="text-sm mt-2">Your teacher assessments will appear here once your enrollment becomes active.</div>
+                </div>
+            `;
+            return;
+        }
+
+        if (!rows.length) {
+            listEl.innerHTML = `
+                <div class="rounded-3xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-6 py-12 text-center text-zinc-500 dark:text-zinc-400">
+                    <i class="fas fa-chart-line text-2xl mb-3"></i>
+                    <div class="font-semibold text-zinc-900 dark:text-white">No session grades yet</div>
+                    <div class="text-sm mt-2">Your grade history will appear here as soon as your teacher records session assessments.</div>
+                </div>
+            `;
+            return;
+        }
+
+        listEl.innerHTML = rows.map(row => {
+            const dateLabel = row.session_date ? formatDateLong(row.session_date) : 'Date pending';
+            const timeLabel = row.start_time && row.end_time
+                ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
+                : (row.start_time ? formatTime12Hour(row.start_time) : 'Time pending');
+            const remarks = row.teacher_remarks
+                ? escapeHtml(row.teacher_remarks)
+                : (row.remarks ? escapeHtml(row.remarks) : 'No remarks recorded for this session.');
+            const scorePills = [
+                ['Performance', row.performance_score],
+                ['Technique', row.technique_score],
+                ['Rhythm', row.rhythm_score],
+                ['Focus', row.focus_score],
+                ['Assignment', row.assignment_score]
+            ].map(([label, value]) => `
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-3 py-3">
+                    <div class="text-[11px] uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400 font-bold">${escapeHtml(label)}</div>
+                    <div class="mt-1 text-lg font-black text-zinc-900 dark:text-white">${value ? `${escapeHtml(String(value))}/5` : '—'}</div>
+                </div>
+            `).join('');
+
+            return `
+                <article class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/30">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">Session ${escapeHtml(String(row.session_number || ''))}</div>
+                            <h3 class="mt-2 text-xl font-black text-zinc-900 dark:text-white">${escapeHtml(row.instrument_name || 'Instrument Session')}</h3>
+                            <div class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(dateLabel)} • ${escapeHtml(timeLabel)}</div>
+                            <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(row.teacher_name || 'Teacher not assigned')} • ${escapeHtml(row.room_name || 'Room to be announced')}</div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            ${renderAttendanceStatusBadge(row.attendance_status && row.attendance_status !== 'Pending' ? row.attendance_status : (row.status || 'Scheduled'))}
+                            ${renderStudentGradeBadge(row.average_score, row.progress_id)}
+                        </div>
+                    </div>
+                    <div class="mt-5 grid grid-cols-2 xl:grid-cols-6 gap-3">
+                        <div class="rounded-2xl border border-gold-500/20 bg-gold-500/10 px-4 py-4 xl:col-span-1">
+                            <div class="text-[11px] uppercase tracking-[0.18em] text-gold-700 dark:text-gold-300 font-bold">Skill Level</div>
+                            <div class="mt-1 text-lg font-black text-zinc-900 dark:text-white">${escapeHtml(row.skill_level || 'Pending')}</div>
+                        </div>
+                        ${scorePills}
+                    </div>
+                    <div class="mt-5 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-4">
+                        <div class="text-[11px] uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400 font-bold">Teacher Remarks</div>
+                        <div class="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-200">${remarks}</div>
+                    </div>
+                </article>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Failed to initialize student grades page:', error);
+        listEl.innerHTML = `
+            <div class="rounded-3xl border border-dashed border-red-200 bg-red-50 px-6 py-12 text-center text-red-600">
+                <div class="font-semibold">Unable to load grade data right now</div>
+                <div class="text-sm mt-2">${escapeHtml(error?.message || 'Unexpected student grade page error.')}</div>
+            </div>
+        `;
+    }
 }
 
 async function initStudentAttendancePage() {
@@ -5056,6 +5209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentDashboard = document.getElementById('studentDashboardRoot');
     const studentProfile = document.getElementById('studentProfileRoot');
     const studentSessions = document.getElementById('studentSessionsRoot');
+    const studentGrades = document.getElementById('studentGradesRoot');
     const studentAttendance = document.getElementById('studentAttendanceRoot');
     const studentQr = document.getElementById('studentQrRoot');
     const guardianStudentsRoot = document.getElementById('guardianStudentsRoot');
@@ -5099,6 +5253,8 @@ document.addEventListener('DOMContentLoaded', () => {
         initStudentProfilePage();
     } else if (studentSessions) {
         initStudentSessionsPage();
+    } else if (studentGrades) {
+        initStudentGradesPage();
     } else if (studentAttendance) {
         initStudentAttendancePage();
     } else if (studentQr) {
