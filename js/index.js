@@ -2750,8 +2750,8 @@ function initStudentRequestSection(student, requestMeta) {
         submitBtn.textContent = 'Submitting...';
         let keepDisabled = false;
 
-        try {
-            const requestFormData = new FormData();
+            try {
+                const requestFormData = new FormData();
             requestFormData.append('action', 'submit-package-request');
             requestFormData.append('student_id', String(Number(student.student_id)));
             requestFormData.append('package_id', String(packageId));
@@ -2764,6 +2764,7 @@ function initStudentRequestSection(student, requestMeta) {
 
             const response = await postStudentPackageRequest(requestFormData);
             if (response.success) {
+                closeStudentRequestModal();
                 showMessage(response.message || 'Request submitted successfully.', 'success');
                 const user = Auth.getUser();
                 if (user?.email) {
@@ -2799,6 +2800,239 @@ function renderOnboardingStatusBadge(label, tone = 'zinc') {
     return `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${cls}">${escapeHtml(label)}</span>`;
 }
 
+function setStudentModalState(modalId, shouldOpen) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.classList.toggle('hidden', !shouldOpen);
+    modal.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+    const anyOpen = ['studentRegistrationModal', 'studentRequestModal'].some((id) => {
+        const item = document.getElementById(id);
+        return item && !item.classList.contains('hidden');
+    });
+    document.body.classList.toggle('overflow-hidden', anyOpen);
+}
+
+function openStudentRegistrationModal() {
+    setStudentModalState('studentRegistrationModal', true);
+}
+
+function closeStudentRegistrationModal() {
+    setStudentModalState('studentRegistrationModal', false);
+}
+
+function openStudentRequestModal() {
+    setStudentModalState('studentRequestModal', true);
+}
+
+function closeStudentRequestModal() {
+    setStudentModalState('studentRequestModal', false);
+}
+
+window.openStudentRegistrationModal = openStudentRegistrationModal;
+window.closeStudentRegistrationModal = closeStudentRegistrationModal;
+window.openStudentRequestModal = openStudentRequestModal;
+window.closeStudentRequestModal = closeStudentRequestModal;
+
+function bindStudentModalFrame(modalId, closeFn) {
+    const modal = document.getElementById(modalId);
+    if (!modal || modal.dataset.bound === 'true') return;
+    modal.dataset.bound = 'true';
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            closeFn();
+        }
+    });
+}
+
+function renderStudentRegistrationModal(student, portal) {
+    const body = document.getElementById('studentRegistrationModalBody');
+    if (!body) return;
+
+    body.innerHTML = `
+        <div class="space-y-5">
+            <div class="rounded-2xl border border-gold-500/20 bg-amber-50 dark:bg-gold-500/10 p-4 sm:p-5">
+                <div class="text-sm font-bold text-zinc-900 dark:text-white">Complete this one step at a time</div>
+                <div class="text-sm text-zinc-600 dark:text-zinc-300 mt-1">Fill in the student details, add guardian details if needed, then upload your registration payment.</div>
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
+                <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">1. Guardian</div>
+                <div id="guardianAutoStatus" class="rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
+                    Select the student's date of birth to check if guardian details are required.
+                </div>
+                <div id="guardianInputs" class="mt-4 space-y-3 hidden">
+                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200">Guardian Email *</label>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input id="guardianEmailInput" type="email" class="flex-1 px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="guardian@email.com">
+                        <button type="button" id="guardianFindBtn" class="px-4 py-3 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">
+                            Find
+                        </button>
+                    </div>
+                    <div id="guardianInfoBox" class="hidden text-xs text-zinc-500 dark:text-zinc-300"></div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">First Name *</label>
+                            <input id="guardianFirstNameInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Last Name *</label>
+                            <input id="guardianLastNameInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Phone *</label>
+                            <input id="guardianPhoneInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Relationship *</label>
+                            <input id="guardianRelationshipInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="e.g., Mother, Father, Guardian" />
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                    Guardian details are required automatically for students aged 18 and below.
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
+                <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">2. Student Details</div>
+                <form id="registrationDetailsForm" class="space-y-3">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">First Name *</label>
+                            <input id="regFirstName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Last Name *</label>
+                            <input id="regLastName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Email *</label>
+                            <input id="regEmail" type="email" readonly class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-600 dark:text-zinc-300 cursor-not-allowed" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Phone *</label>
+                            <input id="regPhone" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Date of Birth *</label>
+                            <input id="regDob" type="date" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Age</label>
+                            <input id="regAge" readonly class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-600 dark:text-zinc-300 cursor-not-allowed" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Address *</label>
+                        <textarea id="regAddress" rows="3" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Branch *</label>
+                        <select id="regBranch" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                            <option value="">Choose branch...</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
+                <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">3. Registration Payment</div>
+                <form id="registrationPaymentForm" class="space-y-3">
+                    <div class="rounded-xl border border-amber-300/70 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                        <div class="font-bold">Required before enrollment</div>
+                        <div class="mt-1">Father &amp; Sons Music requires a <strong>₱1,000 registration fee</strong> before a student can be enrolled.</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Registration Fee</label>
+                        <div class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-bold">
+                            ₱1,000.00
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Method *</label>
+                        <select id="regPayMethod" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                            <option value="GCash">GCash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof of Payment *</label>
+                        <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof ID *</label>
+                        <input type="file" id="regAgeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
+                    </div>
+                    <div id="regPayStatus" class="text-xs text-zinc-500 dark:text-zinc-300"></div>
+                </form>
+            </div>
+
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div id="submitRegistrationStatus" class="text-sm text-zinc-500 dark:text-zinc-400"></div>
+                <button type="button" id="submitRegistrationRequestBtn" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                    Submit Registration Request
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderStudentActionBanner(student, meta, portal) {
+    const banner = document.getElementById('studentActionBanner');
+    const titleEl = document.getElementById('studentActionBannerTitle');
+    const textEl = document.getElementById('studentActionBannerText');
+    const buttonsEl = document.getElementById('studentActionBannerButtons');
+    if (!banner || !titleEl || !textEl || !buttonsEl) return;
+
+    const profileComplete = isRegistrationProfileComplete(student);
+    const regStatus = String(student?.registration_status || 'Pending');
+    const regPaid = ['Approved', 'Fee Paid'].includes(regStatus);
+    const latestReq = meta?.latest_request || null;
+    const hasPendingReq = latestReq && String(latestReq.status || '') === 'Pending';
+    const enrollmentApproved = portal?.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
+
+    if (enrollmentApproved) {
+        banner.classList.add('hidden');
+        return;
+    }
+
+    let title = 'Complete your registration';
+    let text = 'Start with your personal details and upload your registration payment so the staff can review your account.';
+    let actions = `
+        <button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Open Registration</button>
+        <a href="student_profile.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Open Profile</a>
+    `;
+
+    if (profileComplete && !regPaid) {
+        title = 'Wait for registration approval';
+        text = 'Your details are complete. The next thing to check is your registration payment approval from the staff.';
+        actions = `<button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Check Registration</button>`;
+    } else if (profileComplete && regPaid && hasPendingReq) {
+        title = 'Wait for class approval';
+        text = 'Your class request was already sent. There is nothing else you need to do here until the staff approves it.';
+        actions = `<a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Open Sessions</a>`;
+    } else if (profileComplete && regPaid) {
+        title = 'Choose your lesson package';
+        text = 'Your registration is approved. You can now open the class request form and choose your package and instruments.';
+        actions = `
+            <button type="button" onclick="openStudentRequestModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Open Class Request</button>
+            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">View Sessions Page</a>
+        `;
+    }
+
+    titleEl.textContent = title;
+    textEl.textContent = text;
+    buttonsEl.innerHTML = actions;
+    banner.classList.remove('hidden');
+}
+
 function renderStudentOnboardingSteps(student, meta, portal) {
     const container = document.getElementById('studentOnboardingSteps');
     if (!container) return;
@@ -2811,230 +3045,72 @@ function renderStudentOnboardingSteps(student, meta, portal) {
     const enrollmentApproved = portal?.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     const registrationLocked = !profileComplete || !regPaid;
     const registrationBadge = profileComplete
-        ? renderOnboardingStatusBadge('Completed', 'green')
-        : renderOnboardingStatusBadge('Required', 'amber');
+        ? renderOnboardingStatusBadge('Done', 'green')
+        : renderOnboardingStatusBadge('Do This First', 'amber');
     const paymentBadge = regPaid
-        ? renderOnboardingStatusBadge('Paid', 'green')
-        : renderOnboardingStatusBadge('Unpaid', 'amber');
+        ? renderOnboardingStatusBadge('Approved', 'green')
+        : renderOnboardingStatusBadge('Waiting', 'amber');
     const enrollmentBadge = enrollmentApproved
         ? renderOnboardingStatusBadge('Approved', 'green')
-        : (hasPendingReq ? renderOnboardingStatusBadge('Pending', 'blue') : renderOnboardingStatusBadge('Not Started', 'zinc'));
-    const scheduleBadge = enrollmentApproved
-        ? renderOnboardingStatusBadge('Available', 'green')
-        : renderOnboardingStatusBadge('Coming Soon', 'zinc');
+        : (hasPendingReq ? renderOnboardingStatusBadge('Sent', 'blue') : renderOnboardingStatusBadge('Not Yet', 'zinc'));
 
     container.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
                 <div class="flex items-center justify-between gap-2">
                     <div>
-                        <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Registration</div>
-                        <div class="text-lg font-extrabold mt-2">School Registration</div>
+                        <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Step 1</div>
+                        <div class="text-lg font-extrabold mt-2">Complete your details</div>
                     </div>
                     ${registrationBadge}
                 </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Keep your personal details complete in your profile so admin can process your school registration smoothly.</p>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Make sure your personal information is complete so the staff can review your account.</p>
                 <div class="mt-4 flex flex-wrap gap-3">
-                    <a href="student_profile.html" class="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white/10 text-white text-sm font-semibold">Open Profile</a>
-                    <span class="px-3 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-xs text-zinc-600 dark:text-zinc-300">Payment: ${paymentBadge}</span>
+                    <button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white/10 text-white text-sm font-semibold">Open Registration</button>
+                    <a href="student_profile.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">Open Profile</a>
                 </div>
             </div>
 
             <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
                 <div class="flex items-center justify-between gap-2">
                     <div>
-                        <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Enrollment</div>
-                        <div class="text-lg font-extrabold mt-2">Lesson Package Request</div>
+                        <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Step 2</div>
+                        <div class="text-lg font-extrabold mt-2">Pay the registration fee</div>
+                    </div>
+                    ${paymentBadge}
+                </div>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Upload your registration payment so the staff can approve your account for class requests.</p>
+                <div class="mt-4 flex flex-wrap gap-3">
+                    ${registrationLocked
+                        ? `<button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Open Payment Step</button>`
+                        : `<span class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 text-sm font-bold">Already approved</span>`}
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
+                <div class="flex items-center justify-between gap-2">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Step 3</div>
+                        <div class="text-lg font-extrabold mt-2">Request your classes</div>
                     </div>
                     ${enrollmentBadge}
                 </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Choose your package, instruments, and preferred class day below once registration is approved.</p>
-                <div class="mt-4 flex flex-wrap gap-3">
-                    ${registrationLocked
-                        ? `<span class="px-4 py-2 rounded-xl bg-zinc-200 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 text-sm font-bold cursor-not-allowed">Go to Enrollment (Locked)</span>`
-                        : `<a href="#studentPackageRequestForm" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Go to Enrollment</a>`}
-                    <a href="student_sessions.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">Open Sessions</a>
-                </div>
-                ${latestReq ? `<div class="mt-4">${renderStudentRequestStatus(latestReq)}</div>` : ''}
-            </div>
-
-            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
-                <div class="flex items-center justify-between gap-2">
-                    <div>
-                        <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Class Access</div>
-                        <div class="text-lg font-extrabold mt-2">Schedule & QR</div>
-                    </div>
-                    ${scheduleBadge}
-                </div>
                 <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
-                    ${enrollmentApproved
-                        ? 'Your current module is ready. You can now view your class schedule and attendance QR.'
-                        : 'Your current module right now is registration and enrollment review. Schedule and QR will appear here once your class setup is ready.'}
+                    ${regPaid
+                        ? 'After registration approval, choose your package and instruments, then wait for the staff to approve your class request.'
+                        : 'This step stays locked until your registration details and payment are approved.'}
                 </p>
-                ${enrollmentApproved
+                ${regPaid
                     ? `<div class="mt-4 flex flex-wrap gap-3">
-                        <a href="student_qr.html" class="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white/10 text-white text-sm font-semibold">Open QR</a>
-                        <a href="student_sessions.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">View Schedule</a>
+                        <button type="button" onclick="openStudentRequestModal()" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold">Open Class Request</button>
+                        <a href="student_sessions.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">Open Sessions</a>
                     </div>`
                     : `<div class="mt-4 inline-flex items-center px-3 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-sm text-zinc-600 dark:text-zinc-300">
-                        Current module available: Registration and Enrollment
+                        Finish steps 1 and 2 first
                     </div>`}
+                ${latestReq ? `<div class="mt-4">${renderStudentRequestStatus(latestReq)}</div>` : ''}
             </div>
         </div>
-
-        ${registrationLocked ? `
-            <div id="studentRegistrationBlock" class="mt-6 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Registration Form</div>
-                        <div class="text-lg font-extrabold mt-2">Complete student + guardian details, then submit payment</div>
-                        <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">After admin confirms your registration payment, enrollment will unlock.</div>
-                    </div>
-                    <div class="h-12 w-12 rounded-2xl bg-gold-500/15 border border-gold-500/25 grid place-items-center">
-                        <i class="fas fa-clipboard-check text-gold-500"></i>
-                    </div>
-                </div>
-
-                <div class="mt-6 grid grid-cols-1 xl:grid-cols-12 gap-5">
-                    <div class="xl:col-span-12 max-w-4xl mx-auto w-full space-y-5">
-                    <!-- Guardian -->
-                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
-                        <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">1. Guardian</div>
-                        <div id="guardianAutoStatus" class="rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                            Select the student's date of birth to check if guardian details are required.
-                        </div>
-                        <div id="guardianInputs" class="mt-4 space-y-3 hidden">
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200">Guardian Email *</label>
-                            <div class="flex gap-2">
-                                <input id="guardianEmailInput" type="email" class="flex-1 px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="guardian@email.com">
-                                <button type="button" id="guardianFindBtn" class="px-4 py-3 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">
-                                    Find
-                                </button>
-                            </div>
-                            <div id="guardianInfoBox" class="hidden text-xs text-zinc-500 dark:text-zinc-300"></div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">First Name *</label>
-                                    <input id="guardianFirstNameInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Last Name *</label>
-                                    <input id="guardianLastNameInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Phone *</label>
-                                    <input id="guardianPhoneInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Relationship *</label>
-                                    <input id="guardianRelationshipInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="e.g., Mother, Father, Guardian" />
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-                            Guardian details are required automatically for students aged 18 and below. If a guardian account does not exist yet, the system will create one using the guardian email with temporary password <span class="font-semibold text-zinc-700 dark:text-zinc-200">fasmusic@2020</span>.
-                        </div>
-                    </div>
-
-                    <!-- Student details -->
-                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
-                        <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">2. Student Details</div>
-                        <form id="registrationDetailsForm" class="space-y-3">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">First Name *</label>
-                                    <input id="regFirstName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Last Name *</label>
-                                    <input id="regLastName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Email *</label>
-                                    <input id="regEmail" type="email" readonly class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-600 dark:text-zinc-300 cursor-not-allowed" />
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Phone *</label>
-                                    <input id="regPhone" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Date of Birth *</label>
-                                    <input id="regDob" type="date" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Age</label>
-                                    <input id="regAge" readonly class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-600 dark:text-zinc-300 cursor-not-allowed" />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Address *</label>
-                                <textarea id="regAddress" rows="3" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500"></textarea>
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Branch *</label>
-                                <select id="regBranch" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
-                                    <option value="">Choose branch...</option>
-                                </select>
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- Payment -->
-                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
-                        <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">3. Registration Payment</div>
-                        <form id="registrationPaymentForm" class="space-y-3">
-                            <div class="rounded-xl border border-amber-300/70 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
-                                <div class="font-bold">Required before enrollment</div>
-                                <div class="mt-1">Father &amp; Sons Music requires a <strong>₱1,000 registration fee</strong> before a student can be enrolled.</div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Registration Fee</label>
-                                <div class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-bold">
-                                    ₱1,000.00
-                                </div>
-                                <div class="text-xs text-amber-700 dark:text-amber-300 mt-2">This amount is fixed. You only need to choose the payment method and upload your proof of payment.</div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Method *</label>
-                                <select id="regPayMethod" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
-                                    <option value="GCash">GCash</option>
-                                    <option value="Bank Transfer">Bank Transfer</option>
-                                    <option value="Cash">Cash</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof of Payment *</label>
-                                <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
-                                <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">Upload JPG/PNG/WEBP/PDF for admin verification.</div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof ID *</label>
-                                <input type="file" id="regAgeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
-                                <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">Upload a valid ID or document showing the student's birth date. Required for online registration only.</div>
-                            </div>
-                            <div id="regPayStatus" class="text-xs text-zinc-500 dark:text-zinc-300"></div>
-                        </form>
-                    </div>
-                    </div>
-                </div>
-
-                <div class="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div id="submitRegistrationStatus" class="text-sm text-zinc-500 dark:text-zinc-400"></div>
-                    <button type="button" id="submitRegistrationRequestBtn" class="px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
-                        Submit Registration Request
-                    </button>
-                </div>
-            </div>
-        ` : ''}
     `;
 }
 
@@ -3244,6 +3320,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 }
 
                 const msg = resPay.data?.message || 'Registration request submitted.';
+                closeStudentRegistrationModal();
                 if (submitAllStatus) submitAllStatus.textContent = msg;
                 showMessage(msg, 'success');
                 initStudentDashboardPage();
@@ -3289,7 +3366,19 @@ async function initStudentDashboardPage() {
     const overviewGrid = document.getElementById('studentOverviewGrid');
     const overviewCard = document.getElementById('studentEnrollmentOverviewCard');
     const requestShortcutCard = document.getElementById('studentRequestShortcutCard');
-    const requestFormCard = document.getElementById('studentRequestFormCard');
+    const upcomingCard = document.getElementById('studentUpcomingScheduleCard');
+    const qrCard = document.getElementById('studentQrCard');
+    bindStudentModalFrame('studentRegistrationModal', closeStudentRegistrationModal);
+    bindStudentModalFrame('studentRequestModal', closeStudentRequestModal);
+    if (!window.__studentModalEscBound) {
+        window.__studentModalEscBound = true;
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeStudentRegistrationModal();
+                closeStudentRequestModal();
+            }
+        });
+    }
     if (overviewGrid) {
         overviewGrid.classList.toggle('hidden', isNewStudent);
     }
@@ -3304,8 +3393,9 @@ async function initStudentDashboardPage() {
         }
     }
     if (overviewCard) overviewCard.classList.toggle('hidden', isEnrolledStudent);
-    if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent);
-    if (requestFormCard) requestFormCard.style.display = isEnrolledStudent ? 'none' : '';
+    if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent || !regPaid);
+    if (upcomingCard) upcomingCard.classList.toggle('hidden', !isEnrolledStudent);
+    if (qrCard) qrCard.classList.toggle('hidden', !isEnrolledStudent);
 
     // Package
     setText('packageName', s.package_name || 'Not assigned yet');
@@ -3350,7 +3440,7 @@ async function initStudentDashboardPage() {
         const resMeta = await fetchStudentRequestMetaByEmail(user.email);
         if (resMeta?.success) {
             meta = resMeta;
-            if (!isEnrolledStudent) {
+            if (!isEnrolledStudent && regPaid) {
                 initStudentRequestSection(s, meta);
             }
         }
@@ -3359,18 +3449,24 @@ async function initStudentDashboardPage() {
     }
 
     if (!isEnrolledStudent) {
+        renderStudentActionBanner(s, meta, portal);
         renderStudentOnboardingSteps(s, meta, portal);
+        renderStudentRegistrationModal(s, portal);
         wireStudentOnboardingActions(s, meta, portal);
     } else {
+        const actionBanner = document.getElementById('studentActionBanner');
+        if (actionBanner) actionBanner.classList.add('hidden');
         setHtml('studentOnboardingSteps', '');
+        closeStudentRegistrationModal();
+        closeStudentRequestModal();
     }
 
-    const qrCard = document.getElementById('studentQrCard');
     if (!enrollmentApproved) {
         if (qrCard) qrCard.classList.add('opacity-70');
         setHtml('qrCodeBox', '<div class="text-sm text-zinc-500 text-center">QR locked until admin approves your enrollment.</div>');
         setText('qrPayloadText', 'Locked — approval required');
     } else {
+        if (qrCard) qrCard.classList.remove('opacity-70');
         // QR code
         const payload = buildStudentQrPayload(s);
         setText('qrPayloadText', payload);
