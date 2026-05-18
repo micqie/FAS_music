@@ -72,19 +72,94 @@ function formatTime12Hour(timeString) {
     return `${normalizedHour}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
-function updateRevenueStat(revenueData, registrations) {
-    const revenueEl = document.getElementById('statFeePaid');
-    if (!revenueEl) return;
+function monthKeyFromDate(value) {
+    const date = parseDate(value);
+    if (!date) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
 
+function percentDelta(current, previous) {
+    const now = Number(current || 0);
+    const before = Number(previous || 0);
+    if (before <= 0) return now > 0 ? 100 : 0;
+    return ((now - before) / before) * 100;
+}
+
+function renderExecutiveStats(branches, registrations, revenueData, enrollments) {
+    const activeStudentsEl = document.getElementById('statActiveStudents');
+    const activeStudentsMetaEl = document.getElementById('statActiveStudentsMeta');
+    const revenueEl = document.getElementById('statRevenue');
+    const revenueMetaEl = document.getElementById('statRevenueMeta');
+    const activeBranchesEl = document.getElementById('statActiveBranches');
+    const activeBranchesMetaEl = document.getElementById('statActiveBranchesMeta');
+    const classesTodayEl = document.getElementById('statClassesToday');
+    const classesTodayMetaEl = document.getElementById('statClassesTodayMeta');
+
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonthKey = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, '0')}`;
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const activeEnrollments = Array.isArray(enrollments) ? enrollments : [];
+    const activeStudentIds = new Set(activeEnrollments.map(item => Number(item.student_id || 0)).filter(Boolean));
+    const newThisMonthIds = new Set(
+        activeEnrollments
+            .filter(item => monthKeyFromDate(item.created_at || item.start_date) === currentMonthKey)
+            .map(item => Number(item.student_id || 0))
+            .filter(Boolean)
+    );
+
+    let totalRevenue = 0;
     if (revenueData && revenueData.success) {
-        revenueEl.textContent = formatPeso(revenueData.total_revenue);
-        return;
+        totalRevenue = Number(revenueData.total_revenue || 0);
+    } else {
+        const registrationRevenue = (registrations || []).reduce((sum, reg) => sum + Number(reg.registration_fee_paid || 0), 0);
+        const enrollmentRevenue = activeEnrollments.reduce((sum, item) => sum + Number(item.paid_amount || 0), 0);
+        totalRevenue = registrationRevenue + enrollmentRevenue;
     }
 
-    const fallbackRevenue = Array.isArray(registrations)
-        ? registrations.reduce((sum, reg) => sum + (parseFloat(reg.registration_fee_paid) || 0), 0)
-        : 0;
-    revenueEl.textContent = formatPeso(fallbackRevenue);
+    const currentMonthRevenue =
+        (registrations || [])
+            .filter(item => monthKeyFromDate(item.created_at) === currentMonthKey)
+            .reduce((sum, item) => sum + Number(item.registration_fee_paid || 0), 0) +
+        activeEnrollments
+            .filter(item => monthKeyFromDate(item.created_at || item.start_date) === currentMonthKey)
+            .reduce((sum, item) => sum + Number(item.paid_amount || 0), 0);
+
+    const previousMonthRevenue =
+        (registrations || [])
+            .filter(item => monthKeyFromDate(item.created_at) === previousMonthKey)
+            .reduce((sum, item) => sum + Number(item.registration_fee_paid || 0), 0) +
+        activeEnrollments
+            .filter(item => monthKeyFromDate(item.created_at || item.start_date) === previousMonthKey)
+            .reduce((sum, item) => sum + Number(item.paid_amount || 0), 0);
+
+    const activeBranches = (branches || []).filter(item => String(item.status || '').toLowerCase() === 'active').length;
+    const totalBranches = Array.isArray(branches) ? branches.length : 0;
+
+    const todaySessions = activeEnrollments.flatMap(item => Array.isArray(item.sessions_list) ? item.sessions_list : [])
+        .filter(session => String(session.session_date || '') === todayKey)
+        .filter(session => !['cancelled_by_teacher', 'rescheduled', 'cancelled'].includes(String(session.status || '').toLowerCase()));
+
+    const ongoingNow = todaySessions.filter(session => {
+        const start = parseDate(`${session.session_date}T${session.start_time || '00:00:00'}`);
+        const end = parseDate(`${session.session_date}T${session.end_time || session.start_time || '23:59:59'}`);
+        return start && end && start <= now && end >= now;
+    }).length;
+
+    if (activeStudentsEl) activeStudentsEl.textContent = Number(activeStudentIds.size || 0).toLocaleString('en-PH');
+    if (activeStudentsMetaEl) activeStudentsMetaEl.textContent = `+${Number(newThisMonthIds.size || 0).toLocaleString('en-PH')} new this month`;
+    if (revenueEl) revenueEl.textContent = formatPeso(totalRevenue);
+    if (revenueMetaEl) {
+        const delta = percentDelta(currentMonthRevenue, previousMonthRevenue);
+        const arrow = delta >= 0 ? '↑' : '↓';
+        revenueMetaEl.textContent = `${arrow} ${Math.abs(delta).toFixed(1)}%`;
+    }
+    if (activeBranchesEl) activeBranchesEl.textContent = `${activeBranches} / ${totalBranches}`;
+    if (activeBranchesMetaEl) activeBranchesMetaEl.textContent = 'Operational today';
+    if (classesTodayEl) classesTodayEl.textContent = Number(todaySessions.length || 0).toLocaleString('en-PH');
+    if (classesTodayMetaEl) classesTodayMetaEl.textContent = `${ongoingNow} ongoing now`;
 }
 
 function displayRecentActivity(registrations) {
@@ -407,8 +482,7 @@ async function loadDashboardData() {
         const enrollments = enrollmentsData?.success && Array.isArray(enrollmentsData.enrollments) ? enrollmentsData.enrollments : [];
         const teachers = teachersData?.success && Array.isArray(teachersData.teachers) ? teachersData.teachers : [];
 
-        updateStats(registrations);
-        updateRevenueStat(revenueData, registrations);
+        renderExecutiveStats(branches, registrations, revenueData, enrollments);
         displayRecentActivity(registrations);
         renderBranches(branches);
         renderBranchMovements(branches, registrations, enrollments, teachers);
