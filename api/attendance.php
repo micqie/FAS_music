@@ -1045,7 +1045,7 @@ class AttendanceApi
                 $this->sendJSON([
                     'success' => false,
                     'error_code' => 'BRANCH_MISMATCH',
-                    'error' => "This student is enrolled at {$studentBranchName}. Attendance must be recorded at {$studentBranchName}. You are currently at {$deskBranchName}. Uptown=Uptown, Downtown=Downtown only.",
+                    'error' => "This student is enrolled at {$studentBranchName}. Attendance can only be recorded at the same branch. You are currently at {$deskBranchName}.",
                     'student_branch_id' => $studentBranchId,
                     'student_branch_name' => $student['branch_name'] ?? null,
                     'desk_branch_id' => $deskBranchId,
@@ -1167,7 +1167,7 @@ class AttendanceApi
                 $this->sendJSON([
                     'success' => false,
                     'error_code' => 'BRANCH_MISMATCH',
-                    'error' => "Student is enrolled at {$studentBranchName}. Attendance at {$deskBranchName} not allowed. Uptown=Uptown, Downtown=Downtown only.",
+                    'error' => "This student is enrolled at {$studentBranchName}. Attendance can only be recorded at the same branch. You are currently at {$deskBranchName}.",
                     'student_branch_name' => $student['branch_name'] ?? null,
                     'desk_branch_name' => $deskBranchName
                 ], 400);
@@ -1397,4 +1397,3 @@ switch ($action) {
     default:
         $api->sendJSON(['error' => 'Invalid action'], 400);
 }
-

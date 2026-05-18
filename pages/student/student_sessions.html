@@ -41,21 +41,21 @@
             <a href="student_dashboard.html" class="h-10 flex items-center">
                 <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
             </a>
-            <div class="hidden md:block">
-                <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Student Portal</div>
-                <div class="text-sm text-zinc-300">Sessions</div>
-            </div>
+                <div class="hidden md:block">
+                    <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Student Portal</div>
+                    <div class="text-sm text-zinc-500 dark:text-zinc-300">Sessions</div>
+                </div>
         </div>
         <div class="flex items-center gap-3">
-            <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-white/15 flex items-center justify-center text-zinc-200">
+            <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-zinc-300 dark:border-white/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200">
                 <i class="fas fa-bars text-lg"></i>
             </button>
             <div class="hidden md:flex items-center gap-4">
                 <div class="flex flex-col text-right">
-                    <span id="studentNavName" class="text-sm font-semibold text-white">Student</span>
+                    <span id="studentNavName" class="text-sm font-semibold text-zinc-900 dark:text-white">Student</span>
                     <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Account</span>
                 </div>
-                <button onclick="logout()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
+                <button onclick="logout()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
                     <i class="fas fa-sign-out-alt mr-2 text-gold-400"></i>Logout
                 </button>
             </div>
@@ -69,21 +69,21 @@
                 <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Navigation</h3>
                 <nav class="space-y-2">
                     <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-grid-2 mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
+                        <i class="fas fa-music mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
                     </a>
                     <a href="student_sessions.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
                         <i class="fas fa-calendar-check mr-3"></i> Sessions
                     </a>
-                    <a href="student_grades.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <a href="student_grades.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-chart-line mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Grades
                     </a>
-                    <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-clipboard-check mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Attendance
                     </a>
-                    <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-user mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> Profile
                     </a>
-                    <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-qrcode mr-3 text-zinc-500 group-hover:text-gold-400 transition-colors"></i> My QR Code
                     </a>
                 </nav>
@@ -98,22 +98,22 @@
                 <div>
                     <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Navigation</h3>
                     <nav class="space-y-2">
-                        <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                            <i class="fas fa-grid-2 mr-3 text-zinc-500"></i> Dashboard
+                        <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all">
+                            <i class="fas fa-music mr-3 text-zinc-500"></i> Dashboard
                         </a>
                         <a href="student_sessions.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
                             <i class="fas fa-calendar-check mr-3"></i> Sessions
                         </a>
-                        <a href="student_grades.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_grades.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all">
                             <i class="fas fa-chart-line mr-3 text-zinc-500"></i> Grades
                         </a>
-                        <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all">
                             <i class="fas fa-clipboard-check mr-3 text-zinc-500"></i> Attendance
                         </a>
-                        <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all">
                             <i class="fas fa-user mr-3 text-zinc-500"></i> Profile
                         </a>
-                        <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all">
                             <i class="fas fa-qrcode mr-3 text-zinc-500"></i> My QR Code
                         </a>
                     </nav>
@@ -136,45 +136,45 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <div class="lg:col-span-1 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Current Package</div>
-                    <div id="packageName" class="text-xl font-extrabold mt-2">—</div>
-                    <div id="packageSessions" class="text-sm text-zinc-300 mt-1">—</div>
+            <div class="lg:col-span-1 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Current Package</div>
+                    <div id="packageName" class="text-xl font-extrabold mt-2 text-zinc-900 dark:text-white">—</div>
+                    <div id="packageSessions" class="text-sm text-zinc-500 dark:text-zinc-300 mt-1">—</div>
                     <div class="mt-6 grid grid-cols-2 gap-3">
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-                            <div class="text-[11px] text-zinc-400 uppercase tracking-widest font-bold">Graded Sessions</div>
-                            <div id="gradedSessionCount" class="mt-2 text-2xl font-black text-white">—</div>
+                        <div class="rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                            <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-bold">Graded Sessions</div>
+                            <div id="gradedSessionCount" class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">—</div>
                         </div>
-                        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-                            <div class="text-[11px] text-zinc-400 uppercase tracking-widest font-bold">Average Grade</div>
+                        <div class="rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                            <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-bold">Average Grade</div>
                             <div id="currentGradeAverage" class="mt-2 text-2xl font-black text-gold-400">—</div>
                         </div>
                     </div>
-                    <div class="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4">
-                        <div class="text-xs text-zinc-400 uppercase tracking-widest font-bold">Note</div>
-                        <div class="text-sm text-zinc-200 mt-2">Every grade shown here comes from the teacher’s submitted session assessment in the live database.</div>
+                    <div class="mt-4 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
+                        <div class="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-bold">Note</div>
+                        <div class="text-sm text-zinc-600 dark:text-zinc-200 mt-2">Every grade shown here comes from the teacher’s submitted session assessment in the live database.</div>
                     </div>
                 </div>
 
-                <div class="lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 overflow-hidden shadow-2xl shadow-black/40">
-                    <div class="p-6 border-b border-white/10 flex items-center justify-between">
+                <div class="lg:col-span-2 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-xl dark:shadow-black/40">
+                    <div class="p-6 border-b border-zinc-200 dark:border-white/10 flex items-center justify-between">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Session Performance Tracker</div>
-                            <div class="text-sm text-zinc-300 mt-1">Latest sessions first with attendance and grading</div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Session Performance Tracker</div>
+                            <div class="text-sm text-zinc-500 dark:text-zinc-300 mt-1">Latest sessions first with attendance and grading</div>
                         </div>
-                        <div class="h-10 w-10 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
+                        <div class="h-10 w-10 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 grid place-items-center">
                             <i class="fas fa-chart-line text-gold-400"></i>
                         </div>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
-                            <thead class="bg-white/5">
+                            <thead class="bg-zinc-50 dark:bg-white/5">
                                 <tr>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Session</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Attendance</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Grade</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Skill Level</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Teacher Remarks</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Session</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Attendance</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Grade</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Skill Level</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Teacher Remarks</th>
                                 </tr>
                             </thead>
                             <tbody id="attendanceTableBody">
@@ -190,18 +190,18 @@
                 </div>
             </div>
 
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40">
+            <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                 <div class="flex items-center justify-between">
                     <div>
-                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-400 font-bold">Next Session</div>
-                        <div class="text-lg font-extrabold mt-2">Add another session package</div>
+                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Next Session</div>
+                        <div class="text-lg font-extrabold mt-2 text-zinc-900 dark:text-white">Add another session package</div>
                     </div>
-                    <div class="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 grid place-items-center">
+                    <div class="h-12 w-12 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 grid place-items-center">
                         <i class="fas fa-calendar-plus text-gold-400"></i>
                     </div>
                 </div>
 
-                <div id="studentAdditionalSessionStatus" class="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
+                <div id="studentAdditionalSessionStatus" class="mt-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 text-sm text-zinc-600 dark:text-zinc-300">
                     We will check first if you still have remaining sessions before allowing another session package.
                 </div>
 
@@ -209,7 +209,7 @@
                     <button type="button" id="studentAddAnotherSessionBtn" class="px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
                         Add Another Session
                     </button>
-                    <div class="text-xs text-zinc-500">
+                    <div class="text-xs text-zinc-500 dark:text-zinc-400">
                         You can only continue once your current session package is fully completed.
                     </div>
                 </div>

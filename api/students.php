@@ -2515,6 +2515,8 @@ class StudentsApi
             $firstRoomExpr = "NULL";
             $teacherIdExpr = "NULL";
             if ($this->tableExists('tbl_sessions')) {
+                $todayYmd = date('Y-m-d');
+                $excludedUpcomingStatuses = "'Completed', 'Late', 'Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled'";
                 $sessionJoin = "
                     LEFT JOIN (
                         SELECT
@@ -2526,15 +2528,28 @@ class StudentsApi
                             s.notes,
                             s.teacher_id
                         FROM tbl_sessions s
-                        INNER JOIN (
-                            SELECT enrollment_id, MIN(session_number) AS first_session_number
-                            FROM tbl_sessions
-                            GROUP BY enrollment_id
-                        ) sf ON sf.enrollment_id = s.enrollment_id
-                            AND sf.first_session_number = s.session_number
+                        LEFT JOIN tbl_sessions earlier
+                            ON earlier.enrollment_id = s.enrollment_id
+                           AND earlier.session_date >= " . $this->conn->quote($todayYmd) . "
+                           AND earlier.status NOT IN ({$excludedUpcomingStatuses})
+                           AND (
+                               earlier.session_date < s.session_date
+                               OR (
+                                   earlier.session_date = s.session_date
+                                   AND COALESCE(earlier.start_time, '00:00:00') < COALESCE(s.start_time, '00:00:00')
+                               )
+                               OR (
+                                   earlier.session_date = s.session_date
+                                   AND COALESCE(earlier.start_time, '00:00:00') = COALESCE(s.start_time, '00:00:00')
+                                   AND earlier.session_id < s.session_id
+                               )
+                           )
+                        WHERE s.session_date >= " . $this->conn->quote($todayYmd) . "
+                          AND s.status NOT IN ({$excludedUpcomingStatuses})
+                          AND earlier.session_id IS NULL
                     ) fs ON fs.enrollment_id = e.enrollment_id
                 ";
-                $firstDateExpr = "COALESCE(fs.session_date, e.start_date)";
+                $firstDateExpr = "fs.session_date";
                 $firstStartExpr = "fs.start_time";
                 $firstEndExpr = "fs.end_time";
                 $teacherIdExpr = "fs.teacher_id";
@@ -3694,7 +3709,13 @@ class StudentsApi
                             s.session_date,
                             s.start_time,
                             s.end_time,
+                            s.session_type,
                             s.status,
+                            s.attendance_status,
+                            s.absence_notice,
+                            s.counted_in,
+                            s.makeup_eligible,
+                            s.makeup_required,
                             s.notes,
                             s.rescheduled_from_session_id,
                             s.rescheduled_to_session_id,

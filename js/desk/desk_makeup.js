@@ -82,8 +82,18 @@
             return totalSessions >= 20 ? 3 : 2;
         }
 
+        function getPendingMakeupSessions(student) {
+            const sessionsList = Array.isArray(student.sessions_list) ? student.sessions_list : [];
+            return sessionsList.filter(slot => {
+                if (!slot) return false;
+                const makeupRequired = Number(slot.makeup_required || 0) === 1;
+                const replacementScheduled = Number(slot.rescheduled_to_session_id || 0) > 0;
+                return makeupRequired && !replacementScheduled;
+            });
+        }
+
         function isMakeupRequired(student) {
-            return getAbsenceCount(student) >= getMakeupThreshold(student);
+            return getPendingMakeupSessions(student).length > 0;
         }
 
         function getRemainingCount(student) {
@@ -128,9 +138,10 @@
         }
 
         function getStatusBadge(student) {
+            const pendingMakeups = getPendingMakeupSessions(student).length;
             const absences = getAbsenceCount(student);
             const threshold = getMakeupThreshold(student);
-            if (absences >= threshold + 1) {
+            if (pendingMakeups > 1 || absences >= threshold + 1) {
                 return '<span class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700">Urgent Follow-Up</span>';
             }
             return '<span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">Make-Up Required</span>';
@@ -152,10 +163,18 @@
                 const attendanceContext = getAttendanceContext(student);
                 const attended = sessionKey && attendanceContext.attendedKeys.has(sessionKey);
                 const excused = sessionKey && attendanceContext.excusedKeys.has(sessionKey);
+                const makeupRequired = Number(slot.makeup_required || 0) === 1;
+                const replacementScheduled = Number(slot.rescheduled_to_session_id || 0) > 0;
                 let state = 'Upcoming';
                 let badge = '<span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-bold text-sky-700">Upcoming</span>';
 
-                if (excused) {
+                if (makeupRequired && !replacementScheduled) {
+                    state = 'Needs Make-Up';
+                    badge = '<span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">Needs Make-Up</span>';
+                } else if (replacementScheduled) {
+                    state = 'Make-Up Scheduled';
+                    badge = '<span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-bold text-blue-700">Make-Up Scheduled</span>';
+                } else if (excused) {
                     state = 'Excused';
                     badge = '<span class="inline-flex items-center rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700">Excused</span>';
                 } else if (attended || ['completed', 'late', 'present'].includes(status)) {
@@ -195,7 +214,7 @@
                             <div><span class="font-semibold text-slate-900">Package:</span> ${escapeHtml(student.package_name || '—')}</div>
                             <div><span class="font-semibold text-slate-900">Completed:</span> ${getCompletedCount(student)} / ${Number(student.sessions || 0)}</div>
                             <div><span class="font-semibold text-slate-900">Absences:</span> <span class="text-rose-600 font-semibold">${getAbsenceCount(student)}</span></div>
-                            <div><span class="font-semibold text-slate-900">Next Session:</span> ${escapeHtml(getNextSessionLabel(student))}</div>
+                            <div><span class="font-semibold text-slate-900">Pending Make-Ups:</span> ${getPendingMakeupSessions(student).length}</div>
                         </div>
                         <div class="space-y-3 max-h-[58vh] overflow-y-auto pr-1">${rows || '<div class="text-sm text-slate-500">No scheduled sessions found.</div>'}</div>
                     </div>

@@ -1820,11 +1820,11 @@ function renderStudentQrStatus(status) {
     const titleEl = document.getElementById('studentQrStatusTitle');
     const messageEl = document.getElementById('studentQrStatusMessage');
     const styles = {
-        valid_today: 'block border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-        early: 'block border-amber-500/30 bg-amber-500/10 text-amber-200',
-        missed: 'block border-rose-500/30 bg-rose-500/10 text-rose-200',
-        completed: 'block border-sky-500/30 bg-sky-500/10 text-sky-200',
-        no_session: 'block border-zinc-500/30 bg-zinc-500/10 text-zinc-200'
+        valid_today: 'block border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200',
+        early: 'block border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200',
+        missed: 'block border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200',
+        completed: 'block border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200',
+        no_session: 'block border-zinc-300 bg-zinc-50 text-zinc-700 dark:border-zinc-500/30 dark:bg-zinc-500/10 dark:text-zinc-200'
     };
 
     if (titleEl) titleEl.textContent = titleMap[code] || 'QR Status';
@@ -2909,6 +2909,12 @@ function renderStudentRegistrationModal(student, portal) {
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
+                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Middle Name</label>
+                            <input id="regMiddleName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
                             <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Email *</label>
                             <input id="regEmail" type="email" readonly class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-600 dark:text-zinc-300 cursor-not-allowed" />
                         </div>
@@ -3200,12 +3206,14 @@ function wireStudentOnboardingActions(student, meta, portal) {
     // Prefill registration fields from current student record
     const regFirstName = document.getElementById('regFirstName');
     const regLastName = document.getElementById('regLastName');
+    const regMiddleName = document.getElementById('regMiddleName');
     const regEmail = document.getElementById('regEmail');
     const regPhone = document.getElementById('regPhone');
     const regDob = document.getElementById('regDob');
     const regAddress = document.getElementById('regAddress');
     if (regFirstName && !regFirstName.value) regFirstName.value = student?.first_name || '';
     if (regLastName && !regLastName.value) regLastName.value = student?.last_name || '';
+    if (regMiddleName && !regMiddleName.value) regMiddleName.value = student?.middle_name || '';
     if (regEmail && !regEmail.value) regEmail.value = student?.email || '';
     if (regPhone && !regPhone.value) regPhone.value = student?.phone || '';
     if (regDob && !regDob.value) regDob.value = student?.date_of_birth || '';
@@ -3252,6 +3260,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 student_id: Number(student.student_id),
                 first_name: document.getElementById('regFirstName')?.value?.trim() || '',
                 last_name: document.getElementById('regLastName')?.value?.trim() || '',
+                middle_name: document.getElementById('regMiddleName')?.value?.trim() || '',
                 email: document.getElementById('regEmail')?.value?.trim() || '',
                 phone: document.getElementById('regPhone')?.value?.trim() || '',
                 address: document.getElementById('regAddress')?.value?.trim() || '',
@@ -3395,7 +3404,7 @@ async function initStudentDashboardPage() {
     if (overviewCard) overviewCard.classList.toggle('hidden', isEnrolledStudent);
     if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent || !regPaid);
     if (upcomingCard) upcomingCard.classList.toggle('hidden', !isEnrolledStudent);
-    if (qrCard) qrCard.classList.toggle('hidden', !isEnrolledStudent);
+    if (qrCard) qrCard.classList.toggle('hidden', true);
 
     // Package
     setText('packageName', s.package_name || 'Not assigned yet');
@@ -3462,15 +3471,35 @@ async function initStudentDashboardPage() {
     }
 
     if (!enrollmentApproved) {
-        if (qrCard) qrCard.classList.add('opacity-70');
+        if (qrCard) {
+            qrCard.classList.add('hidden');
+            qrCard.classList.add('opacity-70');
+        }
         setHtml('qrCodeBox', '<div class="text-sm text-zinc-500 text-center">QR locked until admin approves your enrollment.</div>');
         setText('qrPayloadText', 'Locked — approval required');
     } else {
-        if (qrCard) qrCard.classList.remove('opacity-70');
-        // QR code
-        const payload = buildStudentQrPayload(s);
-        setText('qrPayloadText', payload);
-        renderQrCode('qrCodeBox', payload);
+        try {
+            const qrStatusRes = await fetchStudentQrStatus(Number(s.student_id || 0), s.email || '');
+            const qrStatus = qrStatusRes?.qr_status || { code: 'no_session', message: 'You do not have a session today.' };
+
+            if (qrStatus.code === 'valid_today') {
+                if (qrCard) {
+                    qrCard.classList.remove('hidden');
+                    qrCard.classList.remove('opacity-70');
+                }
+                const payload = buildStudentQrPayload(s);
+                setText('qrPayloadText', payload);
+                renderQrCode('qrCodeBox', payload);
+            } else {
+                if (qrCard) qrCard.classList.add('hidden');
+                setText('qrPayloadText', qrStatus.message || 'QR unavailable');
+                setHtml('qrCodeBox', `<div class="text-sm text-zinc-500 text-center">${escapeHtml(qrStatus.message || 'QR unavailable for today.')}</div>`);
+            }
+        } catch (_) {
+            if (qrCard) qrCard.classList.add('hidden');
+            setText('qrPayloadText', 'QR status unavailable');
+            setHtml('qrCodeBox', '<div class="text-sm text-zinc-500 text-center">Unable to verify your QR status right now.</div>');
+        }
     }
 }
 
@@ -3491,7 +3520,7 @@ async function initStudentQrPage() {
     const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     if (!enrollmentApproved) {
         renderStudentQrStatus({ code: 'no_session', message: 'QR locked until admin approves your enrollment.' });
-        setHtml('qrCodeBox', '<div class="text-sm text-zinc-400 text-center">QR locked until admin approves your enrollment.</div>');
+        setHtml('qrCodeBox', '<div class="text-sm text-zinc-500 dark:text-zinc-400 text-center">QR locked until admin approves your enrollment.</div>');
         setText('qrPayloadText', 'Locked — approval required');
         return;
     }
@@ -3507,12 +3536,12 @@ async function initStudentQrPage() {
             renderQrCode('qrCodeBox', payload);
         } else {
             setText('qrPayloadText', qrStatus.message || 'QR unavailable');
-            setHtml('qrCodeBox', `<div class="text-sm text-zinc-300 text-center">${escapeHtml(qrStatus.message || 'QR unavailable for today.')}</div>`);
+            setHtml('qrCodeBox', `<div class="text-sm text-zinc-600 dark:text-zinc-300 text-center">${escapeHtml(qrStatus.message || 'QR unavailable for today.')}</div>`);
         }
     } catch (error) {
         renderStudentQrStatus({ code: 'no_session', message: 'Unable to verify your QR status right now.' });
         setText('qrPayloadText', 'QR status unavailable');
-        setHtml('qrCodeBox', '<div class="text-sm text-zinc-300 text-center">Unable to verify your QR status right now.</div>');
+        setHtml('qrCodeBox', '<div class="text-sm text-zinc-600 dark:text-zinc-300 text-center">Unable to verify your QR status right now.</div>');
     }
 
     if (!window.__studentQrRefreshTimer) {
@@ -3585,17 +3614,17 @@ async function initStudentSessionsPage() {
                     : (r.status || 'Scheduled');
                 const remarks = escapeHtml(r.teacher_remarks || r.remarks || r.attendance_notes || r.notes || 'No teacher remarks yet.');
                 return `
-                    <tr class="border-t border-white/10 hover:bg-white/5 transition align-top">
-                        <td class="px-6 py-4 text-sm text-white">
+                    <tr class="border-t border-zinc-200 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/5 transition align-top">
+                        <td class="px-6 py-4 text-sm text-zinc-900 dark:text-white">
                             <div class="font-semibold">${escapeHtml(sessionNumber)}</div>
-                            <div class="text-zinc-300 mt-1">${escapeHtml(dateLabel)}</div>
-                            <div class="text-xs text-zinc-500 mt-1">${escapeHtml(timeLabel)}</div>
-                            <div class="text-xs text-zinc-500 mt-1">${escapeHtml(roomLabel)}</div>
+                            <div class="text-zinc-600 dark:text-zinc-300 mt-1">${escapeHtml(dateLabel)}</div>
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${escapeHtml(timeLabel)}</div>
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${escapeHtml(roomLabel)}</div>
                         </td>
-                        <td class="px-6 py-4 text-sm text-zinc-200">${renderAttendanceStatusBadge(attendanceLabel)}</td>
-                        <td class="px-6 py-4 text-sm text-zinc-200">${renderStudentGradeBadge(r.average_score, r.progress_id)}</td>
-                        <td class="px-6 py-4 text-sm text-zinc-300">${renderStudentSkillLevel(r.skill_level)}</td>
-                        <td class="px-6 py-4 text-sm text-zinc-400">${remarks}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-200">${renderAttendanceStatusBadge(attendanceLabel)}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-200">${renderStudentGradeBadge(r.average_score, r.progress_id)}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-300">${renderStudentSkillLevel(r.skill_level)}</td>
+                        <td class="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">${remarks}</td>
                     </tr>
                 `;
             }).join(''));

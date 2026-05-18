@@ -187,7 +187,7 @@ function handleApiResponse(data, parsed, payload, isManual) {
         if (!isManual && payload) html += `<div class="text-left text-xs bg-slate-50 p-3 rounded-lg mt-2 font-mono text-slate-600 break-all">QR: ${escapeHtml(payload)}</div>`;
         if (data.student_branch_name) html += `<p class="text-left text-sm mt-2">Student branch: <strong>${escapeHtml(data.student_branch_name)}</strong></p>`;
         if (data.desk_branch_name) html += `<p class="text-left text-sm">Desk branch: <strong>${escapeHtml(data.desk_branch_name)}</strong></p>`;
-        setStatus(data.error || 'Invalid', 'warn');
+        if (!isManual) setStatus(data.error || 'Invalid', 'warn');
         showScanAlert(statusErrorCodes.includes(String(data.error_code || '').toUpperCase()) ? 'Attendance Not Allowed Today' : 'Check-in Failed', html, 'warning');
         fetchDeskSummary();
         return;
@@ -207,10 +207,10 @@ function handleApiResponse(data, parsed, payload, isManual) {
             <p class="text-sm">Checked in: ${escapeHtml(checkinStamp)}</p>
         </div>`;
     if (data.already_checked_in) {
-        setStatus(`${name} already checked in today.`, 'warn');
+        if (!isManual) setStatus(`${name} already checked in today.`, 'warn');
         showScanAlert('Already Checked In', html + '<p class="text-amber-600 font-semibold mt-2">This student was already checked in today.</p>', 'info');
     } else {
-        setStatus(`${name} checked in successfully.`, 'success');
+        if (!isManual) setStatus(`${name} checked in successfully.`, 'success');
         showScanAlert('Check-in Success', html + '<p class="text-emerald-600 font-semibold mt-2">Attendance recorded.</p>', 'success');
     }
     fetchDeskSummary();
@@ -249,7 +249,6 @@ async function handleManualEntry(email) {
     lastManualEmail = key;
     lastManualTime = now;
 
-    setStatus('Processing...', 'info');
     const data = await postRecordByEmail(email.trim());
     handleApiResponse(data, null, null, true);
 }

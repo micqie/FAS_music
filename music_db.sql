@@ -46,9 +46,9 @@ INSERT INTO `tbl_attendance` (`attendance_id`, `student_id`, `branch_id`, `atten
 (2, 1, 6, '2026-03-28 13:46:54', 'Present', 'Manual', NULL),
 (3, 4, 6, '2026-03-29 01:22:52', 'Present', 'Manual', NULL),
 (4, 9, 5, '2026-03-29 01:27:09', 'Present', 'Manual', NULL),
-(6, 10, 6, '2026-03-29 03:55:14', 'Present', 'QR', NULL),
+(6, 10, 6, '2026-03-31 10:02:14', 'Present', 'QR', 'Checked in for Session 1.'),
 (7, 1, 6, '2026-03-29 03:59:03', 'Present', 'Manual', NULL),
-(8, 10, 6, '2026-04-07 06:00:31', 'Present', 'Manual', NULL),
+(8, 10, 6, '2026-04-07 10:01:31', 'Present', 'Manual', 'Checked in for Session 2.'),
 (9, 4, 6, '2026-04-07 22:47:10', 'Present', 'Manual', NULL);
 
 -- --------------------------------------------------------
@@ -123,9 +123,9 @@ INSERT INTO `tbl_enrollments` (`enrollment_id`, `student_id`, `package_id`, `ins
 (4, 7, 12, 11, 7, NULL, NULL, NULL, NULL, 'Tuesday 08:00-09:00', '{\"payment_type\":\"Full Payment\",\"instrument_ids\":[11,9],\"payment_proof_path\":null,\"admin_notes\":\"test for walkin enrollment\"}', '2026-03-28', '2026-03-31', '2026-08-11', 'Active', 'Active', '2026-03-28 15:05:17', 'Self', NULL, 20, 0, 0, 0, NULL, 1, 0, 'Partial Payment', NULL),
 (5, 8, 13, 11, 7, NULL, NULL, NULL, NULL, 'Tuesday 13:00-14:00', '{\"payment_type\":\"Full Payment\",\"instrument_ids\":[11],\"payment_proof_path\":null,\"admin_notes\":\"test for walkin enrollment\"}', '2026-03-28', '2026-03-31', '2026-06-16', 'Active', 'Active', '2026-03-28 15:52:27', 'Self', NULL, 12, 0, 0, 0, NULL, 1, 0, 'Partial Payment', NULL),
 (6, 9, 13, 11, 7, NULL, NULL, NULL, NULL, 'Tuesday 14:00-15:00', '{\"payment_type\":\"Full Payment\",\"instrument_ids\":[11],\"payment_proof_path\":null,\"admin_notes\":\"test2 for walkin\"}', '2026-03-29', '2026-03-31', '2026-06-16', 'Active', 'Active', '2026-03-28 16:11:49', 'Self', NULL, 12, 0, 0, 0, NULL, 1, 0, 'Partial Payment', NULL),
-(7, 10, 14, 14, 1, NULL, NULL, NULL, NULL, 'Tuesday 10:00-11:00', '{\"payment_type\":\"Partial Payment\",\"payment_method\":\"GCash\",\"payable_now\":3000,\"package_total_amount\":7450,\"instrument_ids\":[14],\"payment_proof_path\":\"uploads\\/payment_proofs\\/package_requests\\/20260329044537_cc02c7935cb1bd87.png\",\"admin_notes\":\"test for online session\"}', '2026-03-29', '2026-03-31', '2026-06-16', 'Active', 'Active', '2026-03-29 02:45:37', 'Self', NULL, 12, 0, 0, 0, NULL, 1, 0, 'Partial Payment', NULL),
+(7, 10, 14, 14, 1, 'Tuesday', '10:00:00', '11:00:00', 8, 'Tuesday 10:00-11:00', '{\"payment_type\":\"Partial Payment\",\"payment_method\":\"GCash\",\"payable_now\":3000,\"package_total_amount\":7450,\"instrument_ids\":[14],\"payment_proof_path\":\"uploads\\/payment_proofs\\/package_requests\\/20260329044537_cc02c7935cb1bd87.png\",\"admin_notes\":\"test for online session\"}', '2026-03-29', '2026-03-31', '2026-06-16', 'Active', 'Active', '2026-03-29 02:45:37', 'Self', NULL, 12, 2, 1, 0, '2026-06-16', 1, 0, 'Partial Payment', NULL),
 (8, 12, 13, 10, 2, NULL, NULL, NULL, NULL, 'Thursday 15:00-16:00', '{\"payment_type\":\"Installment\",\"payment_method\":\"Cash\",\"payable_now\":621,\"package_total_amount\":7450,\"instrument_ids\":[10],\"payment_proof_path\":\"\",\"admin_notes\":\"test for walkin downtown\"}', '2026-03-29', '2026-04-02', '2026-06-18', 'Active', 'Active', '2026-03-29 04:09:57', 'Self', NULL, 12, 0, 0, 0, NULL, 1, 0, 'Installment', NULL),
-(9, 13, 13, 10, 9, 'Friday', '09:00:00', '10:00:00', 10, 'Friday 09:00:00-10:00:00 | Friday 13:00:00-14:00:00', '{\"payment_type\":\"Installment\",\"payment_method\":\"Cash\",\"payable_now\":621,\"package_total_amount\":7450,\"instrument_ids\":[10],\"payment_proof_path\":\"uploads\\/payment_proofs\\/package_requests\\/20260417102140_2787fbf6e7dce8fe.jpg\",\"admin_notes\":\"TEST\"}', '2026-04-17', '2026-05-01', '2026-06-12', 'Active', 'Active', '2026-04-17 08:21:40', 'Self', NULL, 12, 2, 0, 0, '2026-06-05', 1, 0, 'Installment', NULL);
+(9, 13, 13, 10, 9, 'Friday', '09:00:00', '10:00:00', 10, 'Friday 09:00:00-10:00:00 | Friday 13:00:00-14:00:00', '{\"payment_type\":\"Installment\",\"payment_method\":\"Cash\",\"payable_now\":621,\"package_total_amount\":7450,\"instrument_ids\":[10],\"payment_proof_path\":\"uploads\\/payment_proofs\\/package_requests\\/20260417102140_2787fbf6e7dce8fe.jpg\",\"admin_notes\":\"Primary slot confirmed at 9AM; second option kept only as original preference.\"}', '2026-04-17', '2026-05-01', '2026-07-17', 'Active', 'Active', '2026-04-17 08:21:40', 'Self', NULL, 12, 2, 1, 1, '2026-07-17', 1, 0, 'Installment', NULL);
 
 -- --------------------------------------------------------
 
@@ -154,7 +154,8 @@ CREATE TABLE `tbl_enrollment_schedule_slots` (
 
 INSERT INTO `tbl_enrollment_schedule_slots` (`slot_id`, `enrollment_id`, `teacher_id`, `day_of_week`, `start_time`, `end_time`, `room_id`, `room_name`, `sort_order`, `status`, `created_at`, `updated_at`) VALUES
 (1, 9, 9, 'Friday', '09:00:00', '10:00:00', 10, 'Room 1', 1, 'Active', '2026-04-18 06:45:01', '2026-04-18 06:45:01'),
-(2, 9, 9, 'Friday', '13:00:00', '14:00:00', 10, 'Room 1', 2, 'Active', '2026-04-18 06:45:01', '2026-04-18 06:45:01');
+(2, 9, 9, 'Friday', '13:00:00', '14:00:00', 10, 'Room 1', 2, 'Inactive', '2026-04-18 06:45:01', '2026-04-18 06:45:01'),
+(3, 7, 1, 'Tuesday', '10:00:00', '11:00:00', 8, 'Room 1', 1, 'Active', '2026-03-29 03:17:16', '2026-03-29 03:17:16');
 
 -- --------------------------------------------------------
 
@@ -250,6 +251,13 @@ CREATE TABLE `tbl_makeup_sessions` (
   `status` enum('Scheduled','Completed','Cancelled','Expired') DEFAULT 'Scheduled',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_makeup_sessions`
+--
+
+INSERT INTO `tbl_makeup_sessions` (`makeup_id`, `original_session_id`, `makeup_session_id`, `teacher_id`, `status`, `created_at`) VALUES
+(1, 24, NULL, 1, 'Scheduled', '2026-04-14 12:10:00');
 
 -- --------------------------------------------------------
 
@@ -607,22 +615,32 @@ INSERT INTO `tbl_sessions` (`session_id`, `enrollment_id`, `teacher_id`, `sessio
 (3, 4, 7, 1, '2026-03-31', '08:00:00', '09:00:00', 'Regular', 11, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-03-28 15:08:51', NULL),
 (4, 5, 7, 1, '2026-03-31', '13:00:00', '14:00:00', 'Regular', 11, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-03-28 15:53:06', NULL),
 (5, 6, 7, 1, '2026-03-31', '14:00:00', '15:00:00', 'Regular', 11, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-03-28 16:12:28', NULL),
-(6, 7, 1, 1, '2026-03-31', '10:00:00', '11:00:00', 'Regular', 14, NULL, 9, 'No Show', 'Pending', 'None', 0, 0, 0, 'Automatically marked missed based on scheduled date.', 'Room 2', NULL, NULL, 0, NULL, NULL, NULL, '2026-03-29 03:17:17', NULL),
-(8, 7, 1, 2, '2026-04-04', '09:00:00', '10:00:00', 'Regular', 14, NULL, 8, 'No Show', 'Pending', 'None', 0, 0, 0, 'Automatically marked missed based on scheduled date.', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-03-29 03:48:51', NULL),
+(6, 7, 1, 1, '2026-03-31', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Completed', 'Present', 'None', 0, 0, 0, 'Strong start on posture and stick control.', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-03-29 03:17:17', 1),
+(8, 7, 1, 2, '2026-04-07', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Completed', 'Present', 'None', 0, 0, 0, 'Kept steady tempo during warm-up exercises.', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-03-29 03:48:51', 1),
 (10, 8, 2, 1, '2026-04-02', '15:00:00', '16:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-03-29 04:22:50', NULL),
 (11, 2, 2, 2, '2026-04-08', '09:00:00', '10:00:00', 'Regular', 13, NULL, 8, 'Completed', 'Pending', 'None', 0, 0, 0, 'Completed from manual attendance', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-07 06:40:27', NULL),
-(12, 9, 9, 1, '2026-05-01', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(13, 9, 9, 2, '2026-05-01', '13:00:00', '14:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(14, 9, 9, 3, '2026-05-08', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(15, 9, 9, 4, '2026-05-08', '13:00:00', '14:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(16, 9, 9, 5, '2026-05-15', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(17, 9, 9, 6, '2026-05-15', '13:00:00', '14:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(18, 9, 9, 7, '2026-05-22', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(19, 9, 9, 8, '2026-05-22', '13:00:00', '14:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(20, 9, 9, 9, '2026-05-29', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(21, 9, 9, 10, '2026-05-29', '13:00:00', '14:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(22, 9, 9, 11, '2026-06-05', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
-(23, 9, 9, 12, '2026-06-05', '13:00:00', '14:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1);
+(12, 9, 9, 1, '2026-05-01', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Completed', 'Present', 'None', 0, 0, 0, 'Completed first guitar lesson and reviewed basic hand position.', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(13, 9, 9, 2, '2026-05-08', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Completed', 'Present', 'None', 0, 0, 0, 'Improved chord switching and downstroke accuracy.', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(14, 9, 9, 3, '2026-05-15', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'No Show', 'CI', 'NoNotice', 1, 0, 0, 'Counted in due to no prior notice from student or guardian.', 'Room 1', NULL, NULL, 0, 'No advance notice provided.', NULL, NULL, '2026-04-18 06:45:01', 3),
+(15, 9, 9, 4, '2026-05-22', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(16, 9, 9, 5, '2026-05-29', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(17, 9, 9, 6, '2026-06-05', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(18, 9, 9, 7, '2026-06-12', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(19, 9, 9, 8, '2026-06-19', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(20, 9, 9, 9, '2026-06-26', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(21, 9, 9, 10, '2026-07-03', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(22, 9, 9, 11, '2026-07-10', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(23, 9, 9, 12, '2026-07-17', '09:00:00', '10:00:00', 'Regular', 10, NULL, 10, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-18 06:45:01', 1),
+(24, 7, 1, 3, '2026-04-14', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Cancelled', 'Absent', 'Prior', 0, 1, 1, 'Emergency absence reported ahead of time; make-up session must be arranged.', 'Room 1', NULL, NULL, 1, 'Parent informed staff before the lesson due to emergency.', NULL, NULL, '2026-04-12 08:30:00', 2),
+(25, 7, 1, 4, '2026-04-21', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Completed', 'Present', 'None', 0, 0, 0, 'Returned well after the emergency absence.', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-12 08:31:00', 1),
+(26, 7, 1, 5, '2026-04-28', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Completed', 'Present', 'None', 0, 0, 0, 'Showed better control on snare rudiments.', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-12 08:32:00', 1),
+(27, 7, 1, 6, '2026-05-05', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Late', 'Late', 'None', 0, 0, 0, 'Arrived late but completed the full practice block.', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-12 08:33:00', 1),
+(28, 7, 1, 7, '2026-05-12', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Completed', 'Present', 'None', 0, 0, 0, 'Consistent rebound technique and stronger timing.', 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-12 08:34:00', 1),
+(29, 7, 1, 8, '2026-05-19', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-12 08:35:00', 1),
+(30, 7, 1, 9, '2026-05-26', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-12 08:36:00', 1),
+(31, 7, 1, 10, '2026-06-02', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-12 08:37:00', 1),
+(32, 7, 1, 11, '2026-06-09', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-12 08:38:00', 1),
+(33, 7, 1, 12, '2026-06-16', '10:00:00', '11:00:00', 'Regular', 14, NULL, 8, 'Scheduled', 'Pending', 'None', 0, 0, 0, NULL, 'Room 1', NULL, NULL, 0, NULL, NULL, NULL, '2026-04-12 08:39:00', 1);
 
 -- --------------------------------------------------------
 
@@ -738,7 +756,7 @@ INSERT INTO `tbl_students` (`student_id`, `branch_id`, `first_name`, `last_name`
 (7, 5, 'Arman', 'Salon', 'Dusil', '2005-02-28', 21, '09659153090', 'arman@gmail.com', 'CDO Gusa ', NULL, NULL, NULL, 'Active', 'walkin', '2026-03-28 15:03:39', 12, NULL),
 (8, 5, 'Bruno', 'Mars', '', '1995-06-28', 30, '09748372013', 'bruno@gmail.com', 'CDO Bugo ', NULL, NULL, NULL, 'Inactive', 'walkin', '2026-03-28 15:51:09', 13, NULL),
 (9, 5, 'Ariana', 'Grande', 'Dusil ', '2006-02-28', 20, '090049303', 'ariana@gmail.com', 'CDO tablon ', NULL, NULL, NULL, 'Active', 'walkin', '2026-03-28 16:09:41', 13, NULL),
-(10, 6, 'James', 'Garcia', NULL, '2017-06-29', 8, '098069503', 'james@gmail.com', 'grade 2', NULL, NULL, NULL, 'Active', 'online', '2026-03-29 01:57:17', 14, 'uploads/payment_proofs/registration/20260329042037_586845efce8a3c44.png'),
+(10, 6, 'James', 'Garcia', NULL, '2017-06-29', 8, '098069503', 'james@gmail.com', 'CDO Tablon', 'Tablon Elementary School', 'Grade 2', NULL, 'Active', 'online', '2026-03-29 01:57:17', 14, 'uploads/payment_proofs/registration/20260329042037_586845efce8a3c44.png'),
 (11, 5, 'Jeon', 'Jungkook', 'Yoo', '1998-06-17', 27, '090799574903', 'jeon@gmail.com', 'zone 3 bulua ', NULL, NULL, NULL, 'Active', 'walkin', '2026-03-29 04:04:37', NULL, NULL),
 (12, 5, 'Seokjin', 'Kim', 'Martinez', '2005-10-29', 20, '0907940902', 'seokjin@gmail.com', 'CDO tablon', NULL, NULL, NULL, 'Active', 'walkin', '2026-03-29 04:07:29', 13, NULL),
 (13, 5, 'Jennie', 'Kim', 'idk', '1998-07-17', 27, '090909090', 'jennie@gmail.com', 'YG station', NULL, NULL, NULL, 'Active', 'walkin', '2026-04-17 08:20:43', 13, NULL),
@@ -810,10 +828,30 @@ CREATE TABLE `tbl_student_progress` (
   `session_id` int(11) NOT NULL,
   `instrument_id` int(11) NOT NULL,
   `skill_level` varchar(50) DEFAULT NULL,
+  `performance_score` tinyint(3) unsigned DEFAULT NULL,
+  `technique_score` tinyint(3) unsigned DEFAULT NULL,
+  `rhythm_score` tinyint(3) unsigned DEFAULT NULL,
+  `focus_score` tinyint(3) unsigned DEFAULT NULL,
+  `assignment_score` tinyint(3) unsigned DEFAULT NULL,
   `remarks` text DEFAULT NULL,
   `assessment_date` date DEFAULT curdate(),
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_student_progress`
+--
+
+INSERT INTO `tbl_student_progress` (`progress_id`, `student_id`, `session_id`, `instrument_id`, `skill_level`, `performance_score`, `technique_score`, `rhythm_score`, `focus_score`, `assignment_score`, `remarks`, `assessment_date`, `created_at`, `updated_at`) VALUES
+(1, 10, 6, 14, 'Beginner', 3, 3, 3, 4, 4, 'James followed basic stick grip instructions well and stayed focused for the whole lesson.', '2026-03-31', '2026-03-31 11:15:00', '2026-03-31 11:15:00'),
+(2, 10, 8, 14, 'Beginner', 3, 4, 3, 4, 4, 'Good improvement in counting and simple quarter-note patterns.', '2026-04-07', '2026-04-07 11:10:00', '2026-04-07 11:10:00'),
+(3, 10, 25, 14, 'Beginner', 4, 4, 3, 4, 4, 'Recovered nicely after the missed week and completed all assigned drills.', '2026-04-21', '2026-04-21 11:18:00', '2026-04-21 11:18:00'),
+(4, 10, 26, 14, 'Beginner', 4, 4, 4, 4, 4, 'Cleaner rebounds and more even dynamics across warm-up exercises.', '2026-04-28', '2026-04-28 11:16:00', '2026-04-28 11:16:00'),
+(5, 10, 27, 14, 'Developing', 4, 4, 4, 3, 4, 'Late arrival, but James still completed the lesson goals and showed better timing.', '2026-05-05', '2026-05-05 11:20:00', '2026-05-05 11:20:00'),
+(6, 10, 28, 14, 'Developing', 4, 4, 4, 4, 4, 'Steady pulse throughout practice and stronger confidence on the pad.', '2026-05-12', '2026-05-12 11:18:00', '2026-05-12 11:18:00'),
+(7, 13, 12, 10, 'Beginner', 3, 3, 3, 4, 4, 'Jennie understood guitar posture and basic fretting-hand placement.', '2026-05-01', '2026-05-01 10:45:00', '2026-05-01 10:45:00'),
+(8, 13, 13, 10, 'Developing', 4, 3, 3, 4, 4, 'Improved chord transitions and maintained a more even strumming pattern.', '2026-05-08', '2026-05-08 10:42:00', '2026-05-08 10:42:00');
 
 -- --------------------------------------------------------
 
@@ -1273,7 +1311,7 @@ ALTER TABLE `tbl_enrollments`
 -- AUTO_INCREMENT for table `tbl_enrollment_schedule_slots`
 --
 ALTER TABLE `tbl_enrollment_schedule_slots`
-  MODIFY `slot_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `slot_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `tbl_guardians`
@@ -1297,7 +1335,7 @@ ALTER TABLE `tbl_instrument_types`
 -- AUTO_INCREMENT for table `tbl_makeup_sessions`
 --
 ALTER TABLE `tbl_makeup_sessions`
-  MODIFY `makeup_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `makeup_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `tbl_payments`
@@ -1381,7 +1419,7 @@ ALTER TABLE `tbl_service_providers`
 -- AUTO_INCREMENT for table `tbl_sessions`
 --
 ALTER TABLE `tbl_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
 
 --
 -- AUTO_INCREMENT for table `tbl_session_packages`
@@ -1423,7 +1461,7 @@ ALTER TABLE `tbl_student_instruments`
 -- AUTO_INCREMENT for table `tbl_student_progress`
 --
 ALTER TABLE `tbl_student_progress`
-  MODIFY `progress_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `progress_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `tbl_teachers`
