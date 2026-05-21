@@ -16,6 +16,84 @@ function setText(id, value) {
     if (el) el.textContent = value;
 }
 
+const paymentPaginationState = {
+    largestBalances: 1,
+    enrollmentTable: 1,
+    registrationTable: 1
+};
+
+const paymentPageSizes = {
+    largestBalances: 5,
+    enrollmentTable: 5,
+    registrationTable: 5
+};
+
+let paymentCenterDataCache = null;
+let activePaymentModalId = null;
+
+function resetPaymentPagination() {
+    paymentPaginationState.largestBalances = 1;
+    paymentPaginationState.enrollmentTable = 1;
+    paymentPaginationState.registrationTable = 1;
+}
+
+function getPaginatedRows(rows, key) {
+    const size = Number(paymentPageSizes[key] || 5);
+    const totalItems = Array.isArray(rows) ? rows.length : 0;
+    const totalPages = Math.max(1, Math.ceil(totalItems / size));
+    const currentPage = Math.min(Math.max(1, Number(paymentPaginationState[key] || 1)), totalPages);
+    paymentPaginationState[key] = currentPage;
+    const start = (currentPage - 1) * size;
+    return {
+        rows: (rows || []).slice(start, start + size),
+        currentPage,
+        totalPages,
+        totalItems,
+        startIndex: totalItems ? start + 1 : 0,
+        endIndex: Math.min(start + size, totalItems)
+    };
+}
+
+function renderPaymentPagination(targetId, key, meta) {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+
+    if (!meta || meta.totalItems <= 0) {
+        el.innerHTML = '';
+        return;
+    }
+
+    el.innerHTML = `
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="text-xs font-semibold text-slate-500">
+                Showing ${meta.startIndex}-${meta.endIndex} of ${meta.totalItems}
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" data-page-target="${key}" data-page-action="prev" class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed" ${meta.currentPage <= 1 ? 'disabled' : ''}>
+                    Previous
+                </button>
+                <div class="px-3 py-2 text-sm font-semibold text-slate-600">
+                    Page ${meta.currentPage} of ${meta.totalPages}
+                </div>
+                <button type="button" data-page-target="${key}" data-page-action="next" class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed" ${meta.currentPage >= meta.totalPages ? 'disabled' : ''}>
+                    Next
+                </button>
+            </div>
+        </div>
+    `;
+
+    el.querySelectorAll('button[data-page-target]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.getAttribute('data-page-action');
+            const pageKey = btn.getAttribute('data-page-target');
+            if (!pageKey) return;
+            if (action === 'prev') paymentPaginationState[pageKey] = Math.max(1, Number(paymentPaginationState[pageKey] || 1) - 1);
+            if (action === 'next') paymentPaginationState[pageKey] = Number(paymentPaginationState[pageKey] || 1) + 1;
+            if (paymentCenterDataCache) renderPaymentCenter(paymentCenterDataCache);
+        });
+    });
+}
+
 function paymentBadgeClass(status) {
     const normalized = String(status || '').toLowerCase();
     if (normalized === 'approved' || normalized === 'paid') return 'bg-emerald-100 text-emerald-700';
@@ -309,17 +387,57 @@ function renderCollectionHealth(registrations, enrollments) {
     `;
 }
 
+function setPaymentModalVisibility(modalId, shouldOpen) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    modal.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+    document.body.classList.toggle('overflow-hidden', shouldOpen);
+    activePaymentModalId = shouldOpen ? modalId : (activePaymentModalId === modalId ? null : activePaymentModalId);
+}
+
+function attachPaymentModals() {
+    document.querySelectorAll('[data-open-payment-modal]').forEach(button => {
+        button.addEventListener('click', () => {
+            const modalId = button.getAttribute('data-open-payment-modal');
+            if (!modalId) return;
+            setPaymentModalVisibility(modalId, true);
+        });
+    });
+
+    document.querySelectorAll('.payment-modal').forEach(modal => {
+        modal.querySelectorAll('[data-close-payment-modal]').forEach(button => {
+            button.addEventListener('click', () => {
+                setPaymentModalVisibility(modal.id, false);
+            });
+        });
+    });
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && activePaymentModalId) {
+            setPaymentModalVisibility(activePaymentModalId, false);
+        }
+    });
+}
+
 function renderLargestBalances(enrollments) {
     const list = document.getElementById('largestBalancesList');
+    const summary = document.getElementById('largestBalancesSummary');
     if (!list) return;
 
-    const rows = [...enrollments]
+    const sortedRows = [...enrollments]
         .filter(item => Number(item.balance_amount || 0) > 0)
-        .sort((a, b) => Number(b.balance_amount || 0) - Number(a.balance_amount || 0))
-        .slice(0, 5);
+        .sort((a, b) => Number(b.balance_amount || 0) - Number(a.balance_amount || 0));
+    const page = getPaginatedRows(sortedRows, 'largestBalances');
+    const rows = page.rows;
+
+    if (summary) {
+        summary.textContent = `${sortedRows.length} student${sortedRows.length === 1 ? '' : 's'} with remaining balance`;
+    }
 
     if (!rows.length) {
         list.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">No remaining balances for the current filter.</div>';
+        renderPaymentPagination('largestBalancesPagination', 'largestBalances', page);
         return;
     }
 
@@ -341,12 +459,15 @@ function renderLargestBalances(enrollments) {
             </div>
         `;
     }).join('');
+    renderPaymentPagination('largestBalancesPagination', 'largestBalances', page);
 }
 
 function renderEnrollmentTable(enrollments) {
     const body = document.getElementById('enrollmentPaymentsTable');
     const summary = document.getElementById('enrollmentTableSummary');
     if (!body) return;
+    const page = getPaginatedRows(enrollments, 'enrollmentTable');
+    const visibleRows = page.rows;
 
     if (!enrollments.length) {
         body.innerHTML = `
@@ -358,11 +479,12 @@ function renderEnrollmentTable(enrollments) {
             </tr>
         `;
         if (summary) summary.textContent = '0 enrollment rows';
+        renderPaymentPagination('enrollmentTablePagination', 'enrollmentTable', page);
         return;
     }
 
     if (summary) summary.textContent = `${enrollments.length} enrollment record${enrollments.length === 1 ? '' : 's'}`;
-    body.innerHTML = enrollments.map(row => {
+    body.innerHTML = visibleRows.map(row => {
         const studentName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Student';
         return `
             <tr class="hover:bg-slate-50/80 transition">
@@ -388,28 +510,32 @@ function renderEnrollmentTable(enrollments) {
             </tr>
         `;
     }).join('');
+    renderPaymentPagination('enrollmentTablePagination', 'enrollmentTable', page);
 }
 
 function renderRegistrationTable(registrations) {
     const body = document.getElementById('registrationPaymentsTable');
     const summary = document.getElementById('registrationTableSummary');
     if (!body) return;
+    const page = getPaginatedRows(registrations, 'registrationTable');
+    const visibleRows = page.rows;
 
     if (!registrations.length) {
         body.innerHTML = `
             <tr>
-                <td colspan="7" class="px-6 py-10 text-center text-slate-500">
+                <td colspan="6" class="px-6 py-10 text-center text-slate-500">
                     <i class="fas fa-receipt text-2xl mb-3 text-slate-300"></i>
                     <p>No registration fee records match the current filters.</p>
                 </td>
             </tr>
         `;
         if (summary) summary.textContent = '0 registration rows';
+        renderPaymentPagination('registrationTablePagination', 'registrationTable', page);
         return;
     }
 
     if (summary) summary.textContent = `${registrations.length} registration record${registrations.length === 1 ? '' : 's'}`;
-    body.innerHTML = registrations.map(row => {
+    body.innerHTML = visibleRows.map(row => {
         const studentName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Student';
         const sourceLabel = String(row.registration_source || 'online').toLowerCase() === 'walkin' ? 'Walk-In' : 'Online';
         return `
@@ -421,12 +547,12 @@ function renderRegistrationTable(registrations) {
                 <td class="px-6 py-4 text-sm text-slate-700">${escapeHtml(row.branch_name || '—')}</td>
                 <td class="px-6 py-4 text-sm text-slate-700">${renderPill(sourceLabel, sourceLabel)}</td>
                 <td class="px-6 py-4 text-sm font-semibold text-emerald-700">${formatCurrencyPHP(row.registration_paid || 0)}</td>
-                <td class="px-6 py-4 text-sm font-bold ${Number(row.registration_balance || 0) > 0 ? 'text-amber-700' : 'text-slate-700'}">${formatCurrencyPHP(row.registration_balance || 0)}</td>
                 <td class="px-6 py-4 text-sm">${renderPill(row.registration_status || 'Pending', row.registration_status || 'Pending')}</td>
                 <td class="px-6 py-4 text-sm text-slate-600">${formatDateLabel(row.created_at)}</td>
             </tr>
         `;
     }).join('');
+    renderPaymentPagination('registrationTablePagination', 'registrationTable', page);
 }
 
 function populateBranchFilter(branches) {
@@ -455,7 +581,10 @@ function attachPaymentFilters(refresh) {
         const el = document.getElementById(id);
         if (!el) return;
         const eventName = id === 'paymentSearch' ? 'input' : 'change';
-        el.addEventListener(eventName, refresh);
+        el.addEventListener(eventName, () => {
+            resetPaymentPagination();
+            refresh();
+        });
     });
 }
 
@@ -487,6 +616,7 @@ async function loadPaymentCenter() {
 }
 
 function renderPaymentCenter(data) {
+    paymentCenterDataCache = data;
     const filters = getFilters();
     const filteredRegistrations = filterRegistrationRows(data.registrations, filters);
     const filteredEnrollments = sortEnrollmentRows(filterEnrollmentRows(data.enrollments, filters), filters.sortMode);
@@ -517,6 +647,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     try {
         const data = await loadPaymentCenter();
         const refresh = () => renderPaymentCenter(data);
+        attachPaymentModals();
         attachPaymentFilters(refresh);
         refresh();
     } catch (error) {

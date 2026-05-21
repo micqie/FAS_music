@@ -4781,8 +4781,17 @@ async function loadAllRegistrations() {
 const registrationsTableState = {
     rows: [],
     page: 1,
-    pageSize: 10
+    pageSize: 5
 };
+
+function sortNewestRegistrationsFirst(rows) {
+    return (Array.isArray(rows) ? rows.slice() : []).sort((a, b) => {
+        const timeA = new Date(a?.created_at || 0).getTime();
+        const timeB = new Date(b?.created_at || 0).getTime();
+        if (timeA !== timeB) return timeB - timeA;
+        return Number(b?.student_id || 0) - Number(a?.student_id || 0);
+    });
+}
 
 function getRegistrationsModeFromHash() {
     const hash = (window.location.hash || '').replace('#', '').toLowerCase();
@@ -4805,7 +4814,7 @@ function initRegistrationsPaginationControls() {
     if (pageSizeEl && pageSizeEl.dataset.bound !== '1') {
         pageSizeEl.addEventListener('change', () => {
             const nextSize = parseInt(pageSizeEl.value, 10);
-            registrationsTableState.pageSize = Number.isFinite(nextSize) && nextSize > 0 ? nextSize : 10;
+            registrationsTableState.pageSize = Number.isFinite(nextSize) && nextSize > 0 ? nextSize : 5;
             registrationsTableState.page = 1;
             renderRegistrationsTable();
         });
@@ -4967,7 +4976,7 @@ function displayRegistrations(registrations) {
     if (!document.getElementById('registrationsTable')) {
         return;
     }
-    registrationsTableState.rows = Array.isArray(registrations) ? registrations : [];
+    registrationsTableState.rows = sortNewestRegistrationsFirst(registrations);
     registrationsTableState.page = 1;
     initRegistrationsPaginationControls();
     renderRegistrationsTable();
@@ -5325,6 +5334,315 @@ async function loadAdminUsers() {
     }
 }
 
+function initAdminSidebarMenu() {
+    const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
+    if (!pathname.includes('/pages/admin/')) return;
+
+    const nav = document.querySelector('body > nav');
+    const sidebar = document.querySelector('body > aside');
+    if (!nav || !sidebar || sidebar.dataset.mobileMenuEnhanced === '1') return;
+
+    sidebar.dataset.mobileMenuEnhanced = '1';
+
+    const desktopMedia = window.matchMedia('(min-width: 1024px)');
+    const sidebarId = sidebar.id || 'adminSidebar';
+    sidebar.id = sidebarId;
+
+    sidebar.classList.remove('hidden');
+    sidebar.classList.add(
+        'flex',
+        'max-lg:-translate-x-full',
+        'max-lg:transition-transform',
+        'max-lg:duration-300',
+        'max-lg:ease-out',
+        'max-lg:z-[60]',
+        'max-lg:w-[18.5rem]',
+        'max-lg:shadow-2xl'
+    );
+
+    const overlay = document.createElement('button');
+    overlay.type = 'button';
+    overlay.setAttribute('aria-label', 'Close admin menu');
+    overlay.className = 'fixed inset-0 z-[55] bg-slate-950/60 opacity-0 pointer-events-none transition-opacity duration-300 lg:hidden';
+    document.body.appendChild(overlay);
+
+    const firstNavChild = Array.from(nav.children).find((child) => child.nodeType === 1) || null;
+    let leftCluster = firstNavChild;
+
+    if (!leftCluster || !leftCluster.classList.contains('flex')) {
+        leftCluster = document.createElement('div');
+        leftCluster.className = 'flex items-center gap-3 lg:gap-8';
+        if (firstNavChild) {
+            nav.insertBefore(leftCluster, firstNavChild);
+            leftCluster.appendChild(firstNavChild);
+        } else {
+            nav.prepend(leftCluster);
+        }
+    } else {
+        leftCluster.classList.add('gap-3', 'lg:gap-8');
+    }
+
+    const menuButton = document.createElement('button');
+    menuButton.type = 'button';
+    menuButton.setAttribute('aria-controls', sidebarId);
+    menuButton.setAttribute('aria-expanded', 'false');
+    menuButton.setAttribute('aria-label', 'Open admin menu');
+    menuButton.className = 'lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-gold-400/60';
+    menuButton.innerHTML = '<i class="fas fa-bars text-base"></i><span class="sr-only">Open admin menu</span>';
+    leftCluster.prepend(menuButton);
+
+    const menuIcon = menuButton.querySelector('i');
+
+    function setMenuState(isOpen) {
+        const open = !desktopMedia.matches && Boolean(isOpen);
+        sidebar.classList.toggle('max-lg:-translate-x-full', !open);
+        sidebar.classList.toggle('max-lg:translate-x-0', open);
+        overlay.classList.toggle('opacity-0', !open);
+        overlay.classList.toggle('pointer-events-none', !open);
+        overlay.classList.toggle('opacity-100', open);
+        overlay.classList.toggle('pointer-events-auto', open);
+        menuButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+        menuButton.setAttribute('aria-label', open ? 'Close admin menu' : 'Open admin menu');
+
+        if (menuIcon) {
+            menuIcon.classList.toggle('fa-bars', !open);
+            menuIcon.classList.toggle('fa-xmark', open);
+        }
+
+        document.body.style.overflow = open ? 'hidden' : '';
+    }
+
+    function syncForViewport() {
+        if (desktopMedia.matches) {
+            setMenuState(false);
+        }
+    }
+
+    menuButton.addEventListener('click', () => {
+        const isOpen = menuButton.getAttribute('aria-expanded') === 'true';
+        setMenuState(!isOpen);
+    });
+
+    overlay.addEventListener('click', () => setMenuState(false));
+
+    sidebar.addEventListener('click', (event) => {
+        if (desktopMedia.matches) return;
+        if (event.target.closest('a[href]')) {
+            setMenuState(false);
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            setMenuState(false);
+        }
+    });
+
+    if (typeof desktopMedia.addEventListener === 'function') {
+        desktopMedia.addEventListener('change', syncForViewport);
+    } else if (typeof desktopMedia.addListener === 'function') {
+        desktopMedia.addListener(syncForViewport);
+    }
+
+    syncForViewport();
+}
+
+function initAdminResponsiveTables() {
+    const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
+    if (!pathname.includes('/pages/admin/')) return;
+
+    if (!document.getElementById('adminResponsiveTableStyles')) {
+        const style = document.createElement('style');
+        style.id = 'adminResponsiveTableStyles';
+        style.textContent = `
+            .admin-table-scroll {
+                scrollbar-width: thin;
+                scrollbar-color: rgba(148, 163, 184, 0.9) rgba(226, 232, 240, 0.9);
+                scrollbar-gutter: stable both-edges;
+            }
+            .admin-table-scroll::-webkit-scrollbar {
+                height: 12px;
+            }
+            .admin-table-scroll::-webkit-scrollbar-track {
+                background: rgba(226, 232, 240, 0.9);
+                border-radius: 9999px;
+            }
+            .admin-table-scroll::-webkit-scrollbar-thumb {
+                background: rgba(148, 163, 184, 0.95);
+                border-radius: 9999px;
+                border: 2px solid rgba(226, 232, 240, 0.9);
+            }
+            @media (min-width: 1024px) {
+                .admin-table-scroll {
+                    overflow-x: visible !important;
+                    scrollbar-width: none;
+                }
+                .admin-table-scroll::-webkit-scrollbar {
+                    height: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const tableWrappers = document.querySelectorAll('.overflow-x-auto');
+    if (!tableWrappers.length) return;
+
+    tableWrappers.forEach((wrapper) => {
+        const table = wrapper.querySelector('table');
+        if (!table) return;
+
+        wrapper.classList.remove('overflow-x-auto', 'overflow-visible');
+        wrapper.classList.add('overflow-x-scroll', 'lg:overflow-visible', 'overscroll-x-contain', 'pb-2', 'admin-table-scroll');
+        wrapper.style.webkitOverflowScrolling = 'touch';
+
+        const hasDeclaredMinWidth = /(^|\s)min-w-/.test(table.className) || table.style.minWidth;
+        if (!hasDeclaredMinWidth) {
+            const headerCount = table.querySelectorAll('thead th').length || table.querySelectorAll('tr:first-child th, tr:first-child td').length || 1;
+            const estimatedMinWidth = Math.max(720, headerCount * 140);
+            table.style.minWidth = `${estimatedMinWidth}px`;
+        }
+
+        if (wrapper.dataset.mobileScrollHint === '1') return;
+        wrapper.dataset.mobileScrollHint = '1';
+
+        const hint = document.createElement('p');
+        hint.className = 'px-4 pt-3 text-[11px] font-medium tracking-wide text-slate-400 sm:hidden';
+        hint.textContent = 'Swipe left or right to view the full table.';
+        wrapper.insertAdjacentElement('afterend', hint);
+    });
+}
+
+function initAdminAutoPagination() {
+    const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
+    if (!pathname.includes('/pages/admin/')) return;
+
+    const builtInPaginatedBodies = new Set([
+        'registrationsTable',
+        'adminUsersTable',
+        'enrollmentPaymentsTable',
+        'registrationPaymentsTable'
+    ]);
+    const paginatedState = new WeakMap();
+
+    function getDataRows(tbody) {
+        return Array.from(tbody.querySelectorAll(':scope > tr')).filter((row) => {
+            const cells = row.children;
+            if (!cells.length) return false;
+            if (cells.length === 1 && cells[0].hasAttribute('colspan')) return false;
+            return true;
+        });
+    }
+
+    function ensureControls(wrapper) {
+        if (!wrapper.dataset.autoPaginationKey) {
+            wrapper.dataset.autoPaginationKey = `admin-pagination-${Math.random().toString(36).slice(2, 10)}`;
+        }
+
+        let controls = wrapper.parentElement?.querySelector(`:scope > [data-admin-auto-pagination-for="${wrapper.dataset.autoPaginationKey}"]`);
+        if (controls) return controls;
+
+        controls = document.createElement('div');
+        controls.dataset.adminAutoPagination = '1';
+        controls.dataset.adminAutoPaginationFor = wrapper.dataset.autoPaginationKey;
+        controls.className = 'flex items-center justify-between gap-3 flex-wrap px-4 py-3 border-t border-slate-200 bg-slate-50/60';
+        wrapper.insertAdjacentElement('afterend', controls);
+        return controls;
+    }
+
+    function renderAutoPage(tbody) {
+        if (!tbody || builtInPaginatedBodies.has(tbody.id || '')) return;
+
+        const table = tbody.closest('table');
+        const wrapper = table?.closest('.overflow-x-scroll, .overflow-x-auto');
+        if (!table || !wrapper) return;
+
+        const rows = getDataRows(tbody);
+        const pageSize = 5;
+        let state = paginatedState.get(tbody);
+        if (!state) {
+            state = { page: 1 };
+            paginatedState.set(tbody, state);
+        }
+
+        const controls = ensureControls(wrapper);
+        const totalRows = rows.length;
+        const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+        state.page = Math.min(Math.max(1, state.page), totalPages);
+
+        if (totalRows <= pageSize) {
+            rows.forEach((row) => { row.style.display = ''; });
+            controls.innerHTML = '';
+            controls.classList.add('hidden');
+            return;
+        }
+
+        controls.classList.remove('hidden');
+
+        const start = (state.page - 1) * pageSize;
+        const end = start + pageSize;
+
+        rows.forEach((row, index) => {
+            row.style.display = index >= start && index < end ? '' : 'none';
+        });
+
+        controls.innerHTML = `
+            <div class="text-xs font-semibold text-slate-500">
+                Showing ${start + 1}-${Math.min(end, totalRows)} of ${totalRows}
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" data-admin-auto-page="prev" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed" ${state.page <= 1 ? 'disabled' : ''}>
+                    Prev
+                </button>
+                <div class="px-2 text-xs font-semibold text-slate-600">
+                    Page ${state.page} of ${totalPages}
+                </div>
+                <button type="button" data-admin-auto-page="next" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed" ${state.page >= totalPages ? 'disabled' : ''}>
+                    Next
+                </button>
+            </div>
+        `;
+
+        controls.querySelector('[data-admin-auto-page="prev"]')?.addEventListener('click', () => {
+            state.page = Math.max(1, state.page - 1);
+            renderAutoPage(tbody);
+        });
+        controls.querySelector('[data-admin-auto-page="next"]')?.addEventListener('click', () => {
+            state.page = Math.min(totalPages, state.page + 1);
+            renderAutoPage(tbody);
+        });
+    }
+
+    document.querySelectorAll('table tbody[id]').forEach((tbody) => {
+        if (builtInPaginatedBodies.has(tbody.id || '')) return;
+
+        const observer = new MutationObserver(() => {
+            const state = paginatedState.get(tbody);
+            if (state && state.page > 1 && getDataRows(tbody).length <= (state.page - 1) * 5) {
+                state.page = 1;
+            }
+            renderAutoPage(tbody);
+        });
+
+        observer.observe(tbody, { childList: true });
+        renderAutoPage(tbody);
+    });
+}
+
+function enforceAdminFixedPageSizes() {
+    const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
+    if (!pathname.includes('/pages/admin/')) return;
+
+    ['registrationsPageSize', 'adminUsersPageSize'].forEach((id) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        select.innerHTML = '<option value="5" selected>5</option>';
+        select.value = '5';
+        select.disabled = true;
+        select.classList.add('cursor-not-allowed', 'bg-slate-100', 'text-slate-500');
+    });
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     // Check if we're on index.html or admin page
@@ -5338,6 +5656,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentAttendance = document.getElementById('studentAttendanceRoot');
     const studentQr = document.getElementById('studentQrRoot');
     const guardianStudentsRoot = document.getElementById('guardianStudentsRoot');
+
+    initAdminSidebarMenu();
+    initAdminResponsiveTables();
+    initAdminAutoPagination();
+    enforceAdminFixedPageSizes();
 
     if (loginForm) {
         initIndexPage();

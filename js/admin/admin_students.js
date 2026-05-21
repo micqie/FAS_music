@@ -1,6 +1,15 @@
   let allStudents = [];
         let filteredStudents = [];
 
+        function sortNewestStudentsFirst(rows) {
+            return (Array.isArray(rows) ? rows.slice() : []).sort((a, b) => {
+                const timeA = new Date(a?.created_at || 0).getTime();
+                const timeB = new Date(b?.created_at || 0).getTime();
+                if (timeA !== timeB) return timeB - timeA;
+                return Number(b?.student_id || 0) - Number(a?.student_id || 0);
+            });
+        }
+
         // Load branches for filter
         async function loadBranchesForFilter() {
             const branchFilter = document.getElementById('branchFilter');
@@ -180,7 +189,7 @@
                 const res = await axios.get(`${baseApiUrl}/students.php?action=get-all-students`);
                 const data = res.data;
                 if (data && data.success && data.students) {
-                    allStudents = data.students;
+                    allStudents = sortNewestStudentsFirst(data.students);
                     // Apply current filter if one is selected
                     const branchFilter = document.getElementById('branchFilter');
                     const selectedBranchId = branchFilter ? branchFilter.value : '';

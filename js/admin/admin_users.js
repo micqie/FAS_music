@@ -3,7 +3,7 @@
             rows: [],
             filtered: [],
             page: 1,
-            pageSize: 10
+            pageSize: 5
         };
 
         function showInlineMessage(el, type, text) {
@@ -37,6 +37,15 @@
         function getAdminUserById(userId) {
             const id = Number(userId) || 0;
             return (adminUsersTableState.rows || []).find(u => Number(u.user_id) === id) || null;
+        }
+
+        function sortNewestUsersFirst(rows) {
+            return (Array.isArray(rows) ? rows.slice() : []).sort((a, b) => {
+                const timeA = new Date(a?.created_at || 0).getTime();
+                const timeB = new Date(b?.created_at || 0).getTime();
+                if (timeA !== timeB) return timeB - timeA;
+                return Number(b?.user_id || 0) - Number(a?.user_id || 0);
+            });
         }
 
         function escapeJsString(value) {
@@ -179,7 +188,7 @@
             if (pageSizeEl) {
                 pageSizeEl.addEventListener('change', () => {
                     const size = parseInt(pageSizeEl.value, 10);
-                    adminUsersTableState.pageSize = Number.isFinite(size) && size > 0 ? size : 10;
+                    adminUsersTableState.pageSize = Number.isFinite(size) && size > 0 ? size : 5;
                     adminUsersTableState.page = 1;
                     renderAdminUsersTable();
                 });
@@ -509,7 +518,7 @@
         }
 
         function setAdminUsersRows(rows) {
-            adminUsersTableState.rows = Array.isArray(rows) ? rows : [];
+            adminUsersTableState.rows = sortNewestUsersFirst(rows);
             filterAdminUsers();
             renderAdminUsersTable();
         }
@@ -597,28 +606,30 @@
                             <div class="text-xs text-slate-500">${escapeHtml(user.email || '')}</div>
                         </td>
                         <td class="px-6 py-4 text-slate-700">${escapeHtml(role)}</td>
-                        <td class="px-6 py-4 text-slate-700">${escapeHtml(branch)}</td>
+                        <td class="px-6 py-4 text-slate-700 whitespace-nowrap">${escapeHtml(branch)}</td>
                         <td class="px-6 py-4">
                             <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold border ${statusClass}">
                                 ${escapeHtml(statusLabel)}
                             </span>
                         </td>
-                        <td class="px-6 py-4 space-x-2">
-                            <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-700 hover:bg-slate-100"
-                                onclick="openAdminUserEditModal(${Number(user.user_id) || 0})">
-                                <i class="fas fa-pen"></i>
-                                <span>Edit</span>
-                            </button>
-                            <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-700 hover:bg-slate-100"
-                                onclick="openAdminUserPasswordModal(${Number(user.user_id) || 0}, '${escapeJsString(name)}')">
-                                <i class="fas fa-key"></i>
-                                <span>Password</span>
-                            </button>
-                            <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border text-[11px] ${toggleClass}"
-                                onclick="confirmAdminUserStatus(${Number(user.user_id) || 0}, '${isActive ? 'Inactive' : 'Active'}')">
-                                <i class="fas ${toggleIcon}"></i>
-                                <span>${toggleLabel}</span>
-                            </button>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2 whitespace-nowrap">
+                                <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-700 hover:bg-slate-100"
+                                    onclick="openAdminUserEditModal(${Number(user.user_id) || 0})">
+                                    <i class="fas fa-pen"></i>
+                                    <span>Edit</span>
+                                </button>
+                                <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-700 hover:bg-slate-100"
+                                    onclick="openAdminUserPasswordModal(${Number(user.user_id) || 0}, '${escapeJsString(name)}')">
+                                    <i class="fas fa-key"></i>
+                                    <span>Password</span>
+                                </button>
+                                <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border text-[11px] ${toggleClass}"
+                                    onclick="confirmAdminUserStatus(${Number(user.user_id) || 0}, '${isActive ? 'Inactive' : 'Active'}')">
+                                    <i class="fas ${toggleIcon}"></i>
+                                    <span>${toggleLabel}</span>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;

@@ -197,7 +197,6 @@ class User
         }
         return true;
     }
-
     private function storePaymentProofUpload($file, $scope = 'registration')
     {
         if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
@@ -276,7 +275,6 @@ class User
         if (!move_uploaded_file($tmpName, $targetPath)) {
             throw new Exception('Unable to save ID proof file.');
         }
-
         return 'uploads/payment_proofs/' . $scope . '/' . $safeName;
     }
 
