@@ -510,7 +510,7 @@ class Admin
         }
     }
 
-    // ❌ Reject student (removes from DB so they are not counted as registered)
+    // ❌ Reject student registration but keep the student/login account
     public function rejectStudent($json)
     {
         $data = json_decode($json, true);
@@ -525,8 +525,11 @@ class Admin
         try {
             $this->conn->beginTransaction();
 
-            // Get student email before delete (for user account removal)
-            $stmtStudent = $this->conn->prepare("SELECT email, branch_id FROM tbl_students WHERE student_id = ?");
+            $stmtStudent = $this->conn->prepare("
+                SELECT student_id, email, branch_id
+                FROM tbl_students
+                WHERE student_id = ?
+            ");
             $stmtStudent->execute([$studentId]);
             $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
 
@@ -540,51 +543,43 @@ class Admin
                 $this->sendJSON(['error' => 'Student does not belong to your branch'], 403);
             }
 
-            $email = $student['email'] ?? null;
+            // Preserve the account, but mark the registration itself as rejected.
+            $stmtFailPayments = $this->conn->prepare("
+                UPDATE tbl_registration_payments
+                SET status = 'Failed'
+                WHERE student_id = ?
+                  AND status = 'Pending'
+            ");
+            $stmtFailPayments->execute([$studentId]);
 
-            // Delete user account (linked by email) so they cannot login
-            if (!empty($email)) {
-                $roleStmt = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = 'Student' LIMIT 1");
-                $roleStmt->execute();
-                $role = $roleStmt->fetch(PDO::FETCH_ASSOC);
-                if ($role) {
-                    $stmtUser = $this->conn->prepare("DELETE FROM tbl_users WHERE email = ? AND role_id = ?");
-                    $stmtUser->execute([$email, $role['role_id']]);
-                }
+            $stmtResetStudent = $this->conn->prepare("
+                UPDATE tbl_students
+                SET status = 'Rejected'
+                WHERE student_id = ?
+            ");
+            $stmtResetStudent->execute([$studentId]);
+
+            // Keep the user account active so the student can log in and redo registration.
+            $email = trim((string)($student['email'] ?? ''));
+            if ($email !== '') {
+                $stmtUser = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET status = 'Active'
+                    WHERE email = ?
+                ");
+                $stmtUser->execute([$email]);
             }
-
-            // Delete student (CASCADE will remove related records)
-            // Note: In fas_db.sql, registration_payments links to enrollments, so delete enrollments first
-            $checkCol = $this->conn->query("SHOW COLUMNS FROM tbl_registration_payments LIKE 'student_id'");
-            $hasStudentId = $checkCol && $checkCol->rowCount() > 0;
-
-            if (!$hasStudentId) {
-                // fas_db.sql structure - delete enrollments first (which will cascade delete registration_payments)
-                $stmtDelEnroll = $this->conn->prepare("DELETE FROM tbl_enrollments WHERE student_id = ?");
-                $stmtDelEnroll->execute([$studentId]);
-            }
-
-            $stmtDelete = $this->conn->prepare("DELETE FROM tbl_students WHERE student_id = ?");
-            $stmtDelete->execute([$studentId]);
 
             $this->conn->commit();
 
             $this->sendJSON([
                 'success' => true,
-                'message' => 'Registration rejected and removed from the system'
+                'message' => 'Registration rejected. The student account was kept.'
             ]);
         } catch (Exception $e) {
             $this->conn->rollBack();
-            // If hard delete fails, deactivate instead.
-            $stmt2 = $this->conn->prepare("
-                UPDATE tbl_students
-                SET status = 'Inactive'
-                WHERE student_id = ?
-            ");
-            $stmt2->execute([$studentId]);
             $this->sendJSON([
-                'success' => true,
-                'message' => 'Registration rejected'
+                'error' => 'Failed to reject registration: ' . $e->getMessage()
             ]);
         }
     }

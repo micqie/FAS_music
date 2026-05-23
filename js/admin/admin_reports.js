@@ -102,16 +102,34 @@ function filterRows(rows, branchId) {
     return rows.filter(row => Number(row.branch_id || 0) === branchId);
 }
 
+function getStudentIdSet(rows) {
+    return new Set(
+        (rows || [])
+            .map(row => Number(row.student_id || 0))
+            .filter(Boolean)
+    );
+}
+
+function filterRowsByStudentIds(rows, studentIds) {
+    if (!(studentIds instanceof Set) || studentIds.size === 0) {
+        return [];
+    }
+
+    return (rows || []).filter(row => studentIds.has(Number(row.student_id || 0)));
+}
+
 function applyScopeToRows(registrations, enrollments, scope) {
     if (scope === 'registrations') {
+        const registrationStudentIds = getStudentIdSet(registrations);
         return {
             registrations: registrations,
-            enrollments: []
+            enrollments: filterRowsByStudentIds(enrollments, registrationStudentIds)
         };
     }
     if (scope === 'enrollments') {
+        const enrollmentStudentIds = getStudentIdSet(enrollments);
         return {
-            registrations: [],
+            registrations: filterRowsByStudentIds(registrations, enrollmentStudentIds),
             enrollments: enrollments
         };
     }

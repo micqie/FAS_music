@@ -69,6 +69,17 @@ class User
         }
     }
 
+    private function tableHasColumn($tableName, $columnName)
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW COLUMNS FROM {$tableName} LIKE ?");
+            $stmt->execute([$columnName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     private function isMultipartRequest()
     {
         $contentType = $_SERVER['CONTENT_TYPE'] ?? ($_SERVER['HTTP_CONTENT_TYPE'] ?? '');
@@ -134,7 +145,10 @@ class User
     private function hasAnyRegistrationPayment($studentId)
     {
         $stmt = $this->conn->prepare("
-            SELECT COUNT(*) FROM tbl_registration_payments WHERE student_id = ?
+            SELECT COUNT(*)
+            FROM tbl_registration_payments
+            WHERE student_id = ?
+              AND status IN ('Pending', 'Paid')
         ");
         $stmt->execute([(int)$studentId]);
         return ((int)$stmt->fetchColumn()) > 0;
@@ -145,7 +159,7 @@ class User
         $stmt = $this->conn->prepare("
             SELECT COUNT(*) FROM tbl_registration_payments
             WHERE student_id = ?
-              AND status <> 'Paid'
+              AND status = 'Pending'
         ");
         $stmt->execute([(int)$studentId]);
         return ((int)$stmt->fetchColumn()) > 0;
@@ -163,7 +177,9 @@ class User
         } catch (PDOException $e) {
             $studentStatus = 'Inactive';
         }
-        if ($hasPending) {
+        if ($studentStatus === 'Rejected') {
+            $status = 'Rejected';
+        } elseif ($hasPending) {
             $status = 'Pending';
         } elseif ($paid >= 1000 && $studentStatus === 'Active') {
             $status = 'Approved';
@@ -349,6 +365,67 @@ class User
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function resetRejectedRegistration($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode($json, true) ?: [];
+        $studentId = (int)($data['student_id'] ?? 0);
+        if ($studentId < 1) {
+            $this->sendJSON(['error' => 'Student ID is required'], 400);
+        }
+
+        try {
+            $this->ensureStudentRegistrationProofColumn();
+            $this->ensureStudentAgeVerificationProofColumn();
+            $this->conn->beginTransaction();
+
+            $stmt = $this->conn->prepare("SELECT student_id, status FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmt->execute([$studentId]);
+            $student = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$student) {
+                throw new Exception('Student not found');
+            }
+            if (String($student['status'] ?? '') !== 'Rejected') {
+                throw new Exception('This registration is not marked as rejected');
+            }
+
+            $stmtDeletePayments = $this->conn->prepare("DELETE FROM tbl_registration_payments WHERE student_id = ?");
+            $stmtDeletePayments->execute([$studentId]);
+
+            $updateParts = ["status = 'Inactive'"];
+            if ($this->hasStudentColumn('registration_proof_path')) {
+                $updateParts[] = "registration_proof_path = NULL";
+            }
+            if ($this->hasStudentColumn('age_verification_proof_path')) {
+                $updateParts[] = "age_verification_proof_path = NULL";
+            }
+            if ($this->hasStudentColumn('registration_fee_paid')) {
+                $updateParts[] = "registration_fee_paid = 0";
+            }
+
+            $stmtReset = $this->conn->prepare("
+                UPDATE tbl_students
+                SET " . implode(', ', $updateParts) . "
+                WHERE student_id = ?
+            ");
+            $stmtReset->execute([$studentId]);
+
+            $this->conn->commit();
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Registration reset. You can submit your registration again.'
+            ]);
+        } catch (Exception $e) {
+            if ($this->conn && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -1031,6 +1108,7 @@ class User
 
         try {
             $this->ensureStudentAgeVerificationProofColumn();
+            $this->ensureStudentRegistrationProofColumn();
             $this->conn->beginTransaction();
 
             $stmtStudent = $this->conn->prepare("
@@ -1056,7 +1134,6 @@ class User
             }
 
             $registrationProofPath = null;
-            $ageVerificationProofPath = null;
             if ($isMultipart && isset($_FILES['registration_proof_file'])) {
                 try {
                     $registrationProofPath = $this->storePaymentProofUpload($_FILES['registration_proof_file'], 'registration');
@@ -1064,6 +1141,8 @@ class User
                     $this->sendJSON(['error' => $e->getMessage()], 400);
                 }
             }
+
+            $ageVerificationProofPath = null;
             if ($isMultipart && isset($_FILES['age_verification_proof_file'])) {
                 try {
                     $ageVerificationProofPath = $this->storeVerificationProofUpload($_FILES['age_verification_proof_file'], 'age_verification');
@@ -1079,36 +1158,38 @@ class User
 
             $registrationSource = strtolower(trim((string)($student['registration_source'] ?? 'online')));
             $isWalkInRegistration = $registrationSource === 'walkin';
+            $referenceNumber = trim((string)($data['reference_number'] ?? ''));
+            if (!$isWalkInRegistration && !$registrationProofPath) {
+                throw new Exception("Registration payment proof is required.");
+            }
             if (!$isWalkInRegistration && !$ageVerificationProofPath && empty($student['age_verification_proof_path'])) {
                 throw new Exception("Proof ID is required for online registration age verification.");
+            }
+            $hasRegistrationReferenceColumn = $this->tableHasColumn('tbl_registration_payments', 'reference_number');
+            if ($referenceNumber !== '' && !$hasRegistrationReferenceColumn) {
+                throw new Exception("Database is missing tbl_registration_payments.reference_number. Run add_payment_reference_number.sql first.");
             }
 
             $newPaid = $paidSoFar + (float)$data['amount'];
             $remaining = 1000.0 - $newPaid;
-            $receipt = $data['receipt_number'] ?? ($registrationProofPath ? 'REG-PROOF-' . time() : 'REG-' . time());
+            $receipt = $data['receipt_number'] ?? 'REG-' . time();
             $notes = $data['notes'] ?? '';
 
             $paymentStatus = 'Pending';
+            $paymentColumns = ['student_id', 'amount', 'payment_method', 'receipt_number', 'status'];
+            $paymentValues = [$data['student_id'], $data['amount'], $data['payment_method'], $receipt, $paymentStatus];
+            if ($hasRegistrationReferenceColumn) {
+                $paymentColumns[] = 'reference_number';
+                $paymentValues[] = ($referenceNumber !== '' ? $referenceNumber : null);
+            }
             $stmtPayment = $this->conn->prepare("
-                INSERT INTO tbl_registration_payments (
-                    student_id, amount, payment_method, receipt_number, status
-                ) VALUES (?, ?, ?, ?, ?)
+                INSERT INTO tbl_registration_payments (" . implode(', ', $paymentColumns) . ")
+                VALUES (" . implode(', ', array_fill(0, count($paymentColumns), '?')) . ")
             ");
-            $stmtPayment->execute([$data['student_id'], $data['amount'], $data['payment_method'], $receipt, $paymentStatus]);
+            $stmtPayment->execute($paymentValues);
 
             $newStatus = 'Pending';
 
-            if ($registrationProofPath) {
-                $this->ensureStudentRegistrationProofColumn();
-                if ($this->hasStudentColumn('registration_proof_path')) {
-                    $stmtProof = $this->conn->prepare("
-                        UPDATE tbl_students
-                        SET registration_proof_path = ?
-                        WHERE student_id = ?
-                    ");
-                    $stmtProof->execute([$registrationProofPath, (int)$data['student_id']]);
-                }
-            }
             if ($ageVerificationProofPath) {
                 $this->ensureStudentAgeVerificationProofColumn();
                 if ($this->hasStudentColumn('age_verification_proof_path')) {
@@ -1121,6 +1202,15 @@ class User
                 }
             }
 
+            if ($registrationProofPath && $this->hasStudentColumn('registration_proof_path')) {
+                $stmtRegProof = $this->conn->prepare("
+                    UPDATE tbl_students
+                    SET registration_proof_path = ?
+                    WHERE student_id = ?
+                ");
+                $stmtRegProof->execute([$registrationProofPath, (int)$data['student_id']]);
+            }
+
             $this->conn->commit();
 
             $this->sendJSON([
@@ -1130,6 +1220,7 @@ class User
                 'remaining_amount' => max(0, $remaining),
                 'registration_status' => $newStatus,
                 'receipt_number' => $receipt,
+                'reference_number' => $referenceNumber !== '' ? $referenceNumber : null,
                 'registration_proof_path' => $registrationProofPath,
                 'age_verification_proof_path' => $ageVerificationProofPath
             ]);
@@ -1162,6 +1253,9 @@ switch ($action) {
         break;
     case 'pay-registration-fee':
         $user->payRegistrationFee(file_get_contents('php://input'));
+        break;
+    case 'reset-rejected-registration':
+        $user->resetRejectedRegistration(file_get_contents('php://input'));
         break;
     case 'change-password':
         $user->changePassword(file_get_contents('php://input'));

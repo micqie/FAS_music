@@ -86,6 +86,9 @@ let currentPaymentRedirectUrl = '';
 let currentPaymentSource = '';
 let currentRegistration = null;
 let pendingRequestsById = {};
+let studentDashboardPortalState = null;
+let studentDashboardMetaState = null;
+let studentRegistrationRestartNotice = false;
 
 function normalizeRoleName(role) {
     return String(role || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -1687,10 +1690,73 @@ function checkBranchScopedAuth() {
     return true;
 }
 
+function checkInstructorAuth() {
+    const user = Auth.getUser();
+    if (!user || getRoleCategory(user.role_name) !== 'instructor') {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Access Denied',
+            text: 'You must be logged in as an Instructor to access this page.',
+            confirmButtonColor: '#b8860b',
+            confirmButtonText: 'Go to Login'
+        }).then(() => {
+            const appBase = (typeof appBaseUrl === 'string' && appBaseUrl)
+                ? appBaseUrl
+                : ((typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+                    ? baseApiUrl.slice(0, -4)
+                    : `${window.location.origin}/FAS_music`);
+            window.location.href = `${appBase}/index.html`;
+        });
+        return false;
+    }
+    return true;
+}
+
 async function fetchStudentPortalDataByEmail(email) {
     const url = `${baseApiUrl}/students.php?action=get-student-portal&email=${encodeURIComponent(email)}`;
-    const res = await axios.get(url);
-    return res.data;
+    try {
+        const res = await axios.get(url);
+        return res.data;
+    } catch (error) {
+        const message = String(error?.response?.data?.error || '');
+        if (error?.response?.status === 404 && message.toLowerCase().includes('student not found for this email')) {
+            return {
+                success: true,
+                registration_required: true,
+                message: 'Your previous registration is no longer active. Please register again to continue.',
+                student: null,
+                guardians: [],
+                primary_guardian: null,
+                instruments: [],
+                current_enrollment: null,
+                enrollment_history: [],
+                current_session_grades: []
+            };
+        }
+        throw error;
+    }
+}
+
+async function handleStudentRegistrationReset(portal, fallbackMessage) {
+    if (!portal?.registration_required) {
+        return false;
+    }
+
+    const message = portal.message || fallbackMessage || 'Your registration is no longer active. Please register again.';
+
+    if (typeof Swal !== 'undefined' && Swal.fire) {
+        await Swal.fire({
+            icon: 'info',
+            title: 'Register Again',
+            text: message,
+            confirmButtonText: 'OK'
+        });
+    } else {
+        alert(message);
+    }
+
+    Auth.logout();
+    return true;
 }
 
 async function fetchGuardianPortalDataByEmail(email) {
@@ -2803,8 +2869,38 @@ function renderOnboardingStatusBadge(label, tone = 'zinc') {
 function setStudentModalState(modalId, shouldOpen) {
     const modal = document.getElementById(modalId);
     if (!modal) return;
-    modal.classList.toggle('hidden', !shouldOpen);
-    modal.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+
+    if (shouldOpen) {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && !modal.contains(active)) {
+            modal.__returnFocusEl = active;
+        }
+        modal.removeAttribute('inert');
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+
+        window.requestAnimationFrame(() => {
+            const firstFocusable = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (firstFocusable instanceof HTMLElement) {
+                firstFocusable.focus();
+            }
+        });
+    } else {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && modal.contains(active)) {
+            active.blur();
+        }
+
+        modal.setAttribute('inert', '');
+        modal.setAttribute('aria-hidden', 'true');
+        modal.classList.add('hidden');
+
+        const returnFocusEl = modal.__returnFocusEl;
+        if (returnFocusEl instanceof HTMLElement && document.contains(returnFocusEl)) {
+            window.requestAnimationFrame(() => returnFocusEl.focus());
+        }
+    }
+
     const anyOpen = ['studentRegistrationModal', 'studentRequestModal'].some((id) => {
         const item = document.getElementById(id);
         return item && !item.classList.contains('hidden');
@@ -2813,6 +2909,12 @@ function setStudentModalState(modalId, shouldOpen) {
 }
 
 function openStudentRegistrationModal() {
+    const regStatus = String(studentDashboardPortalState?.student?.registration_status || 'Pending');
+    if (regStatus === 'Rejected') {
+        void handleRejectedStudentRegistrationOpen();
+        return;
+    }
+
     setStudentModalState('studentRegistrationModal', true);
 }
 
@@ -2833,6 +2935,50 @@ window.closeStudentRegistrationModal = closeStudentRegistrationModal;
 window.openStudentRequestModal = openStudentRequestModal;
 window.closeStudentRequestModal = closeStudentRequestModal;
 
+async function resetRejectedStudentRegistration(studentId) {
+    const res = await axios.post(`${baseApiUrl}/users.php?action=reset-rejected-registration`, {
+        student_id: Number(studentId)
+    });
+    return res.data;
+}
+
+async function handleRejectedStudentRegistrationOpen() {
+    const studentId = Number(studentDashboardPortalState?.student?.student_id || 0);
+    if (studentId < 1) {
+        showMessage('Unable to reset this rejected registration right now.', 'error');
+        return;
+    }
+
+    const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Registration Rejected By Admin',
+        text: 'Registration rejected. Please try again or contact admin.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#b8860b'
+    });
+
+    if (!result.isConfirmed) {
+        return;
+    }
+
+    try {
+        const reset = await resetRejectedStudentRegistration(studentId);
+        if (!reset?.success) {
+            throw new Error(reset?.error || 'Failed to reset rejected registration.');
+        }
+
+        try {
+            sessionStorage.setItem('student_reopen_registration_modal', '1');
+            sessionStorage.setItem('student_registration_rejected_notice', '1');
+        } catch (e) {
+            // Ignore storage issues and just reload.
+        }
+        window.location.reload();
+    } catch (error) {
+        showMessage(error?.message || 'Failed to reset rejected registration.', 'error');
+    }
+}
+
 function bindStudentModalFrame(modalId, closeFn) {
     const modal = document.getElementById(modalId);
     if (!modal || modal.dataset.bound === 'true') return;
@@ -2847,9 +2993,63 @@ function bindStudentModalFrame(modalId, closeFn) {
 function renderStudentRegistrationModal(student, portal) {
     const body = document.getElementById('studentRegistrationModalBody');
     if (!body) return;
+    const regStatus = String(student?.registration_status || 'Pending');
+    const latestPaymentStatus = String(student?.registration_payment_status || '');
+    const profileComplete = isRegistrationProfileComplete(student);
+    const hasSubmittedPendingRegistration = regStatus === 'Pending'
+        && latestPaymentStatus === 'Pending'
+        && profileComplete
+        && Boolean(
+            student?.registration_proof_path
+            || student?.registration_payment_method
+            || student?.registration_reference_number
+            || student?.registration_receipt_number
+        );
+
+    if (hasSubmittedPendingRegistration) {
+        body.innerHTML = `
+            <div class="space-y-5">
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 sm:px-5">
+                    <div class="text-sm font-bold text-amber-800">Registration pending admin review</div>
+                    <div class="text-sm text-amber-700 mt-1">Your registration has already been submitted. These details stay locked while admin reviews your request.</div>
+                </div>
+
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
+                    <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">Student Details</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Name:</span> ${escapeHtml(`${student?.first_name || ''} ${student?.last_name || ''}`.trim() || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Email:</span> ${escapeHtml(student?.email || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Phone:</span> ${escapeHtml(student?.phone || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Branch:</span> ${escapeHtml(student?.branch_name || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Birthday:</span> ${escapeHtml(student?.date_of_birth || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Address:</span> ${escapeHtml(student?.address || '—')}</div>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
+                    <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">Registration Payment</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Registration Fee:</span> ₱1,000.00</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Payment Method:</span> ${escapeHtml(student?.registration_payment_method || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Reference Number:</span> ${escapeHtml(student?.registration_reference_number || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Receipt Number:</span> ${escapeHtml(student?.registration_receipt_number || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Payment Proof:</span> ${student?.registration_proof_path ? `<a href="${buildPublicFileUrl(student.registration_proof_path)}" target="_blank" rel="noopener" class="text-blue-700 underline">View file</a>` : '—'}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Proof ID:</span> ${student?.age_verification_proof_path ? `<a href="${buildPublicFileUrl(student.age_verification_proof_path)}" target="_blank" rel="noopener" class="text-emerald-700 underline">View file</a>` : '—'}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
 
     body.innerHTML = `
         <div class="space-y-5">
+            ${studentRegistrationRestartNotice ? `
+                <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 sm:px-5">
+                    <div class="text-sm font-bold text-red-700">Registration rejected</div>
+                    <div class="text-sm text-red-600 mt-1">Registration rejected. Please try again or contact admin.</div>
+                </div>
+            ` : ''}
             <div class="rounded-2xl border border-gold-500/20 bg-amber-50 dark:bg-gold-500/10 p-4 sm:p-5">
                 <div class="text-sm font-bold text-zinc-900 dark:text-white">Complete this one step at a time</div>
                 <div class="text-sm text-zinc-600 dark:text-zinc-300 mt-1">Fill in the student details, add guardian details if needed, then upload your registration payment.</div>
@@ -2969,8 +3169,14 @@ function renderStudentRegistrationModal(student, portal) {
                         </select>
                     </div>
                     <div>
+                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Reference Number *</label>
+                        <input type="text" id="regPayReference" placeholder="Enter GCash reference number" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        <div id="regPayReferenceHint" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Enter the payment reference or transaction number from your receipt.</div>
+                    </div>
+                    <div>
                         <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof of Payment *</label>
                         <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
+                        <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Upload your payment screenshot or receipt for admin review.</div>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof ID *</label>
@@ -2999,6 +3205,7 @@ function renderStudentActionBanner(student, meta, portal) {
 
     const profileComplete = isRegistrationProfileComplete(student);
     const regStatus = String(student?.registration_status || 'Pending');
+    const isRejected = regStatus === 'Rejected';
     const regPaid = ['Approved', 'Fee Paid'].includes(regStatus);
     const latestReq = meta?.latest_request || null;
     const hasPendingReq = latestReq && String(latestReq.status || '') === 'Pending';
@@ -3016,7 +3223,11 @@ function renderStudentActionBanner(student, meta, portal) {
         <a href="student_profile.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Open Profile</a>
     `;
 
-    if (profileComplete && !regPaid) {
+    if (isRejected) {
+        title = 'Registration rejected by admin';
+        text = 'Your previous registration was rejected. Open the registration form to review the notice and start again.';
+        actions = `<button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-red-500 hover:bg-red-400 text-white text-sm font-extrabold transition">Open Registration</button>`;
+    } else if (profileComplete && !regPaid) {
         title = 'Wait for registration approval';
         text = 'Your details are complete. The next thing to check is your registration payment approval from the staff.';
         actions = `<button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Check Registration</button>`;
@@ -3045,15 +3256,20 @@ function renderStudentOnboardingSteps(student, meta, portal) {
 
     const profileComplete = isRegistrationProfileComplete(student);
     const regStatus = String(student?.registration_status || 'Pending');
+    const isRejected = regStatus === 'Rejected';
     const regPaid = ['Approved', 'Fee Paid'].includes(regStatus);
     const latestReq = meta?.latest_request || null;
     const hasPendingReq = latestReq && String(latestReq.status || '') === 'Pending';
     const enrollmentApproved = portal?.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     const registrationLocked = !profileComplete || !regPaid;
-    const registrationBadge = profileComplete
+    const registrationBadge = isRejected
+        ? renderOnboardingStatusBadge('Rejected', 'red')
+        : profileComplete
         ? renderOnboardingStatusBadge('Done', 'green')
         : renderOnboardingStatusBadge('Do This First', 'amber');
-    const paymentBadge = regPaid
+    const paymentBadge = isRejected
+        ? renderOnboardingStatusBadge('Rejected', 'red')
+        : regPaid
         ? renderOnboardingStatusBadge('Approved', 'green')
         : renderOnboardingStatusBadge('Waiting', 'amber');
     const enrollmentBadge = enrollmentApproved
@@ -3070,7 +3286,7 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                     </div>
                     ${registrationBadge}
                 </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Make sure your personal information is complete so the staff can review your account.</p>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">${isRejected ? 'Your last registration was rejected. Open the form to acknowledge it, then submit a fresh registration.' : 'Make sure your personal information is complete so the staff can review your account.'}</p>
                 <div class="mt-4 flex flex-wrap gap-3">
                     <button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white/10 text-white text-sm font-semibold">Open Registration</button>
                     <a href="student_profile.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">Open Profile</a>
@@ -3085,9 +3301,11 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                     </div>
                     ${paymentBadge}
                 </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Upload your registration payment so the staff can approve your account for class requests.</p>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">${isRejected ? 'After you acknowledge the rejection, this step will reset so you can upload a new proof of payment.' : 'Upload your registration payment so the staff can approve your account for class requests.'}</p>
                 <div class="mt-4 flex flex-wrap gap-3">
-                    ${registrationLocked
+                    ${isRejected
+                        ? `<button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-white text-sm font-bold">Restart Registration</button>`
+                        : registrationLocked
                         ? `<button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Open Payment Step</button>`
                         : `<span class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 text-sm font-bold">Already approved</span>`}
                 </div>
@@ -3134,6 +3352,8 @@ function wireStudentOnboardingActions(student, meta, portal) {
     const regBranch = document.getElementById('regBranch');
     const paymentForm = document.getElementById('registrationPaymentForm');
     const regPayStatus = document.getElementById('regPayStatus');
+    const regPayReference = document.getElementById('regPayReference');
+    const regPayReferenceHint = document.getElementById('regPayReferenceHint');
     const regPayProof = document.getElementById('regPayProof');
     const regAgeProof = document.getElementById('regAgeProof');
     const submitAllBtn = document.getElementById('submitRegistrationRequestBtn');
@@ -3241,6 +3461,20 @@ function wireStudentOnboardingActions(student, meta, portal) {
         paymentForm.onsubmit = (e) => e.preventDefault();
     }
 
+    const updateRegistrationReferenceUI = () => {
+        const method = String(document.getElementById('regPayMethod')?.value || 'Other').trim();
+        if (!regPayReference || !regPayReferenceHint) return;
+        const isCash = method === 'Cash';
+        regPayReference.placeholder = isCash
+            ? 'Enter official receipt or transaction number'
+            : `Enter ${method || 'payment'} reference number`;
+        regPayReferenceHint.textContent = isCash
+            ? 'For cash payments, enter the official receipt or transaction number.'
+            : 'Required together with the uploaded proof of payment.';
+    };
+    document.getElementById('regPayMethod')?.addEventListener('change', updateRegistrationReferenceUI);
+    updateRegistrationReferenceUI();
+
     if (submitAllBtn) {
         submitAllBtn.onclick = async () => {
             const guardianRequired = isGuardianRequired();
@@ -3271,6 +3505,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
 
             const amount = 1000;
             const method = document.getElementById('regPayMethod')?.value || 'Other';
+            const referenceNumber = regPayReference?.value?.trim() || '';
             const proofFile = regPayProof?.files && regPayProof.files[0] ? regPayProof.files[0] : null;
             const ageProofFile = regAgeProof?.files && regAgeProof.files[0] ? regAgeProof.files[0] : null;
 
@@ -3280,6 +3515,10 @@ function wireStudentOnboardingActions(student, meta, portal) {
             }
             if (!proofFile) {
                 showMessage('Upload proof of payment for admin approval.', 'error');
+                return;
+            }
+            if (!referenceNumber) {
+                showMessage('Enter the payment reference number for admin approval.', 'error');
                 return;
             }
             if (!ageProofFile) {
@@ -3318,6 +3557,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 formData.append('student_id', String(Number(student.student_id)));
                 formData.append('amount', String(amount));
                 formData.append('payment_method', String(method));
+                formData.append('reference_number', String(referenceNumber));
                 formData.append('registration_proof_file', proofFile);
                 formData.append('age_verification_proof_file', ageProofFile);
 
@@ -3327,6 +3567,13 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 if (!(resPay.data && resPay.data.success)) {
                     throw new Error(resPay.data?.error || 'Payment submission failed.');
                 }
+
+                try {
+                    sessionStorage.removeItem('student_registration_rejected_notice');
+                } catch (e) {
+                    // Ignore storage issues.
+                }
+                studentRegistrationRestartNotice = false;
 
                 const msg = resPay.data?.message || 'Registration request submitted.';
                 closeStudentRegistrationModal();
@@ -3357,6 +3604,7 @@ async function initStudentDashboardPage() {
     setText('studentMobileMenuName', user.username || user.email || 'Signed in');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
     if (!portal.success) {
         showMessage(portal.error || 'Failed to load your profile.', 'error');
         return;
@@ -3458,10 +3706,28 @@ async function initStudentDashboardPage() {
     }
 
     if (!isEnrolledStudent) {
+        studentDashboardPortalState = portal;
+        studentDashboardMetaState = meta;
         renderStudentActionBanner(s, meta, portal);
         renderStudentOnboardingSteps(s, meta, portal);
         renderStudentRegistrationModal(s, portal);
         wireStudentOnboardingActions(s, meta, portal);
+
+        let reopenRegistrationModal = false;
+        try {
+            reopenRegistrationModal = sessionStorage.getItem('student_reopen_registration_modal') === '1';
+            studentRegistrationRestartNotice = sessionStorage.getItem('student_registration_rejected_notice') === '1';
+            if (reopenRegistrationModal) {
+                sessionStorage.removeItem('student_reopen_registration_modal');
+            }
+        } catch (e) {
+            reopenRegistrationModal = false;
+            studentRegistrationRestartNotice = false;
+        }
+        if (reopenRegistrationModal) {
+            renderStudentRegistrationModal(s, portal);
+            setStudentModalState('studentRegistrationModal', true);
+        }
     } else {
         const actionBanner = document.getElementById('studentActionBanner');
         if (actionBanner) actionBanner.classList.add('hidden');
@@ -3509,6 +3775,7 @@ async function initStudentQrPage() {
     setText('studentNavName', user.username || user.email || 'Student');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
     if (!portal.success) {
         showMessage(portal.error || 'Failed to load your QR code.', 'error');
         return;
@@ -3557,6 +3824,7 @@ async function initStudentSessionsPage() {
     setText('studentNavName', user.username || user.email || 'Student');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
     if (!portal.success) {
         showMessage(portal.error || 'Failed to load sessions.', 'error');
         return;
@@ -3682,6 +3950,7 @@ async function initStudentGradesPage() {
 
     try {
         const portal = await fetchStudentPortalDataByEmail(user.email);
+        if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
         if (!portal.success) {
             listEl.innerHTML = `
                 <div class="rounded-3xl border border-dashed border-red-200 bg-red-50 px-6 py-12 text-center text-red-600">
@@ -3801,6 +4070,7 @@ async function initStudentAttendancePage() {
     setText('studentMobileMenuName', user.username || user.email || 'Signed in');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
     if (!portal.success) {
         showMessage(portal.error || 'Failed to load attendance.', 'error');
         return;
@@ -3892,6 +4162,7 @@ async function initStudentProfilePage() {
     setText('studentMobileMenuName', user.username || user.email || 'Signed in');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
+    if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
     if (!portal.success) {
         showMessage(portal.error || 'Failed to load profile.', 'error');
         return;
@@ -5083,6 +5354,7 @@ async function viewDetails(studentId) {
                                         <th class="px-4 py-2 text-left text-zinc-200">Amount</th>
                                         <th class="px-4 py-2 text-left text-zinc-200">Method</th>
                                         <th class="px-4 py-2 text-left text-zinc-200">Receipt</th>
+                                        <th class="px-4 py-2 text-left text-zinc-200">Reference</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -5092,6 +5364,7 @@ async function viewDetails(studentId) {
                                             <td class="px-4 py-2 text-white">₱${parseFloat(p.amount).toFixed(2)}</td>
                                             <td class="px-4 py-2 text-white">${p.payment_method}</td>
                                             <td class="px-4 py-2 text-white">${p.receipt_number || 'N/A'}</td>
+                                            <td class="px-4 py-2 text-white">${p.reference_number || 'N/A'}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -5298,7 +5571,17 @@ function initPaymentForm() {
 
 // Reject Registration
 async function rejectRegistration(studentId) {
-    if (!confirm('Are you sure you want to reject this registration?')) return;
+    const result = await Swal.fire({
+        title: 'Reject Registration?',
+        text: 'Are you sure you want to reject this registration?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Reject',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280'
+    });
+    if (!result.isConfirmed) return;
 
     try {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;

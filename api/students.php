@@ -2134,6 +2134,12 @@ class StudentsApi
 
         try {
             $this->ensureStudentRegistrationFeesTable();
+            $stmtExists = $this->conn->prepare("SELECT student_id FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmtExists->execute([$id]);
+            if (!$stmtExists->fetchColumn()) {
+                $this->sendJSON(['error' => 'Student not found'], 404);
+            }
+
             $stmt = $this->conn->prepare("
                 UPDATE tbl_students SET
                     first_name = ?, last_name = ?, middle_name = ?, email = ?, phone = ?, address = ?,
@@ -2148,9 +2154,6 @@ class StudentsApi
             ]);
             if ($registrationFeeAmount !== null || $registrationFeePaid !== null || $registrationStatus !== null) {
                 // Registration fee table was removed; values now come from tbl_registration_payments.
-            }
-            if ($stmt->rowCount() === 0) {
-                $this->sendJSON(['error' => 'Student not found'], 404);
             }
             $this->sendJSON(['success' => true, 'message' => 'Student updated']);
         } catch (PDOException $e) {
@@ -2400,6 +2403,10 @@ class StudentsApi
         $this->ensureStudentInstrumentsTable();
         $this->ensureStudentRegistrationFeesTable();
         $this->ensureStudentAgeVerificationProofColumn();
+        $hasRegistrationReferenceColumn = $this->tableHasColumn('tbl_registration_payments', 'reference_number');
+        $registrationReferenceSelect = $hasRegistrationReferenceColumn
+            ? "(SELECT rp.reference_number FROM tbl_registration_payments rp WHERE rp.student_id = s.student_id ORDER BY rp.registration_payment_id DESC LIMIT 1) AS registration_reference_number,"
+            : "NULL AS registration_reference_number,";
 
         $stmtStudent = $this->conn->prepare("
             SELECT
@@ -2407,6 +2414,10 @@ class StudentsApi
                 COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
                 COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
                 COALESCE(rf.registration_status, 'Pending') AS registration_status,
+                (SELECT rp.status FROM tbl_registration_payments rp WHERE rp.student_id = s.student_id ORDER BY rp.registration_payment_id DESC LIMIT 1) AS registration_payment_status,
+                (SELECT rp.payment_method FROM tbl_registration_payments rp WHERE rp.student_id = s.student_id ORDER BY rp.registration_payment_id DESC LIMIT 1) AS registration_payment_method,
+                (SELECT rp.receipt_number FROM tbl_registration_payments rp WHERE rp.student_id = s.student_id ORDER BY rp.registration_payment_id DESC LIMIT 1) AS registration_receipt_number,
+                {$registrationReferenceSelect}
                 b.branch_name
             FROM tbl_students s
             LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
@@ -2434,7 +2445,11 @@ class StudentsApi
 
         if (!isset($student['registration_fee_amount'])) $student['registration_fee_amount'] = 1000;
         if (!isset($student['registration_fee_paid'])) $student['registration_fee_paid'] = 0;
-        if (!isset($student['registration_status'])) $student['registration_status'] = 'Pending';
+        if ((string)($student['status'] ?? '') === 'Rejected') {
+            $student['registration_status'] = 'Rejected';
+        } elseif (!isset($student['registration_status'])) {
+            $student['registration_status'] = 'Pending';
+        }
         $student['balance_due'] = 0;
         $student['package_name'] = null;
         $student['package_sessions'] = null;
@@ -2696,12 +2711,34 @@ class StudentsApi
             $stmt->execute([$email]);
             $studentId = (int) $stmt->fetchColumn();
             if ($studentId < 1) {
-                $this->sendJSON(['error' => 'Student not found for this email'], 404);
+                $this->sendJSON([
+                    'success' => true,
+                    'registration_required' => true,
+                    'message' => 'Your previous registration is no longer active. Please register again to continue.',
+                    'student' => null,
+                    'guardians' => [],
+                    'primary_guardian' => null,
+                    'instruments' => [],
+                    'current_enrollment' => null,
+                    'enrollment_history' => [],
+                    'current_session_grades' => []
+                ]);
             }
 
             $payload = $this->buildStudentPortalById($studentId);
             if (!$payload) {
-                $this->sendJSON(['error' => 'Student not found for this email'], 404);
+                $this->sendJSON([
+                    'success' => true,
+                    'registration_required' => true,
+                    'message' => 'Your previous registration is no longer active. Please register again to continue.',
+                    'student' => null,
+                    'guardians' => [],
+                    'primary_guardian' => null,
+                    'instruments' => [],
+                    'current_enrollment' => null,
+                    'enrollment_history' => [],
+                    'current_session_grades' => []
+                ]);
             }
 
             $this->sendJSON(array_merge(['success' => true], $payload));
