@@ -246,20 +246,22 @@
 
         function populateWalkinStudentSelect() {
             const input = document.getElementById('walkinStudentSearch');
-            const dataList = document.getElementById('walkinStudentOptions');
             const hidden = document.getElementById('walkinStudentSelect');
-            if (!input || !dataList || !hidden) return;
+            if (!input || !hidden) return;
 
             walkinStudentLookup = new Map();
-            dataList.innerHTML = walkinStudents.map(student => {
+            walkinStudents.forEach(student => {
                 const name = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
                 const email = student.email || '';
                 const label = email ? `${name} (${email})` : name;
                 walkinStudentLookup.set(label, student);
-                return `<option value="${escapeHtml(label)}"></option>`;
-            }).join('');
+                if (email) walkinStudentLookup.set(email.toLowerCase(), student);
+                walkinStudentLookup.set(name.toLowerCase(), student);
+            });
             input.value = '';
             hidden.value = '';
+            renderWalkinStudentResults('');
+            updateWalkinSelectedStudentCard(null);
         }
 
         function resolveWalkinSelectedStudent() {
@@ -267,9 +269,154 @@
             const hidden = document.getElementById('walkinStudentSelect');
             if (!input || !hidden) return null;
             const label = String(input.value || '').trim();
-            const student = walkinStudentLookup.get(label) || null;
+            const student = walkinStudentLookup.get(label) || walkinStudentLookup.get(label.toLowerCase()) || null;
             hidden.value = student ? String(student.email || '') : '';
             return student;
+        }
+
+        function getWalkinStudentLabel(student) {
+            const name = `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || 'Student';
+            const email = String(student?.email || '').trim();
+            return email ? `${name} (${email})` : name;
+        }
+
+        function getWalkinStudentStatusBadge(student) {
+            const registrationStatus = String(student?.registration_status || 'Pending');
+            const cls = registrationStatus === 'Approved' || registrationStatus === 'Fee Paid'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-amber-200 bg-amber-50 text-amber-700';
+            return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${cls}">${escapeHtml(registrationStatus)}</span>`;
+        }
+
+        function updateWalkinSelectedStudentCard(student) {
+            const card = document.getElementById('walkinSelectedStudentCard');
+            const nameEl = document.getElementById('walkinSelectedStudentName');
+            const metaEl = document.getElementById('walkinSelectedStudentMeta');
+            if (!card || !nameEl || !metaEl) return;
+
+            if (!student) {
+                card.classList.add('hidden');
+                nameEl.textContent = '—';
+                metaEl.textContent = '—';
+                return;
+            }
+
+            const branch = student.branch_name || managerBranchName || 'Assigned branch';
+            const phone = student.phone || 'No phone';
+            nameEl.textContent = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
+            metaEl.textContent = `${student.email || 'No email'} • ${phone} • ${branch}`;
+            card.classList.remove('hidden');
+        }
+
+        function renderWalkinStudentResults(query) {
+            const listEl = document.getElementById('walkinStudentResults');
+            const hidden = document.getElementById('walkinStudentSelect');
+            if (!listEl) return;
+
+            const term = String(query || '').trim().toLowerCase();
+            const rows = !term
+                ? walkinStudents.slice(0, 8)
+                : walkinStudents.filter((student) => {
+                    const haystack = [
+                        `${student.first_name || ''} ${student.last_name || ''}`,
+                        student.email || '',
+                        student.phone || ''
+                    ].join(' ').toLowerCase();
+                    return haystack.includes(term);
+                }).slice(0, 10);
+
+            if (!walkinStudents.length) {
+                listEl.innerHTML = `
+                    <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                        No walk-in students are currently available for enrollment in this branch.
+                    </div>
+                `;
+                return;
+            }
+
+            if (!rows.length) {
+                listEl.innerHTML = `
+                    <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                        No student matched that search.
+                    </div>
+                `;
+                return;
+            }
+
+            const selectedEmail = String(hidden?.value || '').trim().toLowerCase();
+            listEl.innerHTML = rows.map((student, index) => {
+                const isSelected = selectedEmail && selectedEmail === String(student.email || '').trim().toLowerCase();
+                const branchName = student.branch_name || managerBranchName || 'Assigned branch';
+                return `
+                    <button
+                        type="button"
+                        class="walkin-student-result w-full rounded-2xl border px-4 py-4 text-left transition ${isSelected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/60'}"
+                        data-student-index="${index}"
+                    >
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <div class="text-base font-black text-slate-900">${escapeHtml(`${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student')}</div>
+                                <div class="mt-1 text-sm text-slate-500">${escapeHtml(student.email || 'No email on file')}</div>
+                                <div class="mt-2 text-xs text-slate-500">${escapeHtml(branchName)} • ${escapeHtml(student.phone || 'No phone')}</div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                ${getWalkinStudentStatusBadge(student)}
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-700">Walk-In</span>
+                            </div>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        async function selectWalkinStudent(student) {
+            const hidden = document.getElementById('walkinStudentSelect');
+            const statusEl = document.getElementById('walkinStatusInfo');
+            const packageSelect = document.getElementById('walkinPackageSelect');
+            const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
+            const submitBtn = document.getElementById('submitWalkinEnrollmentBtn');
+            const input = document.getElementById('walkinStudentSearch');
+            if (!hidden || !packageSelect || !instrumentsContainer) return;
+
+            hidden.value = student ? String(student.email || '') : '';
+            if (input) input.value = student ? getWalkinStudentLabel(student) : '';
+            updateWalkinSelectedStudentCard(student);
+            renderWalkinStudentResults(input?.value || '');
+
+            if (!student || !hidden.value) {
+                packageSelect.innerHTML = '<option value="">Select package...</option>';
+                instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
+                if (statusEl) statusEl.textContent = '';
+                if (submitBtn) submitBtn.disabled = false;
+                walkinMeta = null;
+                return;
+            }
+
+            const meta = await fetchStudentRequestMetaByEmail(hidden.value);
+            if (!meta?.success) {
+                if (statusEl) statusEl.textContent = meta?.error || 'Failed to load student request details.';
+                walkinMeta = null;
+                return;
+            }
+
+            walkinMeta = meta;
+            const packages = Array.isArray(meta.packages) ? meta.packages : [];
+            packageSelect.innerHTML = '<option value="">Select package...</option>' + packages.map(pkg => {
+                const sessions = Number(pkg.sessions || 0);
+                const maxInst = Number(pkg.max_instruments || 1);
+                const price = formatCurrencyPHP(pkg.price || 0);
+                return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''}) - ${price}</option>`;
+            }).join('');
+
+            const latest = meta.latest_request || null;
+            const hasPending = latest && String(latest.status || '') === 'Pending';
+            if (statusEl) {
+                statusEl.textContent = hasPending
+                    ? 'This student already has a pending enrollment request. Finish that scheduling first before creating another one.'
+                    : 'Student selected. Continue with package, instrument, and payment details.';
+            }
+            if (submitBtn) submitBtn.disabled = hasPending;
+            updateWalkinPackageUI();
         }
 
         function openWalkinEnrollmentModal() {
@@ -301,6 +448,8 @@
             if (hiddenSelect) hiddenSelect.value = '';
             if (packageSelect) packageSelect.innerHTML = '<option value="">Select package...</option>';
             if (instrumentsContainer) instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
+            updateWalkinSelectedStudentCard(null);
+            renderWalkinStudentResults('');
         }
 
         function updateWalkinPackageUI() {
@@ -329,53 +478,21 @@
         }
 
         async function handleWalkinStudentChange() {
-            const hidden = document.getElementById('walkinStudentSelect');
             const statusEl = document.getElementById('walkinStatusInfo');
-            const packageSelect = document.getElementById('walkinPackageSelect');
-            const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
-            const submitBtn = document.getElementById('submitWalkinEnrollmentBtn');
-            if (!hidden || !packageSelect || !instrumentsContainer) return;
+            const input = document.getElementById('walkinStudentSearch');
+            const term = String(input?.value || '').trim();
+            renderWalkinStudentResults(term);
 
             const selectedStudent = resolveWalkinSelectedStudent();
-            const email = hidden.value || '';
-            if (!email) {
-                packageSelect.innerHTML = '<option value="">Select package...</option>';
-                instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
-                if (statusEl) {
-                    statusEl.textContent = selectedStudent === null && (document.getElementById('walkinStudentSearch')?.value || '').trim()
-                        ? 'Please select a walk-in student from the suggestions.'
-                        : '';
-                }
-                if (submitBtn) submitBtn.disabled = false;
-                walkinMeta = null;
+            if (selectedStudent && term) {
+                await selectWalkinStudent(selectedStudent);
                 return;
             }
 
-            const meta = await fetchStudentRequestMetaByEmail(email);
-            if (!meta?.success) {
-                if (statusEl) statusEl.textContent = meta?.error || 'Failed to load student request details.';
-                walkinMeta = null;
-                return;
-            }
-
-            walkinMeta = meta;
-            const packages = Array.isArray(meta.packages) ? meta.packages : [];
-            packageSelect.innerHTML = '<option value="">Select package...</option>' + packages.map(pkg => {
-                const sessions = Number(pkg.sessions || 0);
-                const maxInst = Number(pkg.max_instruments || 1);
-                const price = formatCurrencyPHP(pkg.price || 0);
-                return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''}) - ${price}</option>`;
-            }).join('');
-
-            const latest = meta.latest_request || null;
-            const hasPending = latest && String(latest.status || '') === 'Pending';
+            updateWalkinSelectedStudentCard(null);
             if (statusEl) {
-                statusEl.textContent = hasPending
-                    ? 'This student already has a pending request. Please schedule it first.'
-                    : '';
+                statusEl.textContent = term ? 'Choose a student card below to continue.' : '';
             }
-            if (submitBtn) submitBtn.disabled = hasPending;
-            updateWalkinPackageUI();
         }
 
         async function submitWalkinEnrollment(e) {
@@ -387,7 +504,6 @@
             const packageSelect = document.getElementById('walkinPackageSelect');
             const paymentTypeEl = document.getElementById('walkinPaymentType');
             const paymentMethodEl = document.getElementById('walkinPaymentMethod');
-            const paymentProofEl = document.getElementById('walkinPaymentProof');
             if (!studentSelect || !packageSelect || !paymentTypeEl || !paymentMethodEl) return;
 
             const selectedStudent = resolveWalkinSelectedStudent();
@@ -403,12 +519,6 @@
 
             if (!email || !studentId || !packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
                 showMessage('Please complete student, package, instruments, payment type, and payment method.', 'error');
-                return;
-            }
-
-            const paymentProofFile = paymentProofEl && paymentProofEl.files && paymentProofEl.files[0] ? paymentProofEl.files[0] : null;
-            if (paymentMethod !== 'Cash' && !paymentProofFile) {
-                showMessage('Upload proof of payment for non-cash enrollment payments.', 'error');
                 return;
             }
 
@@ -430,9 +540,7 @@
                 requestFormData.append('payment_type', paymentType);
                 requestFormData.append('payment_method', paymentMethod);
                 requestFormData.append('instrument_ids_json', JSON.stringify(uniqueInstrumentIds));
-                if (paymentProofFile) {
-                    requestFormData.append('package_payment_proof_file', paymentProofFile);
-                }
+                requestFormData.append('is_walkin_request', '1');
 
                 const response = await postStudentPackageRequest(requestFormData);
                 if (response.success) {
@@ -1545,6 +1653,32 @@
             document.getElementById('walkinEnrollmentForm')?.addEventListener('submit', submitWalkinEnrollment);
             document.getElementById('walkinStudentSearch')?.addEventListener('input', handleWalkinStudentChange);
             document.getElementById('walkinStudentSearch')?.addEventListener('change', handleWalkinStudentChange);
+            document.getElementById('walkinStudentResults')?.addEventListener('click', async (event) => {
+                const button = event.target.closest('.walkin-student-result');
+                if (!button) return;
+                const index = Number(button.getAttribute('data-student-index') || -1);
+                const student = walkinStudents[index];
+                if (!student) return;
+                await selectWalkinStudent(student);
+            });
+            document.getElementById('walkinClearStudentBtn')?.addEventListener('click', async () => {
+                const input = document.getElementById('walkinStudentSearch');
+                const hidden = document.getElementById('walkinStudentSelect');
+                const packageSelect = document.getElementById('walkinPackageSelect');
+                const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
+                const submitBtn = document.getElementById('submitWalkinEnrollmentBtn');
+                const statusEl = document.getElementById('walkinStatusInfo');
+                if (input) input.value = '';
+                if (hidden) hidden.value = '';
+                if (packageSelect) packageSelect.innerHTML = '<option value="">Select package...</option>';
+                if (instrumentsContainer) instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
+                if (submitBtn) submitBtn.disabled = false;
+                if (statusEl) statusEl.textContent = '';
+                walkinMeta = null;
+                updateWalkinSelectedStudentCard(null);
+                renderWalkinStudentResults('');
+                updateWalkinPackageUI();
+            });
             document.getElementById('walkinPackageSelect')?.addEventListener('change', updateWalkinPackageUI);
             document.getElementById('walkinPaymentType')?.addEventListener('change', updateWalkinPackageUI);
             document.getElementById('assignRequestDate')?.addEventListener('change', () => {

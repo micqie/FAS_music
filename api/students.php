@@ -3440,6 +3440,7 @@ class StudentsApi
         $paymentType = $this->normalizeEnrollmentPaymentType($paymentRaw);
         $paymentMethodRaw = $data['payment_method'] ?? '';
         $paymentMethod = $this->normalizeEnrollmentPaymentMethod($paymentMethodRaw);
+        $isWalkinRequest = !empty($data['is_walkin_request']);
         $preferredDate = !empty($data['preferred_date']) ? $data['preferred_date'] : null;
         $preferredDay = trim($data['preferred_day_of_week'] ?? '');
         if (!empty($data['instrument_ids_json'])) {
@@ -3576,7 +3577,7 @@ class StudentsApi
             if ($payableNow <= 0) {
                 $this->sendJSON(['error' => 'Unable to compute the enrollment payment amount. Please contact desk/admin.'], 400);
             }
-            if ($paymentMethod !== 'Cash' && !$paymentProofPath) {
+            if (!$isWalkinRequest && $paymentMethod !== 'Cash' && !$paymentProofPath) {
                 $this->sendJSON(['error' => 'Upload proof of payment for this enrollment request.'], 400);
             }
             $preferredSchedule = null;
@@ -3589,7 +3590,8 @@ class StudentsApi
                 'payable_now' => $payableNow,
                 'package_total_amount' => $packagePrice,
                 'instrument_ids' => array_values($instrumentIds),
-                'payment_proof_path' => $paymentProofPath
+                'payment_proof_path' => $paymentProofPath,
+                'is_walkin_request' => $isWalkinRequest ? 1 : 0
             ]);
             $stmtPendingEnrollment = $this->conn->prepare("
                 INSERT INTO tbl_enrollments (
@@ -4779,6 +4781,7 @@ class StudentsApi
             }
             $paymentMethod = $this->normalizeEnrollmentPaymentMethod($requestMeta['payment_method'] ?? '');
             $paymentProofPath = trim((string)($requestMeta['payment_proof_path'] ?? ''));
+            $isWalkinRequest = !empty($requestMeta['is_walkin_request']);
             $payableNow = (float)($requestMeta['payable_now'] ?? 0);
             if ($payableNow <= 0) {
                 $payableNow = $this->computeEnrollmentPayableNow($packagePrice, $packageSessions, $paymentType);
@@ -4791,7 +4794,7 @@ class StudentsApi
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'The enrollment payment amount is invalid.'], 400);
             }
-            if ($paymentMethod !== 'Cash' && $paymentProofPath === '') {
+            if (!$isWalkinRequest && $paymentMethod !== 'Cash' && $paymentProofPath === '') {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Enrollment proof of payment is required before approval.'], 400);
             }
