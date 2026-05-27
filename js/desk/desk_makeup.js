@@ -126,6 +126,60 @@
             return timeText ? `${dateText} • ${timeText}` : dateText;
         }
 
+        function getNextSessionSummary(student) {
+            const upcoming = getUpcomingScheduledSessions(student);
+            if (!upcoming.length) {
+                return {
+                    label: 'No upcoming sessions',
+                    meta: 'Needs branch scheduling follow-up.'
+                };
+            }
+
+            return {
+                label: `${upcoming.length} upcoming session${upcoming.length === 1 ? '' : 's'}`,
+                meta: `Next: ${formatDateShort(upcoming[0].session_date)}`
+            };
+        }
+
+        function openUpcomingSessionsModal(enrollmentId) {
+            const student = makeupRows.find(row => Number(row.enrollment_id) === Number(enrollmentId));
+            if (!student) {
+                showMessage('Upcoming sessions not found.', 'error');
+                return;
+            }
+
+            const upcoming = getUpcomingScheduledSessions(student);
+            const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
+            const content = upcoming.length
+                ? upcoming.map(slot => {
+                    const dateText = formatDateShort(slot.session_date);
+                    const timeText = slot.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : 'Time pending';
+                    const roomText = slot.room_name ? escapeHtml(slot.room_name) : 'Room pending';
+                    return `
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div class="text-sm font-semibold text-slate-900">${escapeHtml(dateText)}</div>
+                            <div class="mt-1 text-sm text-slate-600">${escapeHtml(timeText)}</div>
+                            <div class="mt-1 text-xs text-slate-500">${roomText}</div>
+                        </div>
+                    `;
+                }).join('')
+                : '<div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">No upcoming sessions scheduled yet.</div>';
+
+            Swal.fire({
+                title: `${studentName} Upcoming Sessions`,
+                width: 720,
+                confirmButtonText: 'Close',
+                html: `
+                    <div class="text-left">
+                        <div class="mb-4 text-sm text-slate-600">
+                            Package: <span class="font-semibold text-slate-900">${escapeHtml(student.package_name || '—')}</span>
+                        </div>
+                        <div class="space-y-3 max-h-[55vh] overflow-y-auto pr-1">${content}</div>
+                    </div>
+                `
+            });
+        }
+
         function updateSummary(rows) {
             const studentCountEl = document.getElementById('makeupStudentCount');
             const redCountEl = document.getElementById('makeupRedCount');
@@ -258,6 +312,7 @@
 
             tbody.innerHTML = makeupRows.map(student => {
                 const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
+                const sessionSummary = getNextSessionSummary(student);
                 return `
                     <tr class="hover:bg-rose-50/40 transition">
                         <td class="px-6 py-4">
@@ -269,7 +324,15 @@
                         <td class="px-6 py-4 font-semibold text-rose-600">${getAbsenceCount(student)}</td>
                         <td class="px-6 py-4 font-medium text-amber-600">${getRemainingCount(student)}</td>
                         <td class="px-6 py-4 text-slate-600">${getMakeupThreshold(student)} absence${getMakeupThreshold(student) === 1 ? '' : 's'}</td>
-                        <td class="px-6 py-4 text-sm text-slate-600 leading-6">${escapeHtml(getNextSessionLabel(student))}</td>
+                        <td class="px-6 py-4">
+                            <button type="button" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left hover:bg-slate-100 transition" onclick="openUpcomingSessionsModal(${Number(student.enrollment_id)})">
+                                <i class="fas fa-calendar-days text-blue-600"></i>
+                                <span>
+                                    <span class="block text-sm font-semibold text-slate-800">${escapeHtml(sessionSummary.label)}</span>
+                                    <span class="block text-xs text-slate-500">${escapeHtml(sessionSummary.meta)}</span>
+                                </span>
+                            </button>
+                        </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-2 flex-wrap">
                                 ${getStatusBadge(student)}
@@ -348,3 +411,4 @@
         });
 
         window.openMakeupDetails = openMakeupDetails;
+        window.openUpcomingSessionsModal = openUpcomingSessionsModal;

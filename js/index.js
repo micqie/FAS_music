@@ -1345,19 +1345,15 @@ async function loadPendingRequests() {
                 ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
                 : '—';
             const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
-            const paymentMethod = escapeHtml(r.payment_method || '—');
             const payableNow = Number(r.payable_now || 0);
-            const paymentProofHtml = r.payment_proof_path
-                ? `<a href="${escapeHtml(buildPublicFileUrl(r.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">View payment proof</a>`
-                : '<span class="text-xs text-slate-500">No payment proof</span>';
-            const paymentCellHtml = isAdminEnrollmentsPage
-                ? `<div class="font-semibold text-slate-800">${paymentType}</div>`
-                : `
+            const paymentCellHtml = `
+                    <div class="space-y-2">
                         <div class="font-semibold text-slate-800">${paymentType}</div>
-                        <div class="text-xs text-slate-500 mt-1">Method: ${paymentMethod}</div>
-                        <div class="text-xs text-slate-500 mt-1">Pay now: ${formatCurrencyPHP(payableNow)}</div>
-                        <div class="mt-1">${paymentProofHtml}</div>
-                    `;
+                        <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition">
+                            Payment Info
+                        </button>
+                    </div>
+                `;
             return `
                 <tr class="hover:bg-slate-50/80 transition">
                     <td class="px-6 py-4">
@@ -2990,6 +2986,39 @@ function bindStudentModalFrame(modalId, closeFn) {
     });
 }
 
+function openPendingRequestPaymentModal(requestId) {
+    const req = pendingRequestsById[String(requestId)];
+    if (!req) {
+        showMessage('Payment details not found.', 'error');
+        return;
+    }
+
+    const paymentType = escapeHtml(req.payment_type || 'Partial Payment');
+    const paymentMethod = escapeHtml(req.payment_method || '—');
+    const payableNow = Number(req.payable_now || 0);
+    const packageAmount = Number(req.requested_amount || req.package_price || 0);
+    const proofHtml = req.payment_proof_path
+        ? `<a href="${escapeHtml(buildPublicFileUrl(req.payment_proof_path))}" target="_blank" rel="noopener" class="text-sm text-blue-600 underline">View payment proof</a>`
+        : '<span class="text-sm text-slate-500">No payment proof uploaded</span>';
+
+    Swal.fire({
+        title: 'Payment Details',
+        width: 620,
+        confirmButtonText: 'Close',
+        html: `
+            <div class="text-left space-y-4 text-sm text-slate-700">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div><span class="font-semibold text-slate-900">Payment Type:</span> ${paymentType}</div>
+                    <div><span class="font-semibold text-slate-900">Payment Method:</span> ${paymentMethod}</div>
+                    <div><span class="font-semibold text-slate-900">Pay Now:</span> ${formatCurrencyPHP(payableNow)}</div>
+                    <div><span class="font-semibold text-slate-900">Package Amount:</span> ${formatCurrencyPHP(packageAmount)}</div>
+                </div>
+                <div><span class="font-semibold text-slate-900">Proof of Payment:</span> ${proofHtml}</div>
+            </div>
+        `
+    });
+}
+
 function renderStudentRegistrationModal(student, portal) {
     const body = document.getElementById('studentRegistrationModalBody');
     if (!body) return;
@@ -3857,7 +3886,13 @@ async function initStudentSessionsPage() {
         setText('gradedSessionCount', String(gradedRows.length));
         setText('currentGradeAverage', averageGrade ? `${averageGrade}/5` : 'Pending');
 
-        if (rows.length === 0) {
+        const sortedRows = [...rows].sort((a, b) => {
+            const aTime = new Date(`${a?.session_date || ''}T${a?.start_time || '00:00:00'}`).getTime() || 0;
+            const bTime = new Date(`${b?.session_date || ''}T${b?.start_time || '00:00:00'}`).getTime() || 0;
+            return bTime - aTime;
+        });
+
+        if (sortedRows.length === 0) {
             setHtml('attendanceTableBody', `
                 <tr>
                     <td colspan="5" class="px-6 py-10 text-center text-zinc-400">
@@ -3868,7 +3903,7 @@ async function initStudentSessionsPage() {
                 </tr>
             `);
         } else {
-            setHtml('attendanceTableBody', rows.map(r => {
+            setHtml('attendanceTableBody', sortedRows.map(r => {
                 const dateLabel = r.session_date ? formatDateLong(r.session_date) : 'Date pending';
                 const start = r.start_time ? formatTime12Hour(r.start_time) : '';
                 const end = r.end_time ? formatTime12Hour(r.end_time) : '';
@@ -3940,6 +3975,66 @@ function renderStudentSkillLevel(skillLevel) {
     return `<span class="font-semibold text-white">${escapeHtml(skillLevel)}</span>`;
 }
 
+function buildStudentGradeDetailsMarkup(row) {
+    const dateLabel = row.session_date ? formatDateLong(row.session_date) : 'Date pending';
+    const timeLabel = row.start_time && row.end_time
+        ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
+        : (row.start_time ? formatTime12Hour(row.start_time) : 'Time pending');
+    const remarks = row.teacher_remarks
+        ? escapeHtml(row.teacher_remarks)
+        : (row.remarks ? escapeHtml(row.remarks) : 'No remarks recorded for this session.');
+    const scorePills = [
+        ['Performance', row.performance_score],
+        ['Technique', row.technique_score],
+        ['Rhythm', row.rhythm_score],
+        ['Focus', row.focus_score],
+        ['Assignment', row.assignment_score]
+    ].map(([label, value]) => `
+        <div class="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-3">
+            <div class="text-[11px] uppercase tracking-[0.18em] text-zinc-500 font-bold">${escapeHtml(label)}</div>
+            <div class="mt-1 text-lg font-black text-zinc-900">${value ? `${escapeHtml(String(value))}/5` : '—'}</div>
+        </div>
+    `).join('');
+
+    return `
+        <div class="text-left">
+            <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 font-bold">Session ${escapeHtml(String(row.session_number || ''))}</div>
+            <h3 class="mt-2 text-xl font-black text-zinc-900">${escapeHtml(row.instrument_name || 'Instrument Session')}</h3>
+            <div class="mt-2 text-sm text-zinc-500">${escapeHtml(dateLabel)} • ${escapeHtml(timeLabel)}</div>
+            <div class="mt-1 text-sm text-zinc-500">${escapeHtml(row.teacher_name || 'Teacher not assigned')} • ${escapeHtml(row.room_name || 'Room to be announced')}</div>
+            <div class="mt-4 flex flex-wrap items-center gap-2">
+                ${renderAttendanceStatusBadge(row.attendance_status && row.attendance_status !== 'Pending' ? row.attendance_status : (row.status || 'Scheduled'))}
+                ${renderStudentGradeBadge(row.average_score, row.progress_id)}
+            </div>
+            <div class="mt-5 grid grid-cols-2 xl:grid-cols-6 gap-3">
+                <div class="rounded-2xl border border-gold-500/20 bg-gold-500/10 px-4 py-4 xl:col-span-1">
+                    <div class="text-[11px] uppercase tracking-[0.18em] text-gold-700 font-bold">Skill Level</div>
+                    <div class="mt-1 text-lg font-black text-zinc-900">${escapeHtml(row.skill_level || 'Pending')}</div>
+                </div>
+                ${scorePills}
+            </div>
+            <div class="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4">
+                <div class="text-[11px] uppercase tracking-[0.18em] text-zinc-500 font-bold">Teacher Remarks</div>
+                <div class="mt-2 text-sm leading-6 text-zinc-700">${remarks}</div>
+            </div>
+        </div>
+    `;
+}
+
+function openStudentGradeDetails(index) {
+    const rows = Array.isArray(window.__studentGradesRows) ? window.__studentGradesRows : [];
+    const row = rows[Number(index)];
+    if (!row) return;
+    Swal.fire({
+        width: 980,
+        confirmButtonText: 'Close',
+        confirmButtonColor: '#b8860b',
+        html: buildStudentGradeDetailsMarkup(row)
+    });
+}
+
+window.openStudentGradeDetails = openStudentGradeDetails;
+
 async function initStudentGradesPage() {
     const listEl = document.getElementById('studentGradesList');
     if (!checkStudentAuth()) return;
@@ -3992,7 +4087,15 @@ async function initStudentGradesPage() {
             return;
         }
 
-        if (!rows.length) {
+        const sortedRows = [...rows].sort((a, b) => {
+            const aTime = new Date(`${a?.session_date || ''}T${a?.start_time || '00:00:00'}`).getTime() || 0;
+            const bTime = new Date(`${b?.session_date || ''}T${b?.start_time || '00:00:00'}`).getTime() || 0;
+            return bTime - aTime;
+        });
+        const sortedGradedRows = sortedRows.filter(row => Number(row.progress_id || 0) > 0);
+        const sortedPendingRows = sortedRows.filter(row => Number(row.progress_id || 0) < 1);
+
+        if (!sortedRows.length) {
             listEl.innerHTML = `
                 <div class="rounded-3xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-6 py-12 text-center text-zinc-500 dark:text-zinc-400">
                     <i class="fas fa-chart-line text-2xl mb-3"></i>
@@ -4003,55 +4106,95 @@ async function initStudentGradesPage() {
             return;
         }
 
-        listEl.innerHTML = rows.map(row => {
-            const dateLabel = row.session_date ? formatDateLong(row.session_date) : 'Date pending';
-            const timeLabel = row.start_time && row.end_time
-                ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
-                : (row.start_time ? formatTime12Hour(row.start_time) : 'Time pending');
-            const remarks = row.teacher_remarks
-                ? escapeHtml(row.teacher_remarks)
-                : (row.remarks ? escapeHtml(row.remarks) : 'No remarks recorded for this session.');
-            const scorePills = [
-                ['Performance', row.performance_score],
-                ['Technique', row.technique_score],
-                ['Rhythm', row.rhythm_score],
-                ['Focus', row.focus_score],
-                ['Assignment', row.assignment_score]
-            ].map(([label, value]) => `
-                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-3 py-3">
-                    <div class="text-[11px] uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400 font-bold">${escapeHtml(label)}</div>
-                    <div class="mt-1 text-lg font-black text-zinc-900 dark:text-white">${value ? `${escapeHtml(String(value))}/5` : '—'}</div>
-                </div>
-            `).join('');
-
-            return `
-                <article class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/30">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        window.__studentGradesRows = sortedRows;
+        const gradedSection = sortedGradedRows.length
+            ? `
+                <section class="space-y-4">
+                    <div class="flex items-center justify-between gap-3">
                         <div>
-                            <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">Session ${escapeHtml(String(row.session_number || ''))}</div>
-                            <h3 class="mt-2 text-xl font-black text-zinc-900 dark:text-white">${escapeHtml(row.instrument_name || 'Instrument Session')}</h3>
-                            <div class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(dateLabel)} • ${escapeHtml(timeLabel)}</div>
-                            <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(row.teacher_name || 'Teacher not assigned')} • ${escapeHtml(row.room_name || 'Room to be announced')}</div>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            ${renderAttendanceStatusBadge(row.attendance_status && row.attendance_status !== 'Pending' ? row.attendance_status : (row.status || 'Scheduled'))}
-                            ${renderStudentGradeBadge(row.average_score, row.progress_id)}
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Graded Sessions</div>
+                            <div class="mt-2 text-lg font-extrabold text-zinc-900 dark:text-white">Sessions with recorded grades</div>
                         </div>
                     </div>
-                    <div class="mt-5 grid grid-cols-2 xl:grid-cols-6 gap-3">
-                        <div class="rounded-2xl border border-gold-500/20 bg-gold-500/10 px-4 py-4 xl:col-span-1">
-                            <div class="text-[11px] uppercase tracking-[0.18em] text-gold-700 dark:text-gold-300 font-bold">Skill Level</div>
-                            <div class="mt-1 text-lg font-black text-zinc-900 dark:text-white">${escapeHtml(row.skill_level || 'Pending')}</div>
-                        </div>
-                        ${scorePills}
-                    </div>
-                    <div class="mt-5 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-4">
-                        <div class="text-[11px] uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400 font-bold">Teacher Remarks</div>
-                        <div class="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-200">${remarks}</div>
-                    </div>
-                </article>
+                    ${sortedGradedRows.map((row) => {
+                        const index = sortedRows.indexOf(row);
+                        const dateLabel = row.session_date ? formatDateLong(row.session_date) : 'Date pending';
+                        const timeLabel = row.start_time && row.end_time
+                            ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
+                            : (row.start_time ? formatTime12Hour(row.start_time) : 'Time pending');
+                        return `
+                            <article class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-lg dark:shadow-black/20">
+                                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                    <div>
+                                        <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">Session ${escapeHtml(String(row.session_number || ''))}</div>
+                                        <h3 class="mt-2 text-lg font-black text-zinc-900 dark:text-white">${escapeHtml(row.instrument_name || 'Instrument Session')}</h3>
+                                        <div class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(dateLabel)} • ${escapeHtml(timeLabel)}</div>
+                                        <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(row.teacher_name || 'Teacher not assigned')} • ${escapeHtml(row.room_name || 'Room to be announced')}</div>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        ${renderAttendanceStatusBadge(row.attendance_status && row.attendance_status !== 'Pending' ? row.attendance_status : (row.status || 'Scheduled'))}
+                                        ${renderStudentGradeBadge(row.average_score, row.progress_id)}
+                                        <button type="button" onclick="openStudentGradeDetails(${index})" class="inline-flex items-center px-4 py-2 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                                            View Grades
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        `;
+                    }).join('')}
+                </section>
+            `
+            : `
+                <section class="rounded-3xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-6 py-10 text-center text-zinc-500 dark:text-zinc-400">
+                    <div class="font-semibold text-zinc-900 dark:text-white">No graded sessions yet</div>
+                    <div class="text-sm mt-2">Your graded sessions will appear here once your teacher records assessments.</div>
+                </section>
             `;
-        }).join('');
+
+        const pendingSection = sortedPendingRows.length
+            ? `
+                <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-lg dark:shadow-black/20">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Waiting for Grade</div>
+                            <div class="mt-2 text-lg font-extrabold text-zinc-900 dark:text-white">Upcoming or ungraded sessions</div>
+                        </div>
+                        <div class="text-sm text-zinc-500 dark:text-zinc-400">${sortedPendingRows.length} session${sortedPendingRows.length > 1 ? 's' : ''}</div>
+                    </div>
+                    <div class="mt-4 space-y-3">
+                        ${sortedPendingRows.map((row) => {
+                            const index = sortedRows.indexOf(row);
+                            const dateLabel = row.session_date ? formatDateLong(row.session_date) : 'Date pending';
+                            const timeLabel = row.start_time && row.end_time
+                                ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
+                                : (row.start_time ? formatTime12Hour(row.start_time) : 'Time pending');
+                            return `
+                                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                    <div>
+                                        <div class="text-sm font-bold text-zinc-900 dark:text-white">Session ${escapeHtml(String(row.session_number || ''))} • ${escapeHtml(row.instrument_name || 'Instrument Session')}</div>
+                                        <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(dateLabel)} • ${escapeHtml(timeLabel)}</div>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        ${renderAttendanceStatusBadge(row.attendance_status && row.attendance_status !== 'Pending' ? row.attendance_status : (row.status || 'Scheduled'))}
+                                        ${renderStudentGradeBadge(row.average_score, row.progress_id)}
+                                        <button type="button" onclick="openStudentGradeDetails(${index})" class="inline-flex items-center px-3 py-2 rounded-2xl bg-zinc-900 dark:bg-white/10 hover:bg-zinc-800 dark:hover:bg-white/20 text-white text-xs font-bold transition">
+                                            View Session
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </section>
+            `
+            : '';
+
+        listEl.innerHTML = `
+            <div class="space-y-5">
+                ${gradedSection}
+                ${pendingSection}
+            </div>
+        `;
     } catch (error) {
         console.error('Failed to initialize student grades page:', error);
         listEl.innerHTML = `
@@ -4123,7 +4266,12 @@ async function initStudentAttendancePage() {
     }
 
     const rows = Array.isArray(listRes.attendance) ? listRes.attendance : [];
-    if (rows.length === 0) {
+    const sortedRows = [...rows].sort((a, b) => {
+        const aTime = new Date(`${a?.session_date || ''}T${a?.start_time || '00:00:00'}`).getTime() || 0;
+        const bTime = new Date(`${b?.session_date || ''}T${b?.start_time || '00:00:00'}`).getTime() || 0;
+        return bTime - aTime;
+    });
+    if (sortedRows.length === 0) {
         setHtml('studentAttendanceTableBody', `
             <tr>
                 <td colspan="5" class="px-6 py-10 text-center text-zinc-400">
@@ -4136,7 +4284,7 @@ async function initStudentAttendancePage() {
         return;
     }
 
-    setHtml('studentAttendanceTableBody', rows.map(r => {
+    setHtml('studentAttendanceTableBody', sortedRows.map(r => {
         const dateLabel = r.session_date ? formatDateLong(r.session_date) : (r.attended_at ? new Date(r.attended_at).toLocaleDateString() : '—');
         const start = r.start_time ? formatTime12Hour(r.start_time) : '';
         const end = r.end_time ? formatTime12Hour(r.end_time) : '';

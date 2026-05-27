@@ -3,6 +3,35 @@
         let packagePagePackages = [];
         let availableRoomsByBranch = {};
         let assignRequestTeacherCandidates = [];
+        let activeAssignRequestSlotRow = null;
+
+        function setSessionSummaryText(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+
+        function updateSessionSummary() {
+            const activeStudents = allStudents.length;
+            let scheduledSlots = 0;
+            let unscheduledSlots = 0;
+
+            allStudents.forEach(student => {
+                const totalSessions = Number(student.sessions || 0);
+                const sessionsList = Array.isArray(student.sessions_list) ? student.sessions_list : [];
+                const scheduledNumbers = new Set(
+                    sessionsList
+                        .filter(slot => Number(slot.session_number || 0) > 0 && String(slot.status || '').toLowerCase() !== 'cancelled_by_teacher')
+                        .map(slot => Number(slot.session_number))
+                );
+                scheduledSlots += scheduledNumbers.size;
+                unscheduledSlots += Math.max(0, totalSessions - scheduledNumbers.size);
+            });
+
+            setSessionSummaryText('sessionSummaryStudents', String(activeStudents));
+            setSessionSummaryText('sessionSummaryScheduled', String(scheduledSlots));
+            setSessionSummaryText('sessionSummaryUnscheduled', String(unscheduledSlots));
+            setSessionSummaryText('sessionSummaryCancelled', String(cancelledSessions.length));
+        }
 
         function showMessage(message, type = 'error') {
             Swal.fire({
@@ -303,11 +332,7 @@
                         : '—';
                     const prefDate = r.preferred_date ? new Date(r.preferred_date).toLocaleDateString() : '—';
                     const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
-                    const paymentMethod = escapeHtml(r.payment_method || '—');
                     const payableNow = Number(r.payable_now || 0);
-                    const paymentProofHtml = r.payment_proof_path
-                        ? `<a href="${escapeHtml(buildPublicFileUrl(r.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">View payment proof</a>`
-                        : '<span class="text-xs text-slate-500">No payment proof</span>';
                     return `
                         <tr class="hover:bg-slate-50/80 transition">
                             <td class="px-6 py-4">
@@ -322,10 +347,12 @@
                                 <div class="text-xs text-slate-500 mt-1">Date: ${prefDate}</div>
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-700">
-                                <div class="font-semibold text-slate-800">${paymentType}</div>
-                                <div class="text-xs text-slate-500 mt-1">Method: ${paymentMethod}</div>
-                                <div class="text-xs text-slate-500 mt-1">Pay now: ${formatCurrencyPHP(payableNow)}</div>
-                                <div class="mt-1">${paymentProofHtml}</div>
+                                <div class="space-y-2">
+                                    <div class="font-semibold text-slate-800">${paymentType}</div>
+                                    <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition">
+                                        Payment Info
+                                    </button>
+                                </div>
                             </td>
                             <td class="px-6 py-4 text-sm font-semibold text-gold-600">${formatCurrencyPHP(payableNow)}</td>
                             <td class="px-6 py-4">
@@ -397,6 +424,39 @@
             });
         }
 
+        function openPendingRequestPaymentModal(requestId) {
+            const req = pendingRequestsById[String(requestId)];
+            if (!req) {
+                showMessage('Payment details not found.', 'error');
+                return;
+            }
+
+            const paymentType = escapeHtml(req.payment_type || 'Partial Payment');
+            const paymentMethod = escapeHtml(req.payment_method || '—');
+            const payableNow = Number(req.payable_now || 0);
+            const packageAmount = Number(req.requested_amount || req.package_price || 0);
+            const proofHtml = req.payment_proof_path
+                ? `<a href="${escapeHtml(buildPublicFileUrl(req.payment_proof_path))}" target="_blank" rel="noopener" class="text-sm text-blue-600 underline">View payment proof</a>`
+                : '<span class="text-sm text-slate-500">No payment proof uploaded</span>';
+
+            Swal.fire({
+                title: 'Payment Details',
+                width: 620,
+                confirmButtonText: 'Close',
+                html: `
+                    <div class="text-left space-y-4 text-sm text-slate-700">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div><span class="font-semibold text-slate-900">Payment Type:</span> ${paymentType}</div>
+                            <div><span class="font-semibold text-slate-900">Payment Method:</span> ${paymentMethod}</div>
+                            <div><span class="font-semibold text-slate-900">Pay Now:</span> ${formatCurrencyPHP(payableNow)}</div>
+                            <div><span class="font-semibold text-slate-900">Package Amount:</span> ${formatCurrencyPHP(packageAmount)}</div>
+                        </div>
+                        <div><span class="font-semibold text-slate-900">Proof of Payment:</span> ${proofHtml}</div>
+                    </div>
+                `
+            });
+        }
+
         function getDayNameFromDate(dateValue) {
             if (!dateValue) return '';
             const parts = String(dateValue).split('-');
@@ -408,6 +468,104 @@
             const d = new Date(y, m - 1, dNum);
             if (Number.isNaN(d.getTime())) return '';
             return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] || '';
+        }
+
+        function getTimeMinutes(timeValue) {
+            const parts = String(timeValue || '').split(':');
+            if (parts.length < 2) return NaN;
+            const hours = Number(parts[0]);
+            const minutes = Number(parts[1]);
+            if (Number.isNaN(hours) || Number.isNaN(minutes)) return NaN;
+            return (hours * 60) + minutes;
+        }
+
+        function renderAssignRequestSlotRow(slot = {}) {
+            const day = String(slot.day_of_week || '').trim();
+            const start = String(slot.start_time || '').slice(0, 5);
+            const end = String(slot.end_time || '').slice(0, 5);
+            const dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                .map(option => `<option value="${option}"${option === day ? ' selected' : ''}>${option}</option>`)
+                .join('');
+
+            return `
+                <div class="assign-request-slot grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr_auto] gap-3 items-end rounded-xl border border-zinc-700 bg-black/30 p-3 transition">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 mb-1">Day</label>
+                        <select class="assign-request-slot-day w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            <option value="">Select day...</option>
+                            ${dayOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 mb-1">Start</label>
+                        <input type="time" class="assign-request-slot-start w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" value="${escapeHtml(start)}">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 mb-1">End</label>
+                        <input type="time" class="assign-request-slot-end w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" value="${escapeHtml(end)}">
+                    </div>
+                    <button type="button" class="assign-request-slot-remove px-3 py-2 rounded-lg bg-red-500/10 text-red-300 hover:bg-red-500/20 text-xs font-semibold">Remove</button>
+                </div>
+            `;
+        }
+
+        function setActiveAssignRequestSlot(row) {
+            const rows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot'));
+            const nextActive = row && rows.includes(row) ? row : (rows[0] || null);
+            activeAssignRequestSlotRow = nextActive;
+            rows.forEach(item => {
+                const isActive = item === nextActive;
+                item.classList.toggle('border-gold-500', isActive);
+                item.classList.toggle('bg-gold-500/10', isActive);
+                item.classList.toggle('border-zinc-700', !isActive);
+                item.classList.toggle('bg-black/30', !isActive);
+            });
+        }
+
+        function bindAssignRequestSlotFocusHandlers() {
+            document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot').forEach(row => {
+                if (row.dataset.bound === '1') return;
+                row.dataset.bound = '1';
+                row.addEventListener('click', () => setActiveAssignRequestSlot(row));
+                row.addEventListener('focusin', () => setActiveAssignRequestSlot(row));
+            });
+        }
+
+        function bindAssignRequestSlotRemoveHandlers() {
+            document.querySelectorAll('.assign-request-slot-remove').forEach(button => {
+                if (button.dataset.bound === '1') return;
+                button.dataset.bound = '1';
+                button.addEventListener('click', () => {
+                    const container = document.getElementById('assignRequestSlotsContainer');
+                    const row = button.closest('.assign-request-slot');
+                    if (!container || !row) return;
+                    if (container.children.length <= 1) {
+                        showMessage('At least one weekly slot is required.', 'error');
+                        return;
+                    }
+                    const wasActive = activeAssignRequestSlotRow === row;
+                    row.remove();
+                    if (wasActive) setActiveAssignRequestSlot(container.querySelector('.assign-request-slot'));
+                });
+            });
+        }
+
+        function addAssignRequestSlot(slot = {}) {
+            const container = document.getElementById('assignRequestSlotsContainer');
+            if (!container) return;
+            container.insertAdjacentHTML('beforeend', renderAssignRequestSlotRow(slot));
+            bindAssignRequestSlotFocusHandlers();
+            bindAssignRequestSlotRemoveHandlers();
+            setActiveAssignRequestSlot(container.lastElementChild);
+        }
+
+        function collectAssignRequestSlots() {
+            const rows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot'));
+            return rows.map(row => ({
+                day_of_week: row.querySelector('.assign-request-slot-day')?.value || '',
+                start_time: row.querySelector('.assign-request-slot-start')?.value || '',
+                end_time: row.querySelector('.assign-request-slot-end')?.value || ''
+            })).filter(slot => slot.day_of_week && slot.start_time && slot.end_time);
         }
 
         async function openAssignRequestModal(requestId) {
@@ -428,13 +586,11 @@
             const teacherSearch = document.getElementById('assignRequestTeacherSearch');
             const teacherHelp = document.getElementById('assignRequestTeacherSearchHelp');
             const dateEl = document.getElementById('assignRequestDate');
-            const dayEl = document.getElementById('assignRequestDay');
-            const startEl = document.getElementById('assignRequestStartTime');
-            const endEl = document.getElementById('assignRequestEndTime');
+            const slotsContainer = document.getElementById('assignRequestSlotsContainer');
             const roomEl = document.getElementById('assignRequestRoom');
             const notesEl = document.getElementById('assignRequestNotes');
 
-            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !dayEl || !startEl || !endEl || !roomEl || !notesEl) return;
+            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !roomEl || !notesEl) return;
 
             const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
             const instrumentSummary = Array.isArray(req.instruments) && req.instruments.length
@@ -465,10 +621,16 @@
                 setAssignRequestTeacherSelection('');
             }
 
+            const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+            dateEl.min = todayYmd;
             dateEl.value = req.preferred_date || '';
-            dayEl.value = getDayNameFromDate(dateEl.value || '') || req.preferred_day_of_week || '';
-            startEl.value = '';
-            endEl.value = '';
+            slotsContainer.innerHTML = '';
+            activeAssignRequestSlotRow = null;
+            addAssignRequestSlot({
+                day_of_week: req.preferred_day_of_week || getDayNameFromDate(dateEl.value || ''),
+                start_time: '',
+                end_time: ''
+            });
             await populateAssignRoomDropdown(req);
             roomEl.value = '';
             notesEl.value = '';
@@ -506,29 +668,39 @@
             const requestId = Number(document.getElementById('assignRequestId')?.value || 0);
             const teacherId = Number(document.getElementById('assignRequestTeacherSelect')?.value || 0);
             const assignedDate = document.getElementById('assignRequestDate')?.value || '';
-            const assignedDay = getDayNameFromDate(assignedDate);
-            const assignedStart = document.getElementById('assignRequestStartTime')?.value || '';
-            const assignedEnd = document.getElementById('assignRequestEndTime')?.value || '';
+            const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+            const assignedSlots = collectAssignRequestSlots();
             const assignedRoom = document.getElementById('assignRequestRoom')?.value?.trim() || '';
             const adminNotes = document.getElementById('assignRequestNotes')?.value?.trim() || '';
 
-            if (!requestId || !teacherId || !assignedDate || !assignedDay || !assignedStart || !assignedEnd) {
-                showMessage('Please complete teacher, date, start time, and end time.', 'error');
+            if (!requestId || !teacherId || !assignedDate || !assignedSlots.length) {
+                showMessage('Please complete teacher, start date, and at least one weekly slot.', 'error');
                 return;
             }
-            if (assignedStart >= assignedEnd) {
-                showMessage('End time must be later than start time.', 'error');
+            if (assignedDate < todayYmd) {
+                showMessage('Past dates are not allowed for enrollment scheduling.', 'error');
                 return;
             }
+            const invalidSlot = assignedSlots.find(slot => {
+                const startMinutes = getTimeMinutes(slot.start_time);
+                const endMinutes = getTimeMinutes(slot.end_time);
+                return !slot.day_of_week || !slot.start_time || !slot.end_time || Number.isNaN(startMinutes) || Number.isNaN(endMinutes) || startMinutes >= endMinutes || (endMinutes - startMinutes) !== 60;
+            });
+            if (invalidSlot) {
+                showMessage('Each weekly slot needs a valid day and must be exactly 1 hour.', 'error');
+                return;
+            }
+            const primarySlot = assignedSlots[0];
 
             await approveStudentRequest({
                 action: 'approve-package-request',
                 request_id: requestId,
                 teacher_id: teacherId,
                 assigned_date: assignedDate,
-                assigned_day_of_week: assignedDay,
-                assigned_start_time: assignedStart,
-                assigned_end_time: assignedEnd,
+                assigned_day_of_week: primarySlot.day_of_week,
+                assigned_start_time: primarySlot.start_time,
+                assigned_end_time: primarySlot.end_time,
+                assigned_slots: assignedSlots,
                 assigned_room: assignedRoom,
                 admin_notes: adminNotes
             });
@@ -587,6 +759,7 @@
                     renderStudents(listEl);
                     if (countEl) countEl.textContent = `${data.enrollments.length} enrolled`;
                 } else {
+                    allStudents = [];
                     listEl.innerHTML = `
                         <tr>
                             <td colspan="4" class="px-6 py-8 text-center text-slate-500">
@@ -596,8 +769,11 @@
                         </tr>`;
                     if (countEl) countEl.textContent = '0 enrolled';
                 }
+                updateSessionSummary();
             } catch (error) {
                 console.error('Failed to load sessions:', error);
+                allStudents = [];
+                updateSessionSummary();
                 listEl.innerHTML = `
                     <tr>
                         <td colspan="4" class="px-6 py-8 text-center text-red-500">
@@ -624,9 +800,11 @@
                 cancelledSessions = data.success && Array.isArray(data.sessions) ? data.sessions : [];
                 if (countEl) countEl.textContent = `${cancelledSessions.length} waiting`;
                 renderCancelledSessions(listEl);
+                updateSessionSummary();
             } catch (error) {
                 console.error('Failed to load cancelled sessions:', error);
                 cancelledSessions = [];
+                updateSessionSummary();
                 if (countEl) countEl.textContent = 'Error';
                 listEl.innerHTML = '<div class="text-sm text-red-500">Failed to load cancelled sessions.</div>';
             }
@@ -827,6 +1005,7 @@
             const enrollmentId = Number(document.getElementById('scheduleEnrollmentId')?.value || 0);
             const sessionNumber = Number(document.getElementById('scheduleSessionNumber')?.value || 0);
             const sessionDate = document.getElementById('scheduleDate')?.value || '';
+            const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
             const startTime = document.getElementById('scheduleStart')?.value || '';
             const endTime = document.getElementById('scheduleEnd')?.value || '';
             const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
@@ -834,6 +1013,10 @@
 
             if (!enrollmentId || !sessionNumber || !sessionDate || !startTime || !endTime) {
                 showMessage('Please complete date and time before saving.', 'error');
+                return;
+            }
+            if (sessionDate < todayYmd) {
+                showMessage('Past dates are not allowed for session scheduling.', 'error');
                 return;
             }
 
@@ -995,6 +1178,12 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
+            const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+            const assignRequestDateEl = document.getElementById('assignRequestDate');
+            if (assignRequestDateEl) assignRequestDateEl.min = todayYmd;
+            const scheduleDateEl = document.getElementById('scheduleDate');
+            if (scheduleDateEl) scheduleDateEl.min = todayYmd;
+
             if (typeof Auth !== 'undefined' && Auth.getUser) {
                 const user = Auth.getUser();
                 if (user) {
@@ -1025,4 +1214,5 @@
                 loadCancelledSessions();
             });
             document.getElementById('closeScheduleModalBtn')?.addEventListener('click', closeScheduleModal);
+            document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
         });

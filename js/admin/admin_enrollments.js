@@ -1,8 +1,29 @@
-        window.adminEnrollmentsAllowActions = true;
-        window.pendingRequestActionLabel = 'Schedule Sessions';
-        window.onPendingRequestAssignClick = function(requestId) {
-            window.location.href = `admin_sessions.html?view=pending&assign_request_id=${requestId}`;
-        };
+        window.adminEnrollmentsAllowActions = false;
+        window.pendingRequestActionLabel = 'Branch Review';
+        window.onPendingRequestAssignClick = null;
+        let adminPendingEnrollments = [];
+        let adminActiveEnrollments = [];
+
+        function setEnrollmentSummaryText(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+
+        function updateEnrollmentSummary() {
+            const pendingCount = adminPendingEnrollments.length;
+            const activeCount = adminActiveEnrollments.length;
+            const collected = adminActiveEnrollments.reduce((sum, row) => sum + Number(row.paid_amount || 0), 0);
+            const outstanding = adminActiveEnrollments.reduce((sum, row) => {
+                const total = Number(row.total_amount || 0);
+                const paid = Number(row.paid_amount || 0);
+                return sum + Math.max(0, total - paid);
+            }, 0);
+
+            setEnrollmentSummaryText('enrollSummaryPendingCount', String(pendingCount));
+            setEnrollmentSummaryText('enrollSummaryActiveCount', String(activeCount));
+            setEnrollmentSummaryText('enrollSummaryCollected', formatCurrencyPHP(collected));
+            setEnrollmentSummaryText('enrollSummaryOutstanding', formatCurrencyPHP(outstanding));
+        }
 
         function setEnrollmentNavState(view) {
             const pendingLink = document.getElementById('enrollNavPending');
@@ -32,8 +53,8 @@
             if (view === 'pending') {
                 if (pendingSection) pendingSection.classList.remove('hidden');
                 if (activeSection) activeSection.classList.add('hidden');
-                if (title) title.textContent = 'Pending Enrollments';
-                if (subtitle) subtitle.textContent = 'Requests submitted by students and waiting for branch manager action.';
+                if (title) title.textContent = 'Pending Enrollment Queue';
+                if (subtitle) subtitle.textContent = 'Read-only queue of requests waiting for desk or branch admin action.';
                 setEnrollmentNavState('pending');
                 return;
             }
@@ -42,7 +63,7 @@
                 if (pendingSection) pendingSection.classList.add('hidden');
                 if (activeSection) activeSection.classList.remove('hidden');
                 if (title) title.textContent = 'Active Enrollments';
-                if (subtitle) subtitle.textContent = 'Students with approved packages and active sessions.';
+                if (subtitle) subtitle.textContent = 'Read-only list of approved enrollments and payment balances.';
                 setEnrollmentNavState('active');
                 return;
             }
@@ -50,7 +71,7 @@
             if (pendingSection) pendingSection.classList.remove('hidden');
             if (activeSection) activeSection.classList.remove('hidden');
             if (title) title.textContent = 'Enrollments';
-            if (subtitle) subtitle.textContent = 'General overview of pending and active enrollments.';
+            if (subtitle) subtitle.textContent = 'Read-only enrollment oversight across all branches.';
             setEnrollmentNavState('');
         }
 
@@ -94,6 +115,8 @@
                 const response = await axios.get(url);
                 const data = response.data;
                 const enrollments = data.success && Array.isArray(data.enrollments) ? data.enrollments : [];
+                adminActiveEnrollments = enrollments;
+                updateEnrollmentSummary();
 
                 if (countEl) countEl.textContent = `${enrollments.length} active`;
 
@@ -142,6 +165,8 @@
                 }).join('');
             } catch (error) {
                 console.error('Failed to load active enrollments:', error);
+                adminActiveEnrollments = [];
+                updateEnrollmentSummary();
                 if (countEl) countEl.textContent = 'Error';
                 tableBody.innerHTML = `
                     <tr>
@@ -151,6 +176,23 @@
                         </td>
                     </tr>`;
             }
+        }
+
+        async function loadPendingEnrollmentSummary() {
+            try {
+                const branchFilter = document.getElementById('branchFilter');
+                let url = `${baseApiUrl}/students.php?action=get-pending-package-requests`;
+                if (branchFilter && branchFilter.value) {
+                    url += `&branch_id=${branchFilter.value}`;
+                }
+                const response = await axios.get(url);
+                const data = response.data || {};
+                adminPendingEnrollments = data.success && Array.isArray(data.requests) ? data.requests : [];
+            } catch (error) {
+                console.error('Failed to load pending enrollment summary:', error);
+                adminPendingEnrollments = [];
+            }
+            updateEnrollmentSummary();
         }
 
         let walkinStudents = [];
@@ -399,14 +441,14 @@
 
             loadBranches();
             loadPendingRequests();
+            loadPendingEnrollmentSummary();
             loadActiveEnrollments();
-            loadWalkinStudents();
             applyEnrollmentView();
 
             document.getElementById('branchFilter')?.addEventListener('change', () => {
                 loadPendingRequests();
+                loadPendingEnrollmentSummary();
                 loadActiveEnrollments();
-                loadWalkinStudents();
             });
             document.getElementById('enrollNavPending')?.addEventListener('click', () => {
                 const viewUrl = new URL(window.location.href);
@@ -420,12 +462,4 @@
                 window.history.replaceState({}, '', viewUrl.toString());
                 applyEnrollmentView();
             });
-            document.getElementById('openWalkinEnrollmentModalBtn')?.addEventListener('click', openWalkinEnrollmentModal);
-            document.getElementById('closeWalkinEnrollmentModalBtn')?.addEventListener('click', closeWalkinEnrollmentModal);
-            document.getElementById('cancelWalkinEnrollmentBtn')?.addEventListener('click', closeWalkinEnrollmentModal);
-            document.getElementById('walkinEnrollmentForm')?.addEventListener('submit', submitWalkinEnrollment);
-            document.getElementById('walkinStudentSearch')?.addEventListener('input', handleWalkinStudentChange);
-            document.getElementById('walkinStudentSearch')?.addEventListener('change', handleWalkinStudentChange);
-            document.getElementById('walkinPackageSelect')?.addEventListener('change', updateWalkinPackageUI);
-            document.getElementById('walkinPaymentType')?.addEventListener('change', updateWalkinPackageUI);
         });

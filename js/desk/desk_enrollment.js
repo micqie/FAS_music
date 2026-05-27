@@ -6,6 +6,7 @@
         let uiIsDesk = false;
         let managerPageMode = 'enrollments';
         let assignRequestTeacherCandidates = [];
+        let activeAssignRequestSlotRow = null;
         let activeAssignRequest = null;
         let assignRequestAvailabilitySlots = [];
         let assignRequestAvailabilityMonth = '';
@@ -565,7 +566,7 @@
                 if (!requests.length) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
                                 <p>${uiIsDesk ? 'No pending enrollment requests.' : 'No pending student requests.'}</p>
                             </td>
@@ -582,11 +583,7 @@
                         ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
                         : '—';
                     const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
-                    const paymentMethod = escapeHtml(r.payment_method || '—');
                     const payableNow = Number(r.payable_now || 0);
-                    const paymentProofHtml = r.payment_proof_path
-                        ? `<a href="${escapeHtml(buildPublicFileUrl(r.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">View payment proof</a>`
-                        : '<span class="text-xs text-slate-500">No payment proof</span>';
                     return `
                         <tr class="hover:bg-slate-50/80 transition">
                             <td class="px-6 py-4">
@@ -598,12 +595,13 @@
                             <td class="px-6 py-4 text-sm text-slate-700">${instruments}</td>
                             <td class="px-6 py-4 text-sm text-slate-700">Based on instructor availability</td>
                             <td class="px-6 py-4 text-sm text-slate-700">
-                                <div class="font-semibold text-slate-800">${paymentType}</div>
-                                <div class="text-xs text-slate-500 mt-1">Method: ${paymentMethod}</div>
-                                <div class="text-xs text-slate-500 mt-1">Pay now: ${formatCurrencyPHP(payableNow)}</div>
-                                <div class="mt-1">${paymentProofHtml}</div>
+                                <div class="space-y-2">
+                                   
+                                    <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition">
+                                        Payment Info
+                                    </button>
+                                </div>
                             </td>
-                            <td class="px-6 py-4 text-sm font-semibold text-gold-600">${formatCurrencyPHP(payableNow)}</td>
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-2">
                                     <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
@@ -624,7 +622,7 @@
                 if (countEl) countEl.textContent = 'Error';
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-red-500">
+                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Failed to load pending requests.</p>
                         </td>
@@ -700,19 +698,165 @@
 
         function updateAssignRequestRecurringSummary() {
             const summaryEl = document.getElementById('assignRequestRecurringSummary');
-            const day = document.getElementById('assignRequestDay')?.value || '';
-            const start = document.getElementById('assignRequestStartTime')?.value || '';
-            const end = document.getElementById('assignRequestEndTime')?.value || '';
             const room = document.getElementById('assignRequestRoom')?.value || '';
             if (!summaryEl) return;
 
-            if (!day || !start || !end) {
-                summaryEl.textContent = 'Choose a one-hour slot. Once assigned, that instructor time becomes reserved weekly for this student to avoid conflicts.';
+            const slots = collectAssignRequestSlots();
+            if (!slots.length) {
+                summaryEl.textContent = 'Choose one or more one-hour slots. Once assigned, those instructor times become reserved weekly for this student to avoid conflicts.';
                 return;
             }
 
             const roomText = room ? ` in ${room}` : '';
-            summaryEl.textContent = `Reserved weekly every ${day}, ${formatTime12Hour(start)} - ${formatTime12Hour(end)}${roomText}. Other students will no longer be offered this recurring slot.`;
+            const slotText = slots.map(slot => `${slot.day_of_week}, ${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`).join('; ');
+            summaryEl.textContent = `Reserved weekly on ${slotText}${roomText}. Other students will no longer be offered these recurring slots.`;
+        }
+
+        function renderAssignRequestSlotRow(slot = {}) {
+            const day = String(slot.day_of_week || '').trim();
+            const start = String(slot.start_time || '').slice(0, 5);
+            const end = String(slot.end_time || '').slice(0, 5);
+            const dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                .map(option => `<option value="${option}"${option === day ? ' selected' : ''}>${option}</option>`)
+                .join('');
+            return `
+                <div class="assign-request-slot grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr_auto] gap-3 items-end rounded-xl border border-slate-200 bg-white p-3 transition">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Day</label>
+                        <select class="assign-request-slot-day w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                            <option value="">Select day...</option>
+                            ${dayOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Start</label>
+                        <input type="time" class="assign-request-slot-start w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500" value="${escapeHtml(start)}">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">End</label>
+                        <input type="time" class="assign-request-slot-end w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500" value="${escapeHtml(end)}">
+                    </div>
+                    <button type="button" class="assign-request-slot-remove px-3 py-2 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-semibold">Remove</button>
+                </div>
+            `;
+        }
+
+        function setActiveAssignRequestSlot(row) {
+            const rows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot'));
+            const nextActive = row && rows.includes(row) ? row : (rows[0] || null);
+            activeAssignRequestSlotRow = nextActive;
+            rows.forEach(item => {
+                const isActive = item === nextActive;
+                item.classList.toggle('border-gold-400', isActive);
+                item.classList.toggle('bg-gold-50', isActive);
+                item.classList.toggle('shadow-sm', isActive);
+                item.classList.toggle('border-slate-200', !isActive);
+                item.classList.toggle('bg-white', !isActive);
+            });
+        }
+
+        function openPendingRequestPaymentModal(requestId) {
+            const req = pendingRequestsById[String(requestId)];
+            if (!req) {
+                showMessage('Payment details not found.', 'error');
+                return;
+            }
+
+            const paymentType = escapeHtml(req.payment_type || 'Partial Payment');
+            const paymentMethod = escapeHtml(req.payment_method || '—');
+            const payableNow = Number(req.payable_now || 0);
+            const packageAmount = Number(req.requested_amount || req.package_price || 0);
+            const proofHtml = req.payment_proof_path
+                ? `<a href="${escapeHtml(buildPublicFileUrl(req.payment_proof_path))}" target="_blank" rel="noopener" class="text-sm text-blue-600 underline">View payment proof</a>`
+                : '<span class="text-sm text-slate-500">No payment proof uploaded</span>';
+
+            Swal.fire({
+                title: 'Payment Details',
+                width: 620,
+                confirmButtonText: 'Close',
+                html: `
+                    <div class="text-left space-y-4 text-sm text-slate-700">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div><span class="font-semibold text-slate-900">Payment Type:</span> ${paymentType}</div>
+                            <div><span class="font-semibold text-slate-900">Payment Method:</span> ${paymentMethod}</div>
+                            <div><span class="font-semibold text-slate-900">Pay Now:</span> ${formatCurrencyPHP(payableNow)}</div>
+                            <div><span class="font-semibold text-slate-900">Package Amount:</span> ${formatCurrencyPHP(packageAmount)}</div>
+                        </div>
+                        <div><span class="font-semibold text-slate-900">Proof of Payment:</span> ${proofHtml}</div>
+                    </div>
+                `
+            });
+        }
+
+        function bindAssignRequestSlotFocusHandlers() {
+            document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot').forEach(row => {
+                if (row.dataset.bound === '1') return;
+                row.dataset.bound = '1';
+                row.addEventListener('click', () => setActiveAssignRequestSlot(row));
+                row.addEventListener('focusin', () => setActiveAssignRequestSlot(row));
+                row.querySelectorAll('select,input').forEach(input => input.addEventListener('change', () => {
+                    updateAssignRequestRecurringSummary();
+                    renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate);
+                }));
+            });
+        }
+
+        function bindAssignRequestSlotRemoveHandlers() {
+            document.querySelectorAll('.assign-request-slot-remove').forEach(button => {
+                if (button.dataset.bound === '1') return;
+                button.dataset.bound = '1';
+                button.addEventListener('click', () => {
+                    const container = document.getElementById('assignRequestSlotsContainer');
+                    const row = button.closest('.assign-request-slot');
+                    if (!container || !row) return;
+                    if (container.children.length <= 1) {
+                        showMessage('At least one weekly slot is required.', 'error');
+                        return;
+                    }
+                    const wasActive = activeAssignRequestSlotRow === row;
+                    row.remove();
+                    if (wasActive) setActiveAssignRequestSlot(container.querySelector('.assign-request-slot'));
+                    updateAssignRequestRecurringSummary();
+                    renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate);
+                });
+            });
+        }
+
+        function addAssignRequestSlot(slot = {}) {
+            const container = document.getElementById('assignRequestSlotsContainer');
+            if (!container) return;
+            container.insertAdjacentHTML('beforeend', renderAssignRequestSlotRow(slot));
+            bindAssignRequestSlotFocusHandlers();
+            bindAssignRequestSlotRemoveHandlers();
+            setActiveAssignRequestSlot(container.lastElementChild);
+            updateAssignRequestRecurringSummary();
+        }
+
+        function collectAssignRequestSlots() {
+            const rows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot'));
+            return rows.map(row => ({
+                day_of_week: row.querySelector('.assign-request-slot-day')?.value || '',
+                start_time: row.querySelector('.assign-request-slot-start')?.value || '',
+                end_time: row.querySelector('.assign-request-slot-end')?.value || ''
+            })).filter(slot => slot.day_of_week && slot.start_time && slot.end_time);
+        }
+
+        function getActiveAssignRequestSlotData() {
+            const row = activeAssignRequestSlotRow;
+            if (!row) return null;
+            return {
+                day_of_week: row.querySelector('.assign-request-slot-day')?.value || '',
+                start_time: row.querySelector('.assign-request-slot-start')?.value || '',
+                end_time: row.querySelector('.assign-request-slot-end')?.value || ''
+            };
+        }
+
+        function getLockedAssignRequestDays() {
+            const rows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot'));
+            return new Set(rows
+                .filter(row => row !== activeAssignRequestSlotRow)
+                .map(row => row.querySelector('.assign-request-slot-day')?.value || '')
+                .filter(Boolean));
         }
 
         function setAssignRequestTeacherSelection(teacherId) {
@@ -879,6 +1023,8 @@
             }
 
             const selectedSlots = grouped[resolvedSelectedDate] || [];
+            const lockedDays = getLockedAssignRequestDays();
+            const activeSlot = getActiveAssignRequestSlotData();
             listEl.innerHTML = `
                 <div class="space-y-4">
                     <div class="flex items-center justify-between gap-3">
@@ -904,16 +1050,26 @@
                             </div>
                         </div>
                         <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            ${selectedSlots.map(slot => `
+                            ${selectedSlots.map(slot => {
+                                const slotDay = String(slot.day_of_week || '');
+                                const slotStart = String(slot.start_time || '').slice(0, 5);
+                                const slotEnd = String(slot.end_time || '').slice(0, 5);
+                                const isActiveMatch = activeSlot
+                                    && activeSlot.day_of_week === slotDay
+                                    && String(activeSlot.start_time || '').slice(0, 5) === slotStart
+                                    && String(activeSlot.end_time || '').slice(0, 5) === slotEnd;
+                                const isLocked = lockedDays.has(slotDay) || (activeSlot?.day_of_week === slotDay && !isActiveMatch);
+                                return `
                                 <button
                                     type="button"
-                                    class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100"
-                                    onclick="applyAssignRequestAvailabilitySlot('${escapeHtml(String(slot.session_date || ''))}','${escapeHtml(String(slot.day_of_week || ''))}','${escapeHtml(String(slot.start_time || ''))}','${escapeHtml(String(slot.end_time || ''))}')"
+                                    ${isLocked ? 'disabled' : `onclick="applyAssignRequestAvailabilitySlot('${escapeHtml(String(slot.session_date || ''))}','${escapeHtml(String(slot.day_of_week || ''))}','${escapeHtml(String(slot.start_time || ''))}','${escapeHtml(String(slot.end_time || ''))}')"`}
+                                    class="rounded-xl border px-3 py-3 text-left transition ${isLocked ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-70' : 'border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100'}"
                                 >
-                                    <div class="text-sm font-semibold text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div>
-                                    <div class="mt-1 text-xs text-slate-500">${escapeHtml(slot.day_of_week || '')} • Weekly recurring</div>
+                                    <div class="text-sm font-semibold ${isLocked ? 'text-slate-500' : 'text-emerald-800'}">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div>
+                                    <div class="mt-1 text-xs ${isLocked ? 'text-slate-400' : 'text-slate-500'}">${escapeHtml(slot.day_of_week || '')} • ${isLocked ? 'Locked by current selection' : 'Weekly recurring'}</div>
                                 </button>
-                            `).join('') || '<div class="text-sm text-slate-500">No available slots on this date.</div>'}
+                            `;
+                            }).join('') || '<div class="text-sm text-slate-500">No available slots on this date.</div>'}
                         </div>
                     </div>
                 </div>
@@ -922,14 +1078,22 @@
 
         function applyAssignRequestAvailabilitySlot(sessionDate, dayOfWeek, startTime, endTime) {
             const dateEl = document.getElementById('assignRequestDate');
-            const dayEl = document.getElementById('assignRequestDay');
-            const startEl = document.getElementById('assignRequestStartTime');
-            const endEl = document.getElementById('assignRequestEndTime');
             if (dateEl) dateEl.value = sessionDate || '';
-            if (dayEl) dayEl.value = dayOfWeek || getDayNameFromDate(sessionDate || '');
-            if (startEl) startEl.value = String(startTime || '').slice(0, 5);
-            if (endEl) endEl.value = String(endTime || '').slice(0, 5);
+            const container = document.getElementById('assignRequestSlotsContainer');
+            const targetRow = activeAssignRequestSlotRow && container && container.contains(activeAssignRequestSlotRow)
+                ? activeAssignRequestSlotRow
+                : container?.querySelector('.assign-request-slot');
+            if (targetRow) {
+                const dayEl = targetRow.querySelector('.assign-request-slot-day');
+                const startEl = targetRow.querySelector('.assign-request-slot-start');
+                const endEl = targetRow.querySelector('.assign-request-slot-end');
+                if (dayEl) dayEl.value = dayOfWeek || getDayNameFromDate(sessionDate || '');
+                if (startEl) startEl.value = String(startTime || '').slice(0, 5);
+                if (endEl) endEl.value = String(endTime || '').slice(0, 5);
+                setActiveAssignRequestSlot(targetRow);
+            }
             updateAssignRequestRecurringSummary();
+            renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate || sessionDate || '');
         }
 
         async function loadAssignRequestAvailability() {
@@ -984,13 +1148,11 @@
             const teacherSearch = document.getElementById('assignRequestTeacherSearch');
             const teacherHelp = document.getElementById('assignRequestTeacherSearchHelp');
             const dateEl = document.getElementById('assignRequestDate');
-            const dayEl = document.getElementById('assignRequestDay');
-            const startEl = document.getElementById('assignRequestStartTime');
-            const endEl = document.getElementById('assignRequestEndTime');
+            const slotsContainer = document.getElementById('assignRequestSlotsContainer');
             const roomEl = document.getElementById('assignRequestRoom');
             const notesEl = document.getElementById('assignRequestNotes');
 
-            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !dayEl || !startEl || !endEl || !roomEl || !notesEl) return;
+            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !roomEl || !notesEl) return;
 
             const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
             const instrumentSummary = Array.isArray(req.instruments) && req.instruments.length
@@ -1025,10 +1187,16 @@
                 setAssignRequestTeacherSelection('');
             }
 
+            const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+            dateEl.min = todayYmd;
             dateEl.value = '';
-            dayEl.value = '';
-            startEl.value = '';
-            endEl.value = '';
+            slotsContainer.innerHTML = '';
+            activeAssignRequestSlotRow = null;
+            addAssignRequestSlot({
+                day_of_week: '',
+                start_time: '',
+                end_time: ''
+            });
             await populateAssignRoomDropdown(req);
             roomEl.value = '';
             notesEl.value = '';
@@ -1069,39 +1237,39 @@
             const requestId = Number(document.getElementById('assignRequestId')?.value || 0);
             const teacherId = Number(document.getElementById('assignRequestTeacherSelect')?.value || 0);
             const assignedDate = document.getElementById('assignRequestDate')?.value || '';
-            const assignedDay = getDayNameFromDate(assignedDate);
-            const assignedStart = document.getElementById('assignRequestStartTime')?.value || '';
-            const assignedEnd = document.getElementById('assignRequestEndTime')?.value || '';
+            const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+            const assignedSlots = collectAssignRequestSlots();
             const assignedRoom = document.getElementById('assignRequestRoom')?.value?.trim() || '';
             const adminNotes = document.getElementById('assignRequestNotes')?.value?.trim() || '';
 
-            if (!requestId || !teacherId || !assignedDate || !assignedDay || !assignedStart || !assignedEnd) {
-                showMessage('Please complete teacher, date, start time, and end time.', 'error');
+            if (!requestId || !teacherId || !assignedDate || !assignedSlots.length) {
+                showMessage('Please complete teacher, start date, and at least one weekly slot.', 'error');
                 return;
             }
-            if (assignedStart >= assignedEnd) {
-                showMessage('End time must be later than start time.', 'error');
+            if (assignedDate < todayYmd) {
+                showMessage('Past dates are not allowed for enrollment scheduling.', 'error');
                 return;
             }
-            if ((getTimeMinutes(assignedEnd) - getTimeMinutes(assignedStart)) !== 60) {
-                showMessage('Assigned schedule must be exactly 1 hour.', 'error');
+            const invalidSlot = assignedSlots.find(slot => {
+                const startMinutes = getTimeMinutes(slot.start_time);
+                const endMinutes = getTimeMinutes(slot.end_time);
+                return !slot.day_of_week || !slot.start_time || !slot.end_time || startMinutes >= endMinutes || (endMinutes - startMinutes) !== 60;
+            });
+            if (invalidSlot) {
+                showMessage('Each weekly slot needs a valid day and must be exactly 1 hour.', 'error');
                 return;
             }
+            const primarySlot = assignedSlots[0];
 
             await approveStudentRequest({
                 action: 'approve-package-request',
                 request_id: requestId,
                 teacher_id: teacherId,
                 assigned_date: assignedDate,
-                assigned_day_of_week: assignedDay,
-                assigned_start_time: assignedStart,
-                assigned_end_time: assignedEnd,
-                assigned_slots: [{
-                    day_of_week: assignedDay,
-                    start_time: assignedStart,
-                    end_time: assignedEnd,
-                    room_name: assignedRoom
-                }],
+                assigned_day_of_week: primarySlot.day_of_week,
+                assigned_start_time: primarySlot.start_time,
+                assigned_end_time: primarySlot.end_time,
+                assigned_slots: assignedSlots.map(slot => ({ ...slot, room_name: assignedRoom })),
                 assigned_room: assignedRoom,
                 admin_notes: adminNotes,
                 branch_id: managerBranchId
@@ -1425,11 +1593,7 @@
             document.getElementById('walkinStudentSearch')?.addEventListener('change', handleWalkinStudentChange);
             document.getElementById('walkinPackageSelect')?.addEventListener('change', updateWalkinPackageUI);
             document.getElementById('walkinPaymentType')?.addEventListener('change', updateWalkinPackageUI);
-            document.getElementById('assignRequestDate')?.addEventListener('change', (e) => {
-                const dayEl = document.getElementById('assignRequestDay');
-                if (!dayEl) return;
-                const d = getDayNameFromDate(e.target.value || '');
-                dayEl.value = d || '';
+            document.getElementById('assignRequestDate')?.addEventListener('change', () => {
                 updateAssignRequestRecurringSummary();
                 loadAssignRequestAvailability();
             });
@@ -1437,8 +1601,7 @@
                 updateAssignRequestRecurringSummary();
                 loadAssignRequestAvailability();
             });
-            document.getElementById('assignRequestStartTime')?.addEventListener('change', updateAssignRequestRecurringSummary);
-            document.getElementById('assignRequestEndTime')?.addEventListener('change', updateAssignRequestRecurringSummary);
+            document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
         });
 
         window.applyAssignRequestAvailabilitySlot = applyAssignRequestAvailabilitySlot;

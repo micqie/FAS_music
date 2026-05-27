@@ -70,9 +70,9 @@
             </div>
         </aside>
 
-        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6">
-            <div class="max-w-6xl mx-auto">
-                <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <main class="flex-1 px-4 sm:px-6 px-8 py-6">
+            <div class="max-w-7xl mx-auto">
+                <div class="mb-4 flex flex-wrap items-end justify-between gap-4">
                     <div>
                         <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Attendance Overview</h1>
                         <p class="text-slate-500 text-sm mt-1">Track upcoming sessions, scanner attendance, absences, and make-up session alerts.</p>
@@ -80,67 +80,102 @@
                             Desk branch: <span id="deskBranchNamePill">—</span>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 min-w-[140px]">
+                   <div class="flex flex-wrap justify-start gap-4">
+
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2.5 min-w-[126px]">
                             <div class="text-[11px] uppercase tracking-[0.25em] text-slate-400 font-semibold">Students</div>
-                            <div id="attendanceStudentCount" class="mt-2 text-2xl font-bold text-slate-900">0</div>
+                            <div id="attendanceStudentCount" class="mt-1 text-xl font-bold text-slate-900">0</div>
                         </div>
-                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 min-w-[140px]">
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2.5 min-w-[126px]">
                             <div class="text-[11px] uppercase tracking-[0.25em] text-slate-400 font-semibold">Make-Up List</div>
-                            <div id="attendanceMakeupCount" class="mt-2 text-2xl font-bold text-rose-600">0</div>
+                            <div id="attendanceMakeupCount" class="mt-1 text-xl font-bold text-rose-600">0</div>
                         </div>
                     </div>
                 </div>
 
                 <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
 
-                <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-                    <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between gap-4 flex-wrap">
+                <section class="rounded-[2rem] overflow-hidden border border-slate-200 shadow-xl shadow-slate-200/50 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_32%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)]">
+                    <div class="p-5 lg:p-6 border-b border-slate-200/80 flex items-center justify-between gap-4 flex-wrap">
                         <div>
-                            <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-list-check mr-2 text-gold-500"></i>Enrolled Students Attendance</h3>
-                            <p class="text-xs text-slate-500 mt-1">Session dates come from the branch scheduling records.</p>
+                            <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-calendar-days mr-2 text-gold-500"></i>Attendance Calendar</h3>
+                            <p class="text-xs text-slate-500 mt-1">Premium branch view of student sessions, with date, time, instructor, package, and attendance context together.</p>
                         </div>
-                        <span id="attendanceTableCount" class="text-xs text-slate-500">Loading...</span>
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                                <span id="attendanceTableCount">Loading...</span>
+                            </div>
+                            <div class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                                Selected day: <span id="attendanceSelectedDateLabel">—</span>
+                            </div>
+                            <button id="attendanceOpenUpcomingBtn" type="button" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+                                <i class="fas fa-clock text-blue-600"></i>
+                                Upcoming
+                            </button>
+                            <button id="attendanceOpenTodayBtn" type="button" class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition">
+                                <i class="fas fa-user-check"></i>
+                                Who's Today
+                            </button>
+                            <button id="attendanceOpenMakeupBtn" type="button" class="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition">
+                                <i class="fas fa-triangle-exclamation"></i>
+                                Make-Up List
+                            </button>
+                        </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-slate-50">
-                                <tr>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Session Dates</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Completed</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Absences</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Remaining</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="attendanceTableBody" class="divide-y divide-slate-100">
-                                <tr>
-                                    <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                        <p>Loading attendance data...</p>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
 
-                <div class="mt-6 bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-                    <div class="p-6 bg-rose-50/70 flex items-center justify-between gap-4 flex-wrap">
+                    <div class="p-4 lg:p-5 grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
                         <div>
-                            <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-triangle-exclamation mr-2 text-rose-500"></i>Make-Up Sessions Required</h3>
-                            <p class="text-xs text-slate-500 mt-1">Use the separate make-up page to review detailed student records without crowding this attendance overview.</p>
+                            <div class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm overflow-hidden h-full">
+                                <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="text-[11px] uppercase tracking-[0.25em] text-slate-500 font-bold">Monthly Calendar</div>
+                                        <div id="attendanceCalendarMonthLabel" class="mt-2 text-xl font-black text-slate-900">Loading...</div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button id="attendancePrevMonthBtn" type="button" class="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition">
+                                            <i class="fas fa-chevron-left text-sm"></i>
+                                        </button>
+                                        <button id="attendanceTodayBtn" type="button" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">Today</button>
+                                        <button id="attendanceNextMonthBtn" type="button" class="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition">
+                                            <i class="fas fa-chevron-right text-sm"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="p-4">
+                                    <div class="grid grid-cols-7 gap-2 mb-3 text-center text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                                        <div>Sun</div>
+                                        <div>Mon</div>
+                                        <div>Tue</div>
+                                        <div>Wed</div>
+                                        <div>Thu</div>
+                                        <div>Fri</div>
+                                        <div>Sat</div>
+                                    </div>
+                                    <div id="attendanceCalendarGrid" class="grid grid-cols-7 gap-2">
+                                        <div class="col-span-7 rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                                            Loading calendar...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <span id="attendanceMakeupLabel" class="text-xs text-rose-600 font-semibold">Checking branch absences...</span>
-                            <a href="desk_makeup.html" class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition">
-                                <i class="fas fa-up-right-from-square"></i> Open Make-Up List
-                            </a>
+
+                        <div>
+                            <div class="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden h-full">
+                                <div class="px-5 py-4 border-b border-slate-200">
+                                    <div class="text-[11px] uppercase tracking-[0.25em] text-slate-500 font-bold">Day Schedule</div>
+                                    <div id="attendanceSelectedDateTitle" class="mt-2 text-xl font-black text-slate-900">Loading...</div>
+                                    <div id="attendanceSelectedDateMeta" class="mt-1 text-sm text-slate-500">Pulling branch sessions...</div>
+                                </div>
+                                <div id="attendanceSelectedDateList" class="p-4 space-y-3 max-h-[calc(100vh-21rem)] min-h-[24rem] overflow-y-auto">
+                                    <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                                        Loading sessions...
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </section>
             </div>
         </main>
     </div>
