@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Guardian Portal | Father & Sons Music</title>
+    <title>Guardian Payments | Father & Sons Music</title>
     <script>(function(){ var t=localStorage.getItem('theme')||'light'; document.documentElement.classList.toggle('dark',t==='dark'); })();</script>
     <script src="https://cdn.tailwindcss.com"></script>
- <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
+    <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../../css/portal.css">
     <script>
@@ -33,7 +33,7 @@
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
-    <div id="guardianStudentsRoot"></div>
+    <div id="guardianPaymentsRoot"></div>
 
     <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
         <div class="flex min-w-0 items-center gap-3 sm:gap-6">
@@ -64,11 +64,11 @@
             <div>
                 <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Guardian Menu</h3>
                 <nav class="space-y-2">
-                    <a href="guardian_students.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
-                        <i class="fas fa-user-graduate mr-3"></i> Students
+                    <a href="guardian_students.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all">
+                        <i class="fas fa-user-graduate mr-3 text-zinc-500"></i> Students
                     </a>
-                    <a href="guardian_payments.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all">
-                        <i class="fas fa-wallet mr-3 text-zinc-500"></i> Payments
+                    <a href="guardian_payments.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-wallet mr-3"></i> Payments
                     </a>
                     <a href="guardian_absences.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all">
                         <i class="fas fa-notes-medical mr-3 text-zinc-500"></i> Absence Requests
@@ -87,11 +87,11 @@
                 <div>
                     <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Guardian Menu</h3>
                     <nav class="space-y-2">
-                        <a href="guardian_students.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
-                            <i class="fas fa-user-graduate mr-3"></i> Students
+                        <a href="guardian_students.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
+                            <i class="fas fa-user-graduate mr-3 text-zinc-500"></i> Students
                         </a>
-                        <a href="guardian_payments.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
-                            <i class="fas fa-wallet mr-3 text-zinc-500"></i> Payments
+                        <a href="guardian_payments.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
+                            <i class="fas fa-wallet mr-3"></i> Payments
                         </a>
                         <a href="guardian_absences.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all">
                             <i class="fas fa-notes-medical mr-3 text-zinc-500"></i> Absence Requests
@@ -112,14 +112,14 @@
     </div>
 
     <main class="lg:ml-72 pt-24 sm:pt-28 p-4 sm:p-8">
-        <div class="max-w-7xl mx-auto">
+        <div class="mx-auto max-w-7xl">
             <div class="mb-6 hidden md:flex flex-wrap items-center gap-3">
-                <a href="guardian_students.html" class="inline-flex items-center gap-2 rounded-full border border-gold-200 bg-gold-50 px-4 py-2 text-sm font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-400">
-                    <i class="fas fa-user-graduate"></i>
+                <a href="guardian_students.html" class="inline-flex items-center gap-2 rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-200">
+                    <i class="fas fa-user-graduate text-gold-500"></i>
                     Students
                 </a>
-                <a href="guardian_payments.html" class="inline-flex items-center gap-2 rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-200">
-                    <i class="fas fa-wallet text-gold-500"></i>
+                <a href="guardian_payments.html" class="inline-flex items-center gap-2 rounded-full border border-gold-200 bg-gold-50 px-4 py-2 text-sm font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-400">
+                    <i class="fas fa-wallet"></i>
                     Payments
                 </a>
                 <a href="guardian_absences.html" class="inline-flex items-center gap-2 rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-200">
@@ -132,45 +132,50 @@
                 </a>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-10">
-                <div class="lg:col-span-2 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
-                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl">
-                            <i class="fas fa-user-shield"></i>
+            <div class="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+                <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-gold-500 font-bold">Guardian Payments</div>
+                            <h1 class="mt-2 text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-white">Track Student Balances</h1>
+                            <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Tap a student entry to open the full balance and session details in a modal.</p>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <div id="guardianName" class="text-xl font-extrabold truncate text-zinc-900 dark:text-white">—</div>
-                            <div class="text-sm text-zinc-500 dark:text-zinc-400">Email: <span id="guardianEmail" class="text-zinc-700 dark:text-zinc-200 font-semibold">—</span></div>
-                            <div class="text-sm text-zinc-500 dark:text-zinc-400">Phone: <span id="guardianPhone" class="text-zinc-700 dark:text-zinc-200 font-semibold">—</span></div>
-                        </div>
-                    </div>
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-4">This portal shows your linked students, session progress, and payment status.</p>
-                </div>
-                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Overview</div>
-                    <div class="mt-4 space-y-4">
-                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Students</div>
-                            <div id="guardianStudentCount" class="text-2xl font-black text-zinc-900 dark:text-white mt-1">0</div>
-                        </div>
-                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Total Balance Due</div>
-                            <div id="guardianTotalBalance" class="text-2xl font-black text-gold-500 mt-1">₱0.00</div>
-                        </div>
-                        <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400">Total Paid</div>
-                            <div id="guardianTotalPaid" class="text-2xl font-black text-zinc-900 dark:text-white mt-1">₱0.00</div>
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
+                            Logged in as <span id="guardianNameInline" class="font-bold text-zinc-900 dark:text-white">Guardian</span>
                         </div>
                     </div>
+                </section>
+
+                <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
+                            <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Students</div>
+                            <div id="guardianPaymentStudentCount" class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">0</div>
+                        </div>
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
+                            <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Total Paid</div>
+                            <div id="guardianPaymentTotalPaid" class="mt-2 text-2xl font-black text-emerald-600">₱0.00</div>
+                        </div>
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
+                            <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Total Balance</div>
+                            <div id="guardianPaymentTotalBalance" class="mt-2 text-2xl font-black text-gold-500">₱0.00</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <section class="mt-8 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">
+                <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-xl font-black text-zinc-900 dark:text-white">Payment Breakdown</h2>
+                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Each row stays compact so the list scales better as more students are linked.</p>
+                    </div>
+                    <div class="rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                        Linked guardian account summary
+                    </div>
                 </div>
-            </div>
-
-            <div class="mb-6">
-                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">Your Students</h1>
-                <p class="text-zinc-500 dark:text-zinc-400 mt-2">Tap a student name to open the full session, schedule, and payment tracker in a modal.</p>
-            </div>
-
-            <div id="guardianStudentsList" class="grid grid-cols-1 gap-4"></div>
+                <div id="guardianPaymentsList" class="grid grid-cols-1 gap-4"></div>
+            </section>
         </div>
     </main>
 

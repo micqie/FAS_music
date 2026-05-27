@@ -511,43 +511,6 @@
             return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
         }
 
-        async function fetchRoomsForBranch(branchId) {
-            const key = Number(branchId || 0);
-            if (key > 0 && Array.isArray(availableRoomsByBranch[key])) {
-                return availableRoomsByBranch[key];
-            }
-            try {
-                let url = `${baseApiUrl}/students.php?action=get-available-rooms`;
-                if (key > 0) {
-                    url += `&branch_id=${key}`;
-                }
-                const response = await axios.get(url);
-                const data = response.data;
-                const rooms = data.success && Array.isArray(data.rooms) ? data.rooms : [];
-                availableRoomsByBranch[key] = rooms;
-                return rooms;
-            } catch (error) {
-                console.error('Failed to load rooms:', error);
-                return [];
-            }
-        }
-
-        async function populateAssignRoomDropdown(req) {
-            const roomEl = document.getElementById('assignRequestRoom');
-            if (!roomEl) return;
-
-            roomEl.innerHTML = '<option value="">Select room...</option>';
-            const rooms = await fetchRoomsForBranch(req?.branch_id || 0);
-            if (!rooms.length) {
-                roomEl.innerHTML = '<option value="">No available rooms in this branch</option>';
-                return;
-            }
-            roomEl.innerHTML = '<option value="">Select room...</option>' + rooms.map(room => {
-                const label = `${escapeHtml(room.room_name || 'Room')} (${escapeHtml(room.room_type || 'Room')}, cap ${Number(room.capacity || 1)})`;
-                return `<option value="${escapeHtml(room.room_name || '')}">${label}</option>`;
-            }).join('');
-        }
-
         async function loadPendingRequests() {
             const tableBody = document.getElementById('pendingRequestsTable');
             const countEl = document.getElementById('pendingRequestCount');
@@ -698,7 +661,6 @@
 
         function updateAssignRequestRecurringSummary() {
             const summaryEl = document.getElementById('assignRequestRecurringSummary');
-            const room = document.getElementById('assignRequestRoom')?.value || '';
             if (!summaryEl) return;
 
             const slots = collectAssignRequestSlots();
@@ -707,9 +669,8 @@
                 return;
             }
 
-            const roomText = room ? ` in ${room}` : '';
             const slotText = slots.map(slot => `${slot.day_of_week}, ${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`).join('; ');
-            summaryEl.textContent = `Reserved weekly on ${slotText}${roomText}. Other students will no longer be offered these recurring slots.`;
+            summaryEl.textContent = `Reserved weekly on ${slotText}. Other students will no longer be offered these recurring slots.`;
         }
 
         function renderAssignRequestSlotRow(slot = {}) {
@@ -1101,7 +1062,6 @@
             const hintEl = document.getElementById('assignRequestAvailabilityHint');
             const teacherId = Number(document.getElementById('assignRequestTeacherSelect')?.value || 0);
             const startDate = document.getElementById('assignRequestDate')?.value || '';
-            const roomName = document.getElementById('assignRequestRoom')?.value || '';
             if (!listEl || !hintEl) return;
 
             if (!activeAssignRequest || !teacherId) {
@@ -1120,7 +1080,6 @@
             try {
                 let url = `${baseApiUrl}/students.php?action=get-teacher-available-slots&teacher_id=${encodeURIComponent(teacherId)}&branch_id=${encodeURIComponent(activeAssignRequest.branch_id || managerBranchId || 0)}&student_id=${encodeURIComponent(activeAssignRequest.student_id || 0)}`;
                 if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
-                if (roomName) url += `&room_name=${encodeURIComponent(roomName)}`;
                 const response = await axios.get(url);
                 const data = response.data || {};
                 renderAssignRequestAvailability(Array.isArray(data.slots) ? data.slots : [], startDate);
@@ -1149,10 +1108,9 @@
             const teacherHelp = document.getElementById('assignRequestTeacherSearchHelp');
             const dateEl = document.getElementById('assignRequestDate');
             const slotsContainer = document.getElementById('assignRequestSlotsContainer');
-            const roomEl = document.getElementById('assignRequestRoom');
             const notesEl = document.getElementById('assignRequestNotes');
 
-            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !roomEl || !notesEl) return;
+            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !notesEl) return;
 
             const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
             const instrumentSummary = Array.isArray(req.instruments) && req.instruments.length
@@ -1197,8 +1155,6 @@
                 start_time: '',
                 end_time: ''
             });
-            await populateAssignRoomDropdown(req);
-            roomEl.value = '';
             notesEl.value = '';
             updateAssignRequestRecurringSummary();
             await loadAssignRequestAvailability();
@@ -1239,7 +1195,6 @@
             const assignedDate = document.getElementById('assignRequestDate')?.value || '';
             const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
             const assignedSlots = collectAssignRequestSlots();
-            const assignedRoom = document.getElementById('assignRequestRoom')?.value?.trim() || '';
             const adminNotes = document.getElementById('assignRequestNotes')?.value?.trim() || '';
 
             if (!requestId || !teacherId || !assignedDate || !assignedSlots.length) {
@@ -1269,8 +1224,7 @@
                 assigned_day_of_week: primarySlot.day_of_week,
                 assigned_start_time: primarySlot.start_time,
                 assigned_end_time: primarySlot.end_time,
-                assigned_slots: assignedSlots.map(slot => ({ ...slot, room_name: assignedRoom })),
-                assigned_room: assignedRoom,
+                assigned_slots: assignedSlots,
                 admin_notes: adminNotes,
                 branch_id: managerBranchId
             });
@@ -1594,10 +1548,6 @@
             document.getElementById('walkinPackageSelect')?.addEventListener('change', updateWalkinPackageUI);
             document.getElementById('walkinPaymentType')?.addEventListener('change', updateWalkinPackageUI);
             document.getElementById('assignRequestDate')?.addEventListener('change', () => {
-                updateAssignRequestRecurringSummary();
-                loadAssignRequestAvailability();
-            });
-            document.getElementById('assignRequestRoom')?.addEventListener('change', () => {
                 updateAssignRequestRecurringSummary();
                 loadAssignRequestAvailability();
             });

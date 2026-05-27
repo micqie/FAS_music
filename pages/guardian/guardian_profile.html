@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Guardian Profile | Father & Sons Music</title>
+    <script>(function(){ var t=localStorage.getItem('theme')||'light'; document.documentElement.classList.toggle('dark',t==='dark'); })();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/portal.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .portal-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); }
+        html.dark .portal-nav { background: rgba(15,17,21,0.92); }
+        .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
+    <div id="guardianProfileRoot"></div>
+
+    <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-3 sm:gap-6">
+            <a href="guardian_students.html" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
+            </a>
+            <div class="hidden md:block">
+                <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Guardian Portal</div>
+                <div class="text-sm text-zinc-500 dark:text-zinc-300">Profile</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="guardianMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-zinc-300 dark:border-white/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200" aria-label="Open menu">
+                <i class="fas fa-bars text-lg"></i>
+            </button>
+            <div class="hidden md:flex items-center gap-4">
+                <div class="flex flex-col text-right">
+                    <span id="guardianNavName" class="text-sm font-semibold text-zinc-900 dark:text-white">Guardian</span>
+                    <span class="text-[10px] uppercase tracking-widest text-gold-500 font-bold">Account</span>
+                </div>
+                <button onclick="logout()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
+                    <i class="fas fa-sign-out-alt mr-2 text-gold-500"></i>Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <aside class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-zinc-200 dark:border-white/5">
+        <div class="px-6 space-y-8 flex-1 mt-4">
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Guardian Menu</h3>
+                <nav class="space-y-2">
+                    <a href="guardian_students.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-user-graduate mr-3 text-zinc-500"></i> Students</a>
+                    <a href="guardian_payments.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-wallet mr-3 text-zinc-500"></i> Payments</a>
+                    <a href="guardian_absences.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-notes-medical mr-3 text-zinc-500"></i> Absence Requests</a>
+                    <a href="guardian_profile.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all"><i class="fas fa-user-pen mr-3"></i> Profile</a>
+                </nav>
+            </div>
+        </div>
+    </aside>
+
+    <div id="guardianMobileMenu" class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden hidden">
+        <div class="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-white dark:bg-obsidian border-r border-zinc-200 dark:border-white/10 pt-20 pb-6 flex flex-col shadow-xl">
+            <div class="px-6 space-y-6 flex-1 overflow-y-auto">
+                <div>
+                    <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Guardian Menu</h3>
+                    <nav class="space-y-2">
+                        <a href="guardian_students.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-user-graduate mr-3 text-zinc-500"></i> Students</a>
+                        <a href="guardian_payments.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-wallet mr-3 text-zinc-500"></i> Payments</a>
+                        <a href="guardian_absences.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-notes-medical mr-3 text-zinc-500"></i> Absence Requests</a>
+                        <a href="guardian_profile.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all"><i class="fas fa-user-pen mr-3"></i> Profile</a>
+                    </nav>
+                </div>
+            </div>
+            <div class="px-6 border-t border-zinc-200 dark:border-white/10 pt-4 flex items-center justify-between">
+                <div class="text-xs text-zinc-500 dark:text-zinc-400" id="guardianMobileMenuName">Signed in</div>
+                <button onclick="logout()" class="px-3 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-xs font-semibold transition text-zinc-700 dark:text-zinc-300">
+                    <i class="fas fa-sign-out-alt mr-1 text-gold-400"></i>Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="lg:ml-72 pt-24 pb-8 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto">
+            <div class="mb-8 sm:mb-10">
+                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">Guardian Profile</h1>
+                <p class="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-2">Keep your contact details updated so desk staff can coordinate about payments, schedules, and absences.</p>
+            </div>
+
+            <section class="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                    <div class="h-16 w-16 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center text-2xl font-black shadow-lg shadow-gold-500/20">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <h2 id="guardianProfileHeading" class="mt-5 text-2xl font-black text-zinc-900 dark:text-white">Guardian Profile</h2>
+                    <div class="mt-5 space-y-3">
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
+                            <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Linked Students</div>
+                            <div id="guardianProfileLinkedStudents" class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">0</div>
+                        </div>
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
+                            <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Total Balance</div>
+                            <div id="guardianProfileBalance" class="mt-2 text-2xl font-black text-gold-500">₱0.00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="guardianProfileForm" class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 sm:p-8 shadow-xl dark:shadow-black/40">
+                    <input id="guardianProfileGuardianId" type="hidden">
+                    <input id="guardianProfileUserId" type="hidden">
+                    <div class="grid gap-5 sm:grid-cols-2">
+                        <label class="block">
+                            <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">First Name</span>
+                            <input id="guardianProfileFirstName" type="text" class="mt-2 w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 outline-none focus:border-gold-400">
+                        </label>
+                        <label class="block">
+                            <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Last Name</span>
+                            <input id="guardianProfileLastName" type="text" class="mt-2 w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 outline-none focus:border-gold-400">
+                        </label>
+                        <label class="block">
+                            <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Email</span>
+                            <input id="guardianProfileEmail" type="email" class="mt-2 w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 outline-none focus:border-gold-400">
+                        </label>
+                        <label class="block">
+                            <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Phone</span>
+                            <input id="guardianProfilePhone" type="text" class="mt-2 w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 outline-none focus:border-gold-400">
+                        </label>
+                        <label class="block">
+                            <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Relationship</span>
+                            <select id="guardianProfileRelationship" class="mt-2 w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 outline-none focus:border-gold-400">
+                                <option value="Father">Father</option>
+                                <option value="Mother">Mother</option>
+                                <option value="Legal Guardian">Legal Guardian</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </label>
+                        <label class="block">
+                            <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Occupation</span>
+                            <input id="guardianProfileOccupation" type="text" class="mt-2 w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 outline-none focus:border-gold-400">
+                        </label>
+                    </div>
+                    <label class="block mt-5">
+                        <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Address</span>
+                        <textarea id="guardianProfileAddress" rows="4" class="mt-2 w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 outline-none focus:border-gold-400"></textarea>
+                    </label>
+                    <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Changes here update the guardian account record used across the portal and admin views.</p>
+                        <button id="guardianProfileSaveBtn" type="submit" class="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-zinc-800 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400">
+                            <i class="fas fa-floppy-disk"></i>
+                            Save Profile
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="../../js/mode.js"></script>
+    <button id="themeToggle" aria-label="Toggle dark or light mode"><div class="relative w-6 h-6 flex items-center justify-center"><i id="sunIcon" class="fas fa-sun absolute inset-0 m-auto transition-opacity duration-300"></i><i id="moonIcon" class="fas fa-moon absolute inset-0 m-auto transition-opacity duration-300 opacity-0"></i></div></button>
+    <script src="../../js/index.js"></script>
+</body>
+</html>

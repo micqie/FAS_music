@@ -5,6 +5,8 @@
         let attendanceCalendarEvents = [];
         let attendanceSelectedDate = '';
         let attendanceCalendarMonth = '';
+        let attendanceRoomTrackerModalOpen = false;
+        let deskGuardianAbsenceRequests = [];
 
         function showMessage(message, type = 'error') {
             Swal.fire({
@@ -183,6 +185,187 @@
             if (normalized === 'absent') return 'border-red-200 bg-red-50 text-red-700';
             if (normalized === 'excused') return 'border-slate-200 bg-slate-100 text-slate-700';
             return 'border-sky-200 bg-sky-50 text-sky-700';
+        }
+
+        function openAttendanceRoomTrackerModal() {
+            const modal = document.getElementById('attendanceRoomTrackerModal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.classList.add('overflow-hidden');
+            attendanceRoomTrackerModalOpen = true;
+            if (typeof loadBranchRoomOccupancy === 'function') {
+                loadBranchRoomOccupancy();
+            }
+        }
+
+        function closeAttendanceRoomTrackerModal() {
+            const modal = document.getElementById('attendanceRoomTrackerModal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.classList.remove('overflow-hidden');
+            attendanceRoomTrackerModalOpen = false;
+        }
+
+        async function fetchDeskGuardianAbsenceRequests(status = 'Pending') {
+            const url = `${baseApiUrl}/attendance.php?action=desk-guardian-absence-list&branch_id=${encodeURIComponent(deskBranchId || '')}&status=${encodeURIComponent(status)}`;
+            const response = await axios.get(url);
+            return response.data;
+        }
+
+        async function updateDeskGuardianAbsenceRequestStatus(requestId, status, reviewedNotes = '') {
+            const payload = {
+                request_id: requestId,
+                status,
+                reviewed_by_user_id: Number(Auth.getUser()?.user_id || 0),
+                reviewed_notes: reviewedNotes
+            };
+            const response = await axios.post(`${baseApiUrl}/attendance.php?action=guardian-absence-update-status`, payload);
+            return response.data;
+        }
+
+        function renderDeskGuardianAbsenceStatus(status) {
+            const value = String(status || 'Pending');
+            const normalized = value.toLowerCase();
+            const cls = normalized === 'approved'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : normalized === 'declined'
+                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                    : normalized === 'reviewed'
+                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                        : 'border-amber-200 bg-amber-50 text-amber-700';
+            return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${cls}">${escapeHtml(value)}</span>`;
+        }
+
+        function renderDeskGuardianAbsenceRequestsList(items) {
+            const rows = Array.isArray(items) ? items : [];
+            if (!rows.length) {
+                return `
+                    <div class="rounded-3xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
+                        No pending guardian absence requests for this branch.
+                    </div>
+                `;
+            }
+
+            return rows.map((row) => `
+                <div class="rounded-3xl border border-slate-200 bg-white p-5">
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.2em] text-slate-400 font-bold">Student</div>
+                            <div class="mt-2 text-lg font-black text-slate-900">${escapeHtml(row.student_name || 'Student')}</div>
+                            <div class="mt-1 text-sm text-slate-500">${escapeHtml(row.guardian_name || 'Guardian')} • ${escapeHtml(row.branch_name || deskBranchName || 'Branch')}</div>
+                        </div>
+                        ${renderDeskGuardianAbsenceStatus(row.status)}
+                    </div>
+                    <div class="mt-4 grid gap-3 md:grid-cols-3 text-sm">
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <div class="text-xs uppercase tracking-[0.16em] text-slate-400 font-bold">Session Date</div>
+                            <div class="mt-2 font-semibold text-slate-900">${escapeHtml(formatDateLong(row.session_date || ''))}</div>
+                        </div>
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <div class="text-xs uppercase tracking-[0.16em] text-slate-400 font-bold">Reason</div>
+                            <div class="mt-2 font-semibold text-slate-900">${escapeHtml(row.reason || '—')}</div>
+                        </div>
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <div class="text-xs uppercase tracking-[0.16em] text-slate-400 font-bold">Submitted</div>
+                            <div class="mt-2 font-semibold text-slate-900">${escapeHtml(row.created_at ? new Date(row.created_at).toLocaleString() : '—')}</div>
+                        </div>
+                    </div>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                        ${escapeHtml(row.notes || 'No additional notes from guardian.')}
+                    </div>
+                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                        <button type="button" class="guardian-absence-action inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 transition" data-request-id="${Number(row.request_id || 0)}" data-status="Reviewed">
+                            <i class="fas fa-eye"></i>
+                            Mark Reviewed
+                        </button>
+                        <button type="button" class="guardian-absence-action inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition" data-request-id="${Number(row.request_id || 0)}" data-status="Approved">
+                            <i class="fas fa-check"></i>
+                            Approve
+                        </button>
+                        <button type="button" class="guardian-absence-action inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition" data-request-id="${Number(row.request_id || 0)}" data-status="Declined">
+                            <i class="fas fa-xmark"></i>
+                            Decline
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function refreshDeskGuardianAbsenceCount() {
+            try {
+                const data = await fetchDeskGuardianAbsenceRequests('Pending');
+                deskGuardianAbsenceRequests = Array.isArray(data?.requests) ? data.requests : [];
+                const countEl = document.getElementById('attendanceGuardianAbsenceCount');
+                if (countEl) countEl.textContent = String(deskGuardianAbsenceRequests.length);
+            } catch (error) {
+                const countEl = document.getElementById('attendanceGuardianAbsenceCount');
+                if (countEl) countEl.textContent = '0';
+            }
+        }
+
+        async function openDeskGuardianAbsenceModal() {
+            try {
+                const data = await fetchDeskGuardianAbsenceRequests('Pending');
+                deskGuardianAbsenceRequests = Array.isArray(data?.requests) ? data.requests : [];
+
+                await Swal.fire({
+                    width: 980,
+                    confirmButtonText: 'Close',
+                    confirmButtonColor: '#b8860b',
+                    title: 'Guardian Absence Notices',
+                    html: `
+                        <div class="text-left">
+                            <div class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                Desk staff can review excuses here before following the branch absence policy.
+                            </div>
+                            <div id="deskGuardianAbsenceRequestsList" class="space-y-4">${renderDeskGuardianAbsenceRequestsList(deskGuardianAbsenceRequests)}</div>
+                        </div>
+                    `,
+                    didOpen: () => {
+                        const container = Swal.getHtmlContainer();
+                        if (!container) return;
+                        if (container.dataset.guardianAbsenceBound === 'true') return;
+                        container.dataset.guardianAbsenceBound = 'true';
+                        container.addEventListener('click', async (event) => {
+                            const button = event.target.closest('.guardian-absence-action');
+                            if (!button) return;
+
+                            const requestId = Number(button.getAttribute('data-request-id') || 0);
+                            const status = String(button.getAttribute('data-status') || 'Reviewed');
+                            try {
+                                const notePrompt = await Swal.fire({
+                                    title: `${status} absence request`,
+                                    input: 'text',
+                                    inputLabel: 'Desk notes',
+                                    inputPlaceholder: 'Optional notes for the guardian record',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#b8860b'
+                                });
+                                if (!notePrompt.isConfirmed) return;
+
+                                const result = await updateDeskGuardianAbsenceRequestStatus(requestId, status, notePrompt.value || '');
+                                if (result?.success) {
+                                    deskGuardianAbsenceRequests = deskGuardianAbsenceRequests.filter((row) => Number(row.request_id || 0) !== requestId);
+                                    const listEl = document.getElementById('deskGuardianAbsenceRequestsList');
+                                    if (listEl) {
+                                        listEl.innerHTML = renderDeskGuardianAbsenceRequestsList(deskGuardianAbsenceRequests);
+                                    }
+                                    await refreshDeskGuardianAbsenceCount();
+                                    showMessage(result.message || 'Absence request updated.', 'success');
+                                } else {
+                                    showMessage(result?.error || 'Failed to update absence request.', 'error');
+                                }
+                            } catch (error) {
+                                showMessage(error?.response?.data?.error || 'Failed to update absence request.', 'error');
+                            }
+                        });
+                    }
+                });
+            } catch (error) {
+                showMessage(error?.response?.data?.error || 'Failed to load guardian absence notices.', 'error');
+            }
         }
 
         function setCalendarText(id, value) {
@@ -843,7 +1026,21 @@
                 openAttendanceDayModal(getTodayDateKey());
             });
             document.getElementById('attendanceOpenMakeupBtn')?.addEventListener('click', openMakeupSummaryModal);
+            document.getElementById('attendanceOpenGuardianAbsenceBtn')?.addEventListener('click', openDeskGuardianAbsenceModal);
+            document.getElementById('attendanceOpenRoomTrackerBtn')?.addEventListener('click', openAttendanceRoomTrackerModal);
+            document.getElementById('attendanceCloseRoomTrackerBtn')?.addEventListener('click', closeAttendanceRoomTrackerModal);
+            document.getElementById('attendanceRoomTrackerModal')?.addEventListener('click', (event) => {
+                if (event.target?.id === 'attendanceRoomTrackerModal') {
+                    closeAttendanceRoomTrackerModal();
+                }
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && attendanceRoomTrackerModalOpen) {
+                    closeAttendanceRoomTrackerModal();
+                }
+            });
 
+            await refreshDeskGuardianAbsenceCount();
             await loadAttendanceRows();
         });
 

@@ -3,7 +3,8 @@
             rows: [],
             filtered: [],
             page: 1,
-            pageSize: 5
+            pageSize: 5,
+            roles: []
         };
 
         function showInlineMessage(el, type, text) {
@@ -46,6 +47,57 @@
                 if (timeA !== timeB) return timeB - timeA;
                 return Number(b?.user_id || 0) - Number(a?.user_id || 0);
             });
+        }
+
+        function normalizeAdminRoleLabel(roleName) {
+            const raw = String(roleName || '').trim();
+            if (!raw) return '';
+            if (raw.toLowerCase() === 'manager') return 'Branch Manager';
+            if (['guardian', 'guardians'].includes(raw.toLowerCase())) return 'Guardian';
+            return raw;
+        }
+
+        function normalizeAdminUserRow(user) {
+            const row = { ...(user || {}) };
+            row.role_name = normalizeAdminRoleLabel(row.role_name || '');
+            return row;
+        }
+
+        function renderAdminUsersRoleFilterOptions(roles) {
+            const roleFilter = document.getElementById('adminUsersRoleFilter');
+            if (!roleFilter) return;
+
+            const currentValue = (roleFilter.value || '').trim();
+            const normalizedRoles = Array.from(new Set(
+                (Array.isArray(roles) ? roles : [])
+                    .map(role => normalizeAdminRoleLabel(role))
+                    .filter(Boolean)
+            )).sort((a, b) => a.localeCompare(b));
+
+            adminUsersTableState.roles = normalizedRoles;
+            roleFilter.innerHTML = '<option value="">All Roles</option>' + normalizedRoles
+                .map(role => `<option value="${escapeHtml(role)}">${escapeHtml(role)}</option>`)
+                .join('');
+
+            if (currentValue && normalizedRoles.includes(currentValue)) {
+                roleFilter.value = currentValue;
+            }
+        }
+
+        async function loadAdminUserRoles() {
+            try {
+                const res = await axios.get(`${baseApiUrl}/admin.php?action=get-roles`);
+                const data = res.data || {};
+                if (data.success && Array.isArray(data.roles)) {
+                    renderAdminUsersRoleFilterOptions(data.roles.map(role => role.display_name || role.role_name || ''));
+                    return;
+                }
+            } catch (error) {
+                console.warn('Failed to load admin role filter options', error);
+            }
+
+            const fallbackRoles = (adminUsersTableState.rows || []).map(user => user.role_name || '');
+            renderAdminUsersRoleFilterOptions(fallbackRoles);
         }
 
         function escapeJsString(value) {
@@ -518,7 +570,10 @@
         }
 
         function setAdminUsersRows(rows) {
-            adminUsersTableState.rows = sortNewestUsersFirst(rows);
+            adminUsersTableState.rows = sortNewestUsersFirst((Array.isArray(rows) ? rows : []).map(normalizeAdminUserRow));
+            if (!adminUsersTableState.roles.length) {
+                renderAdminUsersRoleFilterOptions(adminUsersTableState.rows.map(user => user.role_name || ''));
+            }
             filterAdminUsers();
             renderAdminUsersTable();
         }
@@ -749,6 +804,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             bindAdminUsersPage();
             bindAdminUsersCreationForms();
+            loadAdminUserRoles();
             if (typeof loadAdminUsers === 'function') {
                 loadAdminUsers();
             }

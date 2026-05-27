@@ -3035,6 +3035,113 @@ class StudentsApi
         }
     }
 
+    public function updateGuardianProfile()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $guardianId = (int)($data['guardian_id'] ?? 0);
+        $userId = (int)($data['user_id'] ?? 0);
+        $firstName = trim((string)($data['first_name'] ?? ''));
+        $lastName = trim((string)($data['last_name'] ?? ''));
+        $email = trim((string)($data['email'] ?? ''));
+        $phone = trim((string)($data['phone'] ?? ''));
+        $relationship = trim((string)($data['relationship_type'] ?? ''));
+        $occupation = trim((string)($data['occupation'] ?? ''));
+        $address = trim((string)($data['address'] ?? ''));
+
+        if ($guardianId < 1 || $userId < 1) {
+            $this->sendJSON(['error' => 'Guardian account reference is required'], 400);
+        }
+        if ($firstName === '' || $lastName === '' || $email === '') {
+            $this->sendJSON(['error' => 'First name, last name, and email are required'], 400);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->sendJSON(['error' => 'Invalid email address'], 400);
+        }
+
+        $allowedRelationships = ['Father', 'Mother', 'Legal Guardian', 'Other'];
+        if ($relationship !== '' && !in_array($relationship, $allowedRelationships, true)) {
+            $this->sendJSON(['error' => 'Invalid relationship type'], 400);
+        }
+
+        try {
+            $stmtGuardian = $this->conn->prepare("SELECT guardian_id, email FROM tbl_guardians WHERE guardian_id = ? LIMIT 1");
+            $stmtGuardian->execute([$guardianId]);
+            $guardian = $stmtGuardian->fetch(PDO::FETCH_ASSOC);
+            if (!$guardian) {
+                $this->sendJSON(['error' => 'Guardian record not found'], 404);
+            }
+
+            $stmtUser = $this->conn->prepare("
+                SELECT u.user_id, u.email, r.role_name
+                FROM tbl_users u
+                INNER JOIN tbl_roles r ON r.role_id = u.role_id
+                WHERE u.user_id = ?
+                LIMIT 1
+            ");
+            $stmtUser->execute([$userId]);
+            $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            if (!$user || !in_array(strtolower(trim((string)($user['role_name'] ?? ''))), ['guardian', 'guardians'], true)) {
+                $this->sendJSON(['error' => 'Guardian user account not found'], 404);
+            }
+
+            $dupGuardian = $this->conn->prepare("SELECT guardian_id FROM tbl_guardians WHERE email = ? AND guardian_id <> ? LIMIT 1");
+            $dupGuardian->execute([$email, $guardianId]);
+            if ($dupGuardian->fetch(PDO::FETCH_ASSOC)) {
+                $this->sendJSON(['error' => 'Email is already used by another guardian record'], 400);
+            }
+
+            $dupUser = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE email = ? AND user_id <> ? LIMIT 1");
+            $dupUser->execute([$email, $userId]);
+            if ($dupUser->fetch(PDO::FETCH_ASSOC)) {
+                $this->sendJSON(['error' => 'Email is already used by another account'], 400);
+            }
+
+            $this->conn->beginTransaction();
+
+            $updateGuardian = $this->conn->prepare("
+                UPDATE tbl_guardians
+                SET first_name = ?, last_name = ?, email = ?, phone = ?, relationship_type = ?, occupation = ?, address = ?
+                WHERE guardian_id = ?
+            ");
+            $updateGuardian->execute([
+                $firstName,
+                $lastName,
+                $email,
+                $phone !== '' ? $phone : null,
+                $relationship !== '' ? $relationship : 'Other',
+                $occupation !== '' ? $occupation : null,
+                $address !== '' ? $address : null,
+                $guardianId
+            ]);
+
+            $updateUser = $this->conn->prepare("
+                UPDATE tbl_users
+                SET username = ?, email = ?, first_name = ?, last_name = ?, phone = ?
+                WHERE user_id = ?
+            ");
+            $updateUser->execute([
+                $email,
+                $email,
+                $firstName,
+                $lastName,
+                $phone !== '' ? $phone : null,
+                $userId
+            ]);
+
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'message' => 'Guardian profile updated successfully.']);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     /** Ensure tbl_session_packages exists for package selection flows */
     private function ensureSessionPackagesTable()
     {
@@ -5110,6 +5217,9 @@ switch ($action) {
         break;
     case 'get-guardian-portal':
         $studentsApi->getGuardianPortal();
+        break;
+    case 'update-guardian-profile':
+        $studentsApi->updateGuardianProfile();
         break;
     case 'get-student-request-meta':
         $studentsApi->getStudentRequestMeta();

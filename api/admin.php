@@ -897,13 +897,14 @@ class Admin
                     u.email,
                     u.phone,
                     u.status,
-                    COALESCE({$userBranchIdSql}, t.branch_id, s.branch_id, sgs.branch_id) AS branch_id,
+                    COALESCE({$userBranchIdSql}, t.branch_id, s.branch_id, gb.branch_id) AS branch_id,
                     CASE
-                        WHEN r.role_name = 'Manager' THEN 'Branch Manager'
-                        WHEN r.role_name = 'Staff' THEN 'Staff'
+                        WHEN LOWER(TRIM(r.role_name)) = 'manager' THEN 'Branch Manager'
+                        WHEN LOWER(TRIM(r.role_name)) = 'staff' THEN 'Staff'
+                        WHEN LOWER(TRIM(r.role_name)) IN ('guardian', 'guardians') THEN 'Guardian'
                         ELSE r.role_name
                     END AS role_name,
-                    COALESCE({$userBranchNameSql} bt.branch_name, bs.branch_name, bg.branch_name, '') AS branch_name
+                    COALESCE({$userBranchNameSql} bt.branch_name, bs.branch_name, gb.branch_name, '') AS branch_name
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 LEFT JOIN tbl_teachers t ON t.user_id = u.user_id
@@ -911,10 +912,17 @@ class Admin
                 {$userBranchJoinSql}
                 LEFT JOIN tbl_students s ON s.email = u.email
                 LEFT JOIN tbl_branches bs ON s.branch_id = bs.branch_id
-                LEFT JOIN tbl_guardians g ON g.email = u.email
-                LEFT JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id AND sg.is_primary_guardian = 'Y'
-                LEFT JOIN tbl_students sgs ON sgs.student_id = sg.student_id
-                LEFT JOIN tbl_branches bg ON sgs.branch_id = bg.branch_id
+                LEFT JOIN (
+                    SELECT
+                        g.email,
+                        MIN(sgs.branch_id) AS branch_id,
+                        GROUP_CONCAT(DISTINCT bg.branch_name ORDER BY bg.branch_name SEPARATOR ', ') AS branch_name
+                    FROM tbl_guardians g
+                    LEFT JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
+                    LEFT JOIN tbl_students sgs ON sgs.student_id = sg.student_id
+                    LEFT JOIN tbl_branches bg ON sgs.branch_id = bg.branch_id
+                    GROUP BY g.email
+                ) gb ON gb.email = u.email
                 ORDER BY r.role_name, u.first_name, u.last_name, u.user_id
             ";
             $stmt = $this->conn->prepare($sql);
@@ -927,6 +935,42 @@ class Admin
             ]);
         } catch (Exception $e) {
             $this->sendJSON(['error' => 'Failed to load users: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getRoles()
+    {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT role_id, role_name
+                FROM tbl_roles
+                ORDER BY role_name ASC
+            ");
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $roles = array_map(function ($row) {
+                $rawName = trim((string)($row['role_name'] ?? ''));
+                $displayName = $rawName;
+                if (strcasecmp($rawName, 'Manager') === 0) {
+                    $displayName = 'Branch Manager';
+                } elseif (strcasecmp($rawName, 'Guardians') === 0 || strcasecmp($rawName, 'Guardian') === 0) {
+                    $displayName = 'Guardian';
+                }
+
+                return [
+                    'role_id' => (int)($row['role_id'] ?? 0),
+                    'role_name' => $rawName,
+                    'display_name' => $displayName
+                ];
+            }, $rows);
+
+            $this->sendJSON([
+                'success' => true,
+                'roles' => $roles
+            ]);
+        } catch (Exception $e) {
+            $this->sendJSON(['error' => 'Failed to load roles: ' . $e->getMessage()], 500);
         }
     }
 
@@ -1188,6 +1232,9 @@ switch ($action) {
         break;
     case 'get-users':
         $admin->getUsers();
+        break;
+    case 'get-roles':
+        $admin->getRoles();
         break;
     case 'create-user':
         $admin->createUser(file_get_contents('php://input'));

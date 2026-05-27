@@ -123,6 +123,266 @@ class AttendanceApi
         }
     }
 
+    private function ensureGuardianAbsenceRequestsTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_guardian_absence_requests (
+                    request_id INT AUTO_INCREMENT PRIMARY KEY,
+                    guardian_id INT NOT NULL,
+                    guardian_user_id INT NULL,
+                    student_id INT NOT NULL,
+                    branch_id INT NULL,
+                    session_date DATE NOT NULL,
+                    reason VARCHAR(120) NOT NULL,
+                    notes TEXT NULL,
+                    status ENUM('Pending','Reviewed','Approved','Declined') NOT NULL DEFAULT 'Pending',
+                    reviewed_notes TEXT NULL,
+                    reviewed_by_user_id INT NULL,
+                    reviewed_at DATETIME NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+            try { $this->conn->exec("CREATE INDEX idx_guardian_absence_branch_status ON tbl_guardian_absence_requests(branch_id, status, session_date)"); } catch (PDOException $e) {}
+            try { $this->conn->exec("CREATE INDEX idx_guardian_absence_guardian ON tbl_guardian_absence_requests(guardian_id, created_at)"); } catch (PDOException $e) {}
+            try { $this->conn->exec("CREATE INDEX idx_guardian_absence_student_date ON tbl_guardian_absence_requests(student_id, session_date)"); } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+            return false;
+        }
+        return $this->tableExists('tbl_guardian_absence_requests');
+    }
+
+    private function getGuardianRecordByEmail($email)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT guardian_id, first_name, last_name, email, phone
+            FROM tbl_guardians
+            WHERE LOWER(TRIM(email)) = LOWER(?)
+            LIMIT 1
+        ");
+        $stmt->execute([trim((string)$email)]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function submitGuardianAbsenceRequest()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+        if (!$this->ensureGuardianAbsenceRequestsTable()) {
+            $this->sendJSON(['error' => 'Absence request storage is unavailable'], 500);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $guardianEmail = trim((string)($data['guardian_email'] ?? ''));
+        $guardianUserId = (int)($data['guardian_user_id'] ?? 0);
+        $studentId = (int)($data['student_id'] ?? 0);
+        $sessionDate = trim((string)($data['session_date'] ?? ''));
+        $reason = trim((string)($data['reason'] ?? ''));
+        $notes = trim((string)($data['notes'] ?? ''));
+
+        if ($guardianEmail === '' || $studentId < 1 || $sessionDate === '' || $reason === '') {
+            $this->sendJSON(['error' => 'Guardian email, student, session date, and reason are required'], 400);
+        }
+
+        $guardian = $this->getGuardianRecordByEmail($guardianEmail);
+        if (!$guardian) {
+            $this->sendJSON(['error' => 'Guardian record not found'], 404);
+        }
+
+        $student = $this->getStudentById($studentId);
+        if (!$student) {
+            $this->sendJSON(['error' => 'Student not found'], 404);
+        }
+
+        $linkStmt = $this->conn->prepare("
+            SELECT student_guardian_id
+            FROM tbl_student_guardians
+            WHERE guardian_id = ? AND student_id = ?
+            LIMIT 1
+        ");
+        $linkStmt->execute([(int)$guardian['guardian_id'], $studentId]);
+        if (!$linkStmt->fetch(PDO::FETCH_ASSOC)) {
+            $this->sendJSON(['error' => 'This guardian is not linked to the selected student'], 403);
+        }
+
+        $dateObj = DateTime::createFromFormat('Y-m-d', $sessionDate);
+        if (!$dateObj || $dateObj->format('Y-m-d') !== $sessionDate) {
+            $this->sendJSON(['error' => 'Invalid session date'], 400);
+        }
+
+        try {
+            $dupStmt = $this->conn->prepare("
+                SELECT request_id
+                FROM tbl_guardian_absence_requests
+                WHERE guardian_id = ? AND student_id = ? AND session_date = ? AND status IN ('Pending','Reviewed','Approved')
+                LIMIT 1
+            ");
+            $dupStmt->execute([(int)$guardian['guardian_id'], $studentId, $sessionDate]);
+            if ($dupStmt->fetch(PDO::FETCH_ASSOC)) {
+                $this->sendJSON(['error' => 'An absence request already exists for this student and date'], 400);
+            }
+
+            $insert = $this->conn->prepare("
+                INSERT INTO tbl_guardian_absence_requests
+                (guardian_id, guardian_user_id, student_id, branch_id, session_date, reason, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $insert->execute([
+                (int)$guardian['guardian_id'],
+                $guardianUserId > 0 ? $guardianUserId : null,
+                $studentId,
+                (int)($student['branch_id'] ?? 0) ?: null,
+                $sessionDate,
+                substr($reason, 0, 120),
+                $notes !== '' ? $notes : null
+            ]);
+
+            $this->sendJSON(['success' => true, 'message' => 'Absence notice sent to desk staff.']);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getGuardianAbsenceRequests()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+        if (!$this->ensureGuardianAbsenceRequestsTable()) {
+            $this->sendJSON(['success' => true, 'requests' => []]);
+        }
+
+        $guardianEmail = trim((string)($_GET['guardian_email'] ?? ''));
+        if ($guardianEmail === '') {
+            $this->sendJSON(['error' => 'guardian_email is required'], 400);
+        }
+
+        $guardian = $this->getGuardianRecordByEmail($guardianEmail);
+        if (!$guardian) {
+            $this->sendJSON(['success' => true, 'requests' => []]);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    gar.request_id,
+                    gar.student_id,
+                    gar.session_date,
+                    gar.reason,
+                    gar.notes,
+                    gar.status,
+                    gar.reviewed_notes,
+                    gar.reviewed_at,
+                    gar.created_at,
+                    s.first_name AS student_first_name,
+                    s.last_name AS student_last_name,
+                    b.branch_name
+                FROM tbl_guardian_absence_requests gar
+                INNER JOIN tbl_students s ON s.student_id = gar.student_id
+                LEFT JOIN tbl_branches b ON b.branch_id = gar.branch_id
+                WHERE gar.guardian_id = ?
+                ORDER BY gar.created_at DESC, gar.request_id DESC
+            ");
+            $stmt->execute([(int)$guardian['guardian_id']]);
+            $this->sendJSON(['success' => true, 'requests' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getDeskGuardianAbsenceRequests()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+        if (!$this->ensureGuardianAbsenceRequestsTable()) {
+            $this->sendJSON(['success' => true, 'requests' => []]);
+        }
+
+        $branchId = (int)($_GET['branch_id'] ?? 0);
+        $status = trim((string)($_GET['status'] ?? 'Pending'));
+
+        try {
+            $sql = "
+                SELECT
+                    gar.request_id,
+                    gar.student_id,
+                    gar.branch_id,
+                    gar.session_date,
+                    gar.reason,
+                    gar.notes,
+                    gar.status,
+                    gar.reviewed_notes,
+                    gar.reviewed_at,
+                    gar.created_at,
+                    s.first_name AS student_first_name,
+                    s.last_name AS student_last_name,
+                    g.first_name AS guardian_first_name,
+                    g.last_name AS guardian_last_name,
+                    g.phone AS guardian_phone,
+                    b.branch_name
+                FROM tbl_guardian_absence_requests gar
+                INNER JOIN tbl_students s ON s.student_id = gar.student_id
+                INNER JOIN tbl_guardians g ON g.guardian_id = gar.guardian_id
+                LEFT JOIN tbl_branches b ON b.branch_id = gar.branch_id
+                WHERE 1=1
+            ";
+            $params = [];
+            if ($branchId > 0) {
+                $sql .= " AND gar.branch_id = ? ";
+                $params[] = $branchId;
+            }
+            if ($status !== '') {
+                $sql .= " AND gar.status = ? ";
+                $params[] = $status;
+            }
+            $sql .= " ORDER BY gar.created_at DESC, gar.request_id DESC ";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            $this->sendJSON(['success' => true, 'requests' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function updateGuardianAbsenceRequestStatus()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+        if (!$this->ensureGuardianAbsenceRequestsTable()) {
+            $this->sendJSON(['error' => 'Absence request storage is unavailable'], 500);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $requestId = (int)($data['request_id'] ?? 0);
+        $status = trim((string)($data['status'] ?? ''));
+        $reviewedBy = (int)($data['reviewed_by_user_id'] ?? 0);
+        $reviewedNotes = trim((string)($data['reviewed_notes'] ?? ''));
+
+        if ($requestId < 1 || !in_array($status, ['Reviewed', 'Approved', 'Declined'], true)) {
+            $this->sendJSON(['error' => 'Request and valid status are required'], 400);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                UPDATE tbl_guardian_absence_requests
+                SET status = ?, reviewed_notes = ?, reviewed_by_user_id = ?, reviewed_at = NOW()
+                WHERE request_id = ?
+            ");
+            $stmt->execute([
+                $status,
+                $reviewedNotes !== '' ? $reviewedNotes : null,
+                $reviewedBy > 0 ? $reviewedBy : null,
+                $requestId
+            ]);
+            $this->sendJSON(['success' => true, 'message' => 'Absence request updated.']);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     private function formatLongDate($dateYmd)
     {
         $timestamp = strtotime((string)$dateYmd);
@@ -1393,6 +1653,18 @@ switch ($action) {
         break;
     case 'desk-recent':
         $api->getDeskRecent();
+        break;
+    case 'guardian-absence-submit':
+        $api->submitGuardianAbsenceRequest();
+        break;
+    case 'guardian-absence-list':
+        $api->getGuardianAbsenceRequests();
+        break;
+    case 'desk-guardian-absence-list':
+        $api->getDeskGuardianAbsenceRequests();
+        break;
+    case 'guardian-absence-update-status':
+        $api->updateGuardianAbsenceRequestStatus();
         break;
     default:
         $api->sendJSON(['error' => 'Invalid action'], 400);
