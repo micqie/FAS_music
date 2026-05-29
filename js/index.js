@@ -485,7 +485,7 @@ function initLoginForm() {
                     } else if (roleCategory === 'student') {
                         window.location.href = 'pages/student/student_dashboard.html';
                     } else if (roleCategory === 'guardian') {
-                        window.location.href = 'pages/guardian/guardian_students.html';
+                        window.location.href = 'pages/guardian/guardian_dashboard.html';
                     } else {
                         window.location.href = 'index.html';
                     }
@@ -2378,6 +2378,140 @@ function getGuardianSessionRows(item) {
     });
 }
 
+function isGuardianUpcomingSessionRow(row) {
+    const raw = String(row?.attendance_status || row?.status || 'Scheduled').trim().toLowerCase();
+    if (['present', 'late', 'completed', 'absent', 'cancelled', 'no show', 'cancelled_by_teacher', 'rescheduled'].includes(raw)) {
+        return false;
+    }
+    if (!row?.session_date) return false;
+    const sessionDate = new Date(`${row.session_date}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return sessionDate >= today;
+}
+
+function getNextUpcomingSession(item) {
+    const rows = getGuardianSessionRows(item).filter(isGuardianUpcomingSessionRow);
+    return rows[0] || null;
+}
+
+function formatGuardianNextSessionLabel(item) {
+    const enrollment = item?.current_enrollment || null;
+    const nextRow = getNextUpcomingSession(item);
+    if (nextRow) {
+        const dateLabel = formatDateLong(nextRow.session_date);
+        const timeLabel = nextRow.start_time && nextRow.end_time
+            ? `${formatTime12Hour(nextRow.start_time)} - ${formatTime12Hour(nextRow.end_time)}`
+            : (nextRow.start_time ? formatTime12Hour(nextRow.start_time) : '');
+        return `${dateLabel}${timeLabel ? ` • ${timeLabel}` : ''}`;
+    }
+    const scheduleDate = enrollment?.first_session_date || enrollment?.start_date;
+    if (scheduleDate) {
+        return `First lesson: ${formatDateLong(scheduleDate)}`;
+    }
+    return 'No upcoming session scheduled yet';
+}
+
+function collectGuardianUpcomingSessions(items, limit = 6) {
+    const rows = [];
+    (Array.isArray(items) ? items : []).forEach((item, index) => {
+        getGuardianSessionRows(item)
+            .filter(isGuardianUpcomingSessionRow)
+            .forEach((session) => {
+                rows.push({
+                    item,
+                    index,
+                    session,
+                    sortTime: new Date(`${session.session_date}T${session.start_time || '00:00:00'}`).getTime() || 0
+                });
+            });
+    });
+    return rows.sort((a, b) => a.sortTime - b.sortTime).slice(0, limit);
+}
+
+function renderGuardianDashboardAlerts(students) {
+    const rows = Array.isArray(students) ? students : [];
+    const dueStudents = rows.filter((item) => getGuardianPaymentMetrics(item).totalBalance > 0);
+    const alerts = [];
+
+    if (dueStudents.length > 0) {
+        alerts.push(`
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-sm text-amber-900 dark:text-amber-100">
+                    <span class="font-bold">${dueStudents.length} student${dueStudents.length === 1 ? '' : 's'}</span> still have an outstanding balance.
+                </div>
+                <a href="guardian_payments.html" class="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-500 transition">Review payments</a>
+            </div>
+        `);
+    }
+
+    const upcoming = collectGuardianUpcomingSessions(rows, 1);
+    if (upcoming.length > 0) {
+        const entry = upcoming[0];
+        const name = getGuardianStudentName(entry.item, entry.index);
+        const when = formatGuardianNextSessionLabel(entry.item);
+        alerts.push(`
+            <div class="rounded-2xl border border-blue-200 bg-blue-50 dark:border-blue-500/20 dark:bg-blue-500/10 px-4 py-3 text-sm text-blue-900 dark:text-blue-100">
+                <span class="font-bold">Next lesson:</span> ${escapeHtml(name)} — ${escapeHtml(when)}
+            </div>
+        `);
+    }
+
+    if (!alerts.length) {
+        return `
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+                <i class="fas fa-circle-check mr-2"></i>You're all caught up. No urgent balance or session alerts right now.
+            </div>
+        `;
+    }
+    return alerts.join('');
+}
+
+function renderGuardianDashboardUpcomingList(items) {
+    const upcoming = collectGuardianUpcomingSessions(items, 6);
+    if (!upcoming.length) {
+        return `<div class="rounded-2xl border border-dashed border-zinc-200 dark:border-white/10 px-4 py-8 text-center text-sm text-zinc-500">No upcoming sessions in the schedule yet.</div>`;
+    }
+    return upcoming.map((entry) => {
+        const name = getGuardianStudentName(entry.item, entry.index);
+        const session = entry.session;
+        const when = formatGuardianNextSessionLabel(entry.item);
+        const teacher = session.teacher_name || 'Teacher pending';
+        const room = session.room_name || 'Room pending';
+        return `
+            <button type="button" onclick="window.location.href='guardian_students.html'" class="w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 text-left hover:border-gold-300 transition">
+                <div class="font-bold text-zinc-900 dark:text-white">${escapeHtml(name)}</div>
+                <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">${escapeHtml(when)}</div>
+                <div class="mt-1 text-xs text-zinc-500">${escapeHtml(teacher)} • ${escapeHtml(room)}</div>
+            </button>
+        `;
+    }).join('');
+}
+
+function renderGuardianDashboardBalanceList(items) {
+    const rows = (Array.isArray(items) ? items : [])
+        .map((item, index) => ({ item, index, metrics: getGuardianPaymentMetrics(item) }))
+        .filter((row) => row.metrics.totalBalance > 0)
+        .sort((a, b) => b.metrics.totalBalance - a.metrics.totalBalance);
+
+    if (!rows.length) {
+        return `<div class="rounded-2xl border border-dashed border-zinc-200 dark:border-white/10 px-4 py-8 text-center text-sm text-emerald-600 dark:text-emerald-300">All linked students are fully paid for now.</div>`;
+    }
+
+    return rows.map(({ item, index, metrics }) => {
+        const name = getGuardianStudentName(item, index);
+        return `
+            <a href="guardian_payments.html" class="block rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 hover:border-gold-300 transition">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="font-bold text-zinc-900 dark:text-white">${escapeHtml(name)}</div>
+                    <div class="text-lg font-black text-gold-600 dark:text-gold-400">${formatCurrencyPHP(metrics.totalBalance)}</div>
+                </div>
+                <div class="mt-1 text-xs text-zinc-500">Registration + package balance</div>
+            </a>
+        `;
+    }).join('');
+}
+
 function buildGuardianSessionDetailMarkup(row) {
     const dateLabel = row.session_date ? formatDateLong(row.session_date) : 'Date pending';
     const timeLabel = row.start_time && row.end_time
@@ -2466,6 +2600,10 @@ function renderGuardianStudentCard(item, index) {
                 <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">${statusMetrics.upcoming} upcoming</span>
                 <span class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-700">${statusMetrics.absent} absent</span>
                 <span class="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-slate-700">${statusMetrics.excused} excused</span>
+            </div>
+            <div class="mt-3 rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-blue-900 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100">
+                <i class="fas fa-calendar-day mr-1 text-blue-600 dark:text-blue-300"></i>
+                <span class="font-semibold">Next:</span> ${escapeHtml(formatGuardianNextSessionLabel(item))}
             </div>
             <div id="guardianProgressLast-${studentId}" class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Last attendance: —</div>
         </button>
@@ -2814,6 +2952,51 @@ function bindGuardianStudentModalEvents() {
             if (event.key === 'Escape') closeGuardianStudentModal();
         });
     }
+}
+
+async function initGuardianDashboardPage() {
+    if (!checkGuardianAuth()) return;
+
+    const user = Auth.getUser();
+    bindGuardianPortalNav();
+    applyGuardianPortalIdentity(user);
+
+    const portal = await fetchGuardianPortalDataByEmail(user?.email || '');
+    if (!portal?.success) {
+        showMessage(portal?.error || 'Failed to load guardian dashboard.', 'error');
+        return;
+    }
+
+    const guardian = getGuardianPrimaryGuardian(portal, user) || {};
+    applyGuardianPortalIdentity(user, guardian);
+
+    const students = Array.isArray(portal.students) ? portal.students : [];
+    guardianPortalStudents = students;
+
+    const greetingName = `${guardian.first_name || ''}`.trim() || 'Guardian';
+    setText('guardianDashboardGreeting', `Welcome back, ${greetingName}. Here is what needs your attention today.`);
+
+    let totalBalance = 0;
+    let totalPaid = 0;
+    let upcomingCount = 0;
+    students.forEach((item) => {
+        const metrics = getGuardianPaymentMetrics(item);
+        totalBalance += metrics.totalBalance;
+        totalPaid += metrics.totalPaid;
+        upcomingCount += getGuardianSessionStatusMetrics(item).upcoming;
+    });
+
+    setText('guardianDashboardStudentCount', String(students.length));
+    setText('guardianDashboardTotalBalance', formatCurrencyPHP(totalBalance));
+    setText('guardianDashboardTotalPaid', formatCurrencyPHP(totalPaid));
+    setText('guardianDashboardUpcomingCount', String(upcomingCount));
+
+    setHtml('guardianDashboardAlerts', renderGuardianDashboardAlerts(students));
+    setHtml('guardianDashboardUpcomingList', renderGuardianDashboardUpcomingList(students));
+    setHtml('guardianDashboardBalanceList', renderGuardianDashboardBalanceList(students));
+
+    await hydrateGuardianAttendance(students);
+    bindGuardianStudentModalEvents();
 }
 
 async function initGuardianStudentsPage() {
@@ -6656,6 +6839,8 @@ document.addEventListener('DOMContentLoaded', () => {
         initStudentAttendancePage();
     } else if (studentQr) {
         initStudentQrPage();
+    } else if (document.getElementById('guardianDashboardRoot')) {
+        initGuardianDashboardPage();
     } else if (guardianStudentsRoot) {
         initGuardianStudentsPage();
     } else if (guardianPaymentsRoot) {

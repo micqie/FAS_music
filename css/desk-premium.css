@@ -60,14 +60,28 @@
     position: relative;
 }
 
-.desk-app .desk-sidebar > .flex.items-center.gap-3 {
-    padding-bottom: 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    margin-bottom: 0.25rem;
+.desk-app .desk-sidebar-brand {
+    flex-shrink: 0;
+    padding-bottom: 0.85rem !important;
+    margin-bottom: 0.65rem !important;
 }
 
-.desk-app .desk-sidebar nav {
-    padding-top: 0.5rem;
+.desk-app .desk-sidebar-brand a {
+    transition: opacity 0.2s ease;
+}
+
+.desk-app .desk-sidebar-brand a:hover {
+    opacity: 0.88;
+}
+
+.desk-app .desk-sidebar nav,
+.desk-app .desk-sidebar-nav {
+    margin-top: 0 !important;
+    padding-top: 0;
+}
+
+.desk-app .desk-sidebar .mt-auto {
+    padding-top: 1rem;
 }
 
 .desk-app .desk-sidebar nav a {
@@ -379,6 +393,18 @@
 
 .desk-topnav summary::-webkit-details-marker {
     display: none;
+}
+
+.desk-topnav .desk-topnav-branch {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(212, 175, 55, 0.2) !important;
+    color: #e2e8f0 !important;
+    box-shadow: none;
+}
+
+.desk-topnav .desk-topnav-branch span {
+    color: #f1f5f9 !important;
+    font-weight: 600;
 }
 
 .desk-topnav details[open] summary .rounded-full {

@@ -34,16 +34,13 @@
 <body class="desk-app bg-[#f1f5f9] text-slate-900 antialiased" data-custom-registration-mode="1">
     <div class="min-h-screen flex">
     <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden lg:flex flex-col sidebar-scroll">
-        <div class="flex items-center gap-3 px-2">
-            <div class="h-10 w-10 rounded-xl bg-gold-500/20 flex items-center justify-center text-[color:var(--gold)]">
-                <i class="fas fa-headset"></i>
-            </div>
-            <div>
-                <div class="text-xs uppercase tracking-[0.3em] text-slate-400">Desk Staff</div>
-                <div id="registrationSidePanelTitle" class="text-lg font-semibold">Front Desk</div>
-            </div>
+        <div class="desk-sidebar-brand px-2 pb-4 mb-3 border-b border-white/10">
+            <a href="desk_scanner.html" class="inline-flex h-10 items-center" aria-label="Father & Sons Music home">
+                <img src="../../assets/fas-logo.png" alt="Father & Sons Music" class="h-full w-auto brightness-200">
+            </a>
+            <span id="registrationSidePanelTitle" class="hidden" aria-hidden="true"></span>
         </div>
-        <nav class="mt-10 space-y-2">
+        <nav class="desk-sidebar-nav space-y-1.5">
          <a href="desk_attendance.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
                     <i class="fas fa-clipboard-check text-slate-400"></i> Attendance
                 </a>
