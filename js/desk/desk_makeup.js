@@ -406,6 +406,7 @@
             const pillBranch = document.getElementById('deskBranchNamePill');
             if (sidebarBranch) sidebarBranch.textContent = branchName;
             if (pillBranch) pillBranch.textContent = branchName;
+            if (typeof syncDeskNavUser === 'function') syncDeskNavUser();
 
             await loadMakeupRows();
         });

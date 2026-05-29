@@ -323,6 +323,7 @@ function initDeskScanner() {
     setInterval(updateClock, 1000);
     const branchName = getDeskBranchName();
     if (branchName) setText('deskBranchName', branchName);
+    if (typeof syncDeskNavUser === 'function') syncDeskNavUser();
     const branchId = getDeskBranchId();
     if (!branchId) {
         setStatus('No desk branch assigned. Please contact the administrator.', 'error');

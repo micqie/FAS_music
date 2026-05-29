@@ -429,6 +429,72 @@ class User
         }
     }
 
+    public function updateSelfProfile($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid payload'], 400);
+        }
+
+        $userId = (int)($data['user_id'] ?? 0);
+        $firstName = trim((string)($data['first_name'] ?? ''));
+        $lastName = trim((string)($data['last_name'] ?? ''));
+        $phone = trim((string)($data['phone'] ?? ''));
+
+        if ($userId <= 0 || $firstName === '' || $lastName === '') {
+            $this->sendJSON(['error' => 'user_id, first_name, and last_name are required'], 400);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT u.user_id, u.email, u.username, u.first_name, u.last_name, u.phone, u.status,
+                       r.role_name
+                FROM tbl_users u
+                INNER JOIN tbl_roles r ON u.role_id = r.role_id
+                WHERE u.user_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$userId]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$existing) {
+                $this->sendJSON(['error' => 'User not found'], 404);
+            }
+
+            $update = $this->conn->prepare("
+                UPDATE tbl_users
+                SET first_name = ?, last_name = ?, phone = ?
+                WHERE user_id = ?
+            ");
+            $update->execute([$firstName, $lastName, $phone, $userId]);
+
+            $hasUserBranch = $this->hasUserColumn('branch_id');
+            $selectBranch = $hasUserBranch ? ', u.branch_id, b.branch_name' : '';
+            $joinBranch = $hasUserBranch ? ' LEFT JOIN tbl_branches b ON b.branch_id = u.branch_id ' : '';
+            $stmtUser = $this->conn->prepare("
+                SELECT u.user_id, u.username, u.first_name, u.last_name, u.email, u.phone, u.status, r.role_name{$selectBranch}
+                FROM tbl_users u
+                INNER JOIN tbl_roles r ON u.role_id = r.role_id
+                {$joinBranch}
+                WHERE u.user_id = ?
+                LIMIT 1
+            ");
+            $stmtUser->execute([$userId]);
+            $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Profile updated successfully.',
+                'user' => $user
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function changePassword($json)
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1259,6 +1325,9 @@ switch ($action) {
         break;
     case 'change-password':
         $user->changePassword(file_get_contents('php://input'));
+        break;
+    case 'update-self-profile':
+        $user->updateSelfProfile(file_get_contents('php://input'));
         break;
     default:
         $user->sendJSON(['error' => 'Invalid action'], 400);

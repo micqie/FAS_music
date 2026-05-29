@@ -1452,6 +1452,18 @@
             }).join('');
         }
 
+        function renderEnrollmentDetailCard(label, value, iconClass, valueClass = 'text-slate-900') {
+            return `
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">
+                        <i class="fas ${iconClass} text-gold-500/90"></i>
+                        ${escapeHtml(label)}
+                    </div>
+                    <div class="mt-2 text-sm font-semibold ${valueClass}">${value}</div>
+                </div>
+            `;
+        }
+
         function openEnrollmentDetailsModal(enrollmentId) {
             const student = allStudents.find(row => Number(row.enrollment_id) === Number(enrollmentId));
             if (!student) {
@@ -1464,29 +1476,87 @@
             const balance = Math.max(0, totalAmount - paidAmount);
             const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
             const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
-            const firstSession = student.first_session_date
+            const packageName = escapeHtml(student.package_name || '—');
+            const branchName = escapeHtml(student.branch_name || '—');
+            const paymentType = escapeHtml(student.payment_type || '—');
+            const sessionsCount = Number(student.sessions || 0) || '—';
+            const roomName = escapeHtml(student.assigned_room || '—');
+            const hasFirstSession = Boolean(student.first_session_date);
+            const firstSession = hasFirstSession
                 ? `${new Date(student.first_session_date).toLocaleDateString()} • ${formatTime12Hour(student.first_start_time)} - ${formatTime12Hour(student.first_end_time)}`
                 : 'No session scheduled yet';
+            const balanceCardClass = balance > 0
+                ? 'border-red-200 bg-red-50/80'
+                : 'border-slate-200 bg-slate-50';
+            const balanceValueClass = balance > 0 ? 'text-red-600' : 'text-slate-900';
 
             Swal.fire({
                 title: 'Enrollment Details',
-                width: 760,
+                width: 780,
                 confirmButtonText: 'Close',
+                confirmButtonColor: '#b8860b',
+                customClass: {
+                    popup: 'enrollment-details-popup',
+                    title: 'text-xl font-black tracking-tight text-slate-900',
+                    htmlContainer: 'px-1'
+                },
                 html: `
                     <div class="text-left space-y-4 text-sm text-slate-700">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div><span class="font-semibold text-slate-900">Student:</span> ${studentName}</div>
-                            <div><span class="font-semibold text-slate-900">Branch:</span> ${escapeHtml(student.branch_name || '—')}</div>
-                            <div><span class="font-semibold text-slate-900">Package:</span> ${escapeHtml(student.package_name || '—')}</div>
-                            <div><span class="font-semibold text-slate-900">Sessions:</span> ${Number(student.sessions || 0) || '—'}</div>
-                            <div><span class="font-semibold text-slate-900">Enrollment Fee:</span> ${formatCurrencyPHP(totalAmount)}</div>
-                            <div><span class="font-semibold text-slate-900">Paid:</span> ${formatCurrencyPHP(paidAmount)}</div>
-                            <div><span class="font-semibold text-slate-900">Balance:</span> ${formatCurrencyPHP(balance)}</div>
-                            <div><span class="font-semibold text-slate-900">Payment Type:</span> ${escapeHtml(student.payment_type || '—')}</div>
-                            <div><span class="font-semibold text-slate-900">Teacher:</span> ${teacherName}</div>
-                            <div><span class="font-semibold text-slate-900">Room:</span> ${escapeHtml(student.assigned_room || '—')}</div>
+                        <div class="rounded-2xl border border-slate-200 px-5 py-4 text-white shadow-sm" style="background: linear-gradient(135deg, #0b0f18 0%, #1a1d23 100%);">
+                            <div class="flex items-center gap-4">
+                                <div class="h-12 w-12 shrink-0 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center">
+                                    <i class="fas fa-user-graduate text-lg"></i>
+                                </div>
+                                <div class="min-w-0 text-left">
+                                    <div class="text-[10px] uppercase tracking-[0.24em] text-gold-400 font-bold">Active Enrollment</div>
+                                    <div class="mt-1 text-xl font-black truncate">${studentName}</div>
+                                    <div class="mt-1 text-sm text-slate-300">${packageName} <span class="text-slate-500">•</span> ${branchName}</div>
+                                </div>
+                            </div>
                         </div>
-                        <div><span class="font-semibold text-slate-900">First Scheduled Session:</span> ${escapeHtml(firstSession)}</div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
+                                <div class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">Enrollment Fee</div>
+                                <div class="mt-2 text-base font-bold text-slate-900">${formatCurrencyPHP(totalAmount)}</div>
+                            </div>
+                            <div class="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-left">
+                                <div class="text-[10px] uppercase tracking-[0.2em] text-emerald-700 font-bold">Paid</div>
+                                <div class="mt-2 text-base font-bold text-emerald-700">${formatCurrencyPHP(paidAmount)}</div>
+                            </div>
+                            <div class="rounded-xl border ${balanceCardClass} px-4 py-3 text-left">
+                                <div class="text-[10px] uppercase tracking-[0.2em] ${balance > 0 ? 'text-red-600' : 'text-slate-500'} font-bold">Balance</div>
+                                <div class="mt-2 text-base font-bold ${balanceValueClass}">${formatCurrencyPHP(balance)}</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            ${renderEnrollmentDetailCard('Branch', branchName, 'fa-location-dot')}
+                            ${renderEnrollmentDetailCard('Sessions', escapeHtml(String(sessionsCount)), 'fa-layer-group')}
+                            ${renderEnrollmentDetailCard('Teacher', teacherName, 'fa-chalkboard-user')}
+                            ${renderEnrollmentDetailCard('Room', roomName, 'fa-door-open')}
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2">
+                                <div class="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">
+                                    <i class="fas fa-credit-card text-gold-500/90"></i>
+                                    Payment Type
+                                </div>
+                                <div class="mt-2">
+                                    <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">${paymentType}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-xl border ${hasFirstSession ? 'border-blue-200 bg-blue-50/80' : 'border-dashed border-slate-200 bg-slate-50'} px-4 py-3 text-left">
+                            <div class="flex items-start gap-3">
+                                <div class="h-9 w-9 shrink-0 rounded-lg ${hasFirstSession ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-500'} flex items-center justify-center">
+                                    <i class="fas fa-calendar-check"></i>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] uppercase tracking-[0.2em] ${hasFirstSession ? 'text-blue-700' : 'text-slate-500'} font-bold">First Scheduled Session</div>
+                                    <div class="mt-2 text-sm font-semibold ${hasFirstSession ? 'text-slate-900' : 'text-slate-500'}">${escapeHtml(firstSession)}</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 `
             });
@@ -1584,13 +1654,18 @@
                     return;
                 }
 
-                const userNameNav = document.getElementById('userNameNav');
-                const profileMenuName = document.getElementById('profileMenuName');
-                const displayName = user.username || user.email || (isDesk ? 'Front Desk' : 'Manager');
                 managerBranchId = Number(user.branch_id || 0);
                 managerBranchName = user.branch_name || '';
-                if (userNameNav) userNameNav.textContent = displayName;
-                if (profileMenuName) profileMenuName.textContent = displayName;
+                if (typeof syncDeskNavUser === 'function') {
+                    syncDeskNavUser();
+                } else {
+                    const userNameNav = document.getElementById('userNameNav');
+                    const profileMenuName = document.getElementById('profileMenuName');
+                    const displayName = `${String(user.first_name || '').trim()} ${String(user.last_name || '').trim()}`.trim()
+                        || user.username || user.email || (isDesk ? 'Front Desk' : 'Manager');
+                    if (userNameNav) userNameNav.textContent = displayName;
+                    if (profileMenuName) profileMenuName.textContent = displayName;
+                }
 
                 // Swap dashboard links for desk users.
                 const deskDashboardHref = '../desk/desk_scanner.html';

@@ -1,0 +1,393 @@
+/**
+ * FAS Music — Desk Staff premium UI layer
+ * Visual-only enhancements. Does not change behavior or IDs.
+ */
+
+:root {
+    --desk-nav: #0b0f18;
+    --desk-gold: #d4af37;
+    --desk-gold-soft: rgba(212, 175, 55, 0.14);
+    --desk-surface: #ffffff;
+    --desk-muted: #64748b;
+    --desk-border: rgba(148, 163, 184, 0.35);
+    --desk-shadow: 0 24px 48px -28px rgba(15, 23, 42, 0.28);
+    --desk-radius-lg: 1.5rem;
+    --desk-radius-xl: 1.75rem;
+}
+
+/* —— Page canvas —— */
+.desk-app {
+    background:
+        radial-gradient(ellipse 80% 50% at 100% -10%, rgba(212, 175, 55, 0.07), transparent 50%),
+        radial-gradient(ellipse 60% 40% at 0% 100%, rgba(59, 130, 246, 0.05), transparent 45%),
+        linear-gradient(180deg, #eef2f7 0%, #f1f5f9 38%, #e8edf4 100%) !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.desk-app .desk-main {
+    position: relative;
+}
+
+.desk-app .desk-main > div {
+    animation: deskFadeUp 0.45s ease both;
+}
+
+@keyframes deskFadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* —— Sidebar —— */
+.desk-app .desk-sidebar {
+    background: linear-gradient(180deg, #0b0f18 0%, #101827 48%, #0d1320 100%) !important;
+    border-right: 1px solid rgba(212, 175, 55, 0.12);
+    box-shadow: 12px 0 40px -24px rgba(0, 0, 0, 0.45);
+}
+
+.desk-app .desk-sidebar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--desk-gold), transparent);
+    opacity: 0.85;
+}
+
+.desk-app .desk-sidebar {
+    position: relative;
+}
+
+.desk-app .desk-sidebar > .flex.items-center.gap-3 {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 0.25rem;
+}
+
+.desk-app .desk-sidebar nav {
+    padding-top: 0.5rem;
+}
+
+.desk-app .desk-sidebar nav a {
+    border: 1px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease, color 0.2s ease;
+}
+
+.desk-app .desk-sidebar nav a:hover:not([class*="bg-blue-600"]) {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border-color: rgba(255, 255, 255, 0.06);
+    transform: translateX(2px);
+}
+
+.desk-app .desk-sidebar nav a[class*="bg-blue-600"] {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.22) 0%, rgba(184, 134, 11, 0.12) 100%) !important;
+    border-color: rgba(212, 175, 55, 0.35) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    color: #fff !important;
+}
+
+.desk-app .desk-sidebar nav a[class*="bg-blue-600"] i {
+    color: var(--desk-gold) !important;
+}
+
+.desk-app .desk-sidebar nav a i {
+    width: 1.15rem;
+    text-align: center;
+    transition: color 0.2s ease;
+}
+
+.desk-app .desk-sidebar .mt-auto button[onclick="logout()"] {
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.desk-app .desk-sidebar .mt-auto button[onclick="logout()"]:hover {
+    transform: translateY(-1px);
+}
+
+.desk-app .desk-sidebar .mt-auto > div:last-child,
+.desk-app .desk-sidebar .mt-auto .rounded-xl.bg-white\/5 {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)) !important;
+    border-color: rgba(212, 175, 55, 0.15) !important;
+}
+
+/* —— Page headers —— */
+.desk-app .desk-main h1 {
+    letter-spacing: -0.03em;
+    font-weight: 800 !important;
+}
+
+.desk-app .desk-main > div > .mb-6 > p,
+.desk-app .desk-main > div > .mb-4 > p,
+.desk-app .desk-main > div > .mb-6.flex > div > p {
+    max-width: 42rem;
+    line-height: 1.55;
+}
+
+.desk-app .desk-branch-pill,
+.desk-app .desk-main .rounded-full.bg-blue-50 {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9)) !important;
+    border: 1px solid var(--desk-border) !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    padding: 0.35rem 0.85rem !important;
+}
+
+.desk-app .desk-branch-pill span:last-child,
+.desk-app .desk-main .rounded-full.bg-blue-50 span:not(:first-child) {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+/* —— Stat / summary mini cards —— */
+.desk-app .desk-stat-card,
+.desk-app .desk-main .grid .bg-white.rounded-2xl.border,
+.desk-app .desk-main .flex .bg-white.rounded-2xl.border {
+    backdrop-filter: blur(8px);
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.desk-app .desk-stat-card:hover,
+.desk-app .desk-main .grid .bg-white.rounded-2xl.border:hover {
+    box-shadow: 0 12px 28px -16px rgba(15, 23, 42, 0.18);
+    transform: translateY(-2px);
+    border-color: rgba(212, 175, 55, 0.25) !important;
+}
+
+/* —— Primary panels & tables —— */
+.desk-app .desk-panel,
+.desk-app .desk-main .bg-white.rounded-3xl {
+    box-shadow: var(--desk-shadow) !important;
+    border-color: var(--desk-border) !important;
+}
+
+.desk-app .desk-main .bg-white.rounded-3xl > .p-6.border-b,
+.desk-app .desk-main .bg-white.rounded-3xl > .p-6.bg-slate-50,
+.desk-app .desk-main section.rounded-\[2rem\] > .p-5.border-b {
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%) !important;
+}
+
+.desk-app .desk-main table thead {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+}
+
+.desk-app .desk-main table thead th {
+    font-size: 0.68rem !important;
+    letter-spacing: 0.12em !important;
+    color: #475569 !important;
+    border-bottom: 1px solid var(--desk-border);
+    white-space: nowrap;
+}
+
+.desk-app .desk-main table tbody tr {
+    transition: background 0.15s ease;
+}
+
+.desk-app .desk-main table tbody tr:hover {
+    background: rgba(248, 250, 252, 0.95) !important;
+}
+
+.desk-app .desk-main table tbody td {
+    vertical-align: middle;
+}
+
+/* —— Section titles —— */
+.desk-app .desk-main h3.text-xl {
+    letter-spacing: -0.02em;
+}
+
+.desk-app .desk-main h3 i.text-gold-500,
+.desk-app .desk-main h3 i[class*="text-gold"] {
+    filter: drop-shadow(0 1px 2px rgba(184, 134, 11, 0.25));
+}
+
+/* —— Toolbar / tab toggles —— */
+.desk-app .desk-toolbar-pill {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 1px solid var(--desk-border) !important;
+    box-shadow: 0 4px 16px -8px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(10px);
+}
+
+.desk-app .desk-main .inline-flex.items-center.bg-white.border.rounded-xl.p-1 {
+    box-shadow: 0 4px 16px -8px rgba(15, 23, 42, 0.1);
+    border-color: var(--desk-border) !important;
+}
+
+/* —— Action buttons (table / inline) —— */
+.desk-app .desk-main button.rounded-lg.bg-blue-100,
+.desk-app .desk-main button[class*="bg-blue-100"] {
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.desk-app .desk-main button.rounded-lg.bg-blue-100:hover,
+.desk-app .desk-main button[class*="bg-blue-100"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -4px rgba(37, 99, 235, 0.35);
+}
+
+/* —— Gold CTA buttons —— */
+.desk-app .desk-main button[class*="from-gold-500"],
+.desk-app .desk-main button.bg-gold-500 {
+    letter-spacing: 0.01em;
+    transition: transform 0.15s ease, box-shadow 0.2s ease !important;
+}
+
+.desk-app .desk-main button[class*="from-gold-500"]:hover,
+.desk-app .desk-main button.bg-gold-500:hover {
+    transform: translateY(-1px);
+}
+
+/* —— Scanner page —— */
+.desk-app .glass-panel {
+    background: linear-gradient(145deg, rgba(15, 23, 42, 0.97) 0%, rgba(11, 15, 24, 0.94) 100%) !important;
+    border: 1px solid rgba(212, 175, 55, 0.15) !important;
+    box-shadow: var(--desk-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.desk-app .scanner-frame {
+    box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.2), 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.desk-app #clock {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+}
+
+/* —— Attendance calendar section —— */
+.desk-app .desk-main section.rounded-\[2rem\] {
+    box-shadow: var(--desk-shadow) !important;
+}
+
+.desk-app .desk-main .rounded-3xl.border.bg-white\/90 {
+    backdrop-filter: blur(12px);
+}
+
+/* —— Modals (visual polish only) —— */
+.desk-app [class*="fixed"][class*="inset-0"] > .bg-white,
+.desk-app [class*="fixed"][class*="inset-0"] > div.rounded-\[2rem\].bg-white,
+.desk-app [class*="fixed"][class*="inset-0"] > div.rounded-2xl.bg-white {
+    box-shadow: 0 32px 64px -24px rgba(15, 23, 42, 0.35) !important;
+}
+
+/* —— Form inputs in main & modals —— */
+.desk-app input:not([type="hidden"]):not([readonly]),
+.desk-app select,
+.desk-app textarea {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.desk-app input:not([type="hidden"]):focus,
+.desk-app select:focus,
+.desk-app textarea:focus {
+    box-shadow: 0 0 0 3px var(--desk-gold-soft);
+}
+
+/* —— Scrollbars (main panels) —— */
+.desk-app .desk-main ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.desk-app .desk-main ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.45);
+    border-radius: 999px;
+}
+
+.desk-app .desk-main ::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.65);
+}
+
+.desk-app .desk-main ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* —— SweetAlert desk theme —— */
+.swal2-popup {
+    border-radius: 1.25rem !important;
+    border: 1px solid var(--desk-border) !important;
+}
+
+.swal2-confirm {
+    border-radius: 0.75rem !important;
+    font-weight: 700 !important;
+}
+
+/* —— Empty / loading states —— */
+.desk-app .desk-main tbody .text-slate-500 i.fa-spinner {
+    color: var(--desk-gold) !important;
+    opacity: 0.7;
+}
+
+/* —— Quick action chips (attendance etc.) —— */
+.desk-app .desk-main button.rounded-full {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.desk-app .desk-main button.rounded-full:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -6px rgba(15, 23, 42, 0.2);
+}
+
+/* —— Branch notice card —— */
+.desk-app .desk-main .mb-6 .bg-white.p-5.rounded-2xl {
+    border-left: 3px solid var(--desk-gold);
+    background: linear-gradient(90deg, rgba(253, 250, 241, 0.6) 0%, #fff 24%) !important;
+}
+
+/* —— Page intro block —— */
+.desk-app .desk-main h1::after {
+    content: '';
+    display: block;
+    width: 3rem;
+    height: 3px;
+    margin-top: 0.65rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--desk-gold), transparent);
+}
+
+/* —— Sidebar brand icon —— */
+.desk-app .desk-sidebar .h-10.w-10.rounded-xl {
+    box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.2), 0 8px 20px -10px rgba(212, 175, 55, 0.35);
+}
+
+/* —— Enrollment details modal (SweetAlert) —— */
+.swal2-popup.enrollment-details-popup {
+    border-radius: 1.25rem;
+    border: 1px solid var(--desk-border);
+    padding-bottom: 1.25rem;
+}
+
+.swal2-popup.enrollment-details-popup .swal2-title {
+    padding-top: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.swal2-popup.enrollment-details-popup .swal2-confirm {
+    border-radius: 0.75rem;
+    font-weight: 700;
+    padding: 0.6rem 1.75rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+/* —— Top navigation —— */
+.desk-topnav {
+    background: linear-gradient(180deg, #0b0f18 0%, #121a2a 100%);
+    box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.45);
+}
+
+.desk-topnav summary::-webkit-details-marker {
+    display: none;
+}
+
+.desk-topnav details[open] summary .rounded-full {
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.35);
+}
+
+/* —— Responsive: slightly tighter on small screens —— */
+@media (max-width: 1023px) {
+    .desk-app .desk-main {
+        padding-top: 1.25rem;
+    }
+}

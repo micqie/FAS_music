@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desk - My Profile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/desk-premium.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+        :root { --nav-bg: #0b0f18; --gold: #d4af37; }
+        body { font-family: 'Space Grotesk', sans-serif; }
+        .sidebar-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    </style>
+</head>
+<body class="desk-app bg-slate-100 text-slate-900">
+    <div class="min-h-screen flex">
+        <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden lg:flex flex-col sidebar-scroll">
+            <div class="flex items-center gap-3 px-2">
+                <div class="h-10 w-10 rounded-xl bg-gold-500/20 flex items-center justify-center text-[color:var(--gold)]">
+                    <i class="fas fa-headset"></i>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[0.3em] text-slate-400">Desk Staff</div>
+                    <div class="text-lg font-semibold">Front Desk</div>
+                </div>
+            </div>
+            <nav class="mt-10 space-y-2">
+                <a href="desk_attendance.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-clipboard-check text-slate-400"></i> Attendance
+                </a>
+                <a href="desk_makeup.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-triangle-exclamation text-slate-400"></i> Make-Up List
+                </a>
+                <a href="desk_scanner.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-qrcode text-slate-400"></i> Scanner
+                </a>
+                <a href="desk_enrollment.html?view=pending" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-user-graduate text-slate-400"></i> Enrollments
+                </a>
+                <a href="desk_sessions.html?page=sessions" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-calendar-check text-slate-400"></i> Sessions
+                </a>
+                <a href="desk_registration.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-id-card text-slate-400"></i> Registrations
+                </a>
+                <a href="desk_profile.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600/30 text-white border border-blue-500/40">
+                    <i class="fas fa-user-pen text-blue-200"></i> My Profile
+                </a>
+            </nav>
+            <div class="mt-auto space-y-4 pt-8">
+                <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-400/20 bg-red-400/10 text-sm font-semibold text-red-200 hover:bg-red-400/15 hover:text-white transition">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+                <div class="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
+                    <div class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Assigned Branch</div>
+                    <div id="managerBranchName" class="mt-2 text-sm font-semibold text-white">—</div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="flex-1 flex flex-col min-w-0">
+            <div id="deskTopNavMount"></div>
+
+            <main class="desk-main flex-1 px-4 sm:px-6 lg:px-8 py-6">
+                <div class="max-w-5xl mx-auto">
+                    <div class="mb-6">
+                        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">My Profile</h1>
+                        <p class="text-slate-500 text-sm mt-1">Update your desk account contact details and password.</p>
+                        <div class="desk-branch-pill mt-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                            Desk branch: <span id="managerBranchNamePill">—</span>
+                        </div>
+                    </div>
+
+                    <div id="deskProfileMessage" class="hidden mb-4 p-3 rounded-xl text-sm"></div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-6">
+                        <section class="desk-panel bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 p-6">
+                            <div class="flex flex-col items-center text-center">
+                                <div class="h-24 w-24 rounded-full bg-gradient-to-br from-gold-500/20 to-gold-400/10 border-2 border-gold-500/30 flex items-center justify-center text-gold-500">
+                                    <i class="fas fa-user text-3xl"></i>
+                                </div>
+                                <h2 id="deskProfileName" class="mt-4 text-xl font-black text-slate-900">Desk Staff</h2>
+                                <p id="deskProfileEmail" class="text-sm text-slate-500 mt-1">—</p>
+                                <span id="deskProfileStatusBadge" class="mt-4 inline-flex px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">Active</span>
+                            </div>
+                            <div class="mt-6 space-y-3 text-sm">
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <div class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">Role</div>
+                                    <div id="deskProfileRole" class="mt-1 font-semibold text-slate-900">—</div>
+                                </div>
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <div class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">Branch</div>
+                                    <div id="deskProfileBranch" class="mt-1 font-semibold text-slate-900">—</div>
+                                </div>
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <div class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">Login Username</div>
+                                    <div id="deskProfileUsername" class="mt-1 font-semibold text-slate-900 break-all">—</div>
+                                </div>
+                            </div>
+                            <button type="button" id="deskProfileChangePasswordBtn" class="mt-6 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-semibold text-slate-700 transition">
+                                <i class="fas fa-key text-gold-500"></i>
+                                Change Password
+                            </button>
+                        </section>
+
+                        <section class="desk-panel bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 p-6 lg:p-8">
+                            <h3 class="text-lg font-bold text-slate-900">Account Details</h3>
+                            <p class="text-sm text-slate-500 mt-1">Keep your name and phone updated so managers can reach you quickly.</p>
+
+                            <form id="deskProfileForm" class="mt-6 space-y-5">
+                                <input type="hidden" name="user_id" value="">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">First Name</label>
+                                        <input name="first_name" required class="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-4 focus:ring-gold-100">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Last Name</label>
+                                        <input name="last_name" required class="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-4 focus:ring-gold-100">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Phone</label>
+                                        <input name="phone" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-4 focus:ring-gold-100">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Email</label>
+                                        <input name="email" type="email" readonly class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed">
+                                    </div>
+                                </div>
+                                <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                    Email is used for login. Contact an administrator if you need to change it.
+                                </div>
+                                <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
+                                    <a href="desk_scanner.html" class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition">Back to Scanner</a>
+                                    <button type="submit" id="deskProfileSaveBtn" class="px-6 py-3 rounded-xl bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold shadow-lg shadow-gold-500/20 transition">
+                                        <i class="fas fa-save mr-2"></i>Save Changes
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../../js/index.js"></script>
+    <script src="../../js/desk/desk_nav.js"></script>
+    <script src="../../js/desk/desk_profile.js"></script>
+</body>
+</html>

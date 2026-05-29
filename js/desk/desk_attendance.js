@@ -1008,6 +1008,7 @@
             const pillBranch = document.getElementById('deskBranchNamePill');
             if (sidebarBranch) sidebarBranch.textContent = deskBranchName;
             if (pillBranch) pillBranch.textContent = deskBranchName;
+            if (typeof syncDeskNavUser === 'function') syncDeskNavUser();
             populateAttendanceBranchFilter();
 
             document.getElementById('attendancePrevMonthBtn')?.addEventListener('click', () => {
