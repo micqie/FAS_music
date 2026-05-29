@@ -23,14 +23,11 @@
                 <div class="min-h-16 py-3 flex items-center justify-between gap-4">
                     <div class="flex items-center gap-3 min-w-0">
                         <a href="desk_scanner.html" class="lg:hidden h-9 flex items-center shrink-0" aria-label="Desk home">
-                            <img src="../../assets/fas-logo.png" alt="FAS Music" class="h-full w-auto brightness-200">
+
                         </a>
                         <div class="min-w-0 flex flex-col gap-1.5">
 
-                            <div id="deskTopNavBranch" class="desk-topnav-branch inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200 w-fit">Branch:
-                                <i class="fas fa-location-dot text-gold-400"></i>
-                                <span id="deskTopNavBranchName">—</span>
-                            </div>
+                      
                         </div>
                     </div>
                     <div class="flex items-center gap-3 sm:gap-4 shrink-0">
