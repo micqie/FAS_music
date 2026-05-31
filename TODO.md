@@ -1,5 +1,0 @@
-- [ ] Inspect desk_attendance layout to see sidebar structure (done)
-- [ ] Inspect desk-premium.css / shared CSS for sidebar scroll behavior (pending)
-- [ ] Add CSS so desk sidebar stays fixed and not scrollable; keep page scroll on main content (pending)
-- [ ] Apply same CSS to other desk pages by targeting .desk-app / .desk-sidebar
-- [ ] Smoke test: verify sidebar does not scroll; main content scroll works
