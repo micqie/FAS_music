@@ -27,6 +27,8 @@
 
 .desk-app .desk-main {
     position: relative;
+    margin-left: 16rem;
+    padding-top: 4rem;
 }
 
 .desk-app .desk-main > div {
@@ -43,6 +45,18 @@
     background: linear-gradient(180deg, #0b0f18 0%, #101827 48%, #0d1320 100%) !important;
     border-right: 1px solid rgba(212, 175, 55, 0.12);
     box-shadow: 12px 0 40px -24px rgba(0, 0, 0, 0.45);
+
+    /* Keep sidebar fixed and non-scrollable */
+    top: 0;
+    bottom: 0;
+    height: 100vh;
+    overflow-y: hidden;
+}
+
+/* Make sure inner nav doesn't cause scroll */
+.desk-app .desk-sidebar nav,
+.desk-app .desk-sidebar .desk-sidebar-nav {
+    overflow-y: hidden;
 }
 
 .desk-app .desk-sidebar::before {
@@ -57,7 +71,9 @@
 }
 
 .desk-app .desk-sidebar {
-    position: relative;
+    position: fixed !important;
+    left: 0;
+    z-index: 1000;
 }
 
 .desk-app .desk-sidebar-brand {
@@ -300,7 +316,7 @@
 /* —— Scrollbars (main panels) —— */
 .desk-app .desk-main ::-webkit-scrollbar {
     width: 8px;
-    height: 8px;
+    height: 0px;
 }
 
 .desk-app .desk-main ::-webkit-scrollbar-thumb {
@@ -314,6 +330,11 @@
 
 .desk-app .desk-main ::-webkit-scrollbar-track {
     background: transparent;
+}
+
+/* Hide horizontal scrollbars */
+.desk-app .overflow-x-auto {
+    overflow-x: hidden !important;
 }
 
 /* —— SweetAlert desk theme —— */
@@ -387,6 +408,11 @@
 
 /* —— Top navigation —— */
 .desk-topnav {
+    position: fixed;
+    top: 0;
+    left: 16rem;
+    right: 0;
+    z-index: 999;
     background: linear-gradient(180deg, #0b0f18 0%, #121a2a 100%);
     box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.45);
 }

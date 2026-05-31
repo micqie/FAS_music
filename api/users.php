@@ -5,6 +5,9 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
+require_once dirname(__DIR__) . '/phpmailer/src/Exception.php';
+require_once dirname(__DIR__) . '/phpmailer/src/PHPMailer.php';
+require_once dirname(__DIR__) . '/phpmailer/src/SMTP.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
@@ -69,6 +72,36 @@ class User
         }
     }
 
+    private function ensureUserVerificationColumns()
+    {
+        if ($this->hasUserColumn('email_verified_at') && $this->hasUserColumn('email_verification_code_hash') && $this->hasUserColumn('email_verification_code_expires_at') && $this->hasUserColumn('email_verification_sent_at')) {
+            return;
+        }
+
+        try {
+            if (!$this->hasUserColumn('email_verified_at')) {
+                $this->conn->exec("ALTER TABLE tbl_users ADD COLUMN email_verified_at DATETIME NULL AFTER status");
+            }
+            if (!$this->hasUserColumn('email_verification_code_hash')) {
+                $this->conn->exec("ALTER TABLE tbl_users ADD COLUMN email_verification_code_hash VARCHAR(255) NULL AFTER email_verified_at");
+            }
+            if (!$this->hasUserColumn('email_verification_code_expires_at')) {
+                $this->conn->exec("ALTER TABLE tbl_users ADD COLUMN email_verification_code_expires_at DATETIME NULL AFTER email_verification_code_hash");
+            }
+            if (!$this->hasUserColumn('email_verification_sent_at')) {
+                $this->conn->exec("ALTER TABLE tbl_users ADD COLUMN email_verification_sent_at DATETIME NULL AFTER email_verification_code_expires_at");
+            }
+            $this->conn->exec("
+                UPDATE tbl_users
+                SET email_verified_at = COALESCE(email_verified_at, NOW())
+                WHERE status = 'Active'
+                  AND email_verified_at IS NULL
+            ");
+        } catch (PDOException $e) {
+            // Keep API working even if alter fails
+        }
+    }
+
     private function tableHasColumn($tableName, $columnName)
     {
         try {
@@ -78,6 +111,143 @@ class User
         } catch (PDOException $e) {
             return false;
         }
+    }
+
+    private function generateEmailVerificationCode()
+    {
+        return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    }
+
+    private function isValidEmailAddress($email)
+    {
+        return filter_var(trim((string)$email), FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    private function isMailConfigured()
+    {
+        $mail = $this->getMailSettings();
+        return !empty($mail['host']) && $this->isValidEmailAddress($mail['from_address']);
+    }
+
+    private function getMailSettings()
+    {
+        $env = static function ($key, $default = '') {
+            $value = getenv($key);
+            if ($value === false || $value === null || $value === '') {
+                $value = $_ENV[$key] ?? $_SERVER[$key] ?? $default;
+            }
+            return is_string($value) ? trim($value) : $default;
+        };
+
+        $fileConfig = [];
+        $mailConfigPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'mail_config.php';
+        if (is_file($mailConfigPath)) {
+            $loadedConfig = include $mailConfigPath;
+            if (is_array($loadedConfig)) {
+                $fileConfig = $loadedConfig;
+            }
+        }
+
+        $fileValue = static function ($key, $default = '') use ($fileConfig) {
+            $value = $fileConfig[$key] ?? $default;
+            return is_string($value) ? trim($value) : $value;
+        };
+
+        return [
+            'host' => $fileValue('MAIL_HOST', $env('MAIL_HOST', '')),
+            'port' => (int) $fileValue('MAIL_PORT', $env('MAIL_PORT', '587')),
+            'username' => $fileValue('MAIL_USERNAME', $env('MAIL_USERNAME', '')),
+            'password' => preg_replace('/\s+/', '', (string) $fileValue('MAIL_PASSWORD', $env('MAIL_PASSWORD', ''))),
+            'encryption' => strtolower($fileValue('MAIL_ENCRYPTION', $env('MAIL_ENCRYPTION', 'tls'))),
+            'from_address' => $fileValue('MAIL_FROM_ADDRESS', $env('MAIL_FROM_ADDRESS', $env('MAIL_USERNAME', 'no-reply@example.com'))),
+            'from_name' => $fileValue('MAIL_FROM_NAME', $env('MAIL_FROM_NAME', 'Father & Sons Music Academy')),
+            'reply_to' => $fileValue('MAIL_REPLY_TO', $env('MAIL_REPLY_TO', $env('MAIL_FROM_ADDRESS', $env('MAIL_USERNAME', 'no-reply@example.com'))))
+        ];
+    }
+
+    private function sendVerificationEmail($toEmail, $toName, $verificationCode)
+    {
+        $mail = $this->getMailSettings();
+        if (!$this->isValidEmailAddress($mail['from_address'])) {
+            throw new Exception('MAIL_FROM_ADDRESS must be a valid email address.');
+        }
+        if (empty($mail['host'])) {
+            return false;
+        }
+        $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+        $mailer->CharSet = 'UTF-8';
+        $mailer->isHTML(true);
+        $mailer->setFrom($mail['from_address'], $mail['from_name']);
+        $mailer->addAddress($toEmail, $toName ?: $toEmail);
+
+        if (!empty($mail['reply_to'])) {
+            $mailer->addReplyTo($mail['reply_to'], $mail['from_name']);
+        }
+
+        if (!empty($mail['host'])) {
+            $mailer->isSMTP();
+            $mailer->Host = $mail['host'];
+            $mailer->Port = $mail['port'] > 0 ? $mail['port'] : 587;
+            $mailer->SMTPAuth = $mail['username'] !== '';
+            $mailer->Username = $mail['username'];
+            $mailer->Password = $mail['password'];
+
+            if ($mail['encryption'] === 'ssl') {
+                $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+            } elseif ($mail['encryption'] === 'tls') {
+                $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            }
+        } else {
+            $mailer->isMail();
+        }
+
+        $safeName = htmlspecialchars($toName ?: 'Student', ENT_QUOTES, 'UTF-8');
+        $safeEmail = htmlspecialchars($toEmail, ENT_QUOTES, 'UTF-8');
+        $safeCode = htmlspecialchars($verificationCode, ENT_QUOTES, 'UTF-8');
+
+        $mailer->Subject = 'Your Father & Sons verification code';
+        $mailer->Body = '
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+                <h2 style="margin: 0 0 12px;">Verify your email</h2>
+                <p>Hello ' . $safeName . ',</p>
+                <p>Use this 6-digit verification code to activate your account:</p>
+                <p style="font-size: 28px; font-weight: 700; letter-spacing: 6px; margin: 16px 0; color: #b8860b;">' . $safeCode . '</p>
+                <p>This code was sent to <strong>' . $safeEmail . '</strong> and expires in 15 minutes.</p>
+                <p>If you did not create this account, you can ignore this message.</p>
+            </div>
+        ';
+        $mailer->AltBody = "Verify your email using code {$verificationCode}. It expires in 15 minutes.";
+        $mailer->send();
+        return true;
+    }
+
+    private function issueEmailVerificationCode($userId, $toEmail, $toName)
+    {
+        $this->ensureUserVerificationColumns();
+        $verificationCode = $this->generateEmailVerificationCode();
+        $verificationHash = password_hash($verificationCode, PASSWORD_DEFAULT);
+        $expiresAt = date('Y-m-d H:i:s', time() + (15 * 60));
+
+        $stmt = $this->conn->prepare("
+            UPDATE tbl_users
+            SET email_verification_code_hash = ?,
+                email_verification_code_expires_at = ?,
+                email_verification_sent_at = NOW(),
+                email_verified_at = NULL
+            WHERE user_id = ?
+        ");
+        $stmt->execute([
+            $verificationHash,
+            $expiresAt,
+            (int)$userId
+        ]);
+
+        $emailSent = $this->sendVerificationEmail($toEmail, $toName, $verificationCode);
+        return [
+            'verification_code' => $verificationCode,
+            'email_sent' => (bool)$emailSent,
+            'mail_configured' => $this->isMailConfigured()
+        ];
     }
 
     private function isMultipartRequest()
@@ -307,13 +477,16 @@ class User
             $this->sendJSON(['error' => 'Username and password are required'], 400);
         }
         try {
+            $this->ensureUserVerificationColumns();
             $hasUserBranch = $this->hasUserColumn('branch_id');
+            $hasVerificationColumns = $this->hasUserColumn('email_verified_at');
             $selectBranch = $hasUserBranch ? ", u.branch_id, b.branch_name" : "";
+            $selectVerification = $hasVerificationColumns ? ", u.email_verified_at" : ", NULL AS email_verified_at";
             $joinBranch = $hasUserBranch ? " LEFT JOIN tbl_branches b ON b.branch_id = u.branch_id " : "";
             // First check if user exists and get status
             $stmt = $this->conn->prepare("
                 SELECT u.user_id, u.username, u.password, u.first_name, u.last_name,
-                       u.email, u.phone, u.status, r.role_name{$selectBranch}
+                       u.email, u.phone, u.status, r.role_name{$selectBranch}{$selectVerification}
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 {$joinBranch}
@@ -334,6 +507,14 @@ class User
 
             if (!$isPasswordValid) {
                 $this->sendJSON(['error' => 'Invalid username or password'], 401);
+            }
+
+            if (empty($user['email_verified_at']) && strcasecmp((string)($user['role_name'] ?? ''), 'Admin') !== 0) {
+                $this->sendJSON([
+                    'error' => 'Please verify your email address before logging in. Check your inbox for the verification code.',
+                    'verification_required' => true,
+                    'verification_email' => $user['email'] ?? $username
+                ], 403);
             }
 
             // Check if account is active
@@ -365,6 +546,163 @@ class User
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function verifyEmail($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid request data'], 400);
+        }
+
+        $email = trim((string)($data['email'] ?? $data['username'] ?? ''));
+        $code = trim((string)($data['code'] ?? ''));
+
+        if ($email === '' || $code === '') {
+            $this->sendJSON(['error' => 'Email and verification code are required'], 400);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->sendJSON(['error' => 'Invalid email address format'], 400);
+        }
+
+        if (!preg_match('/^\d{6}$/', $code)) {
+            $this->sendJSON(['error' => 'Verification code must be a 6-digit number'], 400);
+        }
+
+        try {
+            $this->ensureUserVerificationColumns();
+            $stmt = $this->conn->prepare("
+                SELECT user_id, first_name, last_name, email, status,
+                       email_verified_at, email_verification_code_hash, email_verification_code_expires_at
+                FROM tbl_users
+                WHERE email = ? OR username = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$email, $email]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                $this->sendJSON(['error' => 'Account not found'], 404);
+            }
+
+            if (!empty($user['email_verified_at'])) {
+                $this->sendJSON([
+                    'success' => true,
+                    'message' => 'Your email is already verified.'
+                ]);
+            }
+
+            $storedHash = (string)($user['email_verification_code_hash'] ?? '');
+            $expiresAt = (string)($user['email_verification_code_expires_at'] ?? '');
+
+            if ($storedHash === '' || $expiresAt === '') {
+                $this->sendJSON([
+                    'error' => 'No verification code is available for this account. Please resend the code.',
+                    'resend_required' => true,
+                    'verification_email' => $user['email']
+                ], 400);
+            }
+
+            if (strtotime($expiresAt) < time()) {
+                $this->sendJSON([
+                    'error' => 'Your verification code has expired. Please resend a new code.',
+                    'resend_required' => true,
+                    'verification_email' => $user['email']
+                ], 400);
+            }
+
+            if (!password_verify($code, $storedHash)) {
+                $this->sendJSON([
+                    'error' => 'Invalid verification code. Please try again.',
+                    'verification_required' => true,
+                    'verification_email' => $user['email']
+                ], 400);
+            }
+
+            $update = $this->conn->prepare("
+                UPDATE tbl_users
+                SET status = 'Active',
+                    email_verified_at = NOW(),
+                    email_verification_code_hash = NULL,
+                    email_verification_code_expires_at = NULL,
+                    email_verification_sent_at = NULL
+                WHERE user_id = ?
+            ");
+            $update->execute([(int)$user['user_id']]);
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Email verified successfully. You can now log in.'
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function resendEmailVerification($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid request data'], 400);
+        }
+
+        $email = trim((string)($data['email'] ?? $data['username'] ?? ''));
+        if ($email === '') {
+            $this->sendJSON(['error' => 'Email is required'], 400);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->sendJSON(['error' => 'Invalid email address format'], 400);
+        }
+
+        try {
+            $this->ensureUserVerificationColumns();
+            $stmt = $this->conn->prepare("
+                SELECT user_id, first_name, last_name, email, status, email_verified_at
+                FROM tbl_users
+                WHERE email = ? OR username = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$email, $email]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                $this->sendJSON(['error' => 'Account not found'], 404);
+            }
+
+            if (!empty($user['email_verified_at'])) {
+                $this->sendJSON([
+                    'success' => true,
+                    'message' => 'Your email is already verified.'
+                ]);
+            }
+
+            $verificationResult = $this->issueEmailVerificationCode(
+                (int)$user['user_id'],
+                $user['email'],
+                trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''))
+            );
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'A new verification code has been sent to your email.',
+                'verification_email' => $user['email'],
+                'verification_email_sent' => (bool)($verificationResult['email_sent'] ?? false),
+                'verification_code_preview' => !$this->isMailConfigured() ? ($verificationResult['verification_code'] ?? null) : null
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        } catch (Exception $e) {
+            $this->sendJSON(['error' => 'Verification email could not be sent: ' . $e->getMessage()], 500);
         }
     }
 
@@ -617,6 +955,7 @@ class User
         }
 
         try {
+            $this->ensureUserVerificationColumns();
             $dupStudent = $this->conn->prepare("SELECT student_id FROM tbl_students WHERE email = ? LIMIT 1");
             $dupStudent->execute([$email]);
             if ($dupStudent->fetch()) {
@@ -655,7 +994,7 @@ class User
             $stmtUser = $this->conn->prepare("
                 INSERT INTO tbl_users (
                     username, password, role_id, first_name, last_name, email, phone, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Inactive')
             ");
             $stmtUser->execute([
                 $email,
@@ -668,13 +1007,23 @@ class User
             ]);
             $userId = (int)$this->conn->lastInsertId();
 
+            $verificationResult = $this->issueEmailVerificationCode(
+                $userId,
+                $email,
+                trim(($data['student_first_name'] ?? '') . ' ' . ($data['student_last_name'] ?? ''))
+            );
+
             $this->conn->commit();
 
             $this->sendJSON([
                 'success' => true,
-                'message' => 'Account created successfully. Please complete your registration steps in the student dashboard.',
+                'message' => 'Account created successfully. Please check your email for the verification code.',
                 'student_id' => $studentId,
-                'user_id' => $userId
+                'user_id' => $userId,
+                'verification_required' => true,
+                'verification_email' => $email,
+                'verification_email_sent' => (bool)($verificationResult['email_sent'] ?? false),
+                'verification_code_preview' => !$this->isMailConfigured() ? ($verificationResult['verification_code'] ?? null) : null
             ]);
         } catch (PDOException $e) {
             if ($this->conn && $this->conn->inTransaction()) {
@@ -1313,6 +1662,12 @@ switch ($action) {
         break;
     case 'register-basic':
         $user->registerBasic(file_get_contents('php://input'));
+        break;
+    case 'verify-email':
+        $user->verifyEmail(file_get_contents('php://input'));
+        break;
+    case 'resend-email-verification':
+        $user->resendEmailVerification(file_get_contents('php://input'));
         break;
     case 'check-registration-status':
         $user->checkRegistrationStatus($_GET['student_id'] ?? '');

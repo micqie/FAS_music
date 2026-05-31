@@ -964,6 +964,10 @@ CREATE TABLE `tbl_users` (
   `email` varchar(100) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
   `status` enum('Active','Inactive') DEFAULT 'Active',
+  `email_verified_at` datetime DEFAULT NULL,
+  `email_verification_code_hash` varchar(255) DEFAULT NULL,
+  `email_verification_code_expires_at` datetime DEFAULT NULL,
+  `email_verification_sent_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

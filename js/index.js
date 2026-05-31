@@ -389,6 +389,130 @@ function showRegisterMessage(message, type = 'error') {
     }
 }
 
+async function promptEmailVerification(email, initialCode = '') {
+    const verificationEmail = String(email || '').trim();
+    let currentCode = String(initialCode || '').trim();
+    if (!verificationEmail) {
+        showRegisterMessage('Email address is required for verification.', 'error');
+        return false;
+    }
+
+    if (typeof Swal === 'undefined') {
+        showRegisterMessage('Verification code prompt is unavailable.', 'error');
+        return false;
+    }
+
+    while (true) {
+        const result = await Swal.fire({
+            title: 'Verify Your Email',
+            text: `We sent a 6-digit code to ${verificationEmail}.`,
+            input: 'text',
+            inputPlaceholder: 'Enter verification code',
+            inputValue: currentCode || '',
+            inputAttributes: {
+                maxlength: 6,
+                inputmode: 'numeric',
+                autocomplete: 'one-time-code'
+            },
+            showCancelButton: true,
+            showDenyButton: true,
+            confirmButtonText: 'Verify Code',
+            denyButtonText: 'Resend Code',
+            confirmButtonColor: '#b8860b',
+            denyButtonColor: '#475569',
+            cancelButtonColor: '#6b7280',
+            allowOutsideClick: false
+        });
+
+        if (result.isDismissed) {
+            return false;
+        }
+
+        if (result.isDenied) {
+            try {
+                const resendResponse = await axios.post(
+                    `${baseApiUrl}/users.php?action=resend-email-verification`,
+                    { email: verificationEmail },
+                    { validateStatus: () => true }
+                );
+                const resendData = resendResponse.data || {};
+                if (resendResponse.status === 200 && resendData.success) {
+                    currentCode = String(resendData.verification_code_preview || '').trim();
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'Code Resent',
+                        text: resendData.message || (currentCode
+                            ? `A new verification code is ready for local testing: ${currentCode}`
+                            : 'A new verification code has been sent.'),
+                        confirmButtonColor: '#b8860b'
+                    });
+                } else {
+                    throw new Error(resendData.error || 'Unable to resend verification code.');
+                }
+            } catch (error) {
+                const message = error?.response?.data?.error || error?.message || 'Unable to resend verification code.';
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Resend Failed',
+                    text: message,
+                    confirmButtonColor: '#b8860b'
+                });
+            }
+            continue;
+        }
+
+        const code = String(result.value || '').trim();
+        if (!code) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Code Required',
+                text: 'Please enter the verification code from your email.',
+                confirmButtonColor: '#b8860b'
+            });
+            continue;
+        }
+
+        try {
+            const verifyResponse = await axios.post(
+                `${baseApiUrl}/users.php?action=verify-email`,
+                { email: verificationEmail, code },
+                { validateStatus: () => true }
+            );
+            const verifyData = verifyResponse.data || {};
+
+            if (verifyResponse.status === 200 && verifyData.success) {
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Email Verified',
+                    text: verifyData.message || 'Your email has been verified successfully.',
+                    confirmButtonColor: '#b8860b'
+                });
+                return true;
+            }
+
+            const message = verifyData.error || verifyData.message || 'Verification failed. Please try again.';
+            await Swal.fire({
+                icon: 'error',
+                title: 'Verification Failed',
+                text: message,
+                confirmButtonColor: '#b8860b'
+            });
+
+            if (verifyData.resend_required) {
+                continue;
+            }
+        } catch (error) {
+            const message = error?.response?.data?.error || error?.message || 'Verification failed. Please try again.';
+            await Swal.fire({
+                icon: 'error',
+                title: 'Verification Failed',
+                text: message,
+                confirmButtonColor: '#b8860b'
+            });
+        }
+    }
+}
+
 // Login Form Handler
 function initLoginForm() {
     const loginForm = document.getElementById('loginForm');
@@ -493,6 +617,16 @@ function initLoginForm() {
             } else {
                 const apiMessage = data && typeof data === 'object' ? data.error : '';
                 const status = response.status;
+                if (status === 403 && data && data.verification_required) {
+                    await promptEmailVerification(data.verification_email || username);
+                    if (loginBtn) loginBtn.disabled = false;
+                    if (loginBtnText) loginBtnText.textContent = 'Sign In';
+                    if (loginBtnIcon) {
+                        loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
+                        loginBtnIcon.classList.add('fa-sign-in-alt');
+                    }
+                    return;
+                }
                 const message = apiMessage
                     ? apiMessage
                     : status === 401
@@ -522,6 +656,16 @@ function initLoginForm() {
         } catch (error) {
             const status = error?.response?.status;
             const apiMessage = error?.response?.data?.error;
+            if (status === 403 && error?.response?.data?.verification_required) {
+                await promptEmailVerification(error?.response?.data?.verification_email || username);
+                if (loginBtn) loginBtn.disabled = false;
+                if (loginBtnText) loginBtnText.textContent = 'Sign In';
+                if (loginBtnIcon) {
+                    loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
+                    loginBtnIcon.classList.add('fa-sign-in-alt');
+                }
+                return;
+            }
             const message = apiMessage
                 ? apiMessage
                 : status === 401
@@ -626,9 +770,19 @@ function initRegisterForm() {
                 const data = response.data || {};
 
                 if (response.status === 200 && data.success) {
-                    showRegisterMessage('Account created! Please log in to finish your registration steps.', 'success');
+                    const verificationEmail = data.verification_email || payload.student_email;
+                    const verificationPreviewCode = data.verification_code_preview || '';
                     registerForm.reset();
-                    setTimeout(() => toggleRegisterModal(false), 1200);
+                    toggleRegisterModal(false);
+                    if (verificationPreviewCode) {
+                        await Swal.fire({
+                            icon: 'info',
+                            title: 'Local Verification Mode',
+                            text: `SMTP is not configured, so the code is shown here for local testing: ${verificationPreviewCode}`,
+                            confirmButtonColor: '#b8860b'
+                        });
+                    }
+                    await promptEmailVerification(verificationEmail, verificationPreviewCode);
                 } else {
                     showRegisterMessage(data.error || 'Registration failed. Please try again.', 'error');
                 }
