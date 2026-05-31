@@ -1909,6 +1909,57 @@ async function handleStudentRegistrationReset(portal, fallbackMessage) {
     return true;
 }
 
+function buildStudentPerformanceMetrics(rows) {
+    const rubricRows = Array.isArray(rows) ? rows.filter(row => Number(row?.progress_id || 0) > 0) : [];
+    const rubricDefinitions = [
+        { label: 'Rhythm', source: 'rhythm_score', helper: 'Timing and pulse' },
+        { label: 'Technique', source: 'technique_score', helper: 'Hand control and accuracy' },
+        { label: 'Sight Reading', source: 'assignment_score', helper: 'Reading and response' },
+        { label: 'Performance Confidence', source: 'performance_score', helper: 'Stage presence and confidence' },
+        { label: 'Theory Knowledge', source: 'focus_score', helper: 'Focus and musical understanding' }
+    ];
+
+    return rubricDefinitions.map(item => {
+        const values = rubricRows
+            .map(row => Number(row?.[item.source] || 0))
+            .filter(value => Number.isFinite(value) && value > 0);
+        const average = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+        return {
+            ...item,
+            average,
+            percent: average === null ? null : Math.max(0, Math.min(100, Math.round((average / 5) * 100)))
+        };
+    });
+}
+
+function renderStudentPerformanceBars(metrics) {
+    if (!Array.isArray(metrics) || metrics.length === 0) {
+        return '';
+    }
+
+    return metrics.map(metric => {
+        const percent = Number.isFinite(Number(metric.percent)) ? Number(metric.percent) : 0;
+        const width = Math.max(0, Math.min(100, percent));
+        const valueLabel = metric.average === null ? 'Pending' : `${width}%`;
+        const helperText = metric.helper ? `<div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${escapeHtml(metric.helper)}</div>` : '';
+
+        return `
+            <div class="space-y-2">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <div class="text-sm font-bold text-zinc-900 dark:text-white">${escapeHtml(metric.label)}</div>
+                        ${helperText}
+                    </div>
+                    <div class="text-sm font-extrabold text-gold-600 dark:text-gold-400">${escapeHtml(valueLabel)}</div>
+                </div>
+                <div class="h-3 rounded-full bg-zinc-200 dark:bg-white/10 overflow-hidden">
+                    <div class="h-full rounded-full bg-gradient-to-r from-gold-500 via-amber-400 to-gold-300 transition-all" style="width: ${width}%"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
 async function fetchGuardianPortalDataByEmail(email) {
     const url = `${baseApiUrl}/students.php?action=get-guardian-portal&email=${encodeURIComponent(email)}`;
     const res = await axios.get(url);
@@ -4573,6 +4624,22 @@ async function initStudentDashboardPage() {
         setText('lastAttended', '—');
     }
 
+    const performanceRows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
+    const performanceMetrics = buildStudentPerformanceMetrics(performanceRows);
+    setHtml('studentPerformanceBars', renderStudentPerformanceBars(performanceMetrics) || `
+        <div class="rounded-2xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400 text-center">
+            <i class="fas fa-chart-line text-2xl mb-2"></i>
+            <div class="font-semibold text-zinc-900 dark:text-white">No progress scores yet</div>
+            <div class="mt-1">Your performance bars will appear after your teacher records session assessments.</div>
+        </div>
+    `);
+    setText(
+        'studentPerformanceNote',
+        performanceMetrics.some(metric => metric.average !== null)
+            ? 'Based on your recorded session assessments.'
+            : 'Your performance bars will appear after your teacher records session assessments.'
+    );
+
     let meta = null;
     try {
         const resMeta = await fetchStudentRequestMetaByEmail(user.email);
@@ -4744,43 +4811,52 @@ async function initStudentSessionsPage() {
             return bTime - aTime;
         });
 
+        window.__studentGradesRows = sortedRows;
+        window.__studentSessionsRows = sortedRows;
+
         if (sortedRows.length === 0) {
             setHtml('attendanceTableBody', `
-                <tr>
-                    <td colspan="5" class="px-6 py-10 text-center text-zinc-400">
-                        <i class="fas fa-calendar-minus text-2xl mb-2"></i>
-                        <div class="font-semibold">No session records yet</div>
-                        <div class="text-xs text-zinc-500 mt-1">Your session tracker will fill in once your class schedule is generated.</div>
-                    </td>
-                </tr>
+                <div class="rounded-3xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-6 py-10 text-center text-zinc-400">
+                    <i class="fas fa-calendar-minus text-2xl mb-2"></i>
+                    <div class="font-semibold">No session records yet</div>
+                    <div class="text-xs text-zinc-500 mt-1">Your session tracker will fill in once your class schedule is generated.</div>
+                </div>
             `);
         } else {
-            setHtml('attendanceTableBody', sortedRows.map(r => {
+            setHtml('attendanceTableBody', sortedRows.map((r, index) => {
                 const dateLabel = r.session_date ? formatDateLong(r.session_date) : 'Date pending';
                 const start = r.start_time ? formatTime12Hour(r.start_time) : '';
                 const end = r.end_time ? formatTime12Hour(r.end_time) : '';
                 const timeLabel = start && end ? `${start} - ${end}` : (start || 'Time pending');
                 const sessionNumber = r.session_number ? `Session ${escapeHtml(String(r.session_number))}` : 'Session';
-                const roomLabel = r.room_name || r.teacher_name
-                    ? [r.room_name || '', r.teacher_name ? `Teacher: ${r.teacher_name}` : ''].filter(Boolean).join(' • ')
-                    : (r.instrument_name || 'Instrument');
                 const attendanceLabel = r.attendance_status && r.attendance_status !== 'Pending'
                     ? r.attendance_status
                     : (r.status || 'Scheduled');
-                const remarks = escapeHtml(r.teacher_remarks || r.remarks || r.attendance_notes || r.notes || 'No teacher remarks yet.');
+                const roomLabel = r.room_name || 'Room pending';
+                const teacherLabel = r.teacher_name || 'Teacher pending';
+
                 return `
-                    <tr class="border-t border-zinc-200 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/5 transition align-top">
-                        <td class="px-6 py-4 text-sm text-zinc-900 dark:text-white">
-                            <div class="font-semibold">${escapeHtml(sessionNumber)}</div>
-                            <div class="text-zinc-600 dark:text-zinc-300 mt-1">${escapeHtml(dateLabel)}</div>
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${escapeHtml(timeLabel)}</div>
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${escapeHtml(roomLabel)}</div>
-                        </td>
-                        <td class="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-200">${renderAttendanceStatusBadge(attendanceLabel)}</td>
-                        <td class="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-200">${renderStudentGradeBadge(r.average_score, r.progress_id)}</td>
-                        <td class="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-300">${renderStudentSkillLevel(r.skill_level)}</td>
-                        <td class="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">${remarks}</td>
-                    </tr>
+                    <article class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-lg dark:shadow-black/20">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="min-w-0">
+                                <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">${escapeHtml(sessionNumber)}</div>
+                                <div class="mt-2 text-lg font-black text-zinc-900 dark:text-white">${escapeHtml(dateLabel)}</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(timeLabel)} • ${escapeHtml(roomLabel)} • ${escapeHtml(teacherLabel)}</div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                ${renderAttendanceStatusBadge(attendanceLabel)}
+                                ${renderStudentGradeBadge(r.average_score, r.progress_id)}
+                                <button type="button" onclick="openStudentGradeDetails(${index})" class="inline-flex items-center px-4 py-2 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition whitespace-nowrap">
+                                    View Details
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
+                            Skill level: <span class="font-semibold text-zinc-700 dark:text-zinc-200">${escapeHtml(r.skill_level || 'Not graded yet')}</span>
+                            <span class="mx-2">•</span>
+                            Open the modal for the full score breakdown and teacher remarks.
+                        </div>
+                    </article>
                 `;
             }).join(''));
         }
