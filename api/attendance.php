@@ -633,7 +633,7 @@ class AttendanceApi
             if ($isStudentAbsent) {
                 $usedAbsences++;
                 $currentStreak++;
-                if ($currentStreak >= $freezeThreshold) {
+                if ($usedAbsences >= $freezeThreshold) {
                     $freezeTriggered = true;
                 }
                 continue;
@@ -664,6 +664,51 @@ class AttendanceApi
             $currentOperationId,
             $enrollmentId
         ]);
+    }
+
+    private function getStudentScheduleFreezeStatus($studentId)
+    {
+        $studentId = (int)$studentId;
+        if ($studentId < 1 || !$this->tableExists('tbl_enrollments')) {
+            return ['frozen' => false];
+        }
+
+        $stmt = $this->conn->prepare("
+            SELECT enrollment_id, used_absences, consecutive_absences, schedule_status
+            FROM tbl_enrollments
+            WHERE student_id = ?
+              AND status = 'Active'
+            ORDER BY enrollment_id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$studentId]);
+        $enrollment = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$enrollment) {
+            return ['frozen' => false];
+        }
+
+        $enrollmentId = (int)($enrollment['enrollment_id'] ?? 0);
+        if ($enrollmentId > 0) {
+            $this->syncEnrollmentPolicyState($enrollmentId);
+            $stmt->execute([$studentId]);
+            $enrollment = $stmt->fetch(PDO::FETCH_ASSOC) ?: $enrollment;
+        }
+
+        $usedAbsences = (int)($enrollment['used_absences'] ?? 0);
+        $consecutiveAbsences = (int)($enrollment['consecutive_absences'] ?? 0);
+        $scheduleStatus = (string)($enrollment['schedule_status'] ?? 'Active');
+        $frozen = strcasecmp($scheduleStatus, 'Frozen') === 0 || $usedAbsences >= 3;
+        $amount = 50;
+
+        return [
+            'frozen' => $frozen,
+            'code' => 'schedule_frozen',
+            'message' => "Attendance is locked because this schedule is frozen after {$usedAbsences} recorded absence" . ($usedAbsences === 1 ? '' : 's') . ". Please pay ₱{$amount} to reserve the slot before checking in.",
+            'reservation_fee_amount' => $amount,
+            'used_absences' => $usedAbsences,
+            'consecutive_absences' => $consecutiveAbsences,
+            'schedule_status' => $frozen ? 'Frozen' : $scheduleStatus
+        ];
     }
 
     private function ensureMakeupSessionLink($session, $teacherId)
@@ -764,6 +809,7 @@ class AttendanceApi
                 attendance_notes = CASE
                     WHEN ? = '' THEN attendance_notes
                     WHEN attendance_notes IS NULL OR TRIM(attendance_notes) = '' THEN ?
+                    WHEN CONCAT(' | ', attendance_notes, ' | ') LIKE CONCAT('% | ', ?, ' | %') THEN attendance_notes
                     ELSE CONCAT(attendance_notes, ' | ', ?)
                 END
             WHERE session_id = ?
@@ -776,6 +822,7 @@ class AttendanceApi
             $makeupEligible,
             $makeupRequired,
             $operationId,
+            $note,
             $note,
             $note,
             $note,
@@ -843,6 +890,14 @@ class AttendanceApi
         if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_enrollments')) {
             return;
         }
+        $session = $this->getStudentSessionForDate((int)$studentId, $dateYmd, false);
+        if ($session) {
+            $status = strtolower(trim((string)($session['status'] ?? '')));
+            $attendanceStatus = strtolower(trim((string)($session['attendance_status'] ?? '')));
+            if ($status === 'completed' && $attendanceStatus === 'present') {
+                return;
+            }
+        }
         $note = trim((string)$sourceLabel) !== '' ? trim((string)$sourceLabel) : 'Attendance recorded';
         $this->applySessionAttendanceOutcome((int)$studentId, $dateYmd, 'present', ['note' => $note]);
     }
@@ -885,6 +940,22 @@ class AttendanceApi
                 'scheduled_date' => $todayYmd,
                 'next_session_date' => $nextSession['session_date'] ?? null,
                 'attendance' => $attendanceToday
+            ];
+        }
+
+        $freezeStatus = $this->getStudentScheduleFreezeStatus($studentId);
+        if (!empty($freezeStatus['frozen'])) {
+            return [
+                'code' => 'schedule_frozen',
+                'allow_attendance' => false,
+                'message' => $freezeStatus['message'],
+                'scheduled_date' => $todayYmd,
+                'next_session_date' => $nextSession['session_date'] ?? null,
+                'attendance' => $attendanceToday,
+                'reservation_fee_amount' => $freezeStatus['reservation_fee_amount'],
+                'used_absences' => $freezeStatus['used_absences'],
+                'consecutive_absences' => $freezeStatus['consecutive_absences'],
+                'schedule_status' => $freezeStatus['schedule_status']
             ];
         }
 
@@ -1208,6 +1279,26 @@ class AttendanceApi
         try {
             if (!$this->ensureAttendanceTable()) {
                 $this->sendJSON(['error' => 'Attendance write endpoint is unavailable on this schema'], 400);
+            }
+
+            if (in_array($status, ['Present', 'Late'], true)) {
+                $freezeStatus = $this->getStudentScheduleFreezeStatus($studentId);
+                if (!empty($freezeStatus['frozen'])) {
+                    $this->sendJSON([
+                        'success' => false,
+                        'error_code' => 'SCHEDULE_FROZEN',
+                        'error' => $freezeStatus['message'],
+                        'qr_status' => [
+                            'code' => 'schedule_frozen',
+                            'allow_attendance' => false,
+                            'message' => $freezeStatus['message'],
+                            'reservation_fee_amount' => $freezeStatus['reservation_fee_amount'],
+                            'used_absences' => $freezeStatus['used_absences'],
+                            'consecutive_absences' => $freezeStatus['consecutive_absences'],
+                            'schedule_status' => $freezeStatus['schedule_status']
+                        ]
+                    ], 400);
+                }
             }
 
             $this->conn->beginTransaction();

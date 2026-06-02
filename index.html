@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Father & Sons Music Academy</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/auth-premium.css">
    <link rel="icon" href="logo/android-chrome-512x512.png" type="image/x-icon" />
     <script>
         tailwind.config = {
@@ -44,35 +46,19 @@
         /* Smooth section transitions */
         html { scroll-behavior: smooth; }
 
-        /* Readable login success SweetAlert */
-        .login-success-popup {
-            font-family: "Times New Roman", Georgia, serif;
-        }
-
-        .login-success-title {
-            font-family: "Times New Roman", Georgia, serif;
-            font-size: 2rem;
-            letter-spacing: 0.04em;
-        }
-
-        .login-success-text {
-            font-family: "Times New Roman", Georgia, serif;
-            font-size: 1.1rem;
-            line-height: 1.6;
-        }
     </style>
 </head>
 <body class="bg-white text-zinc-900 dark:bg-obsidian dark:text-zinc-100 selection:bg-gold-400 selection:text-white">
 
     <!-- Navigation: Clean White Glassmorphism -->
     <nav class="fixed w-full z-50 bg-white/80 dark:bg-obsidian/90 backdrop-blur-lg border-b border-zinc-200 dark:border-zinc-800 px-6 md:px-12 py-4 flex justify-between items-center transition-all duration-300">
-        <a href="#home" class="flex items-center h-10 sm:h-12 md:h-14">
+        <a href="#home" class="flex items-center h-10 sm:h-12 lg:h-14">
             <!-- Assumption: Logo handles its own color. Added dark:brightness-200 for dark mode support -->
             <img src="assets/fas-logo.png" alt="Father & Sons Music Academy"
             class="h-full w-auto object-left object-contain dark:brightness-0 dark:invert">
         </a>
 
-        <div class="hidden md:flex space-x-10 items-center uppercase text-xs tracking-[0.2em] font-semibold">
+        <div class="hidden lg:flex space-x-10 items-center uppercase text-xs tracking-[0.2em] font-semibold">
             <a href="#home" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">Home</a>
             <a href="#about" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">About Us</a>
             <a href="featured.html" class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold-400 transition-colors">Featured</a>
@@ -88,12 +74,12 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
             </div>
         </div>
 
-        <button class="md:hidden text-zinc-900 dark:text-gold-400 text-2xl" onclick="toggleMobileMenu()">
+        <button class="lg:hidden text-zinc-900 dark:text-gold-400 text-2xl" onclick="toggleMobileMenu()">
             <i class="fas fa-bars" id="menu-icon"></i>
         </button>
 
         <!-- Mobile Menu: Clean White Card -->
-        <div id="mobile-menu" class="hidden absolute top-full left-0 w-full bg-white dark:bg-obsidian border-b border-zinc-200 dark:border-zinc-800 flex flex-col p-8 space-y-6 md:hidden shadow-2xl">
+        <div id="mobile-menu" class="hidden absolute top-full left-0 w-full bg-white dark:bg-obsidian border-b border-zinc-200 dark:border-zinc-800 flex flex-col p-8 space-y-6 lg:hidden shadow-2xl">
             <a href="#home" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Home</a>
             <a href="#about" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Our Story</a>
             <a href="featured.html" onclick="toggleMobileMenu()" class="text-zinc-800 dark:text-zinc-300 uppercase text-sm tracking-widest border-b border-zinc-100 dark:border-zinc-800 pb-2">Featured</a>
@@ -496,7 +482,9 @@ Experience Prestige
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <script src="js/index.js"></script>

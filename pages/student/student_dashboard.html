@@ -144,8 +144,15 @@
     <main class="lg:ml-72 pt-24 pb-8 px-4 sm:px-6 lg:px-8">
         <div class="max-w-7xl mx-auto">
             <div class="mb-8 sm:mb-10">
-                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">Welcome back</h1>
-                <p id="studentWelcomeNote" class="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-2">We&apos;ll show the next thing you need to do so this page feels simple and easy to follow.</p>
+                    <div class="flex items-center gap-4">
+                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div id="studentName" class="text-lg font-extrabold truncate text-zinc-900 dark:text-white">—</div>
+                            <div class="text-sm text-zinc-500 dark:text-zinc-400">Branch: <span id="studentBranch" class="text-zinc-700 dark:text-zinc-200 font-semibold">—</span></div>
+                        </div>
+                    </div>
             </div>
 
             <div id="studentActionBanner" class="hidden rounded-3xl border border-gold-500/25 bg-amber-50 dark:bg-gold-500/10 p-6 shadow-xl dark:shadow-black/40 mb-8">
@@ -184,29 +191,6 @@
                 <div id="studentPerformanceBars" class="mt-6 space-y-5"></div>
             </div>
 
-            <div id="studentOverviewGrid" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-                <!-- Profile Card -->
-                <div class="lg:col-span-1 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                    <div class="flex items-center gap-4">
-                        <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl">
-                            <i class="fas fa-user"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div id="studentName" class="text-lg font-extrabold truncate text-zinc-900 dark:text-white">—</div>
-                            <div class="text-sm text-zinc-500 dark:text-zinc-400">Branch: <span id="studentBranch" class="text-zinc-700 dark:text-zinc-200 font-semibold">—</span></div>
-                        </div>
-                    </div>
-                    <div class="mt-4" id="studentStatusBadge"></div>
-
-                    <div class="mt-6 grid grid-cols-2 gap-3">
-                        <a href="student_profile.html" class="text-center px-4 py-3 rounded-2xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
-                            <i class="fas fa-pen mr-2 text-gold-500"></i>Edit Profile
-                        </a>
-                        <a href="student_sessions.html" class="text-center px-4 py-3 rounded-2xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
-                            <i class="fas fa-calendar mr-2 text-gold-500"></i>View Sessions
-                        </a>
-                    </div>
-                </div>
 
                 <!-- Upcoming Schedule Card -->
                 <div id="studentUpcomingScheduleCard" class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">

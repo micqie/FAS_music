@@ -154,327 +154,121 @@
                 </div>
             </section>
 
-            <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <article class="glass-card rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/50 p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Students</div>
-                            <div id="statActiveStudents" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                            <div id="statActiveStudentsMeta" class="mt-2 text-xs text-slate-500">Students carrying active enrollments</div>
+                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Branch Revenue</div>
+                            <div id="branchTotalRevenue" class="mt-3 text-3xl font-black text-slate-900">P0</div>
+                            <div class="mt-2 text-xs text-slate-500">Registration + enrollment payments</div>
                         </div>
                         <div class="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                            <i class="fas fa-user-graduate text-xl"></i>
+                            <i class="fas fa-coins text-xl"></i>
                         </div>
                     </div>
                 </article>
                 <article class="glass-card rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/50 p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Pending Work</div>
-                            <div id="statPendingWork" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                            <div id="statPendingWorkMeta" class="mt-2 text-xs text-slate-500">Registrations and enrollments waiting</div>
+                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Outstanding Balance</div>
+                            <div id="reportOutstandingBalance" class="mt-3 text-3xl font-black text-rose-600">P0</div>
+                            <div id="queueCollectionText" class="mt-2 text-xs text-slate-500">Loading branch collection status.</div>
                         </div>
-                        <div class="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                            <i class="fas fa-hourglass-half text-xl"></i>
-                        </div>
-                    </div>
-                </article>
-                <article class="glass-card rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/50 p-5">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Today's Sessions</div>
-                            <div id="statTodaySessions" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                            <div id="statTodaySessionsMeta" class="mt-2 text-xs text-slate-500">Scheduled classes in branch today</div>
-                        </div>
-                        <div class="h-12 w-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                            <i class="fas fa-calendar-day text-xl"></i>
+                        <div class="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                            <i class="fas fa-receipt text-xl"></i>
                         </div>
                     </div>
                 </article>
                 <article class="glass-card rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/50 p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Teachers</div>
-                            <div id="statActiveTeachers" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                            <div id="statActiveTeachersMeta" class="mt-2 text-xs text-slate-500">Teachers currently assigned</div>
+                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Enrollment Payments</div>
+                            <div id="reportEnrollmentRevenue" class="mt-3 text-3xl font-black text-slate-900">P0</div>
+                            <div class="mt-2 text-xs text-slate-500">Collected from active enrollments</div>
                         </div>
-                        <div class="h-12 w-12 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center">
-                            <i class="fas fa-chalkboard-teacher text-xl"></i>
+                        <div class="h-12 w-12 rounded-2xl bg-gold-50 text-gold-600 flex items-center justify-center">
+                            <i class="fas fa-cash-register text-xl"></i>
                         </div>
                     </div>
                 </article>
             </section>
 
-            <section class="grid grid-cols-1 xl:grid-cols-[1.55fr_1fr] gap-6">
+            <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Operations Snapshot</div>
-                            <h2 class="mt-2 text-2xl font-black text-slate-900">What Needs Attention</h2>
-                        </div>
-                        <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                            <i class="fas fa-circle text-[8px] text-emerald-500"></i>
-                            Live branch view
-                        </div>
-                    </div>
-                    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Approvals Queue</div>
-                            <div id="queueApprovalValue" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                            <p id="queueApprovalText" class="mt-2 text-sm text-slate-500">Loading branch approval workload.</p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Collection Pressure</div>
-                            <div id="queueCollectionValue" class="mt-3 text-3xl font-black text-slate-900">P0</div>
-                            <p id="queueCollectionText" class="mt-2 text-sm text-slate-500">Loading branch collection status.</p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Attendance Risk</div>
-                            <div id="queueRiskValue" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                            <p id="queueRiskText" class="mt-2 text-sm text-slate-500">Students nearing absence limits.</p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Reschedules Needed</div>
-                            <div id="queueRescheduleValue" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                            <p id="queueRescheduleText" class="mt-2 text-sm text-slate-500">Teacher cancellations still unresolved.</p>
-                        </div>
-                    </div>
+                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Enrollments</div>
+                    <div id="statActiveStudents" class="mt-3 text-3xl font-black text-slate-900">0</div>
+                    <div id="statActiveStudentsMeta" class="mt-2 text-sm text-slate-500">Students carrying active enrollments</div>
                 </article>
-
                 <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Quick Actions</div>
-                    <h2 class="mt-2 text-2xl font-black text-slate-900">Run the Branch</h2>
-                    <div class="mt-6 space-y-3">
-                        <a href="manager_registration.html" class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 hover:border-gold-400 hover:shadow-md transition">
-                            <div class="flex items-center gap-3">
-                                <div class="h-11 w-11 rounded-2xl bg-gold-50 text-gold-600 flex items-center justify-center">
-                                    <i class="fas fa-id-card"></i>
-                                </div>
-                                <div>
-                                    <div class="font-bold text-slate-900">Review Registrations</div>
-                                    <div class="text-xs text-slate-500">Approve pending online and walk-in records</div>
-                                </div>
-                            </div>
-                            <i class="fas fa-arrow-right text-slate-400"></i>
-                        </a>
-                        <a href="manager_sessions.html?page=enrollments&view=pending" class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 hover:border-gold-400 hover:shadow-md transition">
-                            <div class="flex items-center gap-3">
-                                <div class="h-11 w-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                                    <i class="fas fa-user-clock"></i>
-                                </div>
-                                <div>
-                                    <div class="font-bold text-slate-900">Process Enrollments</div>
-                                    <div class="text-xs text-slate-500">Handle pending package and payment actions</div>
-                                </div>
-                            </div>
-                            <i class="fas fa-arrow-right text-slate-400"></i>
-                        </a>
-                        <a href="manager_sessions.html?page=sessions" class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 hover:border-gold-400 hover:shadow-md transition">
-                            <div class="flex items-center gap-3">
-                                <div class="h-11 w-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                                    <i class="fas fa-calendar-check"></i>
-                                </div>
-                                <div>
-                                    <div class="font-bold text-slate-900">Manage Schedules</div>
-                                    <div class="text-xs text-slate-500">Edit schedules, reschedule emergencies, fill gaps</div>
-                                </div>
-                            </div>
-                            <i class="fas fa-arrow-right text-slate-400"></i>
-                        </a>
-                        <a href="manager_teachers.html" class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 hover:border-gold-400 hover:shadow-md transition">
-                            <div class="flex items-center gap-3">
-                                <div class="h-11 w-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center">
-                                    <i class="fas fa-chalkboard-teacher"></i>
-                                </div>
-                                <div>
-                                    <div class="font-bold text-slate-900">Check Teacher Coverage</div>
-                                    <div class="text-xs text-slate-500">Review active branch staffing and workload</div>
-                                </div>
-                            </div>
-                            <i class="fas fa-arrow-right text-slate-400"></i>
-                        </a>
-                    </div>
+                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Pending Approvals</div>
+                    <div id="queueApprovalValue" class="mt-3 text-3xl font-black text-slate-900">0</div>
+                    <div id="queueApprovalText" class="mt-2 text-sm text-slate-500">Loading branch approval workload.</div>
+                </article>
+                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
+                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Today's Sessions</div>
+                    <div id="statTodaySessions" class="mt-3 text-3xl font-black text-slate-900">0</div>
+                    <div id="statTodaySessionsMeta" class="mt-2 text-sm text-slate-500">Scheduled classes in branch today</div>
+                </article>
+                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
+                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Teachers</div>
+                    <div id="statActiveTeachers" class="mt-3 text-3xl font-black text-slate-900">0</div>
+                    <div id="statActiveTeachersMeta" class="mt-2 text-sm text-slate-500">Teachers currently assigned</div>
                 </article>
             </section>
 
-            <section class="grid grid-cols-1 xl:grid-cols-[1.15fr_1fr_1fr] gap-6">
+            <section class="grid grid-cols-1 xl:grid-cols-[1fr_1.2fr] gap-6">
                 <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
                     <div class="flex items-center justify-between gap-3">
                         <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Reports</div>
-                            <h2 class="mt-2 text-2xl font-black text-slate-900">Branch Performance</h2>
+                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Enrollments</div>
+                            <h2 class="mt-2 text-2xl font-black text-slate-900">Branch Enrollment Summary</h2>
+                        </div>
+                        <a href="manager_sessions.html?page=enrollments&view=active" class="text-sm font-semibold text-branchBlue hover:text-slate-900 transition">Open enrollments</a>
+                    </div>
+                    <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <div id="reportPendingRegs" class="text-3xl font-black text-amber-600">0</div>
+                            <div class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500 font-bold">Pending</div>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <div id="reportFeePaidRegs" class="text-3xl font-black text-sky-600">0</div>
+                            <div class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500 font-bold">Fee Paid</div>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <div id="reportApprovedRegs" class="text-3xl font-black text-emerald-600">0</div>
+                            <div class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500 font-bold">Approved</div>
+                        </div>
+                    </div>
+                    <div id="reportRegistrationMix" class="mt-4 text-sm text-slate-500">0 total registrations</div>
+                </article>
+
+                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
+                    <div class="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Summaries</div>
+                            <h2 class="mt-2 text-2xl font-black text-slate-900">Branch Snapshot</h2>
                         </div>
                         <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Current branch</div>
                     </div>
-                    <div class="mt-6 space-y-4">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="flex items-center justify-between">
-                                <div class="font-bold text-slate-800">Registration Funnel</div>
-                                <span id="reportRegistrationMix" class="text-xs font-semibold text-slate-500">0 total</span>
-                            </div>
-                            <div class="mt-4 grid grid-cols-3 gap-3 text-center">
-                                <div class="rounded-xl bg-white p-3 border border-slate-200">
-                                    <div id="reportPendingRegs" class="text-2xl font-black text-amber-600">0</div>
-                                    <div class="mt-1 text-[11px] uppercase tracking-[0.18em] text-slate-500 font-bold">Pending</div>
-                                </div>
-                                <div class="rounded-xl bg-white p-3 border border-slate-200">
-                                    <div id="reportFeePaidRegs" class="text-2xl font-black text-sky-600">0</div>
-                                    <div class="mt-1 text-[11px] uppercase tracking-[0.18em] text-slate-500 font-bold">Fee Paid</div>
-                                </div>
-                                <div class="rounded-xl bg-white p-3 border border-slate-200">
-                                    <div id="reportApprovedRegs" class="text-2xl font-black text-emerald-600">0</div>
-                                    <div class="mt-1 text-[11px] uppercase tracking-[0.18em] text-slate-500 font-bold">Approved</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="flex items-center justify-between">
-                                <div class="font-bold text-slate-800">Payment Report</div>
-                                <span id="reportRevenueMeta" class="text-xs font-semibold text-slate-500">Branch balances</span>
-                            </div>
-                            <div class="mt-4 space-y-3">
-                                <div class="flex items-center justify-between rounded-xl bg-white border border-slate-200 px-4 py-3">
-                                    <span class="text-sm text-slate-600">Registration fees collected</span>
-                                    <span id="reportRegistrationRevenue" class="text-lg font-black text-slate-900">P0</span>
-                                </div>
-                                <div class="flex items-center justify-between rounded-xl bg-white border border-slate-200 px-4 py-3">
-                                    <span class="text-sm text-slate-600">Enrollment payments collected</span>
-                                    <span id="reportEnrollmentRevenue" class="text-lg font-black text-slate-900">P0</span>
-                                </div>
-                                <div class="flex items-center justify-between rounded-xl bg-white border border-slate-200 px-4 py-3">
-                                    <span class="text-sm text-slate-600">Outstanding enrollment balance</span>
-                                    <span id="reportOutstandingBalance" class="text-lg font-black text-rose-600">P0</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </article>
-
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Teacher Load</div>
-                    <h2 class="mt-2 text-2xl font-black text-slate-900">Branch Coverage</h2>
-                    <div id="teacherLoadList" class="mt-6 space-y-3">
-                        <div class="text-sm text-slate-500">Loading teacher report...</div>
-                    </div>
-                </article>
-
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Schedule Report</div>
-                    <h2 class="mt-2 text-2xl font-black text-slate-900">Operations Health</h2>
-                    <div class="mt-6 space-y-3">
+                    <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                             <div class="text-sm font-bold text-slate-800">This Week</div>
                             <div id="reportWeekSessions" class="mt-2 text-3xl font-black text-slate-900">0</div>
-                            <div id="reportWeekSessionsMeta" class="text-sm text-slate-500 mt-1">Scheduled branch sessions through this week.</div>
+                            <div id="reportWeekSessionsMeta" class="text-sm text-slate-500 mt-1">Scheduled sessions</div>
                         </div>
                         <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">High Absence Risk</div>
+                            <div class="text-sm font-bold text-slate-800">Absence Risk</div>
                             <div id="reportAbsenceRisk" class="mt-2 text-3xl font-black text-rose-600">0</div>
-                            <div id="reportAbsenceRiskMeta" class="text-sm text-slate-500 mt-1">Students at or one step from their limit.</div>
+                            <div id="reportAbsenceRiskMeta" class="text-sm text-slate-500 mt-1">Students near limits</div>
                         </div>
                         <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Reschedule Queue</div>
+                            <div class="text-sm font-bold text-slate-800">Reschedules</div>
                             <div id="reportRescheduleQueue" class="mt-2 text-3xl font-black text-sky-600">0</div>
-                            <div id="reportRescheduleQueueMeta" class="text-sm text-slate-500 mt-1">Teacher-cancelled classes still waiting.</div>
+                            <div id="reportRescheduleQueueMeta" class="text-sm text-slate-500 mt-1">Teacher-cancelled classes</div>
                         </div>
-                    </div>
-                </article>
-            </section>
-
-            <section class="grid grid-cols-1 xl:grid-cols-[1.15fr_1fr] gap-6">
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Recent Activity</div>
-                            <h2 class="mt-2 text-2xl font-black text-slate-900">Latest Branch Movement</h2>
-                        </div>
-                        <a href="manager_registration.html" class="text-sm font-semibold text-branchBlue hover:text-slate-900 transition">Open full queue</a>
-                    </div>
-                    <div id="recentActivityList" class="mt-6 space-y-3">
-                        <div class="text-sm text-slate-500">Loading branch activity...</div>
-                    </div>
-                </article>
-
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Manager Report</div>
-                            <h2 class="mt-2 text-2xl font-black text-slate-900">Daily Brief</h2>
-                        </div>
-                        <button id="copyReportBtn" type="button" class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition">
-                            <i class="fas fa-copy"></i>
-                            Copy Summary
-                        </button>
                     </div>
                     <div class="mt-6 rounded-3xl border border-slate-200 bg-slate-50/70 p-5">
                         <pre id="managerReportText" class="whitespace-pre-wrap text-sm leading-6 text-slate-700">Preparing branch summary...</pre>
-                    </div>
-                </article>
-            </section>
-
-            <section class="grid grid-cols-1 gap-6">
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Makeup Queue</div>
-                            <h2 class="mt-2 text-2xl font-black text-slate-900">Makeup List Summary</h2>
-                        </div>
-                        <a href="manager_sessions.html?page=sessions&view=cancelled" class="text-sm font-semibold text-branchBlue hover:text-slate-900 transition">Open schedules</a>
-                    </div>
-                    <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Needs Makeup</div>
-                            <div id="makeupQueueCount" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                            <p id="makeupQueueMeta" class="mt-2 text-sm text-slate-500">Teacher-cancelled sessions waiting to be rescheduled.</p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Earliest Makeup Date</div>
-                            <div id="makeupEarliestDate" class="mt-3 text-2xl font-black text-slate-900">—</div>
-                            <p class="mt-2 text-sm text-slate-500">Oldest pending class that still needs attention.</p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Most Affected Package</div>
-                            <div id="makeupTopPackage" class="mt-3 text-2xl font-black text-slate-900">—</div>
-                            <p id="makeupTopPackageMeta" class="mt-2 text-sm text-slate-500">Package with the highest makeup count.</p>
-                        </div>
-                    </div>
-                    <div id="makeupSummaryList" class="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-3">
-                        <div class="text-sm text-slate-500">Loading makeup list...</div>
-                    </div>
-                </article>
-            </section>
-
-            <section class="grid grid-cols-1 gap-6">
-                <article class="glass-card rounded-[1.75rem] border border-rose-200/80 shadow-xl shadow-rose-100/50 p-6">
-                    <div class="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-rose-600 font-bold">Branch Red List</div>
-                            <h2 class="mt-2 text-2xl font-black text-slate-900">Detailed Make-Up Tracking</h2>
-                            <p class="mt-2 text-sm text-slate-500">Students appear here once they reach the absence limit for their package.</p>
-                        </div>
-                        <span id="managerRedListCount" class="text-sm font-semibold text-rose-600">Loading...</span>
-                    </div>
-                    <div class="mt-6 overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-rose-50/60">
-                                <tr>
-                                    <th class="px-5 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                                    <th class="px-5 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
-                                    <th class="px-5 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Absences</th>
-                                    <th class="px-5 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Allowance</th>
-                                    <th class="px-5 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Consecutive</th>
-                                    <th class="px-5 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Next Session</th>
-                                </tr>
-                            </thead>
-                            <tbody id="managerRedListTable" class="divide-y divide-rose-100">
-                                <tr>
-                                    <td colspan="6" class="px-5 py-8 text-center text-slate-500">
-                                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                        <p>Loading branch red list...</p>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
                     </div>
                 </article>
             </section>
@@ -833,12 +627,13 @@
 
             setText('heroPendingRegistrations', String(summary.pendingCount));
             setText('heroOutstandingBalance', formatPeso(summary.enrollmentOutstanding));
-            setText('statActiveStudents', String(summary.activeStudents));
+            setText('branchTotalRevenue', formatPeso(summary.registrationRevenue + summary.enrollmentRevenue));
+            setText('statActiveStudents', String(dashboardState.enrollments.length));
             setText('statPendingWork', String(summary.pendingWork));
             setText('statTodaySessions', String(summary.todaySessions));
             setText('statActiveTeachers', String(summary.activeTeachers));
 
-            setText('statActiveStudentsMeta', `${dashboardState.enrollments.length} active enrollment${dashboardState.enrollments.length === 1 ? '' : 's'} in this branch`);
+            setText('statActiveStudentsMeta', `${summary.activeStudents} active student${summary.activeStudents === 1 ? '' : 's'} in this branch`);
             setText('statPendingWorkMeta', `${summary.pendingCount} pending registration${summary.pendingCount === 1 ? '' : 's'}, ${summary.feePaidCount} ready for next action`);
             setText('statTodaySessionsMeta', `${summary.weekSessions} scheduled session${summary.weekSessions === 1 ? '' : 's'} this week`);
             setText('statActiveTeachersMeta', `${dashboardState.teachers.length} teacher record${dashboardState.teachers.length === 1 ? '' : 's'} loaded`);

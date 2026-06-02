@@ -1,0 +1,304 @@
+.auth-premium-popup {
+    width: min(92vw, 500px) !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(228, 228, 231, 0.95) !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2) !important;
+    will-change: opacity, transform !important;
+    backface-visibility: hidden !important;
+}
+
+.auth-premium-popup.auth-premium-error {
+    border-color: rgba(254, 202, 202, 0.95) !important;
+}
+
+.auth-premium-popup.auth-premium-success {
+    border-color: rgba(167, 243, 208, 0.95) !important;
+}
+
+.auth-premium-popup.auth-premium-info {
+    border-color: rgba(253, 230, 138, 0.95) !important;
+}
+
+.auth-premium-html {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.auth-premium-card {
+    position: relative;
+    padding: 2rem 2.15rem 2.15rem;
+    text-align: center;
+}
+
+.auth-premium-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: #d4af37;
+    transform-origin: top;
+    animation: authPremiumBarIn 360ms 80ms ease-out both;
+}
+
+.auth-premium-popup.auth-premium-error .auth-premium-card::before {
+    background: #e11d48;
+}
+
+.auth-premium-popup.auth-premium-success .auth-premium-card::before {
+    background: #059669;
+}
+
+.auth-premium-popup.auth-premium-info .auth-premium-card::before {
+    background: #b8860b;
+}
+
+.auth-premium-status {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.auth-premium-lottie-wrap {
+    display: flex;
+    width: 6.8rem;
+    height: 6.8rem;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.7rem;
+    border-radius: 999px;
+    background: #fffbeb;
+    animation: authPremiumIconPop 420ms 100ms cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
+    will-change: transform, opacity;
+    position: relative;
+}
+
+.auth-premium-lottie-success {
+    background: #ecfdf5;
+}
+
+.auth-premium-lottie-error {
+    background: #fff1f2;
+}
+
+.auth-premium-lottie-info {
+    background: #fffbeb;
+}
+
+.auth-premium-lottie {
+    width: 6.3rem;
+    height: 6.3rem;
+}
+
+.auth-premium-note {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #b8860b;
+    font-size: 2.05rem;
+    line-height: 1;
+    pointer-events: none;
+    text-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+    animation: authPremiumNoteBeat 950ms ease-in-out infinite;
+}
+
+.auth-premium-lottie-success .auth-premium-note {
+    color: #059669;
+}
+
+.auth-premium-lottie-error .auth-premium-note {
+    color: #e11d48;
+}
+
+.auth-premium-lottie-info .auth-premium-note {
+    color: #b8860b;
+}
+
+.auth-premium-title {
+    margin: 0.45rem 0 0;
+    color: #18181b;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1.18;
+    letter-spacing: 0;
+    text-rendering: geometricPrecision;
+    animation: authPremiumTextIn 320ms 150ms ease-out both;
+}
+
+.auth-premium-message {
+    max-width: 22rem;
+    margin: 0.8rem auto 0;
+    color: #52525b;
+    font-size: 1rem;
+    line-height: 1.65;
+    text-rendering: optimizeLegibility;
+    animation: authPremiumTextIn 320ms 190ms ease-out both;
+}
+
+.auth-premium-confirm {
+    border-radius: 4px !important;
+    padding: 0.8rem 1.2rem !important;
+    background: #0f172a !important;
+    color: #fff !important;
+    font-size: 0.75rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    box-shadow: none !important;
+}
+
+.auth-premium-progress {
+    background: rgba(212, 175, 55, 0.2) !important;
+}
+
+.auth-premium-progress .swal2-timer-progress-bar {
+    background: linear-gradient(90deg, #d4af37, #b8860b) !important;
+}
+
+.auth-premium-show {
+    animation: authPremiumIn 160ms ease-out both !important;
+}
+
+.auth-premium-hide {
+    animation: authPremiumOut 120ms ease-in both !important;
+}
+
+@keyframes authPremiumIn {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 8px, 0) scale(0.99);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes authPremiumOut {
+    from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate3d(0, 4px, 0) scale(0.995);
+    }
+}
+
+@keyframes authPremiumBarIn {
+    from {
+        transform: scaleY(0);
+    }
+    to {
+        transform: scaleY(1);
+    }
+}
+
+@keyframes authPremiumIconPop {
+    0% {
+        opacity: 0;
+        transform: scale(0.72);
+    }
+    70% {
+        opacity: 1;
+        transform: scale(1.08);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes authPremiumTextIn {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 6px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes authPremiumNoteBeat {
+    0%,
+    100% {
+        transform: scale(1) rotate(-4deg);
+    }
+    50% {
+        transform: scale(1.08) rotate(2deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-premium-show,
+    .auth-premium-hide,
+    .auth-premium-card::before,
+    .auth-premium-lottie-wrap,
+    .auth-premium-note,
+    .auth-premium-title,
+    .auth-premium-message {
+        animation: none !important;
+    }
+}
+
+.dark .auth-premium-popup {
+    border-color: rgba(63, 63, 70, 0.95) !important;
+    background: #18181b !important;
+}
+
+.dark .auth-premium-title {
+    color: #fafafa;
+}
+
+.dark .auth-premium-message {
+    color: #d4d4d8;
+}
+
+@media (max-width: 640px) {
+    .auth-premium-popup {
+        width: calc(100vw - 24px) !important;
+        border-radius: 8px !important;
+    }
+
+    .auth-premium-card {
+        padding: 1.45rem 1.25rem 1.6rem;
+    }
+
+    .auth-premium-lottie-wrap {
+        width: 5.9rem;
+        height: 5.9rem;
+    }
+
+    .auth-premium-lottie {
+        width: 5.55rem;
+        height: 5.55rem;
+    }
+
+    .auth-premium-note {
+        font-size: 1.75rem;
+    }
+
+    .auth-premium-title {
+        font-size: 1.45rem;
+    }
+
+    .auth-premium-message {
+        font-size: 0.95rem;
+    }
+
+    .auth-premium-confirm {
+        width: calc(100% - 32px) !important;
+        margin-inline: 16px !important;
+    }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+    .auth-premium-popup {
+        width: min(78vw, 512px) !important;
+    }
+}

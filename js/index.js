@@ -362,31 +362,233 @@ function toggleMobileMenu() {
     }
 }
 
-// Show Message Helper (SweetAlert)
-function showLoginMessage(message, type = 'error') {
-    if (typeof Swal !== 'undefined') {
-        Swal.fire({
-            icon: type === 'success' ? 'success' : 'error',
-            title: type === 'success' ? 'Success' : 'Error',
-            text: message,
-            confirmButtonColor: '#b8860b'
-        });
-    } else {
-        alert(message);
-    }
+function escapeAuthHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
-function showRegisterMessage(message, type = 'error') {
+function getPremiumAuthVisual(type) {
+    const normalized = ['success', 'error', 'info'].includes(type) ? type : 'error';
+    const visuals = {
+        success: {
+            label: 'Success',
+            color: '#059669'
+        },
+        error: {
+            label: 'Action needed',
+            color: '#e11d48'
+        },
+        info: {
+            label: 'Notice',
+            color: '#b8860b'
+        }
+    };
+    return visuals[normalized];
+}
+
+function hexToLottieColor(hex) {
+    const normalized = String(hex || '#b8860b').replace('#', '');
+    const full = normalized.length === 3
+        ? normalized.split('').map((char) => char + char).join('')
+        : normalized.padEnd(6, '0').slice(0, 6);
+    return [0, 2, 4].map((start) => parseInt(full.slice(start, start + 2), 16) / 255).concat(1);
+}
+
+function buildAuthLottieSrc(type) {
+    const visual = getPremiumAuthVisual(type);
+    const color = hexToLottieColor(visual.color);
+    const mutedColor = type === 'error' ? hexToLottieColor('#ffe4e6') : (type === 'success' ? hexToLottieColor('#d1fae5') : hexToLottieColor('#fef3c7'));
+    const animation = {
+        v: '5.7.4',
+        fr: 30,
+        ip: 0,
+        op: 90,
+        w: 140,
+        h: 140,
+        nm: 'Auth music status',
+        ddd: 0,
+        assets: [],
+        layers: [
+            {
+                ddd: 0,
+                ind: 1,
+                ty: 4,
+                nm: 'Soft ring',
+                sr: 1,
+                ks: {
+                    o: { a: 0, k: 100 },
+                    r: { a: 0, k: 0 },
+                    p: { a: 0, k: [70, 70, 0] },
+                    a: { a: 0, k: [0, 0, 0] },
+                    s: { a: 0, k: [100, 100, 100] }
+                },
+                shapes: [{
+                    ty: 'gr',
+                    it: [
+                        { ty: 'el', p: { a: 0, k: [0, 0] }, s: { a: 0, k: [90, 90] } },
+                        { ty: 'st', c: { a: 0, k: mutedColor }, o: { a: 0, k: 100 }, w: { a: 0, k: 8 }, lc: 2, lj: 2 },
+                        { ty: 'tr', p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+                    ]
+                }],
+                ip: 0,
+                op: 90,
+                st: 0,
+                bm: 0
+            },
+            {
+                ddd: 0,
+                ind: 2,
+                ty: 4,
+                nm: 'Loading ring',
+                sr: 1,
+                ks: {
+                    o: { a: 0, k: 100 },
+                    r: { a: 1, k: [{ t: 0, s: [0] }, { t: 90, s: [720] }] },
+                    p: { a: 0, k: [70, 70, 0] },
+                    a: { a: 0, k: [0, 0, 0] },
+                    s: { a: 0, k: [100, 100, 100] }
+                },
+                shapes: [{
+                    ty: 'gr',
+                    it: [
+                        { ty: 'el', p: { a: 0, k: [0, 0] }, s: { a: 0, k: [90, 90] } },
+                        { ty: 'st', c: { a: 0, k: color }, o: { a: 0, k: 100 }, w: { a: 0, k: 8 }, lc: 2, lj: 2 },
+                        { ty: 'tm', s: { a: 0, k: 8 }, e: { a: 0, k: 66 }, o: { a: 0, k: 0 } },
+                        { ty: 'tr', p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+                    ]
+                }],
+                ip: 0,
+                op: 90,
+                st: 0,
+                bm: 0
+            },
+            {
+                ddd: 0,
+                ind: 3,
+                ty: 4,
+                nm: 'Music note',
+                sr: 1,
+                ks: {
+                    o: { a: 0, k: 100 },
+                    r: { a: 0, k: -8 },
+                    p: { a: 0, k: [70, 66, 0] },
+                    a: { a: 0, k: [0, 0, 0] },
+                    s: { a: 1, k: [{ t: 0, s: [72, 72, 100] }, { t: 14, s: [112, 112, 100] }, { t: 26, s: [100, 100, 100] }, { t: 90, s: [100, 100, 100] }] }
+                },
+                shapes: [{
+                    ty: 'gr',
+                    it: [
+                        { ty: 'el', p: { a: 0, k: [-14, 23] }, s: { a: 0, k: [28, 22] } },
+                        { ty: 'fl', c: { a: 0, k: color }, o: { a: 0, k: 100 }, r: 1 },
+                        { ty: 'rc', p: { a: 0, k: [0, 0] }, s: { a: 0, k: [8, 58] }, r: { a: 0, k: 4 } },
+                        { ty: 'fl', c: { a: 0, k: color }, o: { a: 0, k: 100 }, r: 1 },
+                        {
+                            ty: 'sh',
+                            ks: {
+                                a: 0,
+                                k: {
+                                    i: [[0, 0], [0, 0], [0, 0], [0, 0]],
+                                    o: [[0, 0], [0, 0], [0, 0], [0, 0]],
+                                    v: [[4, -28], [34, -18], [34, -5], [4, -14]],
+                                    c: true
+                                }
+                            }
+                        },
+                        { ty: 'fl', c: { a: 0, k: color }, o: { a: 0, k: 100 }, r: 1 },
+                        { ty: 'tr', p: { a: 0, k: [8, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+                    ]
+                }],
+                ip: 0,
+                op: 90,
+                st: 0,
+                bm: 0
+            }
+        ]
+    };
+
+    return `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(animation))}`;
+}
+
+function buildPremiumAuthHtml({ type = 'error', title = '', message = '', context = 'login' }) {
+    const lottieSrc = buildAuthLottieSrc(type);
+    const safeTitle = escapeAuthHtml(title || (type === 'success' ? 'Success' : type === 'info' ? 'Notice' : 'Something went wrong'));
+    const safeMessage = escapeAuthHtml(message);
+
+    return `
+        <div class="auth-premium-card">
+            <div class="auth-premium-lottie-wrap auth-premium-lottie-${type}">
+                <lottie-player class="auth-premium-lottie" src="${lottieSrc}" background="transparent" speed="1" loop autoplay></lottie-player>
+                <span class="auth-premium-note" aria-hidden="true">
+                    <i class="fas fa-music"></i>
+                </span>
+            </div>
+            <h2 class="auth-premium-title">${safeTitle}</h2>
+            <p class="auth-premium-message">${safeMessage}</p>
+        </div>
+    `;
+}
+
+function showPremiumAuthMessage(options = {}) {
+    const type = ['success', 'error', 'info'].includes(options.type) ? options.type : 'error';
     if (typeof Swal !== 'undefined') {
-        Swal.fire({
-            icon: type === 'success' ? 'success' : 'error',
-            title: type === 'success' ? 'Success' : 'Error',
-            text: message,
-            confirmButtonColor: '#b8860b'
+        const hasTimerOption = Object.prototype.hasOwnProperty.call(options, 'timer');
+        return Swal.fire({
+            html: buildPremiumAuthHtml({ ...options, type }),
+            width: 'auto',
+            padding: 0,
+            background: 'transparent',
+            icon: undefined,
+            showConfirmButton: options.showConfirmButton ?? type !== 'success',
+            confirmButtonText: options.confirmButtonText || 'Got it',
+            timer: hasTimerOption ? options.timer : (type === 'success' ? 1600 : undefined),
+            timerProgressBar: options.timerProgressBar ?? type === 'success',
+            buttonsStyling: false,
+            showClass: {
+                popup: 'auth-premium-show'
+            },
+            hideClass: {
+                popup: 'auth-premium-hide'
+            },
+            customClass: {
+                popup: `auth-premium-popup auth-premium-${type}`,
+                htmlContainer: 'auth-premium-html',
+                confirmButton: 'auth-premium-confirm',
+                timerProgressBar: 'auth-premium-progress'
+            }
         });
-    } else {
-        alert(message);
     }
+
+    alert(options.message || options.title || 'Authentication message');
+    return Promise.resolve();
+}
+
+// Show Message Helper (SweetAlert)
+function showLoginMessage(message, type = 'error', title = '') {
+    return showPremiumAuthMessage({
+        type,
+        context: 'login',
+        title: title || (type === 'success' ? 'Login Successful' : type === 'info' ? 'Account Notice' : 'Login Failed'),
+        message,
+        detail: type === 'success' ? 'Preparing your dashboard.' : 'Please review your credentials and try again.'
+    });
+}
+
+function showRegisterMessage(message, type = 'error', title = '') {
+    return showPremiumAuthMessage({
+        type,
+        context: 'register',
+        title: title || (type === 'success' ? 'Account Created' : type === 'info' ? 'Registration Notice' : 'Registration Failed'),
+        message,
+        detail: type === 'success' ? 'Check your email verification step next.' : 'Please review the highlighted registration details.',
+        showConfirmButton: type === 'success' ? true : undefined,
+        timer: type === 'success' ? null : undefined,
+        timerProgressBar: type === 'success' ? false : undefined,
+        confirmButtonText: type === 'success' ? 'Continue' : undefined
+    });
 }
 
 async function promptEmailVerification(email, initialCode = '') {
@@ -580,20 +782,7 @@ function initLoginForm() {
                 // Store user in sessionStorage
                 Auth.setUser(data.user);
 
-                // Show success message with SweetAlert
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Login Successful!',
-                    text: 'Redirecting to dashboard...',
-                    customClass: {
-                        popup: 'login-success-popup',
-                        title: 'login-success-title',
-                        htmlContainer: 'login-success-text'
-                    },
-                    timer: 1500,
-                    showConfirmButton: false,
-                    timerProgressBar: true
-                });
+                showLoginMessage('Welcome back. Redirecting to your dashboard...', 'success', 'Login Successful');
 
                 // Redirect based on role
                 setTimeout(() => {
@@ -639,13 +828,7 @@ function initLoginForm() {
                 const title = isPending ? '' : status === 401 ? 'Login Failed' : 'Error';
                 const icon = isPending ? 'info' : 'error';
 
-                // Show error message with SweetAlert
-                Swal.fire({
-                    icon,
-                    title,
-                    text: message,
-                    confirmButtonColor: '#b8860b'
-                });
+                showLoginMessage(message, icon === 'info' ? 'info' : 'error', title || 'Account Notice');
                 if (loginBtn) loginBtn.disabled = false;
                 if (loginBtnText) loginBtnText.textContent = 'Sign In';
                 if (loginBtnIcon) {
@@ -677,12 +860,7 @@ function initLoginForm() {
             const isPending = status === 403 || /pending|deactivated/i.test(message);
             const title = isPending ? '' : status === 401 ? 'Login Failed' : 'Error';
             const icon = isPending ? 'info' : 'error';
-            Swal.fire({
-                icon,
-                title,
-                text: message,
-                confirmButtonColor: '#b8860b'
-            });
+            showLoginMessage(message, icon === 'info' ? 'info' : 'error', title || 'Account Notice');
             if (loginBtn) loginBtn.disabled = false;
             if (loginBtnText) loginBtnText.textContent = 'Sign In';
             if (loginBtnIcon) {
@@ -782,6 +960,7 @@ function initRegisterForm() {
                             confirmButtonColor: '#b8860b'
                         });
                     }
+                    await showRegisterMessage(data.message || 'Your student account was created. Verify your email to unlock login access.', 'success', 'Account Created');
                     await promptEmailVerification(verificationEmail, verificationPreviewCode);
                 } else {
                     showRegisterMessage(data.error || 'Registration failed. Please try again.', 'error');
@@ -1237,6 +1416,32 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function cleanSessionNoteText(text, fallback = '—') {
+    const raw = String(text || '').trim();
+    if (!raw) return fallback;
+
+    const systemNotes = new Set([
+        'completed from manual attendance',
+        'completed from attendance check-in',
+        'completed from qr attendance',
+        'attendance recorded'
+    ]);
+    const seen = new Set();
+    const parts = raw
+        .split('|')
+        .map(part => part.trim())
+        .filter(part => {
+            if (!part) return false;
+            const key = part.toLowerCase();
+            if (systemNotes.has(key)) return false;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+
+    return parts.length ? parts.join(' | ') : fallback;
 }
 
 // Calculate Age from Date of Birth
@@ -2081,6 +2286,7 @@ function renderStudentQrStatus(status) {
         early: 'Not Yet Available',
         missed: 'Session Missed',
         completed: 'Session Completed',
+        schedule_frozen: 'Schedule Frozen',
         no_session: 'No Session Today'
     };
     const banner = document.getElementById('qrStatusBanner');
@@ -2091,6 +2297,7 @@ function renderStudentQrStatus(status) {
         early: 'block border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200',
         missed: 'block border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200',
         completed: 'block border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200',
+        schedule_frozen: 'block border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200',
         no_session: 'block border-zinc-300 bg-zinc-50 text-zinc-700 dark:border-zinc-500/30 dark:bg-zinc-500/10 dark:text-zinc-200'
     };
 
@@ -2341,12 +2548,19 @@ function renderCurrentEnrollmentSummary(enrollment, student, instruments) {
     const balance = Math.max(0, totalAmount - paidAmount);
     const paymentState = totalAmount > 0 && paidAmount >= totalAmount ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Unpaid');
     const status = enrollment.status || '—';
+    const reserveNotice = getScheduleFreezeReservationNotice(enrollment);
     return `
         <div class="rounded-xl border border-white/10 bg-black/20 p-4">
             <div class="flex items-center justify-between gap-2">
                 <div class="text-base font-bold text-white">ENROLLED: ${escapeHtml(enrollment.package_name || 'Package')}</div>
                 <span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold ${enrollmentStatusBadgeClass(status)}">${escapeHtml(status)}</span>
             </div>
+            ${reserveNotice ? `
+                <div class="mt-4 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                    <div class="font-extrabold">${escapeHtml(reserveNotice.title)}</div>
+                    <div class="mt-1 text-amber-50/90">${escapeHtml(reserveNotice.text)}</div>
+                </div>
+            ` : ''}
             <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 <div><span class="text-zinc-400">Instruments to learn:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(instrumentsLabel)}</span></div>
                 <div><span class="text-zinc-400">Payment:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(paymentState)} (${escapeHtml(enrollment.payment_type || 'Partial Payment')})</span></div>
@@ -2359,6 +2573,21 @@ function renderCurrentEnrollmentSummary(enrollment, student, instruments) {
             </div>
         </div>
     `;
+}
+
+function getScheduleFreezeReservationNotice(enrollment) {
+    if (!enrollment) return null;
+    const usedAbsences = Number(enrollment.used_absences || 0);
+    const freezeRequired = Number(enrollment.schedule_freeze_required || 0) === 1 || usedAbsences >= 3;
+    if (!freezeRequired) return null;
+    const amount = Number(enrollment.reservation_fee_amount || 50) || 50;
+    const amountLabel = formatCurrencyPHP(amount).replace(/\.00$/, '');
+    return {
+        amount,
+        usedAbsences,
+        title: `PAY ${amountLabel} to reserve slot`,
+        text: `You have ${usedAbsences} recorded absence${usedAbsences === 1 ? '' : 's'}. Please pay the reservation fee to hold your class slot.`
+    };
 }
 
 function renderEnrollmentHistoryList(history) {
@@ -2725,9 +2954,8 @@ function buildGuardianSessionDetailMarkup(row) {
     const attendanceLabel = row.attendance_status && row.attendance_status !== 'Pending'
         ? row.attendance_status
         : (row.status || 'Scheduled');
-    const remarks = row.teacher_remarks
-        ? escapeHtml(row.teacher_remarks)
-        : (row.remarks ? escapeHtml(row.remarks) : 'No teacher remarks recorded yet.');
+    const remarksText = cleanSessionNoteText(row.teacher_remarks || row.remarks, 'No teacher remarks recorded yet.');
+    const remarks = escapeHtml(remarksText);
 
     return `
         <div class="text-left">
@@ -4142,8 +4370,9 @@ function renderStudentActionBanner(student, meta, portal) {
     const latestReq = meta?.latest_request || null;
     const hasPendingReq = latestReq && String(latestReq.status || '') === 'Pending';
     const enrollmentApproved = portal?.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
+    const reservationNotice = getScheduleFreezeReservationNotice(portal?.current_enrollment || null);
 
-    if (enrollmentApproved) {
+    if (enrollmentApproved && !reservationNotice) {
         banner.classList.add('hidden');
         return;
     }
@@ -4155,7 +4384,14 @@ function renderStudentActionBanner(student, meta, portal) {
         <a href="student_profile.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Open Profile</a>
     `;
 
-    if (isRejected) {
+    if (reservationNotice) {
+        title = reservationNotice.title;
+        text = `${reservationNotice.text} This keeps your schedule from being released after repeated absences.`;
+        actions = `
+            <a href="student_attendance.html" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">View Attendance</a>
+            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Open Sessions</a>
+        `;
+    } else if (isRejected) {
         title = 'Registration rejected by admin';
         text = 'Your previous registration was rejected. Open the registration form to review the notice and start again.';
         actions = `<button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-red-500 hover:bg-red-400 text-white text-sm font-extrabold transition">Open Registration</button>`;
@@ -4677,8 +4913,7 @@ async function initStudentDashboardPage() {
             setStudentModalState('studentRegistrationModal', true);
         }
     } else {
-        const actionBanner = document.getElementById('studentActionBanner');
-        if (actionBanner) actionBanner.classList.add('hidden');
+        renderStudentActionBanner(s, meta, portal);
         setHtml('studentOnboardingSteps', '');
         closeStudentRegistrationModal();
         closeStudentRequestModal();
@@ -4908,9 +5143,8 @@ function buildStudentGradeDetailsMarkup(row) {
     const timeLabel = row.start_time && row.end_time
         ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
         : (row.start_time ? formatTime12Hour(row.start_time) : 'Time pending');
-    const remarks = row.teacher_remarks
-        ? escapeHtml(row.teacher_remarks)
-        : (row.remarks ? escapeHtml(row.remarks) : 'No remarks recorded for this session.');
+    const remarksText = cleanSessionNoteText(row.teacher_remarks || row.remarks, 'No remarks recorded for this session.');
+    const remarks = escapeHtml(remarksText);
     const scorePills = [
         ['Performance', row.performance_score],
         ['Technique', row.technique_score],
@@ -5218,7 +5452,7 @@ async function initStudentAttendancePage() {
         const end = r.end_time ? formatTime12Hour(r.end_time) : '';
         const timeLabel = start && end ? `${start} - ${end}` : (start || (r.attended_at ? new Date(r.attended_at).toLocaleTimeString() : '—'));
         const roomLabel = r.room_name || '—';
-        const notes = escapeHtml(r.notes || '—');
+        const notes = escapeHtml(cleanSessionNoteText(r.notes, '—'));
         return `
             <tr class="border-t border-zinc-200 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/5 transition">
                 <td class="px-6 py-4 text-sm text-zinc-900 dark:text-white">${escapeHtml(dateLabel)}</td>

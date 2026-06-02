@@ -472,7 +472,7 @@
             }
 
             listEl.innerHTML = selectedEvents.map(event => `
-                <article class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
+                <article class="rounded-3xl border border-slate-200 bg-slate-50/70 p-3.5 shadow-sm">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <div class="text-lg font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
@@ -480,19 +480,19 @@
                         </div>
                         <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${getStateClasses(event.state)}">${escapeHtml(event.state)}</span>
                     </div>
-                    <div class="mt-4 grid gap-3 md:grid-cols-2">
-                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <div class="mt-3 grid gap-3 md:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
                             <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Session</div>
                             <div class="mt-2 text-sm font-semibold text-slate-900">${event.startTime ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}` : 'Time pending'}</div>
                             <div class="mt-1 text-xs text-slate-500">Session ${event.sessionNumber || '—'} • ${escapeHtml(event.roomName || 'Room pending')}</div>
                         </div>
-                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
                             <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Teacher & Package</div>
                             <div class="mt-2 text-sm font-semibold text-slate-900">${escapeHtml(event.teacherName)}</div>
                             <div class="mt-1 text-xs text-slate-500">${escapeHtml(event.packageName)}</div>
                         </div>
                     </div>
-                    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
                         <div class="flex flex-wrap gap-2 text-xs">
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 border border-slate-200">Completed ${event.completedCount}/${event.totalSessions || '—'}</span>
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-rose-600 border border-rose-100">Absences ${event.absences}</span>
@@ -504,7 +504,7 @@
                         </button>
                     </div>
                 </article>
-            `).join('');
+            `).join('') + '<div aria-hidden="true" class="h-2"></div>';
         }
 
         function getDayScheduleModalMarkup(dateKey) {
