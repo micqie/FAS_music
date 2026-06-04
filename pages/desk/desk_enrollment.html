@@ -383,9 +383,10 @@
                             <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Age</label>
                             <div id="walkin_student_age_display" class="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-sm text-zinc-300 text-sm">— Select date of birth —</div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Email *</label>
-                            <input type="email" name="student_email" required class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                        <div class="md:col-span-2">
+                            <label id="walkin_student_email_label" class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Login Name (Becomes @fas.com)</label>
+                            <input type="text" id="walkin_student_email" name="student_email" placeholder="Example: juan or juan.dela.cruz" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                            <p id="walkin_student_email_hint" class="mt-2 text-[11px] text-zinc-500">Enter a simple name or username. The system will turn it into a <code>@fas.com</code> login automatically.</p>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Phone *</label>

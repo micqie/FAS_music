@@ -38,7 +38,17 @@
             background: rgba(255, 255, 255, 0.88);
             backdrop-filter: blur(10px);
         }
+        .sidebar-item-active {
+            background: linear-gradient(135deg, rgba(184, 134, 11, 0.25), rgba(212, 175, 55, 0.15));
+            color: white;
+            border-left: 3px solid #d4af37;
+            padding-left: calc(1rem - 3px);
+        }
+        .sidebar-item-active i {
+            color: #d4af37;
+        }
     </style>
+    <script src="manager_shared.js" defer></script>
 </head>
 <body class="dashboard-shell text-slate-900 antialiased">
     <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
@@ -75,10 +85,7 @@
 
     <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto sidebar-scroll">
         <div class="px-6 space-y-8 flex-1 mt-4">
-            <div class="px-4 mb-4">
-                <h2 class="text-[1.5rem] leading-none font-extrabold text-white tracking-tight">Manager Panel</h2>
-                <div class="mt-3 h-2 w-[14rem] rounded-full bg-gold-500"></div>
-            </div>
+            <div data-manager-shell-profile></div>
             <div>
                 <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Management</h3>
                 <nav class="space-y-2">
@@ -91,24 +98,18 @@
                     <a href="manager_registration.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-id-card mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Registrations
                     </a>
-                    <a href="manager_sessions.html?page=enrollments&view=active" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <a href="manager_enrollments.html?view=active" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-user-plus mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Enrollments
                     </a>
                     <a href="manager_sessions.html?page=sessions" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
                     </a>
-                    <a href="manager_featured_posts.html" class="flex items-center px-4 py-3 text-sm font-semibold text-white bg-white/10 rounded-xl transition-all">
-                        <i class="fas fa-photo-film mr-3 text-gold-400"></i> Featured Posts
+                    <a href="manager_featured_posts.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-photo-film mr-3"></i> Featured Posts
                     </a>
                 </nav>
             </div>
-            <div>
-                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Branch</h3>
-                <div class="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
-                    <div class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Assigned Branch</div>
-                    <div id="managerBranchName" class="mt-2 text-sm font-semibold text-white">—</div>
-                </div>
-            </div>
+   
         </div>
     </aside>
 

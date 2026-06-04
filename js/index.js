@@ -6091,6 +6091,26 @@ function setupWalkinEnrollmentForm() {
     calculateWalkinTotalFee();
 }
 
+function syncWalkinLoginModeUI() {
+    const emailInput = document.getElementById('walkin_student_email');
+    const emailLabel = document.getElementById('walkin_student_email_label');
+    const emailHint = document.getElementById('walkin_student_email_hint');
+    if (!emailInput) return;
+
+    emailInput.type = 'text';
+    emailInput.autocomplete = 'off';
+    emailInput.placeholder = 'Example: juan or juan.dela.cruz';
+    emailInput.required = true;
+
+    if (emailLabel) {
+        emailLabel.textContent = 'Login Name (Becomes @fas.com)';
+    }
+
+    if (emailHint) {
+        emailHint.innerHTML = 'Enter a simple name or username. The system will turn it into a <code>@fas.com</code> login automatically.';
+    }
+}
+
 // Initialize walk-in admin page (used on admin_registration.html)
 function initWalkinPage() {
     const form = document.getElementById('walkinForm');
@@ -6098,6 +6118,7 @@ function initWalkinPage() {
 
     // Seed dropdowns
     loadWalkinBranches();
+    syncWalkinLoginModeUI();
 
     const branchSelect = document.getElementById('walkin_branch_id');
     const dobInput = document.getElementById('walkin_student_dob');
@@ -6121,7 +6142,7 @@ function initWalkinPage() {
         const btn = document.getElementById('walkinSubmitBtn');
         const btnText = document.getElementById('walkinSubmitBtnText');
 
-        // Prevent double submit (first request can succeed, second gets "email already registered")
+        // Prevent double submit (first request can succeed, second can duplicate the walk-in account)
         if (form.dataset.submitting === '1') {
             return;
         }
@@ -6173,9 +6194,12 @@ function initWalkinPage() {
                 const guardianLabel = result.guardian_username
                     ? `<strong>Guardian Username:</strong> ${escapeHtml(result.guardian_username)}<br><strong>Guardian Temporary Password:</strong> fasmusic@2020<br>`
                     : '';
+                const loginLabel = 'Login Email';
+                const loginValue = result.login_email || result.username || data['student_email'] || '—';
 
                 // Reset form and hide modal if present
                 form.reset();
+                syncWalkinLoginModeUI();
                 const modal = document.getElementById('registerStudentModal');
                 if (modal) {
                     modal.classList.add('hidden');
@@ -6186,7 +6210,7 @@ function initWalkinPage() {
                     icon: 'success',
                     title: 'Student Registered',
                     html: `Student account was created successfully.<br><br>
-                           <strong>Username:</strong> ${result.username || data['student_email']}<br>
+                           <strong>${loginLabel}:</strong> ${escapeHtml(loginValue)}<br>
                            <strong>Student Temporary Password:</strong> fas@123<br>
                            ${guardianLabel}<br>
                            Next step: confirm the walk-in registration payment method.`,

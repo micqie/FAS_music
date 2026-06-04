@@ -280,6 +280,28 @@
                     <div class="rounded-2xl border border-dashed border-red-200 bg-red-50/40 px-4 py-5 text-sm text-red-700">Loading absence list...</div>
                 </div>
             </div>
+            <div id="absenceModal"
+     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+
+        <div class="flex items-center justify-between border-b px-6 py-4">
+            <h3 class="text-lg font-bold text-slate-900">
+                Student Absence Details
+            </h3>
+
+            <button onclick="closeAbsenceModal()"
+                    class="w-10 h-10 rounded-full hover:bg-slate-100">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div id="absenceModalContent" class="p-6">
+        </div>
+
+    </div>
+
+</div>
 
             <!-- Recent Activity Table -->
             <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">

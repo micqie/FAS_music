@@ -306,6 +306,9 @@ function initManagerFeaturedPosts() {
     setText('profileMenuName', user.username || user.email || 'Manager');
     setText('managerBranchName', branchName);
     setText('profileMenuBranch', branchName);
+    if (window.syncManagerShell) {
+        window.syncManagerShell(user.username || user.email || 'Manager', branchName);
+    }
 
     loadPosts();
 }

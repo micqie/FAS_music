@@ -362,20 +362,7 @@ function renderBranchMovements(branches, registrations, enrollments, teachers) {
                     </div>
                     <a href="admin_students.html?branch_id=${encodeURIComponent(String(branchId))}" class="text-xs font-bold text-gold-400 hover:text-gold-300">Open Branch</a>
                 </div>
-                <div class="mt-4 rounded-2xl border border-red-200 bg-red-50/70 p-4">
-                    <div class="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-red-700 font-bold">Branch Red List</div>
-                            <div class="mt-1 text-sm font-semibold text-red-950">${branchAbsenceRows.length} student${branchAbsenceRows.length === 1 ? '' : 's'} with absences</div>
-                        </div>
-                        <div class="h-10 w-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center">
-                            <i class="fas fa-triangle-exclamation"></i>
-                        </div>
-                    </div>
-                    <div class="space-y-3">
-                        ${branchRedListHtml}
-                    </div>
-                </div>
+               
             </div>
         `;
     });
@@ -388,23 +375,19 @@ function renderAbsenceRedList(enrollments) {
     if (!list) return;
 
     const absenceRows = (Array.isArray(enrollments) ? enrollments : [])
-        .map(item => {
-            const usedAbsences = Number(item.used_absences || 0);
-            const consecutiveAbsences = Number(item.consecutive_absences || 0);
-            const allowedAbsences = Number(item.allowed_absences || 0);
-            return {
-                ...item,
-                usedAbsences,
-                consecutiveAbsences,
-                allowedAbsences
-            };
-        })
+        .map(item => ({
+            ...item,
+            usedAbsences: Number(item.used_absences || 0),
+            consecutiveAbsences: Number(item.consecutive_absences || 0),
+            allowedAbsences: Number(item.allowed_absences || 0)
+        }))
         .filter(item => item.usedAbsences > 0)
         .sort((a, b) =>
             b.usedAbsences - a.usedAbsences ||
-            b.consecutiveAbsences - a.consecutiveAbsences ||
-            `${a.first_name || ''} ${a.last_name || ''}`.localeCompare(`${b.first_name || ''} ${b.last_name || ''}`)
+            b.consecutiveAbsences - a.consecutiveAbsences
         );
+
+    window.absenceStudents = absenceRows;
 
     if (!absenceRows.length) {
         list.innerHTML = `
@@ -415,50 +398,150 @@ function renderAbsenceRedList(enrollments) {
         return;
     }
 
-    list.innerHTML = absenceRows.map(item => {
-        const studentName = `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Student';
-        const branchName = item.branch_name || 'No branch';
-        const instrumentName = item.instrument_name || 'No instrument';
-        const teacherName = `${item.teacher_first_name || ''} ${item.teacher_last_name || ''}`.trim() || 'No teacher assigned';
-        const sessionsText = item.allowedAbsences > 0
-            ? `${item.usedAbsences}/${item.allowedAbsences} absences used`
-            : `${item.usedAbsences} absence${item.usedAbsences === 1 ? '' : 's'} recorded`;
-        const consecutiveText = item.consecutiveAbsences > 0
-            ? `${item.consecutiveAbsences} consecutive`
-            : 'No consecutive streak';
+    list.innerHTML = absenceRows.map((item, index) => {
+
+        const studentName =
+            `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Student';
 
         return `
-            <div class="rounded-3xl border border-red-200 bg-gradient-to-br from-red-50 to-white p-5 shadow-sm">
-                <div class="flex items-start justify-between gap-4">
-                    <div>
-                        <div class="text-lg font-bold text-red-950">${escapeHtml(studentName)}</div>
-                        <div class="mt-1 text-xs text-red-700">${escapeHtml(branchName)} • ${escapeHtml(instrumentName)}</div>
+            <button
+                onclick="openAbsenceModal(${index})"
+                class="w-full text-left flex items-center justify-between rounded-2xl border border-red-200 bg-white hover:bg-red-50 hover:border-red-400 transition-all duration-200 px-5 py-4">
+
+                <div>
+                    <div class="font-semibold text-slate-900">
+                        ${escapeHtml(studentName)}
                     </div>
-                    <div class="rounded-2xl bg-red-100 px-3 py-2 text-right">
-                        <div class="text-[11px] uppercase tracking-[0.18em] text-red-700 font-bold">Absences</div>
-                        <div class="text-2xl font-black text-red-900">${item.usedAbsences}</div>
-                    </div>
-                </div>
-                <div class="mt-4 grid grid-cols-2 gap-3">
-                    <div class="rounded-2xl border border-red-100 bg-white px-3 py-3">
-                        <div class="text-[11px] uppercase tracking-[0.18em] text-red-600 font-bold">Allowance</div>
-                        <div class="mt-1 text-sm font-semibold text-slate-900">${escapeHtml(sessionsText)}</div>
-                    </div>
-                    <div class="rounded-2xl border border-red-100 bg-white px-3 py-3">
-                        <div class="text-[11px] uppercase tracking-[0.18em] text-red-600 font-bold">Consecutive</div>
-                        <div class="mt-1 text-sm font-semibold text-slate-900">${escapeHtml(consecutiveText)}</div>
+
+                    <div class="text-xs text-slate-500 mt-1">
+                        ${escapeHtml(item.branch_name || 'No Branch')}
                     </div>
                 </div>
-                <div class="mt-4 flex items-center justify-between rounded-2xl bg-red-900 px-4 py-3 text-white">
-                    <div class="min-w-0 pr-3">
-                        <div class="text-[11px] uppercase tracking-[0.2em] text-red-200 font-bold">Teacher</div>
-                        <div class="mt-1 truncate text-sm font-semibold">${escapeHtml(teacherName)}</div>
-                    </div>
-                    <a href="admin_students.html" class="text-xs font-bold text-red-100 hover:text-white">Open Students</a>
+
+                <div class="flex items-center gap-2">
+                    <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
+                        ${item.usedAbsences} Absence${item.usedAbsences > 1 ? 's' : ''}
+                    </span>
+
+                    <i class="fas fa-chevron-right text-red-400"></i>
                 </div>
-            </div>
+
+            </button>
         `;
     }).join('');
+}
+function openAbsenceModal(index) {
+
+    const s = window.absenceStudents[index];
+
+    const studentName =
+        `${s.first_name || ''} ${s.last_name || ''}`.trim();
+
+    const teacherName =
+        `${s.teacher_first_name || ''} ${s.teacher_last_name || ''}`.trim()
+        || 'No teacher assigned';
+
+    document.getElementById('absenceModal').classList.remove('hidden');
+    document.getElementById('absenceModal').classList.add('flex');
+
+    document.getElementById('absenceModalContent').innerHTML = `
+        <div class="space-y-5">
+
+            <div>
+                <h2 class="text-2xl font-bold text-slate-900">
+                    ${escapeHtml(studentName)}
+                </h2>
+
+                <p class="text-sm text-slate-500">
+                    ${escapeHtml(s.branch_name || 'No Branch')}
+                </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+
+                <div class="rounded-2xl bg-red-50 p-4">
+                    <div class="text-xs text-red-600 font-semibold">
+                        TOTAL ABSENCES
+                    </div>
+
+                    <div class="text-3xl font-black text-red-900 mt-1">
+                        ${s.usedAbsences}
+                    </div>
+                </div>
+
+                <div class="rounded-2xl bg-orange-50 p-4">
+                    <div class="text-xs text-orange-600 font-semibold">
+                        CONSECUTIVE
+                    </div>
+
+                    <div class="text-3xl font-black text-orange-900 mt-1">
+                        ${s.consecutiveAbsences}
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 p-4">
+
+                <div class="grid gap-3">
+
+                    <div>
+                        <div class="text-xs text-slate-500">
+                            Instrument
+                        </div>
+
+                        <div class="font-semibold">
+                            ${escapeHtml(s.instrument_name || '-')}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="text-xs text-slate-500">
+                            Teacher
+                        </div>
+
+                        <div class="font-semibold">
+                            ${escapeHtml(teacherName)}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="text-xs text-slate-500">
+                            Allowed Absences
+                        </div>
+
+                        <div class="font-semibold">
+                            ${s.allowedAbsences}
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            ${
+                s.usedAbsences >= s.allowedAbsences && s.allowedAbsences > 0
+                ? `
+                    <div class="rounded-2xl border border-red-200 bg-red-50 p-4">
+                        <div class="font-bold text-red-800">
+                            Schedule Freeze Recommended
+                        </div>
+
+                        <div class="text-sm text-red-700 mt-1">
+                            This student has exceeded the allowed absence limit.
+                        </div>
+                    </div>
+                `
+                : ''
+            }
+
+        </div>
+    `;
+}
+
+function closeAbsenceModal() {
+    document.getElementById('absenceModal').classList.add('hidden');
+    document.getElementById('absenceModal').classList.remove('flex');
 }
 
 async function loadDashboardData() {

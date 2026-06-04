@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manager Dashboard | Father & Sons</title>
+    <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
@@ -38,7 +39,17 @@
             background: rgba(255, 255, 255, 0.88);
             backdrop-filter: blur(10px);
         }
+        .sidebar-item-active {
+            background: linear-gradient(135deg, rgba(184, 134, 11, 0.25), rgba(212, 175, 55, 0.15));
+            color: white;
+            border-left: 3px solid #d4af37;
+            padding-left: calc(1rem - 3px);
+        }
+        .sidebar-item-active i {
+            color: #d4af37;
+        }
     </style>
+    <script src="manager_shared.js" defer></script>
 </head>
 <body class="dashboard-shell text-slate-900 antialiased">
     <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
@@ -49,7 +60,7 @@
         </div>
         <div class="flex items-center gap-4">
             <div class="hidden md:flex flex-col text-right">
-                <span id="managerNameNav" class="text-sm font-semibold text-white">Manager</span>
+                <span  class="text-sm font-semibold text-white">Branch Manager</span>
                 <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Branch Operations</span>
             </div>
             <details class="relative group/profile">
@@ -74,16 +85,13 @@
     </nav>
 
     <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto sidebar-scroll">
-        <div class="px-6 space-y-8 flex-1 mt-4">
-            <div class="px-4 mb-4">
-                <h2 class="text-[1.5rem] leading-none font-extrabold text-white tracking-tight">Manager Panel</h2>
-                <div class="mt-3 h-2 w-[14rem] rounded-full bg-gold-500"></div>
-            </div>
+        <div class="px-6 space-y-8 mt-4">
+            <div data-manager-shell-profile></div>
             <div>
                 <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Management</h3>
                 <nav class="space-y-2">
-                    <a href="manager_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl transition-all">
-                        <i class="fas fa-chart-line mr-3 text-gold-400"></i> Dashboard
+                    <a href="manager_dashboard.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-chart-line mr-3 "></i> Dashboard
                     </a>
                     <a href="manager_teachers.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-chalkboard-teacher mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branch Teachers
@@ -91,7 +99,8 @@
                     <a href="manager_registration.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-id-card mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Registrations
                     </a>
-                    <a href="manager_sessions.html?page=enrollments&view=active" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+
+                    <a href="manager_enrollments.html?view=active" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-user-plus mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Enrollments
                     </a>
                     <a href="manager_sessions.html?page=sessions" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
@@ -102,54 +111,21 @@
                     </a>
                 </nav>
             </div>
-            <div>
-                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Branch</h3>
-                <div class="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
-                    <div class="uppercase tracking-[0.25em] text-[10px] text-slate-500 font-bold">Assigned Branch</div>
-                    <div id="managerBranchName" class="mt-2 text-sm font-semibold text-white">—</div>
-                </div>
-            </div>
-            <div class="px-4 py-4 rounded-2xl border border-white/10 bg-white/5 text-slate-300">
-                <div class="flex items-center gap-3">
-                    <div class="h-10 w-10 rounded-xl bg-gold-500/15 flex items-center justify-center text-gold-400">
-                        <i class="fas fa-bolt"></i>
-                    </div>
-                    <div>
-                        <div class="text-xs uppercase tracking-[0.25em] text-slate-500 font-bold">Quick Focus</div>
-                        <div id="managerFocusLine" class="text-sm font-semibold text-white mt-1">Loading branch priorities...</div>
-                    </div>
-                </div>
-            </div>
+
+
         </div>
     </aside>
 
     <main class="lg:ml-72 pt-28 p-6 md:p-8">
-        <div class="max-w-7xl mx-auto space-y-8">
+        <div class="max-w-5xl mx-auto space-y-8">
             <section class="glass-card rounded-[2rem] border border-white/80 shadow-2xl shadow-slate-200/60 overflow-hidden">
                 <div class="px-6 py-8 md:px-8 bg-gradient-to-r from-branchBlue via-slate-900 to-obsidian text-white">
-                    <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-                        <div class="max-w-3xl">
-                            <div class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-gold-100">
-                                <i class="fas fa-building"></i>
-                                <span id="heroBranchLabel">Branch Operations</span>
-                            </div>
-                            <h1 class="mt-4 text-3xl md:text-5xl font-black tracking-tight">Manager Dashboard</h1>
-                            <p id="heroSummary" class="mt-3 text-sm md:text-base text-slate-200 max-w-2xl">
-                                Loading operational summary for your branch.
-                            </p>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 md:min-w-[320px]">
-                            <a href="manager_registration.html" class="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 hover:bg-white/15 transition">
-                                <div class="text-[11px] uppercase tracking-[0.24em] text-slate-300 font-bold">Registrations</div>
-                                <div id="heroPendingRegistrations" class="mt-2 text-2xl font-black">0</div>
-                                <div class="text-xs text-slate-300 mt-1">Pending approvals</div>
-                            </a>
-                            <a href="manager_sessions.html?page=enrollments&view=active" class="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 hover:bg-white/15 transition">
-                                <div class="text-[11px] uppercase tracking-[0.24em] text-slate-300 font-bold">Collections</div>
-                                <div id="heroOutstandingBalance" class="mt-2 text-2xl font-black">P0</div>
-                                <div class="text-xs text-slate-300 mt-1">Outstanding branch balance</div>
-                            </a>
-                        </div>
+                    <div class="max-w-3xl">
+
+                        <h1 class="mt-4 text-3xl md:text-5xl font-black tracking-tight">Branch Summary</h1>
+                        <p id="heroSummary" class="mt-3 text-sm md:text-base text-slate-200 max-w-2xl">
+                            Loading the latest active enrollee, balance, and revenue summary for your branch.
+                        </p>
                     </div>
                 </div>
             </section>
@@ -158,12 +134,12 @@
                 <article class="glass-card rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/50 p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Branch Revenue</div>
-                            <div id="branchTotalRevenue" class="mt-3 text-3xl font-black text-slate-900">P0</div>
-                            <div class="mt-2 text-xs text-slate-500">Registration + enrollment payments</div>
+                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Enrollees</div>
+                            <div id="statActiveStudents" class="mt-3 text-3xl font-black text-slate-900">0</div>
+                            <div id="statActiveStudentsMeta" class="mt-2 text-sm text-slate-500">Students carrying active enrollments</div>
                         </div>
-                        <div class="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                            <i class="fas fa-coins text-xl"></i>
+                        <div class="h-12 w-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                            <i class="fas fa-user-graduate text-xl"></i>
                         </div>
                     </div>
                 </article>
@@ -182,95 +158,56 @@
                 <article class="glass-card rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/50 p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Enrollment Payments</div>
-                            <div id="reportEnrollmentRevenue" class="mt-3 text-3xl font-black text-slate-900">P0</div>
-                            <div class="mt-2 text-xs text-slate-500">Collected from active enrollments</div>
+                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Branch Revenue</div>
+                            <div id="branchTotalRevenue" class="mt-3 text-3xl font-black text-slate-900">P0</div>
+                            <div class="mt-2 text-xs text-slate-500">Registration + enrollment payments</div>
                         </div>
-                        <div class="h-12 w-12 rounded-2xl bg-gold-50 text-gold-600 flex items-center justify-center">
-                            <i class="fas fa-cash-register text-xl"></i>
+                        <div class="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <i class="fas fa-coins text-xl"></i>
                         </div>
                     </div>
                 </article>
             </section>
 
-            <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Enrollments</div>
-                    <div id="statActiveStudents" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                    <div id="statActiveStudentsMeta" class="mt-2 text-sm text-slate-500">Students carrying active enrollments</div>
-                </article>
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Pending Approvals</div>
-                    <div id="queueApprovalValue" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                    <div id="queueApprovalText" class="mt-2 text-sm text-slate-500">Loading branch approval workload.</div>
-                </article>
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Today's Sessions</div>
-                    <div id="statTodaySessions" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                    <div id="statTodaySessionsMeta" class="mt-2 text-sm text-slate-500">Scheduled classes in branch today</div>
-                </article>
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Teachers</div>
-                    <div id="statActiveTeachers" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                    <div id="statActiveTeachersMeta" class="mt-2 text-sm text-slate-500">Teachers currently assigned</div>
-                </article>
-            </section>
+            <section class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
+                <div class="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Quick Links</div>
 
-            <section class="grid grid-cols-1 xl:grid-cols-[1fr_1.2fr] gap-6">
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Enrollments</div>
-                            <h2 class="mt-2 text-2xl font-black text-slate-900">Branch Enrollment Summary</h2>
-                        </div>
-                        <a href="manager_sessions.html?page=enrollments&view=active" class="text-sm font-semibold text-branchBlue hover:text-slate-900 transition">Open enrollments</a>
                     </div>
-                    <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div id="reportPendingRegs" class="text-3xl font-black text-amber-600">0</div>
-                            <div class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500 font-bold">Pending</div>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div id="reportFeePaidRegs" class="text-3xl font-black text-sky-600">0</div>
-                            <div class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500 font-bold">Fee Paid</div>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div id="reportApprovedRegs" class="text-3xl font-black text-emerald-600">0</div>
-                            <div class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500 font-bold">Approved</div>
-                        </div>
-                    </div>
-                    <div id="reportRegistrationMix" class="mt-4 text-sm text-slate-500">0 total registrations</div>
-                </article>
 
-                <article class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                    <div class="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Summaries</div>
-                            <h2 class="mt-2 text-2xl font-black text-slate-900">Branch Snapshot</h2>
+                </div>
+
+                <div class="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <a href="manager_enrollments.html?view=active" class="group rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                        <div class="h-11 w-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center group-hover:bg-sky-600 group-hover:text-white transition">
+                            <i class="fas fa-credit-card"></i>
                         </div>
-                        <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Current branch</div>
-                    </div>
-                    <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">This Week</div>
-                            <div id="reportWeekSessions" class="mt-2 text-3xl font-black text-slate-900">0</div>
-                            <div id="reportWeekSessionsMeta" class="text-sm text-slate-500 mt-1">Scheduled sessions</div>
+                        <div class="mt-3 text-sm font-bold text-slate-900">Payments</div>
+                        <div class="mt-1 text-xs text-slate-500">Review balances</div>
+                    </a>
+                    <a href="manager_registration.html" class="group rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                        <div class="h-11 w-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition">
+                            <i class="fas fa-id-card"></i>
                         </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Absence Risk</div>
-                            <div id="reportAbsenceRisk" class="mt-2 text-3xl font-black text-rose-600">0</div>
-                            <div id="reportAbsenceRiskMeta" class="text-sm text-slate-500 mt-1">Students near limits</div>
+                        <div class="mt-3 text-sm font-bold text-slate-900">Registrations</div>
+                        <div class="mt-1 text-xs text-slate-500">Approve requests</div>
+                    </a>
+                    <a href="manager_sessions.html?page=sessions" class="group rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                        <div class="h-11 w-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition">
+                            <i class="fas fa-calendar-check"></i>
                         </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="text-sm font-bold text-slate-800">Reschedules</div>
-                            <div id="reportRescheduleQueue" class="mt-2 text-3xl font-black text-sky-600">0</div>
-                            <div id="reportRescheduleQueueMeta" class="text-sm text-slate-500 mt-1">Teacher-cancelled classes</div>
+                        <div class="mt-3 text-sm font-bold text-slate-900">Sessions</div>
+                        <div class="mt-1 text-xs text-slate-500">Manage schedules</div>
+                    </a>
+                    <a href="manager_teachers.html" class="group rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                        <div class="h-11 w-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center group-hover:bg-violet-600 group-hover:text-white transition">
+                            <i class="fas fa-chalkboard-teacher"></i>
                         </div>
-                    </div>
-                    <div class="mt-6 rounded-3xl border border-slate-200 bg-slate-50/70 p-5">
-                        <pre id="managerReportText" class="whitespace-pre-wrap text-sm leading-6 text-slate-700">Preparing branch summary...</pre>
-                    </div>
-                </article>
+                        <div class="mt-3 text-sm font-bold text-slate-900">Teachers</div>
+                        <div class="mt-1 text-xs text-slate-500">Branch staff</div>
+                    </a>
+                </div>
             </section>
         </div>
     </main>
@@ -278,542 +215,6 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/index.js"></script>
-    <script>
-        const dashboardState = {
-            branchId: 0,
-            branchName: '—',
-            registrations: [],
-            pendingRegistrations: [],
-            enrollments: [],
-            cancelledSessions: [],
-            teachers: [],
-            todayAttendance: null
-        };
-
-        function showToast(message, icon = 'info') {
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon,
-                title: message,
-                showConfirmButton: false,
-                timer: 2400,
-                timerProgressBar: true
-            });
-        }
-
-        function setText(id, value) {
-            const el = document.getElementById(id);
-            if (el) el.textContent = value;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text == null ? '' : String(text);
-            return div.innerHTML;
-        }
-
-        function formatPeso(value) {
-            const num = Number(value || 0);
-            return `₱${num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        }
-
-        function startOfToday() {
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            return d;
-        }
-
-        function endOfDay(date) {
-            const d = new Date(date);
-            d.setHours(23, 59, 59, 999);
-            return d;
-        }
-
-        function parseDate(value) {
-            if (!value) return null;
-            const date = new Date(value);
-            return Number.isNaN(date.getTime()) ? null : date;
-        }
-
-        function formatDateShort(value) {
-            const date = parseDate(value);
-            return date ? date.toLocaleDateString() : '—';
-        }
-
-        function formatTime12Hour(timeString) {
-            if (!timeString) return '—';
-            const parts = String(timeString).split(':');
-            if (parts.length < 2) return timeString;
-            const hour = parseInt(parts[0], 10);
-            const minute = parseInt(parts[1], 10);
-            if (Number.isNaN(hour) || Number.isNaN(minute)) return timeString;
-            const suffix = hour >= 12 ? 'PM' : 'AM';
-            const normalizedHour = hour % 12 === 0 ? 12 : hour % 12;
-            return `${normalizedHour}:${String(minute).padStart(2, '0')} ${suffix}`;
-        }
-
-        function getNextScheduledSession(enrollment) {
-            const now = new Date();
-            const sessions = Array.isArray(enrollment?.sessions_list) ? enrollment.sessions_list : [];
-            return sessions
-                .filter(session => {
-                    if (!session?.session_date) return false;
-                    const status = String(session.status || '').toLowerCase();
-                    if (['completed', 'present', 'late', 'absent', 'cancelled', 'cancelled_by_teacher', 'rescheduled'].includes(status)) return false;
-                    const sessionDateTime = parseDate(`${session.session_date}T${session.start_time || '00:00:00'}`);
-                    return sessionDateTime && sessionDateTime >= now;
-                })
-                .sort((a, b) => {
-                    const left = parseDate(`${a.session_date}T${a.start_time || '00:00:00'}`)?.getTime() || 0;
-                    const right = parseDate(`${b.session_date}T${b.start_time || '00:00:00'}`)?.getTime() || 0;
-                    return left - right;
-                })[0] || null;
-        }
-
-        function formatNextSessionLabel(enrollment) {
-            const nextSession = getNextScheduledSession(enrollment);
-            if (!nextSession) return 'No upcoming sessions';
-            const dateText = formatDateShort(nextSession.session_date);
-            const timeText = nextSession.start_time ? `${formatTime12Hour(nextSession.start_time)} - ${formatTime12Hour(nextSession.end_time)}` : '';
-            return timeText ? `${dateText} • ${timeText}` : dateText;
-        }
-
-        function isToday(dateValue) {
-            const date = parseDate(dateValue);
-            if (!date) return false;
-            const today = startOfToday();
-            return date >= today && date <= endOfDay(today);
-        }
-
-        function isThisWeek(dateValue) {
-            const date = parseDate(dateValue);
-            if (!date) return false;
-            const today = startOfToday();
-            const dayIndex = today.getDay();
-            const mondayOffset = dayIndex === 0 ? -6 : 1 - dayIndex;
-            const weekStart = new Date(today);
-            weekStart.setDate(today.getDate() + mondayOffset);
-            weekStart.setHours(0, 0, 0, 0);
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekStart.getDate() + 6);
-            weekEnd.setHours(23, 59, 59, 999);
-            return date >= weekStart && date <= weekEnd;
-        }
-
-        function isFutureScheduled(session) {
-            const status = String(session?.status || '').toLowerCase();
-            if (status !== 'scheduled') return false;
-            const date = parseDate(session?.session_date);
-            if (!date) return false;
-            return date >= startOfToday();
-        }
-
-        function buildRecentActivityRows() {
-            const registrationRows = dashboardState.registrations.map(reg => ({
-                kind: 'Registration',
-                title: `${reg.first_name || ''} ${reg.last_name || ''}`.trim() || 'Student',
-                meta: `${reg.registration_status || 'Pending'} registration`,
-                when: reg.created_at || '',
-                color: 'amber'
-            }));
-
-            const enrollmentRows = dashboardState.enrollments.map(enrollment => ({
-                kind: 'Enrollment',
-                title: `${enrollment.first_name || ''} ${enrollment.last_name || ''}`.trim() || 'Student',
-                meta: `${enrollment.package_name || 'Package'} • ${enrollment.status || 'Active'}`,
-                when: enrollment.created_at || '',
-                color: 'emerald'
-            }));
-
-            return registrationRows
-                .concat(enrollmentRows)
-                .filter(item => item.when)
-                .sort((a, b) => new Date(b.when) - new Date(a.when))
-                .slice(0, 7);
-        }
-
-        function collectAllSessions() {
-            return dashboardState.enrollments.flatMap(enrollment => Array.isArray(enrollment.sessions_list) ? enrollment.sessions_list : []);
-        }
-
-        function computeSummary() {
-            const registrations = dashboardState.registrations;
-            const pendingRegistrations = dashboardState.pendingRegistrations;
-            const enrollments = dashboardState.enrollments;
-            const cancelledSessions = dashboardState.cancelledSessions;
-            const teachers = dashboardState.teachers;
-            const allSessions = collectAllSessions();
-
-            const activeStudents = new Set(enrollments.map(item => Number(item.student_id || 0)).filter(Boolean)).size;
-            const pendingWork = pendingRegistrations.length + registrations.filter(item => String(item.registration_status || '').toLowerCase() === 'fee paid').length;
-            const todaySessions = allSessions.filter(isFutureScheduled).filter(item => isToday(item.session_date)).length;
-            const weekSessions = allSessions.filter(isFutureScheduled).filter(item => isThisWeek(item.session_date)).length;
-            const activeTeachers = teachers.filter(item => String(item.status || '').toLowerCase() === 'active').length;
-
-            const pendingCount = registrations.filter(item => String(item.registration_status || '').toLowerCase() === 'pending').length;
-            const feePaidCount = registrations.filter(item => String(item.registration_status || '').toLowerCase() === 'fee paid').length;
-            const approvedCount = registrations.filter(item => String(item.registration_status || '').toLowerCase() === 'approved').length;
-
-            const registrationRevenue = registrations.reduce((sum, item) => sum + Number(item.registration_fee_paid || 0), 0);
-            const enrollmentRevenue = enrollments.reduce((sum, item) => sum + Number(item.paid_amount || 0), 0);
-            const enrollmentOutstanding = enrollments.reduce((sum, item) => {
-                const total = Number(item.total_amount || 0);
-                const paid = Number(item.paid_amount || 0);
-                return sum + Math.max(0, total - paid);
-            }, 0);
-
-            const riskStudents = enrollments.filter(item => {
-                const allowed = Number(item.allowed_absences || 0);
-                const used = Number(item.used_absences || 0);
-                return allowed > 0 && used >= Math.max(1, allowed - 1);
-            });
-
-            const teacherLoad = teachers
-                .map(teacher => {
-                    const assigned = enrollments.filter(item => Number(item.assigned_teacher_id || 0) === Number(teacher.teacher_id || 0)).length;
-                    return {
-                        name: `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Teacher',
-                        assigned,
-                        specialization: teacher.specialization || 'General'
-                    };
-                })
-                .sort((a, b) => b.assigned - a.assigned)
-                .slice(0, 5);
-
-            return {
-                activeStudents,
-                pendingWork,
-                todaySessions,
-                weekSessions,
-                activeTeachers,
-                pendingCount,
-                feePaidCount,
-                approvedCount,
-                registrationRevenue,
-                enrollmentRevenue,
-                enrollmentOutstanding,
-                riskStudents,
-                cancelledSessions,
-                teacherLoad,
-                attendanceSummary: dashboardState.todayAttendance || {},
-                recentActivity: buildRecentActivityRows()
-            };
-        }
-
-        function renderMakeupSummary(summary) {
-            setText('makeupQueueCount', String(summary.cancelledSessions.length));
-
-            const earliestSession = [...summary.cancelledSessions]
-                .sort((a, b) => {
-                    const aTime = parseDate(`${a.session_date || ''}T${a.start_time || '00:00:00'}`)?.getTime() || 0;
-                    const bTime = parseDate(`${b.session_date || ''}T${b.start_time || '00:00:00'}`)?.getTime() || 0;
-                    return aTime - bTime;
-                })[0] || null;
-
-            const packageCounts = summary.cancelledSessions.reduce((acc, session) => {
-                const key = String(session.package_name || '').trim() || 'Unassigned Package';
-                acc[key] = (acc[key] || 0) + 1;
-                return acc;
-            }, {});
-            const topPackageEntry = Object.entries(packageCounts)
-                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
-
-            setText(
-                'makeupQueueMeta',
-                summary.cancelledSessions.length
-                    ? `${summary.cancelledSessions.length} class${summary.cancelledSessions.length === 1 ? '' : 'es'} still need makeup scheduling.`
-                    : 'No teacher-cancelled sessions are waiting for makeup.'
-            );
-            setText('makeupEarliestDate', earliestSession ? formatDateShort(earliestSession.session_date) : '—');
-            setText('makeupTopPackage', topPackageEntry ? topPackageEntry[0] : '—');
-            setText(
-                'makeupTopPackageMeta',
-                topPackageEntry
-                    ? `${topPackageEntry[1]} pending makeup ${topPackageEntry[1] === 1 ? 'class' : 'classes'} in this package.`
-                    : 'No package is currently waiting for makeup.'
-            );
-
-            const listEl = document.getElementById('makeupSummaryList');
-            if (!listEl) return;
-
-            if (!summary.cancelledSessions.length) {
-                listEl.innerHTML = '<div class="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-5 text-sm text-slate-500">No makeup sessions are waiting right now.</div>';
-                return;
-            }
-
-            const visibleSessions = [...summary.cancelledSessions]
-                .sort((a, b) => {
-                    const aTime = parseDate(`${a.session_date || ''}T${a.start_time || '00:00:00'}`)?.getTime() || 0;
-                    const bTime = parseDate(`${b.session_date || ''}T${b.start_time || '00:00:00'}`)?.getTime() || 0;
-                    return aTime - bTime;
-                })
-                .slice(0, 6);
-
-            listEl.innerHTML = visibleSessions.map(session => {
-                const studentName = `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student';
-                const teacherName = `${session.teacher_first_name || ''} ${session.teacher_last_name || ''}`.trim() || 'Teacher';
-                return `
-                    <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                        <div class="flex items-start justify-between gap-3">
-                            <div>
-                                <div class="text-sm font-bold text-slate-900">${escapeHtml(studentName)}</div>
-                                <div class="mt-1 text-xs text-slate-500">${escapeHtml(session.package_name || 'Package')} • ${escapeHtml(teacherName)}</div>
-                            </div>
-                            <div class="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 border border-amber-200">Needs Makeup</div>
-                        </div>
-                        <div class="mt-3 text-sm text-slate-700">
-                            ${escapeHtml(formatDateShort(session.session_date))} • ${escapeHtml(formatTime12Hour(session.start_time))} - ${escapeHtml(formatTime12Hour(session.end_time))}
-                        </div>
-                        <div class="mt-2 text-xs text-slate-500">${escapeHtml(session.cancellation_reason || 'Teacher-cancelled session waiting for manager reschedule.')}</div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function renderBranchRedList(summary) {
-            const table = document.getElementById('managerRedListTable');
-            const countEl = document.getElementById('managerRedListCount');
-            if (!table || !countEl) return;
-
-            const rows = summary.riskStudents
-                .filter(item => Number(item.used_absences || 0) > 0)
-                .sort((a, b) =>
-                    Number(b.used_absences || 0) - Number(a.used_absences || 0) ||
-                    Number(b.consecutive_absences || 0) - Number(a.consecutive_absences || 0) ||
-                    `${a.first_name || ''} ${a.last_name || ''}`.localeCompare(`${b.first_name || ''} ${b.last_name || ''}`)
-                );
-
-            countEl.textContent = rows.length
-                ? `${rows.length} student${rows.length === 1 ? '' : 's'} currently need make-up follow-up`
-                : 'No students currently on the red list';
-
-            if (!rows.length) {
-                table.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="px-5 py-8 text-center text-slate-500">
-                            <i class="fas fa-shield-heart text-2xl mb-2 text-emerald-500/70"></i>
-                            <p>No students are currently on this branch red list.</p>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            table.innerHTML = rows.map(student => {
-                const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
-                const allowed = Number(student.allowed_absences || 0);
-                const used = Number(student.used_absences || 0);
-                const consecutive = Number(student.consecutive_absences || 0);
-                return `
-                    <tr class="hover:bg-rose-50/50 transition">
-                        <td class="px-5 py-4">
-                            <div class="font-medium text-slate-900">${escapeHtml(studentName)}</div>
-                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
-                        </td>
-                        <td class="px-5 py-4 text-slate-700">${escapeHtml(student.package_name || '—')}</td>
-                        <td class="px-5 py-4 font-semibold text-rose-600">${used}</td>
-                        <td class="px-5 py-4 text-slate-700">${allowed > 0 ? `${used}/${allowed}` : `${used}`}</td>
-                        <td class="px-5 py-4 text-slate-700">${consecutive > 0 ? `${consecutive} consecutive` : '—'}</td>
-                        <td class="px-5 py-4 text-sm text-slate-600">${escapeHtml(formatNextSessionLabel(student))}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function renderDashboard() {
-            const summary = computeSummary();
-            const totalRegistrations = dashboardState.registrations.length;
-
-            setText('heroPendingRegistrations', String(summary.pendingCount));
-            setText('heroOutstandingBalance', formatPeso(summary.enrollmentOutstanding));
-            setText('branchTotalRevenue', formatPeso(summary.registrationRevenue + summary.enrollmentRevenue));
-            setText('statActiveStudents', String(dashboardState.enrollments.length));
-            setText('statPendingWork', String(summary.pendingWork));
-            setText('statTodaySessions', String(summary.todaySessions));
-            setText('statActiveTeachers', String(summary.activeTeachers));
-
-            setText('statActiveStudentsMeta', `${summary.activeStudents} active student${summary.activeStudents === 1 ? '' : 's'} in this branch`);
-            setText('statPendingWorkMeta', `${summary.pendingCount} pending registration${summary.pendingCount === 1 ? '' : 's'}, ${summary.feePaidCount} ready for next action`);
-            setText('statTodaySessionsMeta', `${summary.weekSessions} scheduled session${summary.weekSessions === 1 ? '' : 's'} this week`);
-            setText('statActiveTeachersMeta', `${dashboardState.teachers.length} teacher record${dashboardState.teachers.length === 1 ? '' : 's'} loaded`);
-
-            setText('queueApprovalValue', String(summary.pendingCount + summary.feePaidCount));
-            setText('queueApprovalText', `${summary.pendingCount} pending and ${summary.feePaidCount} fee-paid registrations waiting for manager action.`);
-            setText('queueCollectionValue', formatPeso(summary.enrollmentOutstanding));
-            setText('queueCollectionText', `${dashboardState.enrollments.filter(item => Math.max(0, Number(item.total_amount || 0) - Number(item.paid_amount || 0)) > 0).length} active enrollment${dashboardState.enrollments.length === 1 ? '' : 's'} still have a balance.`);
-            setText('queueRiskValue', String(summary.riskStudents.length));
-            setText('queueRiskText', summary.riskStudents.length ? 'These students are at or near their absence limit and may need follow-up.' : 'No students are currently near their branch absence limit.');
-            setText('queueRescheduleValue', String(summary.cancelledSessions.length));
-            setText('queueRescheduleText', summary.cancelledSessions.length ? 'Teacher-cancelled sessions are still waiting to be moved.' : 'No teacher-cancelled sessions are waiting right now.');
-
-            setText('reportRegistrationMix', `${totalRegistrations} total registration${totalRegistrations === 1 ? '' : 's'}`);
-            setText('reportPendingRegs', String(summary.pendingCount));
-            setText('reportFeePaidRegs', String(summary.feePaidCount));
-            setText('reportApprovedRegs', String(summary.approvedCount));
-            setText('reportRegistrationRevenue', formatPeso(summary.registrationRevenue));
-            setText('reportEnrollmentRevenue', formatPeso(summary.enrollmentRevenue));
-            setText('reportOutstandingBalance', formatPeso(summary.enrollmentOutstanding));
-            setText('reportWeekSessions', String(summary.weekSessions));
-            setText('reportWeekSessionsMeta', `${summary.todaySessions} of them are scheduled today.`);
-            setText('reportAbsenceRisk', String(summary.riskStudents.length));
-            setText('reportAbsenceRiskMeta', summary.riskStudents.length ? `${summary.riskStudents[0].first_name || 'A student'} is one of the highest-risk accounts right now.` : 'Branch attendance risk is currently stable.');
-            setText('reportRescheduleQueue', String(summary.cancelledSessions.length));
-            setText('reportRescheduleQueueMeta', summary.cancelledSessions.length ? 'Open the Sessions page to move those cancelled classes.' : 'No teacher-cancelled sessions are waiting in the queue.');
-
-            const teacherLoadList = document.getElementById('teacherLoadList');
-            if (teacherLoadList) {
-                teacherLoadList.innerHTML = summary.teacherLoad.length
-                    ? summary.teacherLoad.map((teacher, index) => `
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div class="flex items-center justify-between gap-3">
-                                <div>
-                                    <div class="text-sm font-bold text-slate-900">${escapeHtml(teacher.name)}</div>
-                                    <div class="text-xs text-slate-500 mt-1">${escapeHtml(teacher.specialization)}</div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-2xl font-black text-slate-900">${teacher.assigned}</div>
-                                    <div class="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-bold">Students</div>
-                                </div>
-                            </div>
-                            <div class="mt-3 h-2 rounded-full bg-white overflow-hidden border border-slate-200">
-                                <div class="h-full rounded-full ${index === 0 ? 'bg-gold-500' : 'bg-slate-400'}" style="width:${Math.min(100, teacher.assigned * 12)}%"></div>
-                            </div>
-                        </div>
-                    `).join('')
-                    : '<div class="text-sm text-slate-500">No teacher load report is available yet.</div>';
-            }
-
-            const recentActivityList = document.getElementById('recentActivityList');
-            if (recentActivityList) {
-                recentActivityList.innerHTML = summary.recentActivity.length
-                    ? summary.recentActivity.map(item => `
-                        <div class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="h-11 w-11 rounded-2xl ${item.color === 'amber' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'} flex items-center justify-center flex-shrink-0">
-                                    <i class="fas ${item.kind === 'Registration' ? 'fa-id-card' : 'fa-user-plus'}"></i>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="font-bold text-slate-900 truncate">${escapeHtml(item.title)}</div>
-                                    <div class="text-sm text-slate-500 truncate">${escapeHtml(item.meta)}</div>
-                                </div>
-                            </div>
-                            <div class="text-right text-xs text-slate-500 font-semibold whitespace-nowrap">${formatDateShort(item.when)}</div>
-                        </div>
-                    `).join('')
-                    : '<div class="text-sm text-slate-500">No recent branch activity yet.</div>';
-            }
-
-            const todayAttendance = summary.attendanceSummary;
-            const attendedToday = Number(todayAttendance.present || 0);
-            const totalScansToday = Number(todayAttendance.total || 0);
-            const briefLines = [
-                `${dashboardState.branchName} branch currently has ${summary.activeStudents} active students, ${summary.activeTeachers} active teachers, and ${summary.weekSessions} scheduled sessions this week.`,
-                `${summary.pendingCount} registrations are still pending, ${summary.feePaidCount} are already fee-paid, and ${summary.approvedCount} are fully approved.`,
-                `Outstanding active-enrollment balance is ${formatPeso(summary.enrollmentOutstanding)} while collected enrollment payments total ${formatPeso(summary.enrollmentRevenue)}.`,
-                summary.riskStudents.length
-                    ? `${summary.riskStudents.length} student${summary.riskStudents.length === 1 ? '' : 's'} are at attendance risk and should be checked for follow-up.`
-                    : 'No students are currently flagged at high absence risk.',
-                summary.cancelledSessions.length
-                    ? `${summary.cancelledSessions.length} teacher-cancelled session${summary.cancelledSessions.length === 1 ? '' : 's'} still need rescheduling.`
-                    : 'There are no teacher-cancelled sessions waiting for branch rescheduling.',
-                totalScansToday
-                    ? `Today’s attendance scans: ${attendedToday} present out of ${totalScansToday} total branch scans.`
-                    : 'No attendance scan summary has been recorded for the branch yet today.'
-            ];
-            setText('managerFocusLine', summary.pendingCount ? 'Prioritize pending registrations and fee-paid approvals today.' : (summary.cancelledSessions.length ? 'Clear reschedule queue and monitor teacher coverage.' : 'Branch operations look stable. Focus on collections and attendance.'));
-            setText('heroSummary', briefLines[0]);
-            setText('managerReportText', briefLines.join('\n'));
-            renderMakeupSummary(summary);
-            renderBranchRedList(summary);
-        }
-
-        async function loadDashboardData() {
-            const branchId = Number(dashboardState.branchId || 0);
-            const branchQuery = branchId > 0 ? `&branch_id=${encodeURIComponent(branchId)}` : '';
-
-            const [allRegistrationsRes, pendingRegistrationsRes, activeEnrollmentsRes, cancelledSessionsRes, teachersRes, attendanceRes] = await Promise.allSettled([
-                axios.get(`${baseApiUrl}/admin.php?action=get-all-registrations${branchQuery}`),
-                axios.get(`${baseApiUrl}/admin.php?action=get-pending-registrations${branchQuery}`),
-                axios.get(`${baseApiUrl}/students.php?action=get-active-enrollments${branchQuery}`),
-                axios.get(`${baseApiUrl}/students.php?action=get-cancelled-sessions${branchQuery}`),
-                axios.get(`${baseApiUrl}/teachers.php?action=get-teachers&status=Active${branchQuery}`),
-                axios.get(`${baseApiUrl}/attendance.php?action=desk-summary${branchQuery}`)
-            ]);
-
-            dashboardState.registrations = allRegistrationsRes.status === 'fulfilled' && allRegistrationsRes.value.data?.success
-                ? (allRegistrationsRes.value.data.registrations || [])
-                : [];
-            dashboardState.pendingRegistrations = pendingRegistrationsRes.status === 'fulfilled' && pendingRegistrationsRes.value.data?.success
-                ? (pendingRegistrationsRes.value.data.registrations || [])
-                : [];
-            dashboardState.enrollments = activeEnrollmentsRes.status === 'fulfilled' && activeEnrollmentsRes.value.data?.success
-                ? (activeEnrollmentsRes.value.data.enrollments || [])
-                : [];
-            dashboardState.cancelledSessions = cancelledSessionsRes.status === 'fulfilled' && cancelledSessionsRes.value.data?.success
-                ? (cancelledSessionsRes.value.data.sessions || [])
-                : [];
-            dashboardState.teachers = teachersRes.status === 'fulfilled' && teachersRes.value.data?.success
-                ? (teachersRes.value.data.teachers || [])
-                : [];
-            dashboardState.todayAttendance = attendanceRes.status === 'fulfilled' && attendanceRes.value.data?.success
-                ? (attendanceRes.value.data.summary || null)
-                : null;
-        }
-
-        async function initManagerDashboard() {
-            if (typeof checkBranchScopedAuth === 'function' && !checkBranchScopedAuth()) {
-                return;
-            }
-            if (typeof Auth === 'undefined' || !Auth.getUser) {
-                showToast('Unable to load manager account context.', 'error');
-                return;
-            }
-
-            const user = Auth.getUser();
-            const role = String(user?.role_name || '').toLowerCase();
-            if (!['manager', 'branch manager'].includes(role)) {
-                window.location.href = '../../index.html';
-                return;
-            }
-
-            const displayName = user.username || user.email || 'Manager';
-            dashboardState.branchId = Number(user.branch_id || 0);
-            dashboardState.branchName = user.branch_name || '—';
-
-            setText('managerNameNav', displayName);
-            setText('profileMenuName', displayName);
-            setText('managerBranchName', dashboardState.branchName);
-            setText('heroBranchLabel', `${dashboardState.branchName} Branch`);
-
-            try {
-                await loadDashboardData();
-                renderDashboard();
-            } catch (error) {
-                console.error('Failed to load manager dashboard:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Dashboard Error',
-                    text: 'Unable to load branch dashboard data right now.'
-                });
-            }
-        }
-
-        document.getElementById('copyReportBtn')?.addEventListener('click', async () => {
-            const reportText = document.getElementById('managerReportText')?.textContent || '';
-            if (!reportText.trim()) {
-                showToast('No report text is ready yet.', 'warning');
-                return;
-            }
-            try {
-                await navigator.clipboard.writeText(reportText);
-                showToast('Manager report copied.', 'success');
-            } catch (error) {
-                showToast('Unable to copy the report.', 'error');
-            }
-        });
-
-        document.addEventListener('DOMContentLoaded', initManagerDashboard);
-    </script>
+    <script src="../../js/manager/dashboard.js"></script>
 </body>
 </html>

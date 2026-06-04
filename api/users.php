@@ -123,6 +123,54 @@ class User
         return filter_var(trim((string)$email), FILTER_VALIDATE_EMAIL) !== false;
     }
 
+    private function sanitizeWalkInLoginBase($value, $fallbackParts = [])
+    {
+        $raw = trim((string)$value);
+        if ($raw === '') {
+            $fallback = '';
+            foreach ((array)$fallbackParts as $part) {
+                $part = trim((string)$part);
+                if ($part === '') {
+                    continue;
+                }
+                $fallback = $fallback === '' ? $part : ($fallback . ' ' . $part);
+            }
+            $raw = $fallback;
+        }
+
+        if (strpos($raw, '@') !== false) {
+            $raw = substr($raw, 0, strpos($raw, '@'));
+        }
+
+        $raw = strtolower($raw);
+        $raw = preg_replace('/[^a-z0-9]+/', '.', $raw);
+        $raw = trim($raw, '.');
+        return $raw !== '' ? $raw : 'student';
+    }
+
+    private function walkInEmailExists($email)
+    {
+        $stmt = $this->conn->prepare("SELECT 1 FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
+        $stmt->execute([$email, $email]);
+        if ($stmt->fetchColumn()) {
+            return true;
+        }
+
+        $stmt = $this->conn->prepare("SELECT 1 FROM tbl_students WHERE email = ? LIMIT 1");
+        $stmt->execute([$email]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    private function buildWalkInLoginEmail($input, $firstName = '', $lastName = '')
+    {
+        $base = $this->sanitizeWalkInLoginBase($input, [$firstName, $lastName]);
+        $email = $base . '@fas.com';
+        if ($this->walkInEmailExists($email)) {
+            return null;
+        }
+        return $email;
+    }
+
     private function isMailConfigured()
     {
         $mail = $this->getMailSettings();
@@ -169,7 +217,7 @@ class User
     {
         $mail = $this->getMailSettings();
         if (!$this->isValidEmailAddress($mail['from_address'])) {
-            throw new Exception('MAIL_FROM_ADDRESS must be a valid email address.');
+            throw new Exception('must be a valid email address.');
         }
         if (empty($mail['host'])) {
             return false;
@@ -217,6 +265,59 @@ class User
             </div>
         ';
         $mailer->AltBody = "Verify your email using code {$verificationCode}. It expires in 15 minutes.";
+        $mailer->send();
+        return true;
+    }
+
+    private function sendWalkInAccountEmail($toEmail, $toName, $loginEmail, $temporaryPassword)
+    {
+        $mail = $this->getMailSettings();
+        if (!$this->isValidEmailAddress($mail['from_address'])) {
+            throw new Exception('This email is invalid. Please check the address or choose No email account.');
+        }
+        if (empty($mail['host'])) {
+            throw new Exception('Mail service is not configured.');
+        }
+
+        $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+        $mailer->CharSet = 'UTF-8';
+        $mailer->isHTML(true);
+        $mailer->setFrom($mail['from_address'], $mail['from_name']);
+        $mailer->addAddress($toEmail, $toName ?: $toEmail);
+
+        if (!empty($mail['reply_to'])) {
+            $mailer->addReplyTo($mail['reply_to'], $mail['from_name']);
+        }
+
+        $mailer->isSMTP();
+        $mailer->Host = $mail['host'];
+        $mailer->Port = $mail['port'] > 0 ? $mail['port'] : 587;
+        $mailer->SMTPAuth = $mail['username'] !== '';
+        $mailer->Username = $mail['username'];
+        $mailer->Password = $mail['password'];
+
+        if ($mail['encryption'] === 'ssl') {
+            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+        } elseif ($mail['encryption'] === 'tls') {
+            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        }
+
+        $safeName = htmlspecialchars($toName ?: 'Student', ENT_QUOTES, 'UTF-8');
+        $safeLogin = htmlspecialchars($loginEmail, ENT_QUOTES, 'UTF-8');
+        $safePassword = htmlspecialchars($temporaryPassword, ENT_QUOTES, 'UTF-8');
+
+        $mailer->Subject = 'Your Father & Sons Walk-In Account';
+        $mailer->Body = '
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+                <h2 style="margin: 0 0 12px;">Your walk-in account is ready</h2>
+                <p>Hello ' . $safeName . ',</p>
+                <p>Your account was created by the branch staff. You can log in using:</p>
+                <p style="font-size: 18px; font-weight: 700; margin: 16px 0; color: #b8860b;">' . $safeLogin . '</p>
+                <p><strong>Temporary Password:</strong> ' . $safePassword . '</p>
+                <p>Please change your password after your first login.</p>
+            </div>
+        ';
+        $mailer->AltBody = "Your walk-in account is ready. Login: {$loginEmail}. Temporary Password: {$temporaryPassword}.";
         $mailer->send();
         return true;
     }
@@ -729,7 +830,7 @@ class User
             if (!$student) {
                 throw new Exception('Student not found');
             }
-            if (String($student['status'] ?? '') !== 'Rejected') {
+            if (($student['status'] ?? '') !== 'Rejected') {
                 throw new Exception('This registration is not marked as rejected');
             }
 
@@ -1081,9 +1182,32 @@ class User
             $this->sendJSON(['error' => 'Selected branch does not belong to your assigned branch'], 403);
         }
 
+        $submittedEmailRaw = trim((string)($data['student_email'] ?? ''));
+        $generatedWalkInLogin = null;
+        $submittedEmail = $submittedEmailRaw;
+        if ($isAdminRegistration) {
+            if ($submittedEmailRaw === '') {
+                $this->sendJSON(['error' => 'Please enter a login name for this walk-in student.'], 400);
+            }
+            if (strpos($submittedEmailRaw, '@') !== false) {
+                $this->sendJSON(['error' => 'Walk-in registrations only accept a name or username, not a real email address.'], 400);
+            }
+            $submittedEmail = $this->buildWalkInLoginEmail(
+                $submittedEmailRaw,
+                $data['student_first_name'] ?? '',
+                $data['student_last_name'] ?? ''
+            );
+            if ($submittedEmail === null) {
+                $this->sendJSON(['error' => 'That walk-in name is already in use. Please choose another name.'], 400);
+            }
+            $generatedWalkInLogin = $submittedEmail;
+        }
+
         // Base required fields (student only)
-        $required = ['student_first_name', 'student_last_name', 'student_email',
-                     'student_phone', 'branch_id'];
+        $required = ['student_first_name', 'student_last_name', 'student_phone', 'branch_id'];
+        if (!$isAdminRegistration) {
+            $required[] = 'student_email';
+        }
         $fieldLabels = [
             'student_first_name' => 'First Name',
             'student_last_name' => 'Last Name',
@@ -1097,6 +1221,15 @@ class User
             if ($val === '' || $val === null) {
                 $label = $fieldLabels[$field] ?? $field;
                 $this->sendJSON(['error' => ucfirst($label) . ' is required'], 400);
+            }
+        }
+
+        if (!$isAdminRegistration) {
+            if (!filter_var($submittedEmail, FILTER_VALIDATE_EMAIL)) {
+                $this->sendJSON(['error' => 'Invalid email address format'], 400);
+            }
+            if (strlen($submittedEmail) > 254) {
+                $this->sendJSON(['error' => 'Email address is too long (max 254 characters)'], 400);
             }
         }
 
@@ -1127,15 +1260,10 @@ class User
             }
         }
 
-        // Validate email
-        $email = trim($data['student_email'] ?? '');
-        if (!empty($email)) {
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $this->sendJSON(['error' => 'Invalid email address format'], 400);
-            }
-            if (strlen($email) > 254) {
-                $this->sendJSON(['error' => 'Email address is too long (max 254 characters)'], 400);
-            }
+        // Validate email for online registrations, or generate a local branch login for walk-ins.
+        $email = $submittedEmail;
+        $data['student_email'] = $email;
+        if (!$isAdminRegistration) {
             $this->ensureStudentRegistrationColumns();
 
             // One-time registration fee guard.
@@ -1394,6 +1522,17 @@ class User
             ]);
 
             $userId = $this->conn->lastInsertId();
+            if ($isAdminRegistration && $this->hasUserColumn('email_verified_at')) {
+                $stmtVerifyUser = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET email_verified_at = NOW(),
+                        email_verification_code_hash = NULL,
+                        email_verification_code_expires_at = NULL,
+                        email_verification_sent_at = NULL
+                    WHERE user_id = ?
+                ");
+                $stmtVerifyUser->execute([$userId]);
+            }
 
             // Create guardian login (shares the student's password) when guardian email is provided
             $guardianEmail = trim((string)($data['guardian_email'] ?? ''));
@@ -1422,6 +1561,18 @@ class User
                         $data['guardian_phone'] ?? null,
                         $userStatus
                     ]);
+                    $guardianUserId = (int)$this->conn->lastInsertId();
+                    if ($isAdminRegistration && $this->hasUserColumn('email_verified_at')) {
+                        $stmtVerifyGuardian = $this->conn->prepare("
+                            UPDATE tbl_users
+                            SET email_verified_at = NOW(),
+                                email_verification_code_hash = NULL,
+                                email_verification_code_expires_at = NULL,
+                                email_verification_sent_at = NULL
+                            WHERE user_id = ?
+                        ");
+                        $stmtVerifyGuardian->execute([$guardianUserId]);
+                    }
                 }
             }
 
@@ -1448,6 +1599,8 @@ class User
                 'guardian_username' => $guardianUsername,
                 'user_id' => $userId,
                 'username' => $username,
+                'login_email' => $data['student_email'],
+                'walkin_login_generated' => $generatedWalkInLogin !== null,
                 'registration_status' => $regStatus,
                 'registration_fee_amount' => $data['registration_fee_amount'],
                 'registration_proof_path' => $registrationProofPath,
