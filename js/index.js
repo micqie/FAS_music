@@ -639,13 +639,13 @@ async function promptEmailVerification(email, initialCode = '') {
                 );
                 const resendData = resendResponse.data || {};
                 if (resendResponse.status === 200 && resendData.success) {
-                    currentCode = String(resendData.verification_code_preview || '').trim();
+                    if (!resendData.verification_email_sent) {
+                        throw new Error(resendData.mail_error || resendData.message || 'Unable to send verification email.');
+                    }
                     await Swal.fire({
                         icon: 'success',
                         title: 'Code Resent',
-                        text: resendData.message || (currentCode
-                            ? `A new verification code is ready for local testing: ${currentCode}`
-                            : 'A new verification code has been sent.'),
+                        text: resendData.message || 'A new verification code has been sent to your email.',
                         confirmButtonColor: '#b8860b'
                     });
                 } else {
@@ -944,30 +944,44 @@ function initRegisterForm() {
             }
 
             try {
-                const response = await axios.post(`${baseApiUrl}/users.php?action=register-basic`, payload);
+                const response = await axios.post(`${baseApiUrl}/online_register.php?action=register`, payload);
                 const data = response.data || {};
 
                 if (response.status === 200 && data.success) {
                     const verificationEmail = data.verification_email || payload.student_email;
-                    const verificationPreviewCode = data.verification_code_preview || '';
+                    const emailSent = Boolean(data.verification_email_sent);
                     registerForm.reset();
                     toggleRegisterModal(false);
-                    if (verificationPreviewCode) {
+                    if (emailSent) {
                         await Swal.fire({
-                            icon: 'info',
-                            title: 'Local Verification Mode',
-                            text: `SMTP is not configured, so the code is shown here for local testing: ${verificationPreviewCode}`,
+                            icon: 'success',
+                            title: 'Check Your Email',
+                            text: `We sent a 6-digit code to ${verificationEmail}.`,
+                            confirmButtonColor: '#b8860b'
+                        });
+                    } else {
+                        await Swal.fire({
+                            icon: 'error',
+                            title: 'Email Delivery Failed',
+                            text: data.mail_error || data.message || 'The verification email could not be sent.',
                             confirmButtonColor: '#b8860b'
                         });
                     }
-                    await showRegisterMessage(data.message || 'Your student account was created. Verify your email to unlock login access.', 'success', 'Account Created');
-                    await promptEmailVerification(verificationEmail, verificationPreviewCode);
+                    await showRegisterMessage(
+                        data.message || 'Your student account was created.',
+                        emailSent ? 'success' : 'info',
+                        'Account Created'
+                    );
+                    if (emailSent) {
+                        await promptEmailVerification(verificationEmail);
+                    }
                 } else {
                     showRegisterMessage(data.error || 'Registration failed. Please try again.', 'error');
                 }
             } catch (error) {
                 console.error('Basic registration error:', error);
-                showRegisterMessage('Network error. Please try again.', 'error');
+                const serverError = error?.response?.data?.error;
+                showRegisterMessage(serverError || error?.message || 'Network error. Please try again.', 'error');
             } finally {
                 registerForm.dataset.submitting = '0';
                 if (registerBtn) registerBtn.disabled = false;
@@ -1479,7 +1493,9 @@ function validateEmail(input) {
     const email = input.value.trim();
     const emailValidation = document.getElementById('emailValidation');
 
-    if (!emailValidation) return;
+    if (!emailValidation) {
+        return email.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
 
     if (email.length === 0) {
         emailValidation.textContent = '';
@@ -1487,8 +1503,8 @@ function validateEmail(input) {
         return false;
     }
 
-    // Strict email validation pattern
-    const emailPattern = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/;
+    // Allow standard addresses (including Gmail +tags)
+    const emailPattern = /^[a-zA-Z0-9]([a-zA-Z0-9._+\-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/;
 
     if (!emailPattern.test(email)) {
         emailValidation.textContent = '✗ Please enter a valid email address (e.g., name@domain.com)';
@@ -6211,8 +6227,6 @@ function initWalkinPage() {
         }
         data['registration_fee_amount'] = 1000;
 
-        // Mark as walk-in and attach role-scoped branch context.
-        data['is_walkin'] = true;
         try {
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
             const role = String(user?.role_name || '').toLowerCase();
@@ -6232,7 +6246,7 @@ function initWalkinPage() {
         }
 
         try {
-            const response = await axios.post(`${baseApiUrl}/users.php?action=register`, data);
+            const response = await axios.post(`${baseApiUrl}/walkin_register.php?action=register`, data);
 
             const responseText = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
             let result;
