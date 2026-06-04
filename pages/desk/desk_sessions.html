@@ -885,14 +885,18 @@
             const price = Number(selected?.getAttribute('data-price') || 0);
             const sessions = Number(selected?.getAttribute('data-sessions') || 0);
             const paymentType = String(paymentTypeEl.value || 'Partial Payment');
+            const registrationFeeDue = typeof getRegistrationFeeDueAmount === 'function'
+                ? getRegistrationFeeDueAmount(walkinMeta?.student || null)
+                : 1000;
             const partialAmount = computeStudentRequestPayableNow(price, sessions, 'Partial Payment');
             const fullAmount = computeStudentRequestPayableNow(price, sessions, 'Full Payment');
             const installmentAmount = computeStudentRequestPayableNow(price, sessions, 'Installment');
-            const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType);
+            const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType, registrationFeeDue);
+            const enrollmentNow = computeStudentRequestPayableNow(price, sessions, paymentType);
             const selectedLabel = paymentType === 'Full Payment'
                 ? 'Full Payment'
                 : (paymentType === 'Installment' ? 'Installment (est. per session)' : 'Partial Payment');
-            amountEl.innerHTML = `Estimated package amount: <span class="font-bold">${formatCurrencyPHP(price)}</span><br>Full Payment: <span class="font-bold">${formatCurrencyPHP(fullAmount)}</span> | Partial Payment: <span class="font-bold">${formatCurrencyPHP(partialAmount)}</span><br>Installment (est./session): <span class="font-bold">${formatCurrencyPHP(installmentAmount)}</span><br>Amount to pay now (${escapeHtml(selectedLabel)}): <span class="font-bold">${formatCurrencyPHP(payableNow)}</span>`;
+            amountEl.innerHTML = `Estimated package amount: <span class="font-bold">${formatCurrencyPHP(price)}</span><br>Registration fee due: <span class="font-bold">${formatCurrencyPHP(registrationFeeDue)}</span><br>Enrollment fee (${escapeHtml(selectedLabel)}): <span class="font-bold">${formatCurrencyPHP(enrollmentNow)}</span><br>Full Payment: <span class="font-bold">${formatCurrencyPHP(fullAmount)}</span> | Partial Payment: <span class="font-bold">${formatCurrencyPHP(partialAmount)}</span><br>Installment (est./session): <span class="font-bold">${formatCurrencyPHP(installmentAmount)}</span><br>Total due now (${escapeHtml(selectedLabel)}): <span class="font-bold">${formatCurrencyPHP(payableNow)}</span>`;
             instrumentsContainer.innerHTML = maxInst > 0
                 ? renderStudentRequestInstrumentSelectors(maxInst, walkinMeta?.instruments || [])
                 : '<div class="text-sm text-slate-500">Select a package first.</div>';

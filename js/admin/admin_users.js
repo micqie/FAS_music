@@ -162,7 +162,7 @@
             idInput.value = user.user_id || '';
             firstName.value = user.first_name || '';
             lastName.value = user.last_name || '';
-            email.value = user.email || '';
+            email.value = user.email || user.username || '';
             if (phone) phone.value = user.phone || '';
             if (role) role.value = user.role_name || '';
             if (status) status.value = user.status || 'Inactive';

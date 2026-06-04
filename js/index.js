@@ -2423,19 +2423,33 @@ function getDayOfWeekFromDate(dateString) {
     return dt.toLocaleDateString('en-US', { weekday: 'long' });
 }
 
-function computeStudentRequestPayableNow(basePrice, sessions, paymentRaw) {
+function getRegistrationFeeDueAmount(studentOrMeta = null) {
+    const source = studentOrMeta && typeof studentOrMeta === 'object' ? studentOrMeta : {};
+    const total = Number(source.registration_fee_amount || 1000);
+    const paid = Number(source.registration_fee_paid || 0);
+    const explicitDue = source.registration_fee_due !== undefined && source.registration_fee_due !== null
+        ? Number(source.registration_fee_due)
+        : null;
+    if (Number.isFinite(explicitDue)) {
+        return Math.max(0, explicitDue);
+    }
+    return Math.max(0, total - paid);
+}
+
+function computeStudentRequestPayableNow(basePrice, sessions, paymentRaw, registrationFeeDue = 0) {
     const price = Number(basePrice || 0);
     const s = Number(sessions || 0);
     const v = String(paymentRaw || '').toLowerCase();
-    if (price <= 0) return 0;
+    const regDue = Math.max(0, Number(registrationFeeDue || 0));
+    if (price <= 0) return regDue;
     const ratio = s === 12 ? (3000 / 7450) : (s === 20 ? (5000 / 11800) : 0.42);
     const partial = Math.round(price * ratio);
-    if (v === 'full' || v === 'full payment' || v === 'fullpayment') return price;
-    if (v === 'partial payment' || v === 'partial' || v === 'downpayment') return partial;
+    if (v === 'full' || v === 'full payment' || v === 'fullpayment') return price + regDue;
+    if (v === 'partial payment' || v === 'partial' || v === 'downpayment') return partial + regDue;
     if (v === 'installment') {
-        return Math.max(1, Math.round(price / Math.max(1, s || 1)));
+        return Math.max(1, Math.round(price / Math.max(1, s || 1))) + regDue;
     }
-    return partial;
+    return partial + regDue;
 }
 
 function renderStudentRequestStatus(latestRequest) {
@@ -3846,22 +3860,28 @@ function initStudentRequestSection(student, requestMeta) {
         const price = Number(selected?.getAttribute('data-price') || 0);
         const sessions = Number(selected?.getAttribute('data-sessions') || 0);
         const paymentType = String(paymentModeEl.value || 'Partial Payment');
+        const registrationFeeDue = getRegistrationFeeDueAmount(student);
         const partialAmount = computeStudentRequestPayableNow(price, sessions, 'Partial Payment');
         const fullAmount = computeStudentRequestPayableNow(price, sessions, 'Full Payment');
         const installmentAmount = computeStudentRequestPayableNow(price, sessions, 'Installment');
-        const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType);
+        const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType, registrationFeeDue);
+        const enrollmentNow = computeStudentRequestPayableNow(price, sessions, paymentType);
         const selectedLabel = paymentType === 'Full Payment'
             ? 'Full Payment'
             : (paymentType === 'Installment' ? 'Installment (est. per session)' : 'Partial Payment');
         amountEl.innerHTML = `
             <div class="text-xs uppercase tracking-[0.2em] text-gold-700 dark:text-gold-300 font-bold">Payment Summary</div>
-            <div class="mt-3 grid grid-cols-2 gap-3">
+            <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="rounded-xl bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-3 py-3">
-                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Total</div>
-                    <div class="mt-1 text-base font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(price)}</div>
+                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Registration Fee Due</div>
+                    <div class="mt-1 text-base font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(registrationFeeDue)}</div>
                 </div>
                 <div class="rounded-xl bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-3 py-3">
-                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Pay Now</div>
+                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Enrollment Fee</div>
+                    <div class="mt-1 text-base font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(enrollmentNow)}</div>
+                </div>
+                <div class="rounded-xl bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-3 py-3">
+                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Total Due Now</div>
                     <div class="mt-1 text-base font-bold text-gold-700 dark:text-gold-300">${formatCurrencyPHP(payableNow)}</div>
                 </div>
             </div>
@@ -4311,10 +4331,10 @@ function renderStudentRegistrationModal(student, portal) {
                 <form id="registrationPaymentForm" class="space-y-3">
                     <div class="rounded-xl border border-amber-300/70 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
                         <div class="font-bold">Required before enrollment</div>
-                        <div class="mt-1">Father &amp; Sons Music requires a <strong>₱1,000 registration fee</strong> before a student can be enrolled.</div>
+                        <div class="mt-1">Father &amp; Sons Music requires a <strong>₱1,000 lifetime registration fee</strong> before a student can be enrolled for the first time.</div>
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Registration Fee</label>
+                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Lifetime Registration Fee</label>
                         <div class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-bold">
                             ₱1,000.00
                         </div>
@@ -5811,7 +5831,24 @@ function calculateWalkinTotalFee() {
 
     if (!sessionPackageSelect || !sessionPackageSelect.value || !paymentTypeSelect || !paymentTypeSelect.value) {
         if (sessionFeeEl) sessionFeeEl.textContent = '₱0.00';
-        if (totalEl) totalEl.textContent = `₱${registrationFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        if (totalEl) {
+            totalEl.innerHTML = `
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <div class="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Registration Fee</div>
+                        <div class="mt-1 font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(registrationFee)}</div>
+                    </div>
+                    <div>
+                        <div class="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Enrollment Fee</div>
+                        <div class="mt-1 font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(0)}</div>
+                    </div>
+                    <div>
+                        <div class="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Total Due</div>
+                        <div class="mt-1 font-bold text-gold-700 dark:text-gold-300">${formatCurrencyPHP(registrationFee)}</div>
+                    </div>
+                </div>
+            `;
+        }
         if (feeInput) feeInput.value = registrationFee;
         return registrationFee;
     }
@@ -5865,7 +5902,24 @@ function calculateWalkinTotalFee() {
     const total = registrationFee + sessionFee;
 
     if (sessionFeeEl) sessionFeeEl.textContent = `₱${sessionFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (totalEl) totalEl.textContent = `₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (totalEl) {
+        totalEl.innerHTML = `
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <div class="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Registration Fee</div>
+                    <div class="mt-1 font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(registrationFee)}</div>
+                </div>
+                <div>
+                    <div class="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Enrollment Fee</div>
+                    <div class="mt-1 font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(sessionFee)}</div>
+                </div>
+                <div>
+                    <div class="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Total Due</div>
+                    <div class="mt-1 font-bold text-gold-700 dark:text-gold-300">${formatCurrencyPHP(total)}</div>
+                </div>
+            </div>
+        `;
+    }
     if (feeInput) feeInput.value = total;
 
     return total;
@@ -6196,6 +6250,7 @@ function initWalkinPage() {
                     : '';
                 const loginLabel = 'Login Email';
                 const loginValue = result.login_email || result.username || data['student_email'] || '—';
+                const isWalkInAccount = Boolean(result.walkin_login_generated);
 
                 // Reset form and hide modal if present
                 form.reset();
@@ -6212,15 +6267,19 @@ function initWalkinPage() {
                     html: `Student account was created successfully.<br><br>
                            <strong>${loginLabel}:</strong> ${escapeHtml(loginValue)}<br>
                            <strong>Student Temporary Password:</strong> fas@123<br>
-                           ${guardianLabel}<br>
-                           Next step: confirm the walk-in registration payment method.`,
+                           ${guardianLabel}
+                           ${isWalkInAccount
+                        ? '<br>The student can log in immediately using the login email above.'
+                        : '<br>Next step: confirm the walk-in registration payment method.'}`,
                     confirmButtonColor: '#b8860b'
                 }).then(() => {
-                    const redirectTemplate = String(form.dataset.paymentRedirectTemplate || '').trim();
-                    const redirectUrl = redirectTemplate
-                        ? redirectTemplate.replace('{student_id}', encodeURIComponent(String(result.student_id)))
-                        : String(form.dataset.paymentRedirectUrl || '').trim();
-                    openPaymentModal(result.student_id, { forceSource: 'walkin', redirectUrl });
+                    if (!isWalkInAccount) {
+                        const redirectTemplate = String(form.dataset.paymentRedirectTemplate || '').trim();
+                        const redirectUrl = redirectTemplate
+                            ? redirectTemplate.replace('{student_id}', encodeURIComponent(String(result.student_id)))
+                            : String(form.dataset.paymentRedirectUrl || '').trim();
+                        openPaymentModal(result.student_id, { forceSource: 'walkin', redirectUrl });
+                    }
                 });
             } else {
                 const errMsg = result.error || 'Registration failed. Please check all required fields and try again.';
@@ -6545,20 +6604,7 @@ function renderRegistrationsTable() {
                             class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-sm transition">
                             <i class="fas fa-eye"></i>
                         </button>
-                        ${['Fee Paid', 'Approved'].includes(String(reg.registration_status || '')) && typeof window.openRegistrationScheduleModal === 'function' ? `
-                            <button onclick="openRegistrationScheduleModal(${Number(reg.student_id)})"
-                                class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-sm font-semibold transition"
-                                title="View schedule">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            ${typeof window.openRegistrationScheduleEditor === 'function' ? `
-                                <button onclick="openRegistrationScheduleEditor(${Number(reg.student_id)})"
-                                    class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm font-semibold shadow-sm transition"
-                                    title="Edit schedule">
-                                    <i class="fas fa-pen"></i>
-                                </button>
-                            ` : ''}
-                        ` : ''}
+
                         ${reg.registration_status === 'Pending' ? `
                             <button onclick="openPaymentModal(${reg.student_id})"
                                 class="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-sm transition">
@@ -6778,7 +6824,7 @@ async function openPaymentModal(studentId, options = {}) {
             }
             if (paymentAmountHintEl) {
                 paymentAmountHintEl.textContent = registrationSource === 'walkin'
-                    ? 'This is the required ₱1,000.00 registration fee for the walk-in student.'
+                    ? 'This is the lifetime ₱1,000.00 registration fee for the walk-in student.'
                     : 'This amount comes from the student\'s submitted registration payment request.';
             }
             paymentMethodEl.value = selectedMethod;

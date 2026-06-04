@@ -97,6 +97,7 @@ class User
                 WHERE status = 'Active'
                   AND email_verified_at IS NULL
             ");
+            $this->ensureWalkInAccountsSynced();
         } catch (PDOException $e) {
             // Keep API working even if alter fails
         }
@@ -121,6 +122,57 @@ class User
     private function isValidEmailAddress($email)
     {
         return filter_var(trim((string)$email), FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    private function isWalkInSystemEmail($email)
+    {
+        return preg_match('/@fas\.com$/i', trim((string)$email)) === 1;
+    }
+
+    private function resolveWalkInLoginIdentifier($username)
+    {
+        $username = trim((string)$username);
+        if ($username === '' || strpos($username, '@') !== false) {
+            return $username;
+        }
+        return $this->sanitizeWalkInLoginBase($username) . '@fas.com';
+    }
+
+    private function ensureWalkInAccountsSynced()
+    {
+        try {
+            $this->ensureStudentRegistrationSourceColumn();
+            if ($this->hasUserColumn('email_verified_at')) {
+                $this->conn->exec("
+                    UPDATE tbl_users u
+                    LEFT JOIN tbl_students s ON s.email = u.email OR s.email = u.username
+                    SET u.email_verified_at = COALESCE(u.email_verified_at, NOW())
+                    WHERE u.email_verified_at IS NULL
+                      AND (
+                          u.email LIKE '%@fas.com'
+                          OR u.username LIKE '%@fas.com'
+                          OR COALESCE(s.registration_source, '') = 'walkin'
+                      )
+                ");
+            }
+            if ($this->tableExists('tbl_registration_payments') && $this->hasStudentColumn('registration_source')) {
+                $this->conn->exec("
+                    UPDATE tbl_registration_payments rp
+                    INNER JOIN tbl_students s ON s.student_id = rp.student_id
+                    SET rp.status = 'Paid',
+                        rp.amount = CASE WHEN rp.amount > 0 THEN rp.amount ELSE 1000.00 END,
+                        rp.payment_method = CASE
+                            WHEN TRIM(COALESCE(rp.payment_method, '')) = '' THEN 'Walk-In'
+                            ELSE rp.payment_method
+                        END
+                    WHERE COALESCE(s.registration_source, '') = 'walkin'
+                      AND rp.status = 'Pending'
+                      AND rp.receipt_number LIKE 'REG-WALKIN-%'
+                ");
+            }
+        } catch (PDOException $e) {
+            // Keep API working even if backfill fails
+        }
     }
 
     private function sanitizeWalkInLoginBase($value, $fallbackParts = [])
@@ -441,12 +493,26 @@ class User
         $paid = $this->getRegistrationPaidAmount($studentId);
         $hasPending = $this->hasPendingRegistrationPayment($studentId);
         $studentStatus = 'Inactive';
+        $registrationSource = 'online';
         try {
-            $stmt = $this->conn->prepare("SELECT status FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $this->ensureStudentRegistrationSourceColumn();
+            $sourceSql = $this->hasStudentColumn('registration_source')
+                ? ', registration_source'
+                : '';
+            $stmt = $this->conn->prepare("SELECT status{$sourceSql} FROM tbl_students WHERE student_id = ? LIMIT 1");
             $stmt->execute([(int)$studentId]);
-            $studentStatus = (string)($stmt->fetchColumn() ?: 'Inactive');
+            $studentRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $studentStatus = (string)($studentRow['status'] ?? 'Inactive');
+            $registrationSource = strtolower(trim((string)($studentRow['registration_source'] ?? 'online')));
         } catch (PDOException $e) {
             $studentStatus = 'Inactive';
+        }
+        if ($registrationSource === 'walkin' && $studentStatus === 'Active') {
+            return [
+                'registration_fee_amount' => 1000.00,
+                'registration_fee_paid' => max($paid, 1000.00),
+                'registration_status' => 'Approved'
+            ];
         }
         if ($studentStatus === 'Rejected') {
             $status = 'Rejected';
@@ -579,6 +645,14 @@ class User
         }
         try {
             $this->ensureUserVerificationColumns();
+            $this->ensureWalkInAccountsSynced();
+            $resolvedUsername = $this->resolveWalkInLoginIdentifier($username);
+            $loginCandidates = array_values(array_unique(array_filter([
+                $username,
+                $resolvedUsername
+            ], static function ($value) {
+                return trim((string)$value) !== '';
+            })));
             $hasUserBranch = $this->hasUserColumn('branch_id');
             $hasVerificationColumns = $this->hasUserColumn('email_verified_at');
             $selectBranch = $hasUserBranch ? ", u.branch_id, b.branch_name" : "";
@@ -591,10 +665,12 @@ class User
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 {$joinBranch}
-                WHERE u.username = ? OR u.email = ?
+                WHERE u.username = ? OR u.email = ? OR u.username = ? OR u.email = ?
                 LIMIT 1
             ");
-            $stmt->execute([$username, $username]);
+            $primaryLogin = $loginCandidates[0];
+            $secondaryLogin = $loginCandidates[1] ?? $primaryLogin;
+            $stmt->execute([$primaryLogin, $primaryLogin, $secondaryLogin, $secondaryLogin]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$user) {
@@ -610,7 +686,13 @@ class User
                 $this->sendJSON(['error' => 'Invalid username or password'], 401);
             }
 
-            if (empty($user['email_verified_at']) && strcasecmp((string)($user['role_name'] ?? ''), 'Admin') !== 0) {
+            $isWalkInAccount = $this->isWalkInSystemEmail($user['email'] ?? '')
+                || $this->isWalkInSystemEmail($user['username'] ?? '');
+            if (
+                empty($user['email_verified_at'])
+                && strcasecmp((string)($user['role_name'] ?? ''), 'Admin') !== 0
+                && !$isWalkInAccount
+            ) {
                 $this->sendJSON([
                     'error' => 'Please verify your email address before logging in. Check your inbox for the verification code.',
                     'verification_required' => true,
@@ -969,21 +1051,27 @@ class User
                 }
             }
 
-            // Validate new password with same strong policy as registration
-            if (strlen($newPassword) < 8) {
-                $this->sendJSON(['error' => 'New password must be at least 8 characters long'], 400);
-            }
-            if (!preg_match('/[A-Z]/', $newPassword)) {
-                $this->sendJSON(['error' => 'New password must contain at least one uppercase letter'], 400);
-            }
-            if (!preg_match('/[a-z]/', $newPassword)) {
-                $this->sendJSON(['error' => 'New password must contain at least one lowercase letter'], 400);
-            }
-            if (!preg_match('/[0-9]/', $newPassword)) {
-                $this->sendJSON(['error' => 'New password must contain at least one number'], 400);
-            }
-            if (!preg_match('/[!@#$%^&*]/', $newPassword)) {
-                $this->sendJSON(['error' => 'New password must contain at least one special character (!@#$%^&*)'], 400);
+            if ($isAdminOverride) {
+                if (strlen($newPassword) < 6) {
+                    $this->sendJSON(['error' => 'New password must be at least 6 characters long'], 400);
+                }
+            } else {
+                // Validate new password with same strong policy as registration
+                if (strlen($newPassword) < 8) {
+                    $this->sendJSON(['error' => 'New password must be at least 8 characters long'], 400);
+                }
+                if (!preg_match('/[A-Z]/', $newPassword)) {
+                    $this->sendJSON(['error' => 'New password must contain at least one uppercase letter'], 400);
+                }
+                if (!preg_match('/[a-z]/', $newPassword)) {
+                    $this->sendJSON(['error' => 'New password must contain at least one lowercase letter'], 400);
+                }
+                if (!preg_match('/[0-9]/', $newPassword)) {
+                    $this->sendJSON(['error' => 'New password must contain at least one number'], 400);
+                }
+                if (!preg_match('/[!@#$%^&*]/', $newPassword)) {
+                    $this->sendJSON(['error' => 'New password must contain at least one special character (!@#$%^&*)'], 400);
+                }
             }
 
             $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
@@ -1446,7 +1534,7 @@ class User
                 $stmtRegPayment = $this->conn->prepare("
                     INSERT INTO tbl_registration_payments (
                         student_id, payment_date, amount, payment_method, status, receipt_number
-                    ) VALUES (?, CURRENT_DATE, 0.00, '', 'Pending', ?)
+                    ) VALUES (?, CURRENT_DATE, 1000.00, 'Walk-In', 'Paid', ?)
                 ");
                 $stmtRegPayment->execute([
                     $studentId,
@@ -1501,7 +1589,9 @@ class User
 
             // Create user account (Active for walk-in/admin, Inactive for self-registration until admin approves)
             $userStatus = $isAdminRegistration ? 'Active' : 'Inactive';
-            $username = $data['username'] ?? $data['student_email'];
+            $username = $isAdminRegistration
+                ? $data['student_email']
+                : ($data['username'] ?? $data['student_email']);
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
             $stmtUser = $this->conn->prepare("
@@ -1588,6 +1678,7 @@ class User
             }
 
             $this->conn->commit();
+            $this->ensureWalkInAccountsSynced();
 
             $this->sendJSON([
                 'success' => true,

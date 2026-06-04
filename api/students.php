@@ -77,6 +77,29 @@ class StudentsApi
         }
     }
 
+    private function isWalkInStudentRecord(array $student)
+    {
+        $source = strtolower(trim((string)($student['registration_source'] ?? '')));
+        if ($source === 'walkin') {
+            return true;
+        }
+        return preg_match('/@fas\.com$/i', trim((string)($student['email'] ?? ''))) === 1;
+    }
+
+    private function normalizeWalkInRegistrationStatus(array &$student)
+    {
+        if (!$this->isWalkInStudentRecord($student)) {
+            return;
+        }
+        if ((string)($student['status'] ?? '') !== 'Active') {
+            return;
+        }
+        $student['registration_status'] = 'Approved';
+        if ((float)($student['registration_fee_paid'] ?? 0) < 1000) {
+            $student['registration_fee_paid'] = 1000.00;
+        }
+    }
+
     private function storePaymentProofUpload($file, $scope = 'package_requests')
     {
         if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
@@ -2296,6 +2319,10 @@ class StudentsApi
                 }
                 unset($row);
             }
+            foreach ($students as &$row) {
+                $this->normalizeWalkInRegistrationStatus($row);
+            }
+            unset($row);
             $this->sendJSON([
                 'success' => true,
                 'students' => $students
@@ -2450,6 +2477,7 @@ class StudentsApi
         } elseif (!isset($student['registration_status'])) {
             $student['registration_status'] = 'Pending';
         }
+        $this->normalizeWalkInRegistrationStatus($student);
         $student['balance_due'] = 0;
         $student['package_name'] = null;
         $student['package_sessions'] = null;
@@ -3196,6 +3224,9 @@ class StudentsApi
                     s.status,
                     s.first_name,
                     s.last_name,
+                    COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
+                    COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
+                    GREATEST(0, COALESCE(rf.registration_fee_amount, 1000.00) - COALESCE(rf.registration_fee_paid, 0.00)) AS registration_fee_due,
                     COALESCE(rf.registration_status, 'Pending') AS registration_status
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id

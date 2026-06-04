@@ -42,6 +42,21 @@ class Admin
         }
     }
 
+    private function isWalkInSystemEmail($email)
+    {
+        return preg_match('/@fas\.com$/i', trim((string)$email)) === 1;
+    }
+
+    private function walkInRegistrationApprovedCaseSql($studentAlias = 's')
+    {
+        if ($this->hasStudentColumn('registration_source')) {
+            return "WHEN COALESCE({$studentAlias}.registration_source, 'online') = 'walkin'
+                         AND {$studentAlias}.status = 'Active' THEN 'Approved'";
+        }
+        return "WHEN {$studentAlias}.email LIKE '%@fas.com'
+                     AND {$studentAlias}.status = 'Active' THEN 'Approved'";
+    }
+
     private function tableExists($tableName)
     {
         try {
@@ -269,7 +284,8 @@ class Admin
                   FROM tbl_registration_payments rp0
                   WHERE rp0.student_id = s.student_id
                     AND rp0.status = 'Pending'
-              )" . $branchSql . "
+              )
+              AND COALESCE(" . ($hasSourceCol ? "s.registration_source" : "'online'") . ", 'online') <> 'walkin'" . $branchSql . "
             ORDER BY s.created_at DESC
         ");
         if ($branchId > 0) {
@@ -316,6 +332,7 @@ class Admin
                 " . ($hasAgeProofCol ? "s.age_verification_proof_path" : "NULL") . " AS age_verification_proof_path,
                 " . ($hasSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                 CASE
+                    " . $this->walkInRegistrationApprovedCaseSql('s') . "
                     WHEN EXISTS (
                         SELECT 1
                         FROM tbl_registration_payments rp2
@@ -346,11 +363,14 @@ class Admin
             LEFT JOIN tbl_student_guardians sg ON s.student_id = sg.student_id AND sg.is_primary_guardian = 'Y'
             LEFT JOIN tbl_guardians g ON sg.guardian_id = g.guardian_id
             WHERE (
-                EXISTS (
-                    SELECT 1
-                    FROM tbl_registration_payments rp0
-                    WHERE rp0.student_id = s.student_id
-                      AND rp0.status = 'Pending'
+                (
+                    EXISTS (
+                        SELECT 1
+                        FROM tbl_registration_payments rp0
+                        WHERE rp0.student_id = s.student_id
+                          AND rp0.status = 'Pending'
+                    )
+                    AND COALESCE(" . ($hasSourceCol ? "s.registration_source" : "'online'") . ", 'online') <> 'walkin'
                 )
                 OR (
                     s.status = 'Active'
@@ -359,6 +379,10 @@ class Admin
                         FROM tbl_registration_payments rp4
                         WHERE rp4.student_id = s.student_id
                     )
+                )
+                OR (
+                    COALESCE(" . ($hasSourceCol ? "s.registration_source" : "'online'") . ", 'online') = 'walkin'
+                    AND s.status = 'Active'
                 )
             )" . $branchSql . "
             ORDER BY s.created_at DESC
@@ -785,8 +809,15 @@ class Admin
                         WHERE rp.student_id = s.student_id
                           AND rp.status = 'Paid'
                     ), 0.00) AS registration_fee_paid,
+                    GREATEST(0, 1000.00 - COALESCE((
+                        SELECT SUM(rp.amount)
+                        FROM tbl_registration_payments rp
+                        WHERE rp.student_id = s.student_id
+                          AND rp.status = 'Paid'
+                    ), 0.00)) AS registration_fee_due,
                     " . ($hasSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                     CASE
+                        " . $this->walkInRegistrationApprovedCaseSql('s') . "
                         WHEN EXISTS (
                             SELECT 1
                             FROM tbl_registration_payments rp1
@@ -1105,15 +1136,29 @@ class Admin
         $phone = trim((string)($data['phone'] ?? ''));
         $branchId = isset($data['branch_id']) && $data['branch_id'] !== '' ? (int)$data['branch_id'] : 0;
 
-        if ($userId <= 0 || $firstName === '' || $lastName === '' || $email === '') {
-            $this->sendJSON(['error' => 'user_id, first_name, last_name and email are required'], 400);
-        }
-
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $this->sendJSON(['error' => 'Invalid email address'], 400);
+        if ($userId <= 0 || $firstName === '' || $lastName === '') {
+            $this->sendJSON(['error' => 'user_id, first_name and last_name are required'], 400);
         }
 
         try {
+            $stmtCurrent = $this->conn->prepare("SELECT username, email FROM tbl_users WHERE user_id = ? LIMIT 1");
+            $stmtCurrent->execute([$userId]);
+            $currentUser = $stmtCurrent->fetch(PDO::FETCH_ASSOC) ?: [];
+            if ($email === '' && $this->isWalkInSystemEmail($currentUser['username'] ?? '')) {
+                $email = (string)($currentUser['username'] ?? '');
+            }
+            if ($email === '' && $this->isWalkInSystemEmail($currentUser['email'] ?? '')) {
+                $email = (string)($currentUser['email'] ?? '');
+            }
+
+            if ($email === '') {
+                $this->sendJSON(['error' => 'Email or walk-in login is required'], 400);
+            }
+
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL) && !$this->isWalkInSystemEmail($email)) {
+                $this->sendJSON(['error' => 'Invalid email address'], 400);
+            }
+
             // Prevent duplicate username/email (exclude current user)
             $stmtCheck = $this->conn->prepare("
                 SELECT user_id FROM tbl_users
