@@ -1,11 +1,11 @@
  let allStudents = [];
         let packagePagePackages = [];
-        let availableRoomsByBranch = {};
         let managerBranchId = 0;
         let managerBranchName = '';
         let uiIsDesk = false;
         let managerPageMode = 'enrollments';
         let assignRequestTeacherCandidates = [];
+        let assignRequestInstruments = [];
         let activeAssignRequestSlotRow = null;
         let activeAssignRequest = null;
         let assignRequestAvailabilitySlots = [];
@@ -31,6 +31,71 @@
                 text: msg,
                 confirmButtonColor: '#b8860b'
             });
+        }
+
+        function normalizeText(value) {
+            return String(value || '').toLowerCase().trim();
+        }
+
+        function isGeneralTeacherSpecialization(text) {
+            const spec = normalizeText(text);
+            return spec.includes('all around')
+                || spec.includes('all-around')
+                || spec.includes('all instruments')
+                || spec.includes('multi')
+                || spec === 'general';
+        }
+
+        function getInstrumentKeywords(instrument) {
+            const keywords = [
+                instrument?.instrument_name || '',
+                instrument?.type_name || ''
+            ].map(normalizeText).filter(Boolean);
+            return Array.from(new Set(keywords));
+        }
+
+        function teacherMatchesInstrument(teacher, instrument) {
+            const specialization = normalizeText(teacher?.specialization || '');
+            if (!specialization || isGeneralTeacherSpecialization(specialization)) return false;
+            const keywords = getInstrumentKeywords(instrument);
+            return keywords.some(keyword => specialization.includes(keyword));
+        }
+
+        function getTeachersForInstrument(instrument) {
+            if (!instrument) {
+                return assignRequestTeacherCandidates.filter(teacher => !isGeneralTeacherSpecialization(teacher.specialization));
+            }
+            return assignRequestTeacherCandidates.filter(teacher => teacherMatchesInstrument(teacher, instrument));
+        }
+
+        function getInstrumentRowLabel(instrument, index) {
+            if (!instrument) return `Additional Slot ${index + 1}`;
+            const name = `${instrument.instrument_name || 'Instrument'}${instrument.type_name ? ` (${instrument.type_name})` : ''}`;
+            return name;
+        }
+
+        function getAssignRequestInstrumentForIndex(index) {
+            return Array.isArray(assignRequestInstruments) ? assignRequestInstruments[index] || null : null;
+        }
+
+        function buildAssignRequestSlotValue(slot) {
+            return [
+                String(slot.session_date || '').trim(),
+                String(slot.day_of_week || '').trim(),
+                String(slot.start_time || '').trim(),
+                String(slot.end_time || '').trim()
+            ].join('__');
+        }
+
+        function parseAssignRequestSlotValue(value) {
+            const parts = String(value || '').split('__');
+            if (parts.length !== 4) return null;
+            return {
+                session_date: parts[0] || '',
+                day_of_week: parts[1] || '',
+                start_time: parts[2] || '',
+                end_time: parts[3] || ''
+            };
         }
 
         function setSessionNavState(view) {
@@ -100,7 +165,7 @@
 
         function applySessionView() {
             const params = new URLSearchParams(window.location.search);
-            const view = String(params.get('view') || '').toLowerCase();
+            const view = String(params.get('view') || 'active').toLowerCase();
             const pendingSection = document.getElementById('pendingSessionsSection');
             const activeSection = document.getElementById('activeSessionsSection');
             const title = document.getElementById('sessionsPageTitle');
@@ -771,29 +836,65 @@
             return (Number(hours || 0) * 60) + Number(minutes || 0);
         }
 
+        function renderTeacherOptionsForInstrument(instrument, selectedTeacherId = '') {
+            const teachers = getTeachersForInstrument(instrument);
+            const options = teachers.length
+                ? teachers.map(teacher => {
+                    const selected = Number(teacher.teacher_id) === Number(selectedTeacherId);
+                    const label = teacher.specialization
+                        ? `${teacher.teacher_name} • ${teacher.specialization}`
+                        : teacher.teacher_name;
+                    return `<option value="${Number(teacher.teacher_id)}"${selected ? ' selected' : ''}>${escapeHtml(label || 'Teacher')}</option>`;
+                }).join('')
+                : '<option value="">No matching teacher found</option>';
+            return `<option value="">Select teacher...</option>${options}`;
+        }
+
         function updateAssignRequestRecurringSummary() {
             const summaryEl = document.getElementById('assignRequestRecurringSummary');
             if (!summaryEl) return;
 
             const slots = collectAssignRequestSlots();
             if (!slots.length) {
-                summaryEl.textContent = 'Choose one or more one-hour slots. Once assigned, those instructor times become reserved weekly for this student to avoid conflicts.';
+                summaryEl.textContent = 'Choose a specialist teacher, then set one or more one-hour slots. Those times will become reserved weekly for this student to avoid conflicts.';
                 return;
             }
 
-            const slotText = slots.map(slot => `${slot.day_of_week}, ${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`).join('; ');
+            const slotText = slots.map(slot => {
+                const teacher = assignRequestTeacherCandidates.find(item => Number(item.teacher_id) === Number(slot.teacher_id));
+                const teacherName = teacher?.teacher_name || 'Teacher';
+                const instrument = assignRequestInstruments.find(item => Number(item.instrument_id) === Number(slot.instrument_id));
+                const instrumentName = instrument ? getInstrumentRowLabel(instrument, 0) : 'Instrument';
+                return `${instrumentName} / ${teacherName}: ${slot.day_of_week}, ${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`;
+            }).join('; ');
             summaryEl.textContent = `Reserved weekly on ${slotText}. Other students will no longer be offered these recurring slots.`;
         }
 
-        function renderAssignRequestSlotRow(slot = {}) {
+        function renderAssignRequestSlotRow(slot = {}, index = 0) {
             const day = String(slot.day_of_week || '').trim();
             const start = String(slot.start_time || '').slice(0, 5);
             const end = String(slot.end_time || '').slice(0, 5);
+            const teacherId = Number(slot.teacher_id || 0);
+            const instrument = slot.instrument_id
+                ? assignRequestInstruments.find(item => Number(item.instrument_id) === Number(slot.instrument_id)) || null
+                : getAssignRequestInstrumentForIndex(index);
+            const label = getInstrumentRowLabel(instrument, index);
             const dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
                 .map(option => `<option value="${option}"${option === day ? ' selected' : ''}>${option}</option>`)
                 .join('');
             return `
-                <div class="assign-request-slot grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr_auto] gap-3 items-end rounded-xl border border-slate-200 bg-white p-3 transition">
+                <div class="assign-request-slot grid grid-cols-1 md:grid-cols-[1.15fr_1.25fr_0.95fr_0.95fr_0.95fr_auto] gap-3 items-end rounded-xl border border-slate-200 bg-white p-3 transition" data-instrument-id="${instrument?.instrument_id || ''}">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Instrument</label>
+                        <div class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">${escapeHtml(label)}</div>
+                        <input type="hidden" class="assign-request-slot-instrument" value="${escapeHtml(String(instrument?.instrument_id || slot.instrument_id || ''))}">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Teacher</label>
+                        <select class="assign-request-slot-teacher w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                            ${renderTeacherOptionsForInstrument(instrument, teacherId)}
+                        </select>
+                    </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">Day</label>
                         <select class="assign-request-slot-day w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
@@ -868,8 +969,15 @@
                 row.addEventListener('click', () => setActiveAssignRequestSlot(row));
                 row.addEventListener('focusin', () => setActiveAssignRequestSlot(row));
                 row.querySelectorAll('select,input').forEach(input => input.addEventListener('change', () => {
+                    if (input.classList.contains('assign-request-slot-teacher')) {
+                        setActiveAssignRequestSlot(row);
+                    }
                     updateAssignRequestRecurringSummary();
-                    renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate);
+                    if (input.classList.contains('assign-request-slot-teacher')) {
+                        loadAssignRequestAvailability();
+                    } else {
+                        renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate);
+                    }
                 }));
             });
         }
@@ -898,7 +1006,8 @@
         function addAssignRequestSlot(slot = {}) {
             const container = document.getElementById('assignRequestSlotsContainer');
             if (!container) return;
-            container.insertAdjacentHTML('beforeend', renderAssignRequestSlotRow(slot));
+            const index = container.querySelectorAll('.assign-request-slot').length;
+            container.insertAdjacentHTML('beforeend', renderAssignRequestSlotRow(slot, index));
             bindAssignRequestSlotFocusHandlers();
             bindAssignRequestSlotRemoveHandlers();
             setActiveAssignRequestSlot(container.lastElementChild);
@@ -908,16 +1017,20 @@
         function collectAssignRequestSlots() {
             const rows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot'));
             return rows.map(row => ({
+                instrument_id: Number(row.querySelector('.assign-request-slot-instrument')?.value || row.dataset.instrumentId || 0) || null,
+                teacher_id: Number(row.querySelector('.assign-request-slot-teacher')?.value || 0) || null,
                 day_of_week: row.querySelector('.assign-request-slot-day')?.value || '',
                 start_time: row.querySelector('.assign-request-slot-start')?.value || '',
                 end_time: row.querySelector('.assign-request-slot-end')?.value || ''
-            })).filter(slot => slot.day_of_week && slot.start_time && slot.end_time);
+            })).filter(slot => slot.teacher_id && slot.day_of_week && slot.start_time && slot.end_time);
         }
 
         function getActiveAssignRequestSlotData() {
             const row = activeAssignRequestSlotRow;
             if (!row) return null;
             return {
+                instrument_id: Number(row.querySelector('.assign-request-slot-instrument')?.value || row.dataset.instrumentId || 0) || null,
+                teacher_id: Number(row.querySelector('.assign-request-slot-teacher')?.value || 0) || null,
                 day_of_week: row.querySelector('.assign-request-slot-day')?.value || '',
                 start_time: row.querySelector('.assign-request-slot-start')?.value || '',
                 end_time: row.querySelector('.assign-request-slot-end')?.value || ''
@@ -1025,6 +1138,8 @@
         function renderAssignRequestAvailability(slots, selectedDate = '') {
             const listEl = document.getElementById('assignRequestAvailabilityList');
             const hintEl = document.getElementById('assignRequestAvailabilityHint');
+            const slotSelect = document.getElementById('assignRequestAvailableSlotSelect');
+            const slotHint = document.getElementById('assignRequestAvailableSlotHint');
             if (!listEl || !hintEl) return;
 
             assignRequestAvailabilitySlots = Array.isArray(slots) ? slots.slice() : [];
@@ -1037,6 +1152,13 @@
                 assignRequestAvailabilitySelectedDate = '';
                 hintEl.textContent = 'No conflict-free recurring one-hour slots were found for the selected instructor and date range.';
                 listEl.innerHTML = '<div class="text-sm text-slate-500">No available slots found.</div>';
+                if (slotSelect) {
+                    slotSelect.innerHTML = '<option value="">No available slots found</option>';
+                    slotSelect.disabled = true;
+                }
+                if (slotHint) {
+                    slotHint.textContent = 'The selected instructor has no valid one-hour slots for this date range.';
+                }
                 return;
             }
 
@@ -1147,10 +1269,39 @@
                     </div>
                 </div>
             `;
+
+            if (slotSelect) {
+                const currentValue = String(slotSelect.value || '');
+                const activeValue = activeSlot
+                    ? buildAssignRequestSlotValue({
+                        session_date: resolvedSelectedDate,
+                        day_of_week: activeSlot.day_of_week,
+                        start_time: activeSlot.start_time,
+                        end_time: activeSlot.end_time
+                    })
+                    : '';
+                slotSelect.disabled = !selectedSlots.length;
+                slotSelect.innerHTML = selectedSlots.length
+                    ? '<option value="">Select a slot for the selected day...</option>' + selectedSlots.map(slot => {
+                        const value = buildAssignRequestSlotValue(slot);
+                        const label = `${formatDateLong(slot.session_date) || slot.session_date} • ${slot.day_of_week || 'Day'} • ${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`;
+                        return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
+                    }).join('')
+                    : '<option value="">No available slots on this date</option>';
+                slotSelect.value = activeValue && selectedSlots.some(slot => buildAssignRequestSlotValue(slot) === activeValue)
+                    ? activeValue
+                    : (selectedSlots.some(slot => buildAssignRequestSlotValue(slot) === currentValue) ? currentValue : '');
+                if (slotHint) {
+                    slotHint.textContent = selectedSlots.length
+                        ? 'Pick a date, then choose one valid one-hour slot from the dropdown to populate the active weekly slot row.'
+                        : 'No valid slots are available on the selected date.';
+                }
+            }
         }
 
         function applyAssignRequestAvailabilitySlot(sessionDate, dayOfWeek, startTime, endTime) {
             const dateEl = document.getElementById('assignRequestDate');
+            const slotSelect = document.getElementById('assignRequestAvailableSlotSelect');
             if (dateEl) dateEl.value = sessionDate || '';
             const container = document.getElementById('assignRequestSlotsContainer');
             const targetRow = activeAssignRequestSlotRow && container && container.contains(activeAssignRequestSlotRow)
@@ -1165,6 +1316,14 @@
                 if (endEl) endEl.value = String(endTime || '').slice(0, 5);
                 setActiveAssignRequestSlot(targetRow);
             }
+            if (slotSelect) {
+                slotSelect.value = buildAssignRequestSlotValue({
+                    session_date: sessionDate || '',
+                    day_of_week: dayOfWeek || '',
+                    start_time: String(startTime || '').slice(0, 5),
+                    end_time: String(endTime || '').slice(0, 5)
+                });
+            }
             updateAssignRequestRecurringSummary();
             renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate || sessionDate || '');
         }
@@ -1172,8 +1331,13 @@
         async function loadAssignRequestAvailability() {
             const listEl = document.getElementById('assignRequestAvailabilityList');
             const hintEl = document.getElementById('assignRequestAvailabilityHint');
-            const teacherId = Number(document.getElementById('assignRequestTeacherSelect')?.value || 0);
+            const slotSelect = document.getElementById('assignRequestAvailableSlotSelect');
             const startDate = document.getElementById('assignRequestDate')?.value || '';
+            const activeSlotData = getActiveAssignRequestSlotData();
+            const teacherId = Number(activeSlotData?.teacher_id || 0);
+            const activeRowTeacherLabel = activeAssignRequestSlotRow
+                ? String(activeAssignRequestSlotRow.querySelector('.assign-request-slot-teacher option:checked')?.textContent || '').trim()
+                : '';
             if (!listEl || !hintEl) return;
 
             if (!activeAssignRequest || !teacherId) {
@@ -1181,23 +1345,37 @@
                 assignRequestAvailabilityMonth = '';
                 assignRequestAvailabilitySelectedDate = '';
                 hintEl.textContent = activeAssignRequest
-                    ? 'Choose an instructor to see their available one-hour slots and avoid conflicts.'
+                    ? 'Choose a teacher in the selected instrument row to see available one-hour slots.'
                     : 'Open a student request first.';
-                listEl.innerHTML = '<div class="text-sm text-slate-500">No instructor selected yet.</div>';
+                listEl.innerHTML = '<div class="text-sm text-slate-500">No teacher selected yet.</div>';
+                if (slotSelect) {
+                    slotSelect.innerHTML = '<option value="">Choose a date first</option>';
+                    slotSelect.disabled = true;
+                }
                 return;
             }
 
             listEl.innerHTML = '<div class="text-sm text-slate-500">Loading available slots...</div>';
+            hintEl.textContent = activeRowTeacherLabel
+                ? `Loading available one-hour slots for ${activeRowTeacherLabel}.`
+                : 'Loading available one-hour slots for the selected teacher.';
 
             try {
                 let url = `${baseApiUrl}/students.php?action=get-teacher-available-slots&teacher_id=${encodeURIComponent(teacherId)}&branch_id=${encodeURIComponent(activeAssignRequest.branch_id || managerBranchId || 0)}&student_id=${encodeURIComponent(activeAssignRequest.student_id || 0)}`;
                 if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
                 const response = await axios.get(url);
                 const data = response.data || {};
+                if (activeRowTeacherLabel) {
+                    hintEl.textContent = `Showing available one-hour slots for ${activeRowTeacherLabel}.`;
+                }
                 renderAssignRequestAvailability(Array.isArray(data.slots) ? data.slots : [], startDate);
             } catch (error) {
                 hintEl.textContent = 'Unable to load instructor availability right now.';
                 listEl.innerHTML = '<div class="text-sm text-red-500">Failed to load available slots.</div>';
+                if (slotSelect) {
+                    slotSelect.innerHTML = '<option value="">Failed to load slots</option>';
+                    slotSelect.disabled = true;
+                }
             }
         }
 
@@ -1215,14 +1393,11 @@
             const studentBranchEl = document.getElementById('assignRequestStudentBranch');
             const studentPackageEl = document.getElementById('assignRequestStudentPackage');
             const studentInstrumentEl = document.getElementById('assignRequestStudentInstrument');
-            const teacherSelect = document.getElementById('assignRequestTeacherSelect');
-            const teacherSearch = document.getElementById('assignRequestTeacherSearch');
-            const teacherHelp = document.getElementById('assignRequestTeacherSearchHelp');
             const dateEl = document.getElementById('assignRequestDate');
             const slotsContainer = document.getElementById('assignRequestSlotsContainer');
             const notesEl = document.getElementById('assignRequestNotes');
 
-            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !notesEl) return;
+            if (!modal || !info || !requestIdEl || !dateEl || !slotsContainer || !notesEl) return;
 
             const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
             const instrumentSummary = Array.isArray(req.instruments) && req.instruments.length
@@ -1244,29 +1419,23 @@
             assignRequestAvailabilitySelectedDate = '';
 
             assignRequestTeacherCandidates = Array.isArray(req.teacher_candidates) ? req.teacher_candidates : [];
-            teacherSelect.value = '';
-            if (teacherSearch) teacherSearch.value = '';
-            if (teacherHelp) {
-                teacherHelp.textContent = assignRequestTeacherCandidates.length
-                    ? 'Only instructors that match the student\'s instrument are listed here.'
-                    : 'No instructor with a matching specialization is available for this request.';
-            }
-            if (assignRequestTeacherCandidates.length) {
-                setAssignRequestTeacherSelection(assignRequestTeacherCandidates[0].teacher_id);
-            } else {
-                setAssignRequestTeacherSelection('');
-            }
+            assignRequestInstruments = Array.isArray(req.instruments) ? req.instruments.slice() : [];
 
             const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
             dateEl.min = todayYmd;
             dateEl.value = '';
             slotsContainer.innerHTML = '';
             activeAssignRequestSlotRow = null;
-            addAssignRequestSlot({
-                day_of_week: '',
-                start_time: '',
-                end_time: ''
-            });
+            const initialSlotCount = Math.max(1, assignRequestInstruments.length || 0);
+            for (let i = 0; i < initialSlotCount; i += 1) {
+                addAssignRequestSlot({
+                    instrument_id: assignRequestInstruments[i]?.instrument_id || null,
+                    teacher_id: '',
+                    day_of_week: '',
+                    start_time: '',
+                    end_time: ''
+                });
+            }
             notesEl.value = '';
             updateAssignRequestRecurringSummary();
             await loadAssignRequestAvailability();
@@ -1279,6 +1448,10 @@
             const modal = document.getElementById('assignRequestModal');
             if (!modal) return;
             activeAssignRequest = null;
+            assignRequestInstruments = [];
+            assignRequestAvailabilitySlots = [];
+            assignRequestAvailabilityMonth = '';
+            assignRequestAvailabilitySelectedDate = '';
             modal.classList.add('hidden');
             modal.classList.remove('flex');
         }
@@ -1303,14 +1476,25 @@
         async function submitAssignRequestForm(e) {
             e.preventDefault();
             const requestId = Number(document.getElementById('assignRequestId')?.value || 0);
-            const teacherId = Number(document.getElementById('assignRequestTeacherSelect')?.value || 0);
             const assignedDate = document.getElementById('assignRequestDate')?.value || '';
             const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+            const slotRows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot'));
+            const invalidRow = slotRows.find(row => {
+                const teacherId = Number(row.querySelector('.assign-request-slot-teacher')?.value || 0);
+                const day = String(row.querySelector('.assign-request-slot-day')?.value || '').trim();
+                const startTime = String(row.querySelector('.assign-request-slot-start')?.value || '').trim();
+                const endTime = String(row.querySelector('.assign-request-slot-end')?.value || '').trim();
+                return !teacherId || !day || !startTime || !endTime;
+            });
             const assignedSlots = collectAssignRequestSlots();
             const adminNotes = document.getElementById('assignRequestNotes')?.value?.trim() || '';
 
-            if (!requestId || !teacherId || !assignedDate || !assignedSlots.length) {
-                showMessage('Please complete teacher, start date, and at least one weekly slot.', 'error');
+            if (!requestId || !assignedDate || !assignedSlots.length) {
+                showMessage('Please complete the date and at least one teacher slot.', 'error');
+                return;
+            }
+            if (invalidRow) {
+                showMessage('Each instrument row needs a teacher, day, start, and end time.', 'error');
                 return;
             }
             if (assignedDate < todayYmd) {
@@ -1331,7 +1515,7 @@
             await approveStudentRequest({
                 action: 'approve-package-request',
                 request_id: requestId,
-                teacher_id: teacherId,
+                teacher_id: Number(primarySlot.teacher_id || 0),
                 assigned_date: assignedDate,
                 assigned_day_of_week: primarySlot.day_of_week,
                 assigned_start_time: primarySlot.start_time,
@@ -1763,6 +1947,11 @@
             document.getElementById('assignRequestDate')?.addEventListener('change', () => {
                 updateAssignRequestRecurringSummary();
                 loadAssignRequestAvailability();
+            });
+            document.getElementById('assignRequestAvailableSlotSelect')?.addEventListener('change', (event) => {
+                const selected = parseAssignRequestSlotValue(event.target.value);
+                if (!selected) return;
+                applyAssignRequestAvailabilitySlot(selected.session_date, selected.day_of_week, selected.start_time, selected.end_time);
             });
             document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
         });

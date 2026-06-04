@@ -44,7 +44,7 @@
 
         function applyEnrollmentView() {
             const params = new URLSearchParams(window.location.search);
-            const view = String(params.get('view') || '').toLowerCase();
+            const view = String(params.get('view') || 'active').toLowerCase();
             const pendingSection = document.getElementById('pendingSessionsSection');
             const activeSection = document.getElementById('activeEnrollmentsSection');
             const title = document.getElementById('sessionsPageTitle');

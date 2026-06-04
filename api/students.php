@@ -894,6 +894,18 @@ class StudentsApi
         return $candidates;
     }
 
+    private function isGeneralTeacherSpecialization($specialization)
+    {
+        $text = strtolower(trim((string)$specialization));
+        return $text !== '' && (
+            strpos($text, 'all around') !== false ||
+            strpos($text, 'all-around') !== false ||
+            strpos($text, 'all instruments') !== false ||
+            strpos($text, 'multi') !== false ||
+            $text === 'general'
+        );
+    }
+
     private function dayOfWeekFromDate($dateYmd)
     {
         $ts = strtotime((string)$dateYmd);
@@ -1038,19 +1050,29 @@ class StudentsApi
         return implode(' | ', $parts);
     }
 
-    private function normalizeAssignedScheduleSlots($slotsInput, $teacherId, $branchId, $fallbackRoomName = '', $studentId = 0, $excludeEnrollmentIds = [])
+    private function normalizeAssignedScheduleSlots($slotsInput, $teacherId, $branchId, $fallbackRoomName = '', $studentId = 0, $excludeEnrollmentIds = [], $instrumentLookup = [])
     {
         $validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $teacherId = (int)$teacherId;
         $branchId = (int)$branchId;
         $studentId = (int)$studentId;
         $fallbackRoomName = trim((string)$fallbackRoomName);
+        $instrumentLookup = is_array($instrumentLookup) ? $instrumentLookup : [];
+        $allInstrumentIds = array_map('intval', array_keys($instrumentLookup));
+        $allInstrumentKeywords = [];
+        foreach ($instrumentLookup as $instrumentInfo) {
+            if (!is_array($instrumentInfo)) continue;
+            if (!empty($instrumentInfo['instrument_name'])) $allInstrumentKeywords[] = $instrumentInfo['instrument_name'];
+            if (!empty($instrumentInfo['type_name'])) $allInstrumentKeywords[] = $instrumentInfo['type_name'];
+        }
         $rows = [];
 
         foreach ((array)$slotsInput as $index => $slot) {
             if (!is_array($slot)) {
                 continue;
             }
+            $slotTeacherId = (int)($slot['teacher_id'] ?? $teacherId);
+            $slotInstrumentId = (int)($slot['instrument_id'] ?? 0);
             $day = trim((string)($slot['day_of_week'] ?? ''));
             $start = trim((string)($slot['start_time'] ?? ''));
             $end = trim((string)($slot['end_time'] ?? ''));
@@ -1086,10 +1108,37 @@ class StudentsApi
                 }
             }
 
-            if (!$this->teacherHasAvailabilityForSlot($teacherId, $this->nextDateForDayOfWeek(date('Y-m-d'), $day), $start, $end)) {
+            $candidateTeacherIds = [];
+            if ($slotInstrumentId > 0 && isset($instrumentLookup[$slotInstrumentId])) {
+                $instrumentInfo = $instrumentLookup[$slotInstrumentId];
+                $teacherCandidates = $this->buildTeacherCandidates($branchId, [$slotInstrumentId], [
+                    $instrumentInfo['instrument_name'] ?? '',
+                    $instrumentInfo['type_name'] ?? ''
+                ]);
+                $candidateTeacherIds = array_map(function ($t) {
+                    if ($this->isGeneralTeacherSpecialization($t['specialization'] ?? '')) {
+                        return 0;
+                    }
+                    return (int)($t['teacher_id'] ?? 0);
+                }, $teacherCandidates);
+            } elseif (!empty($allInstrumentIds)) {
+                $teacherCandidates = $this->buildTeacherCandidates($branchId, $allInstrumentIds, $allInstrumentKeywords);
+                $candidateTeacherIds = array_map(function ($t) {
+                    if ($this->isGeneralTeacherSpecialization($t['specialization'] ?? '')) {
+                        return 0;
+                    }
+                    return (int)($t['teacher_id'] ?? 0);
+                }, $teacherCandidates);
+            }
+            $candidateTeacherIds = array_values(array_unique(array_filter($candidateTeacherIds, function ($v) { return $v > 0; })));
+            if (!empty($candidateTeacherIds) && !in_array($slotTeacherId, $candidateTeacherIds, true)) {
+                throw new InvalidArgumentException("Selected teacher is not eligible for the instrument row on {$day}");
+            }
+
+            if (!$this->teacherHasAvailabilityForSlot($slotTeacherId, $this->nextDateForDayOfWeek(date('Y-m-d'), $day), $start, $end)) {
                 throw new InvalidArgumentException("Teacher is not available for {$day} {$start}-{$end}");
             }
-            if ($this->hasTeacherRecurringScheduleConflict($teacherId, $day, $start, $end, $excludeEnrollmentIds)) {
+            if ($this->hasTeacherRecurringScheduleConflict($slotTeacherId, $day, $start, $end, $excludeEnrollmentIds)) {
                 throw new InvalidArgumentException("Teacher already has a weekly schedule conflict for {$day} {$start}-{$end}");
             }
             if ($studentId > 0 && $this->hasStudentRecurringScheduleConflict($studentId, $day, $start, $end, $excludeEnrollmentIds)) {
@@ -1100,7 +1149,7 @@ class StudentsApi
             }
 
             $rows[$slotKey] = [
-                'teacher_id' => $teacherId,
+                'teacher_id' => $slotTeacherId,
                 'day_of_week' => $day,
                 'start_time' => $start,
                 'end_time' => $end,
@@ -4693,24 +4742,6 @@ class StudentsApi
                 }
             }
 
-            try {
-                $normalizedAssignedSlots = $this->normalizeAssignedScheduleSlots(
-                    $assignedSlotsInput,
-                    $teacherId,
-                    (int)$req['branch_id'],
-                    $assignedRoom,
-                    (int)$req['student_id']
-                );
-            } catch (InvalidArgumentException $e) {
-                $this->conn->rollBack();
-                $this->sendJSON(['error' => $e->getMessage()], 400);
-            }
-
-            if (empty($normalizedAssignedSlots)) {
-                $this->conn->rollBack();
-                $this->sendJSON(['error' => 'Add at least one weekly schedule slot before approval'], 400);
-            }
-
             $instrumentIds = [];
             if (!empty($req['request_notes'])) {
                 $decoded = json_decode((string)$req['request_notes'], true);
@@ -4724,10 +4755,11 @@ class StudentsApi
             }
 
             $instrumentKeywords = [];
+            $instrumentLookup = [];
             if (!empty($instrumentIds)) {
                 $placeholders = implode(',', array_fill(0, count($instrumentIds), '?'));
                 $stmtInst = $this->conn->prepare("
-                    SELECT i.instrument_name, it.type_name
+                    SELECT i.instrument_id, i.instrument_name, it.type_name
                     FROM tbl_instruments i
                     LEFT JOIN tbl_instrument_types it ON i.type_id = it.type_id
                     WHERE i.instrument_id IN ({$placeholders})
@@ -4735,16 +4767,36 @@ class StudentsApi
                 $stmtInst->execute($instrumentIds);
                 $instRows = $stmtInst->fetchAll(PDO::FETCH_ASSOC);
                 foreach ($instRows as $instRow) {
+                    $instId = (int)($instRow['instrument_id'] ?? 0);
+                    if ($instId < 1) continue;
+                    $instrumentLookup[$instId] = [
+                        'instrument_id' => $instId,
+                        'instrument_name' => (string)($instRow['instrument_name'] ?? ''),
+                        'type_name' => (string)($instRow['type_name'] ?? '')
+                    ];
                     if (!empty($instRow['instrument_name'])) $instrumentKeywords[] = $instRow['instrument_name'];
                     if (!empty($instRow['type_name'])) $instrumentKeywords[] = $instRow['type_name'];
                 }
             }
 
-            $candidateTeachers = $this->buildTeacherCandidates((int)$req['branch_id'], $instrumentIds, $instrumentKeywords);
-            $candidateIds = array_map(function ($t) { return (int)($t['teacher_id'] ?? 0); }, $candidateTeachers);
-            if (!in_array($teacherId, $candidateIds, true)) {
+            try {
+                $normalizedAssignedSlots = $this->normalizeAssignedScheduleSlots(
+                    $assignedSlotsInput,
+                    $teacherId,
+                    (int)$req['branch_id'],
+                    $assignedRoom,
+                    (int)$req['student_id'],
+                    [],
+                    $instrumentLookup
+                );
+            } catch (InvalidArgumentException $e) {
                 $this->conn->rollBack();
-                $this->sendJSON(['error' => 'Selected teacher is not eligible for this request/instrument specialization'], 400);
+                $this->sendJSON(['error' => $e->getMessage()], 400);
+            }
+
+            if (empty($normalizedAssignedSlots)) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Add at least one weekly schedule slot before approval'], 400);
             }
 
             $packagePrice = 0.0;
@@ -4793,6 +4845,11 @@ class StudentsApi
             if ($primaryInstrumentId < 1) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'No instrument selected for enrollment'], 400);
+            }
+            $primaryTeacherId = (int)($normalizedAssignedSlots[0]['teacher_id'] ?? 0);
+            if ($primaryTeacherId < 1) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'No teacher selected for the first instrument slot'], 400);
             }
             if (!$this->tableExists('tbl_enrollments')) {
                 $this->conn->rollBack();
@@ -4850,7 +4907,7 @@ class StudentsApi
             $fixedRoomId = $firstSlot['room_id'] ?? null;
             $updateParams = [
                 $primaryInstrumentId,
-                (int)$teacherId,
+                $primaryTeacherId,
                 ($fixedScheduleLabel !== '' ? $fixedScheduleLabel : null),
                 json_encode($requestMeta),
                 $assignedDate,
