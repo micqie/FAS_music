@@ -4826,6 +4826,7 @@ async function initStudentDashboardPage() {
     const isEnrolledStudent = Boolean(enrollmentApproved);
     const overviewGrid = document.getElementById('studentOverviewGrid');
     const overviewCard = document.getElementById('studentEnrollmentOverviewCard');
+    const performanceCard = document.getElementById('studentPerformanceCard');
     const requestShortcutCard = document.getElementById('studentRequestShortcutCard');
     const upcomingCard = document.getElementById('studentUpcomingScheduleCard');
     const qrCard = document.getElementById('studentQrCard');
@@ -4854,6 +4855,7 @@ async function initStudentDashboardPage() {
         }
     }
     if (overviewCard) overviewCard.classList.toggle('hidden', isEnrolledStudent);
+    if (performanceCard) performanceCard.classList.toggle('hidden', !isEnrolledStudent);
     if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent || !regPaid);
     if (upcomingCard) upcomingCard.classList.toggle('hidden', !isEnrolledStudent);
     if (qrCard) qrCard.classList.toggle('hidden', true);
@@ -4896,21 +4898,26 @@ async function initStudentDashboardPage() {
         setText('lastAttended', '—');
     }
 
-    const performanceRows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
-    const performanceMetrics = buildStudentPerformanceMetrics(performanceRows);
-    setHtml('studentPerformanceBars', renderStudentPerformanceBars(performanceMetrics) || `
-        <div class="rounded-2xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400 text-center">
-            <i class="fas fa-chart-line text-2xl mb-2"></i>
-            <div class="font-semibold text-zinc-900 dark:text-white">No progress scores yet</div>
-            <div class="mt-1">Your performance bars will appear after your teacher records session assessments.</div>
-        </div>
-    `);
-    setText(
-        'studentPerformanceNote',
-        performanceMetrics.some(metric => metric.average !== null)
-            ? 'Based on your recorded session assessments.'
-            : 'Your performance bars will appear after your teacher records session assessments.'
-    );
+    if (isEnrolledStudent) {
+        const performanceRows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
+        const performanceMetrics = buildStudentPerformanceMetrics(performanceRows);
+        setHtml('studentPerformanceBars', renderStudentPerformanceBars(performanceMetrics) || `
+            <div class="rounded-2xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400 text-center">
+                <i class="fas fa-chart-line text-2xl mb-2"></i>
+                <div class="font-semibold text-zinc-900 dark:text-white">No progress scores yet</div>
+                <div class="mt-1">Your performance bars will appear after your teacher records session assessments.</div>
+            </div>
+        `);
+        setText(
+            'studentPerformanceNote',
+            performanceMetrics.some(metric => metric.average !== null)
+                ? 'Based on your recorded session assessments.'
+                : 'Your performance bars will appear after your teacher records session assessments.'
+        );
+    } else {
+        setHtml('studentPerformanceBars', '');
+        setText('studentPerformanceNote', 'Performance will appear after enrollment is active.');
+    }
 
     let meta = null;
     try {
