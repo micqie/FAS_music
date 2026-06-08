@@ -2212,6 +2212,12 @@ class StudentsApi
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
 
+            $stmtCurrent = $this->conn->prepare("SELECT email FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmtCurrent->execute([$id]);
+            $currentStudent = $stmtCurrent->fetch(PDO::FETCH_ASSOC) ?: [];
+            $currentEmail = trim((string)($currentStudent['email'] ?? ''));
+
+            $this->conn->beginTransaction();
             $stmt = $this->conn->prepare("
                 UPDATE tbl_students SET
                     first_name = ?, last_name = ?, middle_name = ?, email = ?, phone = ?, address = ?,
@@ -2224,16 +2230,44 @@ class StudentsApi
                 $branchId, $dateOfBirth, $age ?: null, $school ?: null, $gradeYear ?: null,
                 $status, $id
             ]);
+
+            $normalizedEmail = trim((string)$email);
+            if ($currentEmail !== '') {
+                if ($normalizedEmail === '') {
+                    $stmtDeleteUser = $this->conn->prepare("
+                        DELETE u
+                        FROM tbl_users u
+                        INNER JOIN tbl_roles r ON r.role_id = u.role_id
+                        WHERE (u.email = ? OR u.username = ?)
+                          AND LOWER(r.role_name) = 'student'
+                    ");
+                    $stmtDeleteUser->execute([$currentEmail, $currentEmail]);
+                } elseif (strcasecmp($currentEmail, $normalizedEmail) !== 0) {
+                    $stmtUpdateUser = $this->conn->prepare("
+                        UPDATE tbl_users u
+                        INNER JOIN tbl_roles r ON r.role_id = u.role_id
+                        SET u.email = ?, u.username = ?
+                        WHERE (u.email = ? OR u.username = ?)
+                          AND LOWER(r.role_name) = 'student'
+                    ");
+                    $stmtUpdateUser->execute([$normalizedEmail, $normalizedEmail, $currentEmail, $currentEmail]);
+                }
+            }
+
             if ($registrationFeeAmount !== null || $registrationFeePaid !== null || $registrationStatus !== null) {
                 // Registration fee table was removed; values now come from tbl_registration_payments.
             }
+            $this->conn->commit();
             $this->sendJSON(['success' => true, 'message' => 'Student updated']);
         } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }
 
-    // Delete student (soft delete: set status to Inactive)
+    // Delete student and remove the linked login row
     public function deleteStudent()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2247,13 +2281,40 @@ class StudentsApi
         }
 
         try {
-            $stmt = $this->conn->prepare("UPDATE tbl_students SET status = 'Inactive' WHERE student_id = ?");
-            $stmt->execute([$studentId]);
-            if ($stmt->rowCount() === 0) {
+            $this->conn->beginTransaction();
+
+            $stmtStudent = $this->conn->prepare("SELECT email FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $stmtStudent->execute([$studentId]);
+            $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+            if (!$student) {
+                $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
-            $this->sendJSON(['success' => true, 'message' => 'Student deactivated']);
+
+            if (!empty($student['email'])) {
+                $stmtUser = $this->conn->prepare("
+                    DELETE u
+                    FROM tbl_users u
+                    INNER JOIN tbl_roles r ON r.role_id = u.role_id
+                    WHERE (u.email = ? OR u.username = ?)
+                      AND LOWER(r.role_name) = 'student'
+                ");
+                $stmtUser->execute([$student['email'], $student['email']]);
+            }
+
+            $stmt = $this->conn->prepare("DELETE FROM tbl_students WHERE student_id = ?");
+            $stmt->execute([$studentId]);
+            if ($stmt->rowCount() === 0) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Student not found'], 404);
+            }
+
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'message' => 'Student deleted']);
         } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }

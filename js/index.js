@@ -2707,14 +2707,124 @@ function getGuardianPrimaryGuardian(portal, user = null) {
     return matched || guardians[0] || portal?.primary_guardian || null;
 }
 
-function applyGuardianPortalIdentity(user, guardian = null) {
+function getGuardianPortalBranchLabel(portal) {
+    const directBranch = String(
+        portal?.branch_name
+        || portal?.branch
+        || portal?.branchName
+        || portal?.current_enrollment?.branch_name
+        || ''
+    ).trim();
+    if (directBranch) return directBranch;
+
+    const students = Array.isArray(portal?.students) ? portal.students : [];
+    const uniqueBranches = Array.from(new Set(
+        students
+            .map((item) => String(item?.branch_name || '').trim())
+            .filter(Boolean)
+    ));
+    if (uniqueBranches.length === 0) return '—';
+    if (uniqueBranches.length === 1) return uniqueBranches[0];
+    return uniqueBranches.join(', ');
+}
+
+function getStudentPortalBranchLabel(studentOrPortal) {
+    const portal = studentOrPortal?.student ? studentOrPortal : null;
+    const student = portal ? portal.student : (studentOrPortal || {});
+    const branchName = student?.branch_name
+        || student?.branch
+        || student?.branchName
+        || student?.current_branch_name
+        || student?.enrollment_branch_name
+        || portal?.current_enrollment?.branch_name
+        || portal?.branch_name
+        || window.__studentPortalBranchLabel
+        || '—';
+    return String(branchName).trim() || '—';
+}
+
+function applyStudentPortalIdentity(user, studentOrPortal = null) {
+    const portal = studentOrPortal?.student ? studentOrPortal : null;
+    const student = portal ? portal.student : (studentOrPortal || {});
+    const displayName = `${student?.first_name || ''} ${student?.last_name || ''}`.trim()
+        || String(student?.student_name || student?.full_name || student?.display_name || student?.name || '').trim()
+        || user?.username
+        || user?.email
+        || 'Student';
+    const email = student?.email || portal?.student?.email || user?.email || '—';
+    const branchName = getStudentPortalBranchLabel(studentOrPortal);
+
+    window.__studentPortalBranchLabel = branchName;
+
+    setText('studentNavName', displayName);
+    setText('studentMobileMenuName', displayName);
+    setText('studentSidebarName', displayName);
+    setText('studentSidebarEmail', email);
+    if (typeof window.setPortalBranchText === 'function') {
+        window.setPortalBranchText('#studentSidebarBranch, #studentBranch, #studentBranchMobile, #studentSidebarMobileBranch', branchName);
+    } else {
+        setText('studentSidebarBranch', branchName);
+        setText('studentBranch', branchName);
+        setText('studentBranchMobile', branchName);
+    }
+    setText('studentName', displayName);
+    setText('studentEmail', email);
+    setText('studentNameMobile', displayName);
+    setText('studentEmailMobile', email);
+    if (typeof window.fitAllPortalBranchLabels === 'function') {
+        window.fitAllPortalBranchLabels();
+    }
+}
+
+function applyGuardianPortalIdentity(user, guardianOrPortal = null) {
+    const portal = guardianOrPortal && Array.isArray(guardianOrPortal.guardians)
+        ? guardianOrPortal
+        : null;
+    const guardian = portal
+        ? (getGuardianPrimaryGuardian(portal, user) || {})
+        : (guardianOrPortal || {});
+    const portalGuardian = Array.isArray(portal?.guardians) ? portal.guardians[0] : null;
+    const portalUserAccount = portal?.user_account || portal?.user || null;
     const displayName = `${guardian?.first_name || ''} ${guardian?.last_name || ''}`.trim()
         || user?.username
         || user?.email
+        || portalGuardian?.first_name
+        || portalGuardian?.last_name
         || 'Guardian';
+    const email = guardian?.email
+        || portalGuardian?.email
+        || portalUserAccount?.email
+        || user?.email
+        || window.__guardianPortalEmail
+        || '—';
+    const branchName = (portal ? getGuardianPortalBranchLabel(portal) : null)
+        || guardian?.branch_name
+        || guardian?.branch
+        || guardian?.branchName
+        || portal?.branch_name
+        || portal?.branch
+        || portal?.branchName
+        || window.__guardianPortalBranchLabel
+        || '—';
+
+    window.__guardianPortalEmail = email;
+    window.__guardianPortalBranchLabel = branchName;
 
     setText('guardianNavName', displayName);
     setText('guardianMobileMenuName', displayName);
+    setText('guardianSidebarName', displayName);
+    setText('guardianSidebarEmail', email);
+    if (typeof window.setPortalBranchText === 'function') {
+        window.setPortalBranchText('#guardianSidebarBranch, #guardianMobileMenuProfileBranch', branchName);
+    } else {
+        setText('guardianSidebarBranch', branchName);
+        setText('guardianMobileMenuProfileBranch', branchName);
+    }
+    setText('guardianMobileMenuProfileName', displayName);
+    setText('guardianMobileMenuProfileEmail', email);
+    if (typeof window.fitAllPortalBranchLabels === 'function') {
+        window.fitAllPortalBranchLabels();
+    }
 }
 
 async function fetchGuardianAbsenceRequests(email) {
@@ -3431,7 +3541,8 @@ async function initGuardianDashboardPage() {
     }
 
     const guardian = getGuardianPrimaryGuardian(portal, user) || {};
-    applyGuardianPortalIdentity(user, guardian);
+    window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    applyGuardianPortalIdentity(user, portal);
 
     const students = Array.isArray(portal.students) ? portal.students : [];
     guardianPortalStudents = students;
@@ -3476,7 +3587,8 @@ async function initGuardianStudentsPage() {
     }
 
     const primaryGuardian = getGuardianPrimaryGuardian(portal, user) || {};
-    applyGuardianPortalIdentity(user, primaryGuardian);
+    window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    applyGuardianPortalIdentity(user, portal);
     setText('guardianName', `${primaryGuardian.first_name || ''} ${primaryGuardian.last_name || ''}`.trim() || (user?.username || 'Guardian'));
     setText('guardianEmail', primaryGuardian.email || user?.email || '—');
     setText('guardianPhone', primaryGuardian.phone || '—');
@@ -3503,7 +3615,8 @@ async function initGuardianPaymentsPage() {
     }
 
     const primaryGuardian = getGuardianPrimaryGuardian(portal, user) || {};
-    applyGuardianPortalIdentity(user, primaryGuardian);
+    window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    applyGuardianPortalIdentity(user, portal);
     const guardianName = `${primaryGuardian.first_name || ''} ${primaryGuardian.last_name || ''}`.trim() || (user?.username || 'Guardian');
     setText('guardianNameInline', guardianName);
 
@@ -3536,7 +3649,8 @@ async function initGuardianProfilePage() {
         return acc;
     }, { balance: 0 });
 
-    applyGuardianPortalIdentity(user, guardian);
+    window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    applyGuardianPortalIdentity(user, portal);
     setText('guardianProfileHeading', `${guardian.first_name || ''} ${guardian.last_name || ''}`.trim() || 'Guardian Profile');
     setText('guardianProfileLinkedStudents', String(students.length));
     setText('guardianProfileBalance', formatCurrencyPHP(metrics.balance));
@@ -3591,7 +3705,8 @@ async function initGuardianProfilePage() {
                     phone: payload.phone
                 };
                 Auth.setUser(nextUser);
-                applyGuardianPortalIdentity(nextUser, payload);
+                window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+                applyGuardianPortalIdentity(nextUser, portal);
                 setText('guardianProfileHeading', `${payload.first_name} ${payload.last_name}`.trim() || 'Guardian Profile');
                 showMessage(data.message || 'Guardian profile updated.', 'success');
             } else {
@@ -3625,7 +3740,8 @@ async function initGuardianAbsencePage() {
     const guardian = getGuardianPrimaryGuardian(portal, user) || {};
     const students = Array.isArray(portal.students) ? portal.students : [];
     guardianPortalStudents = students;
-    applyGuardianPortalIdentity(user, guardian);
+    window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    applyGuardianPortalIdentity(user, portal);
 
     setText('guardianAbsenceName', `${guardian.first_name || ''} ${guardian.last_name || ''}`.trim() || 'Guardian');
     setText('guardianAbsenceStudentCount', String(students.length));
@@ -4804,9 +4920,6 @@ async function initStudentDashboardPage() {
         return;
     }
 
-    setText('studentNavName', user.username || user.email || 'Student');
-    setText('studentMobileMenuName', user.username || user.email || 'Signed in');
-
     const portal = await fetchStudentPortalDataByEmail(user.email);
     if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
     if (!portal.success) {
@@ -4815,8 +4928,7 @@ async function initStudentDashboardPage() {
     }
 
     const s = portal.student;
-    setText('studentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
-    setText('studentBranch', s.branch_name || '—');
+    applyStudentPortalIdentity(user, portal);
     setHtml('studentStatusBadge', `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(s.registration_status)}">${escapeHtml(s.registration_status || '—')}</span>`);
 
     const profileComplete = isRegistrationProfileComplete(s);
@@ -4998,7 +5110,6 @@ async function initStudentDashboardPage() {
 async function initStudentQrPage() {
     if (!checkStudentAuth()) return;
     const user = Auth.getUser();
-    setText('studentNavName', user.username || user.email || 'Student');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
     if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
@@ -5007,8 +5118,7 @@ async function initStudentQrPage() {
         return;
     }
     const s = portal.student;
-    setText('studentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
-    setText('studentEmail', s.email || '—');
+    applyStudentPortalIdentity(user, portal);
 
     const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     if (!enrollmentApproved) {
@@ -5047,7 +5157,6 @@ async function initStudentQrPage() {
 async function initStudentSessionsPage() {
     if (!checkStudentAuth()) return;
     const user = Auth.getUser();
-    setText('studentNavName', user.username || user.email || 'Student');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
     if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
@@ -5056,6 +5165,7 @@ async function initStudentSessionsPage() {
         return;
     }
     const s = portal.student;
+    applyStudentPortalIdentity(user, portal);
     setText('packageName', s.package_name || 'Not assigned yet');
     setText('packageSessions', s.package_sessions ? `${s.package_sessions} sessions included` : '—');
     setText('gradedSessionCount', '—');
@@ -5244,7 +5354,6 @@ async function initStudentGradesPage() {
     const listEl = document.getElementById('studentGradesList');
     if (!checkStudentAuth()) return;
     const user = Auth.getUser();
-    setText('studentNavName', user.username || user.email || 'Student');
 
     if (!listEl) return;
 
@@ -5261,6 +5370,7 @@ async function initStudentGradesPage() {
             return;
         }
 
+        applyStudentPortalIdentity(user, portal);
         const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
         const rows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
         const gradedRows = rows.filter(row => Number(row.progress_id || 0) > 0);
@@ -5414,9 +5524,6 @@ async function initStudentGradesPage() {
 async function initStudentAttendancePage() {
     if (!checkStudentAuth()) return;
     const user = Auth.getUser();
-    setText('studentNavName', user.username || user.email || 'Student');
-    setText('studentMobileMenuName', user.username || user.email || 'Signed in');
-
     const portal = await fetchStudentPortalDataByEmail(user.email);
     if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
     if (!portal.success) {
@@ -5425,6 +5532,7 @@ async function initStudentAttendancePage() {
     }
 
     const s = portal.student || {};
+    applyStudentPortalIdentity(user, portal);
     const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     const totalSessions = Number(portal.current_enrollment?.package_sessions || s.package_sessions || 0);
 
@@ -5511,8 +5619,6 @@ async function initStudentAttendancePage() {
 async function initStudentProfilePage() {
     if (!checkStudentAuth()) return;
     const user = Auth.getUser();
-    setText('studentNavName', user.username || user.email || 'Student');
-    setText('studentMobileMenuName', user.username || user.email || 'Signed in');
 
     const portal = await fetchStudentPortalDataByEmail(user.email);
     if (await handleStudentRegistrationReset(portal, 'This registration was rejected or removed. Please register again.')) return;
@@ -5522,6 +5628,7 @@ async function initStudentProfilePage() {
     }
 
     const s = portal.student;
+    applyStudentPortalIdentity(user, portal);
     setText('profileStudentName', `${s.first_name || ''} ${s.last_name || ''}`.trim());
     setText('profileBranch', s.branch_name || '—');
     setHtml('profileStatusBadge', `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(s.registration_status)}">${escapeHtml(s.registration_status || '—')}</span>`);
@@ -6345,9 +6452,11 @@ async function loadStudentsForAdmin() {
                 'Pending': 'text-yellow-400 bg-yellow-400/10',
                 'Fee Paid': 'text-green-400 bg-green-400/10',
                 'Approved': 'text-blue-400 bg-blue-400/10',
-                'Rejected': 'text-red-400 bg-red-400/10'
+                'Rejected': 'text-red-400 bg-red-400/10',
+                'Walk-In': 'text-purple-400 bg-purple-400/10'
             };
-            const statusClass = statusColors[s.registration_status] || 'text-zinc-400 bg-zinc-400/10';
+            const displayStatus = getWalkInRegistrationDisplayStatus(s);
+            const statusClass = statusColors[displayStatus] || 'text-zinc-400 bg-zinc-400/10';
 
             const activeBadge = s.status === 'Active'
                 ? '<span class="px-2 py-1 rounded text-xs font-semibold bg-green-400/10 text-green-400">Active</span>'
@@ -6372,7 +6481,7 @@ async function loadStudentsForAdmin() {
                     <td class="px-6 py-4 text-sm">
                         <div class="mb-1">
                             <span class="px-2 py-1 rounded text-xs font-semibold ${statusClass}">
-                                ${s.registration_status}
+                                ${displayStatus}
                             </span>
                         </div>
                         ${activeBadge}
@@ -6478,6 +6587,22 @@ function sortNewestRegistrationsFirst(rows) {
     });
 }
 
+function getWalkInRegistrationDisplayStatus(registration) {
+    const status = String(registration?.registration_status || 'Pending').trim() || 'Pending';
+    return status;
+}
+
+function getWalkInRegistrationRemainingAmount(registration) {
+    const source = String(registration?.registration_source || 'online').toLowerCase();
+    const status = String(registration?.registration_status || 'Pending').trim() || 'Pending';
+    if (source === 'walkin' && ['Approved', 'Fee Paid', 'Active'].includes(status)) {
+        return 0;
+    }
+    const total = Number(registration?.registration_fee_amount || 0);
+    const paid = Number(registration?.registration_fee_paid || 0);
+    return Math.max(0, total - paid);
+}
+
 function getRegistrationsModeFromHash() {
     const hash = (window.location.hash || '').replace('#', '').toLowerCase();
     return hash === 'pending' ? 'pending' : 'all';
@@ -6572,11 +6697,13 @@ function renderRegistrationsTable() {
             'Pending': 'text-amber-700 bg-amber-100',
             'Fee Paid': 'text-emerald-700 bg-emerald-100',
             'Approved': 'text-blue-700 bg-blue-100',
-            'Rejected': 'text-red-700 bg-red-100'
+            'Rejected': 'text-red-700 bg-red-100',
+            'Walk-In': 'text-purple-700 bg-purple-100'
         };
 
-        const statusClass = statusColors[reg.registration_status] || 'text-slate-700 bg-slate-100';
-        const remaining = parseFloat(reg.registration_fee_amount) - parseFloat(reg.registration_fee_paid || 0);
+        const displayStatus = getWalkInRegistrationDisplayStatus(reg);
+        const statusClass = statusColors[displayStatus] || 'text-slate-700 bg-slate-100';
+        const remaining = getWalkInRegistrationRemainingAmount(reg);
         const registrationSource = String(reg.registration_source || 'online').toLowerCase() === 'walkin' ? 'walkin' : 'online';
         const sourceBadgeClass = registrationSource === 'walkin'
             ? 'bg-purple-100 text-purple-700'
@@ -6613,7 +6740,7 @@ function renderRegistrationsTable() {
                 </td>
                 <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded text-xs font-semibold ${statusClass}">
-                        ${reg.registration_status}
+                        ${displayStatus}
                     </span>
                 </td>
                 <td class="px-6 py-4 text-slate-600 text-sm" style="color:#475569;">
@@ -6714,10 +6841,10 @@ async function viewDetails(studentId) {
                     <div>
                         <h4 class="text-lg font-bold text-gold-400 mb-4">Registration Status</h4>
                         <div class="space-y-2 text-sm">
-                            <p><span class="text-zinc-400">Status:</span> <span class="text-white">${student.registration_status}</span></p>
+                            <p><span class="text-zinc-400">Status:</span> <span class="text-white">${getWalkInRegistrationDisplayStatus(student)}</span></p>
                             <p><span class="text-zinc-400">Fee Amount:</span> <span class="text-white">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</span></p>
                             <p><span class="text-zinc-400">Paid Amount:</span> <span class="text-white">₱${parseFloat(student.registration_fee_paid || 0).toFixed(2)}</span></p>
-                            <p><span class="text-zinc-400">Remaining:</span> <span class="text-white">₱${(parseFloat(student.registration_fee_amount || 0) - parseFloat(student.registration_fee_paid || 0)).toFixed(2)}</span></p>
+                            <p><span class="text-zinc-400">Remaining:</span> <span class="text-white">₱${getWalkInRegistrationRemainingAmount(student).toFixed(2)}</span></p>
                             <p><span class="text-zinc-400">Payment Proof:</span> <span class="text-white">${student.registration_proof_path ? `<a class="text-gold-300 underline" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.registration_proof_path)}">View file</a>` : (String(student.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A')}</span></p>
                             <p><span class="text-zinc-400">Proof ID:</span> <span class="text-white">${student.age_verification_proof_path ? `<a class="text-gold-300 underline" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.age_verification_proof_path)}">View file</a>` : (String(student.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A')}</span></p>
                         </div>
@@ -6810,7 +6937,7 @@ async function openPaymentModal(studentId, options = {}) {
             const student = data.student;
             const registrationSource = String(options.forceSource || student.registration_source || '').toLowerCase() === 'walkin' ? 'walkin' : 'online';
             currentPaymentSource = registrationSource;
-            const remaining = parseFloat(student.registration_fee_amount || 0) - parseFloat(student.registration_fee_paid || 0);
+            const remaining = getWalkInRegistrationRemainingAmount(student);
             const payments = Array.isArray(data.payments) ? data.payments : [];
             const receiptPayment = payments.find(payment => String(payment.status || '').toLowerCase() === 'pending')
                 || payments.find(payment => Number(payment.amount || 0) > 0)

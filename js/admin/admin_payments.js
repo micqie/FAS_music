@@ -16,6 +16,11 @@ function setText(id, value) {
     if (el) el.textContent = value;
 }
 
+function getWalkInRegistrationDisplayStatus(row) {
+    const status = String(row?.registration_status || 'Pending').trim() || 'Pending';
+    return status;
+}
+
 const paymentPaginationState = {
     largestBalances: 1,
     enrollmentTable: 1,
@@ -139,12 +144,16 @@ function normalizeRegistrations(registrations, branchMap) {
         const branch = branchMap.get(branchId);
         const registrationTotal = Number(row.registration_fee_amount || 1000);
         const registrationPaid = Number(row.registration_fee_paid || 0);
-        const registrationBalance = Math.max(0, registrationTotal - registrationPaid);
+        const registrationSource = String(row.registration_source || 'online').toLowerCase();
+        const registrationStatus = String(row.registration_status || 'Pending').trim() || 'Pending';
+        const registrationBalance = registrationSource === 'walkin' && ['Approved', 'Fee Paid', 'Active'].includes(registrationStatus)
+            ? 0
+            : Math.max(0, registrationTotal - registrationPaid);
         return {
             ...row,
             branch_id: branchId,
             branch_name: row.branch_name || branch?.branch_name || 'Unassigned Branch',
-            registration_source: row.registration_source || 'online',
+            registration_source: registrationSource,
             registration_total: registrationTotal,
             registration_paid: registrationPaid,
             registration_balance: registrationBalance
@@ -538,6 +547,7 @@ function renderRegistrationTable(registrations) {
     body.innerHTML = visibleRows.map(row => {
         const studentName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Student';
         const sourceLabel = String(row.registration_source || 'online').toLowerCase() === 'walkin' ? 'Walk-In' : 'Online';
+        const displayStatus = getWalkInRegistrationDisplayStatus(row);
         return `
             <tr class="hover:bg-slate-50/80 transition">
                 <td class="px-6 py-4">
@@ -547,7 +557,7 @@ function renderRegistrationTable(registrations) {
                 <td class="px-6 py-4 text-sm text-slate-700">${escapeHtml(row.branch_name || '—')}</td>
                 <td class="px-6 py-4 text-sm text-slate-700">${renderPill(sourceLabel, sourceLabel)}</td>
                 <td class="px-6 py-4 text-sm font-semibold text-emerald-700">${formatCurrencyPHP(row.registration_paid || 0)}</td>
-                <td class="px-6 py-4 text-sm">${renderPill(row.registration_status || 'Pending', row.registration_status || 'Pending')}</td>
+                <td class="px-6 py-4 text-sm">${renderPill(displayStatus, displayStatus)}</td>
                 <td class="px-6 py-4 text-sm text-slate-600">${formatDateLabel(row.created_at)}</td>
             </tr>
         `;
