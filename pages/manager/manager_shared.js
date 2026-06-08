@@ -1,10 +1,15 @@
 (() => {
+    const shellRole = String(document.body?.dataset?.shellRole || 'manager').toLowerCase();
+    const displayRoleName = shellRole === 'desk'
+        ? 'Desk Staff'
+        : 'Branch Manager';
+
     const PROFILE_HTML = `
         <div class="px-4 mb-4">
             <div class="flex justify-center">
                 <i class="fas fa-user-circle fa-6x text-gold-400"></i>
             </div>
-            <p class="manager-shell-name text-center text-white font-semibold text-sm mt-3">Manager Name</p>
+            <p class="manager-shell-name text-center text-white font-semibold text-sm mt-3">${displayRoleName} Name</p>
             <p class="manager-shell-email text-center text-slate-400 text-xs mt-1">email@example.com</p>
             <p class="text-center text-slate-500 text-xs font-bold tracking-wider mt-2">
                 <span class="uppercase">Branch:</span>
@@ -27,7 +32,7 @@
     }
 
     function updateUserLabels(displayName) {
-        const value = displayName || 'Manager';
+        const value = displayName || displayRoleName;
         document.querySelectorAll(
             '#managerNameNav, #userNameNav, #profileMenuName, .manager-shell-name'
         ).forEach((node) => setText(node, value));

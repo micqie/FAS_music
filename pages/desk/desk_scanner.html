@@ -27,8 +27,17 @@
         <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden lg:flex flex-col">
             <div class="desk-sidebar-brand px-2 pb-4 mb-3 border-b border-white/10">
                 <a href="desk_scanner.html" class="inline-flex h-10 items-center" aria-label="Father & Sons Music home">
-                    <img src="../../assets/fas-logo.png" alt="Father & Sons Music" class="h-full w-auto brightness-200">
+                        <div class="flex flex-col items-center  justify-center py-8 ml-6">
+    <img src="../../assets/fas-logo.png"
+         alt="Father & Sons Music"
+         class="h-14 w-auto object-contain">
+</div>
                 </a>
+                <div id="deskTopNavBranch" class="desk-topnav-branch inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200 w-fit mt-3">
+                    Branch:
+                    <i class="fas fa-location-dot text-gold-400"></i>
+                    <span id="deskTopNavBranchName">—</span>
+                </div>
             </div>
             <nav class="desk-sidebar-nav overflow-x-hidden space-y-1.5">
                 <a href="desk_attendance.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
@@ -49,11 +58,11 @@
                 <a href="desk_registration.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
                     <i class="fas fa-id-card text-slate-400"></i> Registrations
                 </a>
-                <a href="../manager/manager_featured_posts.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <a href="desk_featured_posts.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
                     <i class="fas fa-photo-film text-slate-400"></i> Featured Posts
                 </a>
             </nav>
-      
+
         </aside>
 
         <div class="flex-1 flex flex-col min-w-0">

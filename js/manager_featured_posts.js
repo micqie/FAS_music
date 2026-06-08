@@ -2,6 +2,11 @@ function initManagerFeaturedPosts() {
     const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
     const role = String(user?.role_name || '').toLowerCase();
     const allowedRoles = ['staff', 'desk', 'front desk', 'manager', 'branch manager', 'admin'];
+    const pageRole = String(document.body?.dataset?.featuredPostsRole || 'manager').toLowerCase();
+    const roleLabel = pageRole === 'desk' ? 'Desk Staff' : 'Branch Manager';
+    const studioLabel = pageRole === 'desk' ? 'Desk Content Studio' : 'Featured Content Studio';
+    const pageTitleLabel = pageRole === 'desk' ? 'Desk Featured Posts' : 'Featured Posts';
+    const listScope = pageRole === 'desk' ? 'desk' : 'manager';
 
     if (!user || !allowedRoles.includes(role)) {
         if (typeof Swal !== 'undefined') {
@@ -177,7 +182,7 @@ function initManagerFeaturedPosts() {
     const loadPosts = async () => {
         clearMessage('list');
         try {
-            const response = await axios.get(`${baseApiUrl}/featured_posts.php?action=list-editor&user_id=${encodeURIComponent(user.user_id)}`);
+            const response = await axios.get(`${baseApiUrl}/featured_posts.php?action=list-editor&user_id=${encodeURIComponent(user.user_id)}&scope=${encodeURIComponent(listScope)}`);
             const data = response.data || {};
             if (response.status === 200 && data.success) {
                 renderPosts(Array.isArray(data.posts) ? data.posts : []);
@@ -302,12 +307,44 @@ function initManagerFeaturedPosts() {
 
     resetButton?.addEventListener('click', resetForm);
 
-    setText('managerNameNav', user.username || user.email || 'Manager');
-    setText('profileMenuName', user.username || user.email || 'Manager');
+    setText('managerNameNav', user.username || user.email || roleLabel);
+    setText('profileMenuName', user.username || user.email || roleLabel);
     setText('managerBranchName', branchName);
     setText('profileMenuBranch', branchName);
     if (window.syncManagerShell) {
-        window.syncManagerShell(user.username || user.email || 'Manager', branchName);
+        window.syncManagerShell(user.username || user.email || roleLabel, branchName, user.email);
+    }
+
+    const titleNode = document.querySelector('title');
+    if (titleNode) {
+        titleNode.textContent = `${pageTitleLabel} | Father & Sons`;
+    }
+
+    const heroBadge = document.querySelector('[data-featured-page-badge]');
+    if (heroBadge) {
+        heroBadge.textContent = studioLabel;
+    }
+
+    const heroTitle = document.querySelector('[data-featured-page-title]');
+    if (heroTitle) {
+        heroTitle.textContent = pageRole === 'desk' ? 'Create Desk Featured Posts' : 'Create Featured Posts';
+    }
+
+    const heroDescription = document.querySelector('[data-featured-page-description]');
+    if (heroDescription) {
+        heroDescription.textContent = pageRole === 'desk'
+            ? 'Desk staff can publish photo or video updates that appear on the public Featured page.'
+            : 'Staff and branch managers can publish photo or video updates that appear on the public Featured page.';
+    }
+
+    const editorHeading = document.querySelector('[data-featured-editor-heading]');
+    if (editorHeading) {
+        editorHeading.textContent = pageRole === 'desk' ? 'Add a Desk Update' : 'Add a Photo or Video';
+    }
+
+    const feedHeading = document.querySelector('[data-featured-feed-heading]');
+    if (feedHeading) {
+        feedHeading.textContent = pageRole === 'desk' ? 'Desk Feed' : 'Branch Feed';
     }
 
     loadPosts();

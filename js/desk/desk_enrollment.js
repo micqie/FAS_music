@@ -1642,7 +1642,7 @@
 
         function renderEnrollmentDetailCard(label, value, iconClass, valueClass = 'text-slate-900') {
             return `
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
                     <div class="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">
                         <i class="fas ${iconClass} text-gold-500/90"></i>
                         ${escapeHtml(label)}
@@ -1652,7 +1652,34 @@
             `;
         }
 
-        function openEnrollmentDetailsModal(enrollmentId) {
+        async function getEnrollmentSessionProgress(student) {
+            const totalSessions = Math.max(0, Number(student?.sessions || 0));
+            const studentId = Number(student?.student_id || 0);
+
+            if (!studentId) {
+                return { used: 0, total: totalSessions };
+            }
+
+            try {
+                const summary = await fetchAttendanceSummary(studentId);
+                const presentCount = Number(summary?.summary?.present_count || 0);
+                const lateCount = Number(summary?.summary?.late_count || 0);
+                const used = Math.min(totalSessions, presentCount + lateCount);
+                return { used, total: totalSessions };
+            } catch (error) {
+                console.error('Failed to load attendance summary for enrollment modal:', error);
+                return { used: 0, total: totalSessions };
+            }
+        }
+
+        function formatDateOnly(dateString) {
+            if (!dateString) return '—';
+            const isYmd = /^\d{4}-\d{2}-\d{2}$/.test(String(dateString));
+            const date = new Date(isYmd ? `${dateString}T00:00:00` : dateString);
+            return Number.isNaN(date.getTime()) ? dateString : date.toLocaleDateString();
+        }
+
+        async function openEnrollmentDetailsModal(enrollmentId) {
             const student = allStudents.find(row => Number(row.enrollment_id) === Number(enrollmentId));
             if (!student) {
                 showMessage('Enrollment details not found.', 'error');
@@ -1662,16 +1689,18 @@
             const totalAmount = Number(student.total_amount || 0);
             const paidAmount = Number(student.paid_amount || 0);
             const balance = Math.max(0, totalAmount - paidAmount);
+            const sessionProgress = await getEnrollmentSessionProgress(student);
+            const sessionPercent = sessionProgress.total > 0
+                ? Math.min(100, Math.round((sessionProgress.used / sessionProgress.total) * 100))
+                : 0;
             const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
             const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
             const packageName = escapeHtml(student.package_name || '—');
             const branchName = escapeHtml(student.branch_name || '—');
             const paymentType = escapeHtml(student.payment_type || '—');
-            const sessionsCount = Number(student.sessions || 0) || '—';
-            const roomName = escapeHtml(student.assigned_room || '—');
             const hasFirstSession = Boolean(student.first_session_date);
             const firstSession = hasFirstSession
-                ? `${new Date(student.first_session_date).toLocaleDateString()} • ${formatTime12Hour(student.first_start_time)} - ${formatTime12Hour(student.first_end_time)}`
+                ? formatDateOnly(student.first_session_date)
                 : 'No session scheduled yet';
             const balanceCardClass = balance > 0
                 ? 'border-red-200 bg-red-50/80'
@@ -1680,7 +1709,7 @@
 
             Swal.fire({
                 title: 'Enrollment Details',
-                width: 780,
+                width: 860,
                 confirmButtonText: 'Close',
                 confirmButtonColor: '#b8860b',
                 customClass: {
@@ -1690,58 +1719,69 @@
                 },
                 html: `
                     <div class="text-left space-y-4 text-sm text-slate-700">
-                        <div class="rounded-2xl border border-slate-200 px-5 py-4 text-white shadow-sm" style="background: linear-gradient(135deg, #0b0f18 0%, #1a1d23 100%);">
-                            <div class="flex items-center gap-4">
-                                <div class="h-12 w-12 shrink-0 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center">
+                        <div class="rounded-[1.75rem] border border-slate-200 px-5 py-5 text-white shadow-sm" style="background: linear-gradient(135deg, #0b0f18 0%, #1a1d23 100%);">
+                            <div class="flex items-start gap-4">
+                                <div class="h-12 w-12 shrink-0 rounded-2xl bg-gold-500/20 text-gold-400 flex items-center justify-center">
                                     <i class="fas fa-user-graduate text-lg"></i>
                                 </div>
-                                <div class="min-w-0 text-left">
+                                <div class="min-w-0 flex-1 text-left">
                                     <div class="text-[10px] uppercase tracking-[0.24em] text-gold-400 font-bold">Active Enrollment</div>
-                                    <div class="mt-1 text-xl font-black truncate">${studentName}</div>
-                                    <div class="mt-1 text-sm text-slate-300">${packageName} <span class="text-slate-500">•</span> ${branchName}</div>
+                                    <div class="mt-1 text-2xl font-black truncate">${studentName}</div>
+                                    <div class="mt-2 text-sm text-slate-300">${packageName} <span class="text-slate-500">•</span> ${branchName}</div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
-                                <div class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">Enrollment Fee</div>
-                                <div class="mt-2 text-base font-bold text-slate-900">${formatCurrencyPHP(totalAmount)}</div>
+                        <div class="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <div class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">Attendance Progress</div>
+                                    <div class="mt-2 flex items-end gap-2">
+                                        <span class="text-3xl font-black text-slate-900">${sessionProgress.used}</span>
+                                        <span class="pb-1 text-sm font-semibold text-slate-500">/ ${sessionProgress.total}</span>
+                                    </div>
+                                </div>
+                                <div class="text-sm font-semibold text-slate-600">
+                                    ${sessionPercent}% complete
+                                </div>
                             </div>
-                            <div class="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-left">
-                                <div class="text-[10px] uppercase tracking-[0.2em] text-emerald-700 font-bold">Paid</div>
-                                <div class="mt-2 text-base font-bold text-emerald-700">${formatCurrencyPHP(paidAmount)}</div>
+                            <div class="h-3 rounded-full bg-slate-100 overflow-hidden">
+                                <div class="h-full rounded-full bg-gradient-to-r from-gold-500 to-amber-400" style="width: ${sessionPercent}%;"></div>
                             </div>
-                            <div class="rounded-xl border ${balanceCardClass} px-4 py-3 text-left">
-                                <div class="text-[10px] uppercase tracking-[0.2em] ${balance > 0 ? 'text-red-600' : 'text-slate-500'} font-bold">Balance</div>
-                                <div class="mt-2 text-base font-bold ${balanceValueClass}">${formatCurrencyPHP(balance)}</div>
+                        </div>
+
+                        <div class="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">Payment</div>
+                                <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">${paymentType}</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-left shadow-sm">
+                                    <div class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">Enrollment Fee</div>
+                                    <div class="mt-2 text-base font-bold text-slate-900">${formatCurrencyPHP(totalAmount)}</div>
+                                </div>
+                                <div class="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-left shadow-sm">
+                                    <div class="text-[10px] uppercase tracking-[0.2em] text-emerald-700 font-bold">Paid</div>
+                                    <div class="mt-2 text-base font-bold text-emerald-700">${formatCurrencyPHP(paidAmount)}</div>
+                                </div>
+                                <div class="rounded-2xl border ${balanceCardClass} px-4 py-4 text-left shadow-sm">
+                                    <div class="text-[10px] uppercase tracking-[0.2em] ${balance > 0 ? 'text-red-600' : 'text-slate-500'} font-bold">Balance</div>
+                                    <div class="mt-2 text-base font-bold ${balanceValueClass}">${formatCurrencyPHP(balance)}</div>
+                                </div>
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            ${renderEnrollmentDetailCard('Branch', branchName, 'fa-location-dot')}
-                            ${renderEnrollmentDetailCard('Sessions', escapeHtml(String(sessionsCount)), 'fa-layer-group')}
                             ${renderEnrollmentDetailCard('Teacher', teacherName, 'fa-chalkboard-user')}
-                            ${renderEnrollmentDetailCard('Room', roomName, 'fa-door-open')}
-                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2">
-                                <div class="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">
-                                    <i class="fas fa-credit-card text-gold-500/90"></i>
-                                    Payment Type
-                                </div>
-                                <div class="mt-2">
-                                    <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">${paymentType}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="rounded-xl border ${hasFirstSession ? 'border-blue-200 bg-blue-50/80' : 'border-dashed border-slate-200 bg-slate-50'} px-4 py-3 text-left">
-                            <div class="flex items-start gap-3">
-                                <div class="h-9 w-9 shrink-0 rounded-lg ${hasFirstSession ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-500'} flex items-center justify-center">
-                                    <i class="fas fa-calendar-check"></i>
-                                </div>
-                                <div>
-                                    <div class="text-[10px] uppercase tracking-[0.2em] ${hasFirstSession ? 'text-blue-700' : 'text-slate-500'} font-bold">First Scheduled Session</div>
-                                    <div class="mt-2 text-sm font-semibold ${hasFirstSession ? 'text-slate-900' : 'text-slate-500'}">${escapeHtml(firstSession)}</div>
+                            <div class="rounded-2xl border ${hasFirstSession ? 'border-blue-200 bg-blue-50/80' : 'border-dashed border-slate-200 bg-slate-50'} px-4 py-4 text-left shadow-sm md:col-span-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="h-10 w-10 shrink-0 rounded-xl ${hasFirstSession ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-500'} flex items-center justify-center">
+                                        <i class="fas fa-calendar-day"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-[10px] uppercase tracking-[0.2em] ${hasFirstSession ? 'text-blue-700' : 'text-slate-500'} font-bold">Start Date</div>
+                                        <div class="mt-1 text-sm font-semibold ${hasFirstSession ? 'text-slate-900' : 'text-slate-500'}">${escapeHtml(firstSession)}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

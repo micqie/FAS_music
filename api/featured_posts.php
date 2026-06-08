@@ -247,6 +247,7 @@ class FeaturedPosts
             'featured_post_id' => (int)($row['featured_post_id'] ?? 0),
             'branch_id' => isset($row['branch_id']) ? (int)$row['branch_id'] : null,
             'branch_name' => $row['branch_name'] ?? null,
+            'created_by_role_name' => trim((string)($row['created_by_role_name'] ?? '')),
             'title' => $row['title'] ?? '',
             'category' => $row['category'] ?? '',
             'content' => $row['content'] ?? '',
@@ -286,19 +287,28 @@ class FeaturedPosts
     {
         $editor = $this->getEditorContext($userId);
         $isAdmin = $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
+        $scope = $this->normalizeRole($_GET['scope'] ?? '');
         $params = [];
-        $where = '';
+        $where = [];
         if (!$isAdmin) {
-            $where = 'WHERE fp.branch_id = ?';
+            $where[] = 'fp.branch_id = ?';
             $params[] = (int)($editor['branch_id'] ?? 0);
         }
+        if ($scope === 'desk') {
+            $where[] = "LOWER(r_creator.role_name) IN ('staff', 'desk', 'front desk')";
+        } elseif ($scope === 'manager') {
+            $where[] = "LOWER(r_creator.role_name) IN ('manager', 'branch manager', 'admin')";
+        }
+        $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
         $stmt = $this->conn->prepare("
             SELECT fp.*, b.branch_name,
+                   r_creator.role_name AS created_by_role_name,
                    CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS created_by_name
             FROM tbl_featured_posts fp
             LEFT JOIN tbl_branches b ON b.branch_id = fp.branch_id
             LEFT JOIN tbl_users u ON u.user_id = fp.created_by_user_id
-            {$where}
+            LEFT JOIN tbl_roles r_creator ON r_creator.role_id = u.role_id
+            {$whereSql}
             ORDER BY fp.created_at DESC, fp.featured_post_id DESC
         ");
         $stmt->execute($params);
