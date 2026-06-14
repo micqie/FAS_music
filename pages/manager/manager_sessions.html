@@ -231,12 +231,6 @@
                                 <label class="block text-sm font-semibold text-slate-700 mb-1">Date *</label>
                                 <input type="date" id="scheduleDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
                             </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">Room / Location</label>
-                                <select id="scheduleRoom" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                                    <option value="">Select room...</option>
-                                </select>
-                            </div>
                         </div>
                         <input type="hidden" id="scheduleStart" value="09:00">
                         <input type="hidden" id="scheduleEnd" value="10:00">
@@ -355,23 +349,15 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Room / Location</label>
-                        <select id="assignRequestRoom" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            <option value="">Select room...</option>
-                        </select>
-                    </div>
-                    <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Notes</label>
                         <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
                     </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Instructor Availability</label>
+                        <div id="assignRequestAvailabilityHint" class="text-xs text-slate-500 mt-1">Choose an instructor to see their available one-hour slots and avoid conflicts.</div>
+                    </div>
                 </div>
                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:p-5">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700">Instructor Availability</label>
-                            <div id="assignRequestAvailabilityHint" class="text-xs text-slate-500 mt-1">Choose an instructor to see their available one-hour slots and avoid conflicts.</div>
-                        </div>
-                    </div>
                     <div id="assignRequestAvailabilityList" class="mt-3 space-y-2 max-h-[52vh] overflow-y-auto pr-1">
                         <div class="text-sm text-slate-500">No instructor selected yet.</div>
                     </div>
@@ -1297,20 +1283,8 @@
             }
         }
 
-        async function populateAssignRoomDropdown(req) {
-            const roomEl = document.getElementById('assignRequestRoom');
-            if (!roomEl) return;
-
-            roomEl.innerHTML = '<option value="">Select room...</option>';
-            const rooms = await fetchRoomsForBranch(req?.branch_id || 0);
-            if (!rooms.length) {
-                roomEl.innerHTML = '<option value="">No available rooms in this branch</option>';
-                return;
-            }
-            roomEl.innerHTML = '<option value="">Select room...</option>' + rooms.map(room => {
-                const label = `${escapeHtml(room.room_name || 'Room')} (${escapeHtml(room.room_type || 'Room')}, cap ${Number(room.capacity || 1)})`;
-                return `<option value="${escapeHtml(room.room_name || '')}">${label}</option>`;
-            }).join('');
+        async function populateAssignRoomDropdown() {
+            return;
         }
 
         async function loadPendingRequests() {
@@ -1784,7 +1758,6 @@
 
         function applyAssignRequestAvailabilitySlot(sessionDate, dayOfWeek, startTime, endTime) {
             const dateEl = document.getElementById('assignRequestDate');
-            const roomEl = document.getElementById('assignRequestRoom');
             if (dateEl) dateEl.value = sessionDate || '';
             const container = document.getElementById('assignRequestSlotsContainer');
             if (container) {
@@ -1801,9 +1774,7 @@
                     if (endInput) endInput.value = String(endTime || '').slice(0, 5);
                 }
             }
-            if (roomEl && roomEl.value) {
-                loadAssignRequestAvailability();
-            }
+            loadAssignRequestAvailability();
         }
 
         async function loadAssignRequestAvailability() {
@@ -1811,7 +1782,6 @@
             const hintEl = document.getElementById('assignRequestAvailabilityHint');
             const teacherId = Number(document.getElementById('assignRequestTeacherSelect')?.value || 0);
             const startDate = document.getElementById('assignRequestDate')?.value || '';
-            const roomName = document.getElementById('assignRequestRoom')?.value || '';
             if (!listEl || !hintEl) return;
 
             if (!activeAssignRequest || !teacherId) {
@@ -1830,7 +1800,6 @@
             try {
                 let url = `${baseApiUrl}/students.php?action=get-teacher-available-slots&teacher_id=${encodeURIComponent(teacherId)}&branch_id=${encodeURIComponent(activeAssignRequest.branch_id || managerBranchId || 0)}&student_id=${encodeURIComponent(activeAssignRequest.student_id || 0)}`;
                 if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
-                if (roomName) url += `&room_name=${encodeURIComponent(roomName)}`;
                 const response = await axios.get(url);
                 const data = response.data || {};
                 renderAssignRequestAvailability(Array.isArray(data.slots) ? data.slots : [], startDate);
@@ -1859,10 +1828,9 @@
             const teacherHelp = document.getElementById('assignRequestTeacherSearchHelp');
             const dateEl = document.getElementById('assignRequestDate');
             const slotsContainer = document.getElementById('assignRequestSlotsContainer');
-            const roomEl = document.getElementById('assignRequestRoom');
             const notesEl = document.getElementById('assignRequestNotes');
 
-            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !roomEl || !notesEl) return;
+            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !notesEl) return;
 
             activeAssignRequest = req;
             assignRequestAvailabilitySlots = [];
@@ -1906,8 +1874,6 @@
                 start_time: '',
                 end_time: ''
             });
-            await populateAssignRoomDropdown(req);
-            roomEl.value = '';
             notesEl.value = '';
             await loadAssignRequestAvailability();
 
@@ -1948,7 +1914,6 @@
             const assignedDate = document.getElementById('assignRequestDate')?.value || '';
             const todayYmd = getTodayInputDate();
             const assignedSlots = collectAssignRequestSlots();
-            const assignedRoom = document.getElementById('assignRequestRoom')?.value?.trim() || '';
             const adminNotes = document.getElementById('assignRequestNotes')?.value?.trim() || '';
 
             if (!requestId || !teacherId || !assignedDate || !assignedSlots.length) {
@@ -1971,7 +1936,6 @@
                 teacher_id: teacherId,
                 assigned_date: assignedDate,
                 assigned_slots: assignedSlots,
-                assigned_room: assignedRoom,
                 admin_notes: adminNotes,
                 branch_id: managerBranchId
             });
@@ -2134,22 +2098,8 @@
             }).join('');
         }
 
-        async function populateScheduleRoomDropdown(branchId, selectedRoomName = '') {
-            const roomSelect = document.getElementById('scheduleRoom');
-            if (!roomSelect) return;
-
-            const rooms = await fetchRoomsForBranch(branchId);
-            if (!rooms.length) {
-                roomSelect.innerHTML = '<option value="">No available rooms in this branch</option>';
-                return;
-            }
-
-            roomSelect.innerHTML = '<option value="">Select room...</option>' + rooms.map(room => {
-                const roomName = String(room.room_name || '').trim();
-                const label = `${escapeHtml(roomName || 'Room')} (${escapeHtml(room.room_type || 'Room')}, cap ${Number(room.capacity || 1)})`;
-                const selectedAttr = selectedRoomName && roomName === selectedRoomName ? ' selected' : '';
-                return `<option value="${escapeHtml(roomName)}"${selectedAttr}>${label}</option>`;
-            }).join('');
+        async function populateScheduleRoomDropdown() {
+            return;
         }
 
         function openSessionScheduleModal(enrollmentId, options = {}) {
@@ -2164,7 +2114,6 @@
             const sessionInput = document.getElementById('scheduleSessionNumber');
             const teacherInput = document.getElementById('scheduleTeacher');
             const teacherLabel = document.getElementById('scheduleTeacherLabel');
-            const roomSelect = document.getElementById('scheduleRoom');
             if (!modal || !body || !meta) return;
 
             const row = allStudents.find(r => Number(r.enrollment_id) === Number(enrollmentId));
@@ -2189,7 +2138,6 @@
                     const slotHtml = slotHistory.length
                         ? slotHistory.map(slot => {
                             const dateText = slot?.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
-                            const roomText = slot?.room_name ? ` • ${escapeHtml(slot.room_name)}` : '';
                             const slotTeacherName = slot?.teacher_first_name || slot?.teacher_last_name
                                 ? `${escapeHtml(slot.teacher_first_name || '')} ${escapeHtml(slot.teacher_last_name || '')}`.trim()
                                 : '';
@@ -2198,7 +2146,7 @@
                             const slotDateMs = slot?.session_date ? new Date(`${slot.session_date}T00:00:00`).setHours(0, 0, 0, 0) : NaN;
                             const editableThisSlot = normalizedStatus === 'scheduled' && !Number.isNaN(slotDateMs) && slotDateMs >= todayMs;
                             const editBtn = editableThisSlot
-                                ? `<button type="button" class="edit-schedule-btn ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold shadow-sm transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}" data-room-name="${escapeHtml(slot?.room_name || '')}"><i class="fas fa-pen"></i><span>Edit Schedule</span></button>`
+                                ? `<button type="button" class="edit-schedule-btn ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold shadow-sm transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}"><i class="fas fa-pen"></i><span>Edit Schedule</span></button>`
                                 : '';
                             const rescheduleBtn = editableThisSlot && Number(slot?.session_id || 0) > 0
                                 ? `<button type="button" class="reschedule-session-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-sky-500 hover:bg-sky-600 text-white text-[11px] font-bold shadow-sm transition" data-session-id="${Number(slot?.session_id || 0)}"><i class="fas fa-calendar-day"></i><span>Reschedule</span></button>`
@@ -2256,13 +2204,10 @@
             const assignedTeacherName = `${escapeHtml(row.teacher_first_name || '')} ${escapeHtml(row.teacher_last_name || '')}`.trim() || 'No fixed teacher assigned';
             if (teacherInput) teacherInput.value = String(Number(row.assigned_teacher_id || 0));
             if (teacherLabel) teacherLabel.value = assignedTeacherName;
-            if (roomSelect) roomSelect.innerHTML = '<option value="">Loading rooms...</option>';
             if (dateInput) dateInput.value = '';
             if (startInput) startInput.value = String(row.fixed_start_time || '09:00').slice(0, 5);
             if (endInput) endInput.value = String(row.fixed_end_time || '10:00').slice(0, 5);
             if (saveBtn) saveBtn.textContent = 'Save Session';
-
-            populateScheduleRoomDropdown(row.branch_id, row.assigned_room || '');
 
             const editButtons = Array.from(body.querySelectorAll('.edit-schedule-btn'));
             editButtons.forEach((btn) => {
@@ -2275,7 +2220,6 @@
                     startInput.value = (btn.dataset.startTime || '09:00:00').slice(0, 5);
                     endInput.value = (btn.dataset.endTime || '10:00:00').slice(0, 5);
                     if (saveBtn) saveBtn.textContent = `Update Session ${btn.dataset.sessionNumber || ''}`;
-                    await populateScheduleRoomDropdown(row.branch_id, btn.dataset.roomName || '');
                     form.classList.remove('hidden');
                     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 });
@@ -2387,7 +2331,6 @@
             const startTime = document.getElementById('scheduleStart')?.value || '';
             const endTime = document.getElementById('scheduleEnd')?.value || '';
             const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
-            const roomName = document.getElementById('scheduleRoom')?.value || '';
             const editExisting = document.getElementById('scheduleEditExisting')?.value === '1';
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
             const editorRole = String(user?.role_name || '');
@@ -2405,7 +2348,6 @@
                     start_time: startTime,
                     end_time: endTime,
                     teacher_id: teacherId,
-                    room_name: roomName,
                     edit_existing: editExisting,
                     branch_id: managerBranchId || undefined,
                     editor_role: editorRole || undefined
@@ -2598,7 +2540,6 @@
             }
             document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
             document.getElementById('assignRequestDate')?.addEventListener('change', () => loadAssignRequestAvailability());
-            document.getElementById('assignRequestRoom')?.addEventListener('change', loadAssignRequestAvailability);
         });
     </script>
 </body>

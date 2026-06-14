@@ -1686,105 +1686,176 @@
                 return;
             }
 
-            const totalAmount = Number(student.total_amount || 0);
-            const paidAmount = Number(student.paid_amount || 0);
-            const balance = Math.max(0, totalAmount - paidAmount);
+            const totalAmount    = Number(student.total_amount || 0);
+            const paidAmount     = Number(student.paid_amount  || 0);
+            const balance        = Math.max(0, totalAmount - paidAmount);
             const sessionProgress = await getEnrollmentSessionProgress(student);
-            const sessionPercent = sessionProgress.total > 0
+            const sessionPercent  = sessionProgress.total > 0
                 ? Math.min(100, Math.round((sessionProgress.used / sessionProgress.total) * 100))
                 : 0;
+
             const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
-            const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
             const packageName = escapeHtml(student.package_name || '—');
-            const branchName = escapeHtml(student.branch_name || '—');
+            const branchName  = escapeHtml(student.branch_name  || '—');
             const paymentType = escapeHtml(student.payment_type || '—');
+
             const hasFirstSession = Boolean(student.first_session_date);
-            const firstSession = hasFirstSession
-                ? formatDateOnly(student.first_session_date)
-                : 'No session scheduled yet';
-            const balanceCardClass = balance > 0
-                ? 'border-red-200 bg-red-50/80'
-                : 'border-slate-200 bg-slate-50';
+            const firstSession    = hasFirstSession ? formatDateOnly(student.first_session_date) : 'No session scheduled yet';
+
+            const balanceCardClass  = balance > 0 ? 'border-red-200 bg-red-50/80' : 'border-slate-200 bg-slate-50';
             const balanceValueClass = balance > 0 ? 'text-red-600' : 'text-slate-900';
+
+            // ── Build teacher list from schedule_slots (one slot per instrument/teacher) ──
+            const slots       = Array.isArray(student.schedule_slots)  ? student.schedule_slots  : [];
+            const sessionList = Array.isArray(student.sessions_list)   ? student.sessions_list   : [];
+
+            // Build a teacher_id → name map from sessions_list (has joined teacher names)
+            const teacherNameMap = {};
+            sessionList.forEach(s => {
+                const tid   = Number(s.teacher_id || 0);
+                const tName = `${String(s.teacher_first_name || '').trim()} ${String(s.teacher_last_name || '').trim()}`.trim();
+                if (tid > 0 && tName && !teacherNameMap[tid]) {
+                    teacherNameMap[tid] = tName;
+                }
+            });
+
+            // Collect unique teachers from slots
+            let teacherRows = [];
+            if (slots.length > 0) {
+                const seen = new Set();
+                slots.forEach(slot => {
+                    const tid  = Number(slot.teacher_id || 0);
+                    const tName = teacherNameMap[tid]
+                        || `${String(slot.teacher_first_name || slot.first_name || '').trim()} ${String(slot.teacher_last_name || slot.last_name || '').trim()}`.trim()
+                        || (tid > 0 ? `Teacher #${tid}` : '—');
+                    const day  = escapeHtml(slot.day_of_week || '');
+                    const time = slot.start_time
+                        ? `${formatTime12Hour(slot.start_time)} – ${formatTime12Hour(slot.end_time)}`
+                        : '';
+                    const key = `${tid}|${day}|${slot.start_time}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        teacherRows.push({ name: tName, instrument: '', day, time });
+                    }
+                });
+            }
+
+            // If no slots, fall back to the single teacher from the enrollment row
+            if (teacherRows.length === 0) {
+                const fallback = `${String(student.teacher_first_name || '').trim()} ${String(student.teacher_last_name || '').trim()}`.trim();
+                teacherRows.push({ name: fallback || '—', instrument: '', day: '', time: '' });
+            }
+
+            // ── Render teacher cards ──
+            const teacherCardsHtml = teacherRows.map((t, idx) => `
+                <div class="flex items-start gap-3 px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50">
+                    <div class="h-9 w-9 shrink-0 rounded-xl bg-gold-100 text-gold-600 flex items-center justify-center mt-0.5">
+                        <i class="fas fa-chalkboard-user text-sm"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 mb-0.5">
+                            ${teacherRows.length > 1 ? `Teacher ${idx + 1}` : 'Assigned Teacher'}
+                        </p>
+                        <p class="text-sm font-bold text-slate-900">${escapeHtml(t.name)}</p>
+                        ${t.day || t.time ? `<p class="text-xs text-slate-500 mt-0.5">${[t.day, t.time].filter(Boolean).map(v => escapeHtml(v)).join(' · ')}</p>` : ''}
+                    </div>
+                </div>
+            `).join('');
 
             Swal.fire({
                 title: 'Enrollment Details',
                 width: 860,
-                confirmButtonText: 'Close',
+                confirmButtonText: 'Close Details',
                 confirmButtonColor: '#b8860b',
                 customClass: {
                     popup: 'enrollment-details-popup',
                     title: 'text-xl font-black tracking-tight text-slate-900',
-                    htmlContainer: 'px-1'
+                    htmlContainer: 'px-1',
+                    confirmButton: 'rounded-2xl px-8 py-3 text-sm font-bold'
                 },
                 html: `
                     <div class="text-left space-y-4 text-sm text-slate-700">
-                        <div class="rounded-[1.75rem] border border-slate-200 px-5 py-5 text-white shadow-sm" style="background: linear-gradient(135deg, #0b0f18 0%, #1a1d23 100%);">
+
+                        <!-- ── Hero card ── -->
+                        <div class="rounded-[1.75rem] px-5 py-5 text-white shadow-sm" style="background: linear-gradient(135deg, #0b0f18 0%, #1a1d23 100%);">
                             <div class="flex items-start gap-4">
                                 <div class="h-12 w-12 shrink-0 rounded-2xl bg-gold-500/20 text-gold-400 flex items-center justify-center">
                                     <i class="fas fa-user-graduate text-lg"></i>
                                 </div>
-                                <div class="min-w-0 flex-1 text-left">
-                                    <div class="text-[10px] uppercase tracking-[0.24em] text-gold-400 font-bold">Active Enrollment</div>
-                                    <div class="mt-1 text-2xl font-black truncate">${studentName}</div>
-                                    <div class="mt-2 text-sm text-slate-300">${packageName} <span class="text-slate-500">•</span> ${branchName}</div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="inline-flex items-center gap-1.5 rounded-full bg-gold-500/20 border border-gold-500/30 px-2.5 py-0.5 mb-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gold-400 inline-block"></span>
+                                        <span class="text-[10px] uppercase tracking-[0.24em] text-gold-400 font-bold">Active Enrollment</span>
+                                    </div>
+                                    <div class="text-2xl font-black truncate">${studentName}</div>
+                                    <div class="mt-1.5 text-sm text-slate-300">${packageName} <span class="text-slate-500">•</span> ${branchName}</div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm space-y-4">
-                            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                                <div>
-                                    <div class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">Attendance Progress</div>
-                                    <div class="mt-2 flex items-end gap-2">
-                                        <span class="text-3xl font-black text-slate-900">${sessionProgress.used}</span>
-                                        <span class="pb-1 text-sm font-semibold text-slate-500">/ ${sessionProgress.total}</span>
-                                    </div>
-                                </div>
-                                <div class="text-sm font-semibold text-slate-600">
-                                    ${sessionPercent}% complete
-                                </div>
+                        <!-- ── Attendance progress ── -->
+                        <div class="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <p class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">Attendance Progress</p>
+                                <span class="text-xs font-bold text-slate-500">${sessionPercent}% complete</span>
+                            </div>
+                            <div class="flex items-end gap-2">
+                                <span class="text-3xl font-black text-slate-900">${sessionProgress.used}</span>
+                                <span class="pb-1 text-sm font-semibold text-slate-400">/ ${sessionProgress.total} sessions</span>
                             </div>
                             <div class="h-3 rounded-full bg-slate-100 overflow-hidden">
-                                <div class="h-full rounded-full bg-gradient-to-r from-gold-500 to-amber-400" style="width: ${sessionPercent}%;"></div>
+                                <div class="h-full rounded-full transition-all duration-700"
+                                     style="width:${sessionPercent}%; background: linear-gradient(90deg, #b8860b, #d4af37);"></div>
                             </div>
+                            <p class="text-xs text-slate-500">${studentName} has attended <strong>${sessionProgress.used}</strong> out of <strong>${sessionProgress.total}</strong> sessions.</p>
                         </div>
 
+                        <!-- ── Payment status ── -->
                         <div class="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm space-y-4">
                             <div class="flex items-center justify-between gap-3">
-                                <div class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">Payment</div>
-                                <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">${paymentType}</span>
+                                <p class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">Payment Status</p>
+                                ${balance <= 0
+                                    ? `<span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700"><i class="fas fa-circle-check text-emerald-500"></i> Fully Paid</span>`
+                                    : `<span class="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-700"><i class="fas fa-circle-exclamation text-red-400"></i> Balance Due</span>`
+                                }
                             </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-left shadow-sm">
-                                    <div class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">Enrollment Fee</div>
-                                    <div class="mt-2 text-base font-bold text-slate-900">${formatCurrencyPHP(totalAmount)}</div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
+                                    <p class="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-bold">Enrollment Fee</p>
+                                    <p class="mt-1.5 text-base font-black text-slate-900">${formatCurrencyPHP(totalAmount)}</p>
                                 </div>
-                                <div class="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-left shadow-sm">
-                                    <div class="text-[10px] uppercase tracking-[0.2em] text-emerald-700 font-bold">Paid</div>
-                                    <div class="mt-2 text-base font-bold text-emerald-700">${formatCurrencyPHP(paidAmount)}</div>
+                                <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-left">
+                                    <p class="text-[10px] uppercase tracking-[0.18em] text-emerald-600 font-bold">Amount Paid</p>
+                                    <p class="mt-1.5 text-base font-black text-emerald-700">${formatCurrencyPHP(paidAmount)}</p>
                                 </div>
-                                <div class="rounded-2xl border ${balanceCardClass} px-4 py-4 text-left shadow-sm">
-                                    <div class="text-[10px] uppercase tracking-[0.2em] ${balance > 0 ? 'text-red-600' : 'text-slate-500'} font-bold">Balance</div>
-                                    <div class="mt-2 text-base font-bold ${balanceValueClass}">${formatCurrencyPHP(balance)}</div>
+                                <div class="rounded-2xl border ${balanceCardClass} px-4 py-3 text-left">
+                                    <p class="text-[10px] uppercase tracking-[0.18em] ${balance > 0 ? 'text-red-500' : 'text-slate-400'} font-bold">Remaining Balance</p>
+                                    <p class="mt-1.5 text-base font-black ${balanceValueClass}">${formatCurrencyPHP(balance)}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            ${renderEnrollmentDetailCard('Teacher', teacherName, 'fa-chalkboard-user')}
-                            <div class="rounded-2xl border ${hasFirstSession ? 'border-blue-200 bg-blue-50/80' : 'border-dashed border-slate-200 bg-slate-50'} px-4 py-4 text-left shadow-sm md:col-span-2">
-                                <div class="flex items-center gap-3">
-                                    <div class="h-10 w-10 shrink-0 rounded-xl ${hasFirstSession ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-500'} flex items-center justify-center">
-                                        <i class="fas fa-calendar-day"></i>
-                                    </div>
-                                    <div>
-                                        <div class="text-[10px] uppercase tracking-[0.2em] ${hasFirstSession ? 'text-blue-700' : 'text-slate-500'} font-bold">Start Date</div>
-                                        <div class="mt-1 text-sm font-semibold ${hasFirstSession ? 'text-slate-900' : 'text-slate-500'}">${escapeHtml(firstSession)}</div>
-                                    </div>
-                                </div>
+                        <!-- ── Teachers ── -->
+                        <div class="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                            <p class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">
+                                ${teacherRows.length > 1 ? 'Assigned Teachers' : 'Assigned Teacher'}
+                            </p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                ${teacherCardsHtml}
                             </div>
                         </div>
+
+                        <!-- ── Start date ── -->
+                        <div class="rounded-2xl border ${hasFirstSession ? 'border-blue-200 bg-blue-50/70' : 'border-dashed border-slate-200 bg-slate-50'} px-4 py-3 flex items-center gap-3">
+                            <div class="h-10 w-10 shrink-0 rounded-xl ${hasFirstSession ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center">
+                                <i class="fas fa-calendar-day text-sm"></i>
+                            </div>
+                            <div>
+                                <p class="text-[10px] uppercase tracking-[0.18em] ${hasFirstSession ? 'text-blue-600' : 'text-slate-400'} font-bold">Start Date</p>
+                                <p class="mt-0.5 text-sm font-semibold ${hasFirstSession ? 'text-slate-900' : 'text-slate-400'}">${escapeHtml(firstSession)}</p>
+                            </div>
+                        </div>
+
                     </div>
                 `
             });

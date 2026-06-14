@@ -5,6 +5,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
+require_once 'audit_logs.php'; // ← Audit logging
 
 header("Content-Type: application/json");
 
@@ -524,6 +525,15 @@ class Admin
 
             $this->conn->commit();
 
+            AuditLogs::record(
+                $this->conn,
+                'Student Approved',
+                'Registrations',
+                "Registration approved for student ID {$data['student_id']}.",
+                'student', (int)$data['student_id'], $student['email'] ?? null,
+                'info', ['status' => 'Pending'], ['status' => 'Active']
+            );
+
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Student approved successfully. User account has been activated.'
@@ -595,6 +605,15 @@ class Admin
             }
 
             $this->conn->commit();
+
+            AuditLogs::record(
+                $this->conn,
+                'Student Rejected',
+                'Registrations',
+                "Registration rejected for student ID {$studentId}.",
+                'student', $studentId, $student['email'] ?? null,
+                'warning', ['status' => 'Pending'], ['status' => 'Rejected']
+            );
 
             $this->sendJSON([
                 'success' => true,
@@ -764,6 +783,15 @@ class Admin
             }
 
             $this->conn->commit();
+
+            AuditLogs::record(
+                $this->conn,
+                'Payment Confirmed',
+                'Payments',
+                "Registration payment of ₱{$paymentAmount} confirmed for student ID {$data['student_id']} via {$paymentMethod}.",
+                'student', (int)$data['student_id'], $student['email'] ?? null,
+                'info', null, ['amount' => $paymentAmount, 'method' => $paymentMethod, 'status' => $newStatus]
+            );
 
             $this->sendJSON([
                 'success' => true,
@@ -1104,6 +1132,15 @@ class Admin
 
             $userId = (int)$this->conn->lastInsertId();
 
+            AuditLogs::record(
+                $this->conn,
+                'User Created',
+                'Users',
+                "New user account created: {$email} with role {$roleName}.",
+                'user', $userId, $email,
+                'info', null, ['name' => "{$firstName} {$lastName}", 'email' => $email, 'role' => $roleName]
+            );
+
             $this->sendJSON([
                 'success' => true,
                 'message' => 'User created successfully.',
@@ -1202,6 +1239,15 @@ class Admin
                     $userId
                 ]);
             }
+
+            AuditLogs::record(
+                $this->conn,
+                'User Updated',
+                'Users',
+                "User profile updated for user ID {$userId} ({$email}).",
+                'user', $userId, $email,
+                'info', ['email' => $currentUser['email'] ?? ''], ['first_name' => $firstName, 'last_name' => $lastName, 'email' => $email]
+            );
 
             $this->sendJSON([
                 'success' => true,

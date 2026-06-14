@@ -604,27 +604,98 @@ async function promptEmailVerification(email, initialCode = '') {
         return false;
     }
 
-    while (true) {
-        const result = await Swal.fire({
+    // ── Helper: build and show the 6-box OTP dialog ───────────────
+    function showOtpDialog(prefill = '') {
+        const digits = (prefill + '      ').slice(0, 6).split('');
+        return Swal.fire({
             title: 'Verify Your Email',
-            text: `We sent a 6-digit code to ${verificationEmail}.`,
-            input: 'text',
-            inputPlaceholder: 'Enter verification code',
-            inputValue: currentCode || '',
-            inputAttributes: {
-                maxlength: 6,
-                inputmode: 'numeric',
-                autocomplete: 'one-time-code'
-            },
+            html: `
+                <p class="swal2-html-container" style="margin:0 0 20px;font-size:0.95rem;color:#6b7280;">
+                    We sent a 6-digit code to<br>
+                    <strong style="color:#0f172a">${verificationEmail}</strong>
+                </p>
+                <div id="otpBoxes" style="display:flex;justify-content:center;gap:10px;margin:0 auto 6px;">
+                    ${[0,1,2,3,4,5].map(i => `
+                    <input id="otp${i}" type="text" inputmode="numeric" maxlength="1"
+                        value="${digits[i].trim()}"
+                        style="width:48px;height:56px;border:2px solid #e2e8f0;border-radius:12px;
+                               text-align:center;font-size:1.5rem;font-weight:700;color:#0f172a;
+                               outline:none;transition:border-color .15s,box-shadow .15s;
+                               background:#f8fafc;"
+                        oninput="
+                            this.value=this.value.replace(/[^0-9]/g,'').slice(-1);
+                            if(this.value){
+                                var n=document.getElementById('otp${i < 5 ? i+1 : i}');
+                                if(n){n.focus();n.select();}
+                            }
+                        "
+                        onkeydown="
+                            if(event.key==='Backspace'&&!this.value){
+                                var p=document.getElementById('otp${i > 0 ? i-1 : 0}');
+                                if(p){p.focus();p.select();}
+                            }
+                            if(event.key==='ArrowLeft'){
+                                var p=document.getElementById('otp${i > 0 ? i-1 : 0}');
+                                if(p){p.focus();p.select();}
+                            }
+                            if(event.key==='ArrowRight'){
+                                var n=document.getElementById('otp${i < 5 ? i+1 : 5}');
+                                if(n){n.focus();n.select();}
+                            }
+                        "
+                        onfocus="this.style.borderColor='#d4af37';this.style.boxShadow='0 0 0 3px rgba(212,175,55,0.2)';"
+                        onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none';"
+                        onpaste="
+                            event.preventDefault();
+                            var p=event.clipboardData.getData('text').replace(/[^0-9]/g,'').slice(0,6);
+                            for(var k=0;k<6;k++){
+                                var b=document.getElementById('otp'+k);
+                                if(b) b.value=p[k]||'';
+                            }
+                            var last=document.getElementById('otp'+(Math.min(p.length,5)));
+                            if(last){last.focus();last.select();}
+                        "
+                    >
+                    `).join('')}
+                </div>
+                <p style="font-size:0.75rem;color:#94a3b8;text-align:center;margin-top:4px;">
+                    Check your spam folder if you don't see it.
+                </p>
+            `,
             showCancelButton: true,
             showDenyButton: true,
-            confirmButtonText: 'Verify Code',
-            denyButtonText: 'Resend Code',
+            confirmButtonText: '<i class="fas fa-check" style="margin-right:6px"></i>Verify',
+            denyButtonText: '<i class="fas fa-rotate-right" style="margin-right:6px"></i>Resend',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#b8860b',
             denyButtonColor: '#475569',
             cancelButtonColor: '#6b7280',
-            allowOutsideClick: false
+            allowOutsideClick: false,
+            focusConfirm: false,
+            didOpen: () => {
+                // Focus first empty box, or first box if prefilled
+                const first = document.getElementById('otp0');
+                if (first) {
+                    first.focus();
+                    if (first.value) first.select();
+                }
+            },
+            preConfirm: () => {
+                const code = [0,1,2,3,4,5]
+                    .map(i => (document.getElementById('otp'+i)?.value || '').trim())
+                    .join('');
+                if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+                    Swal.showValidationMessage('Please enter all 6 digits.');
+                    return false;
+                }
+                return code;
+            }
         });
+    }
+
+    // ── Main loop ──────────────────────────────────────────────────
+    while (true) {
+        const result = await showOtpDialog(currentCode);
 
         if (result.isDismissed) {
             return false;
@@ -660,19 +731,12 @@ async function promptEmailVerification(email, initialCode = '') {
                     confirmButtonColor: '#b8860b'
                 });
             }
+            currentCode = '';
             continue;
         }
 
         const code = String(result.value || '').trim();
-        if (!code) {
-            await Swal.fire({
-                icon: 'error',
-                title: 'Code Required',
-                text: 'Please enter the verification code from your email.',
-                confirmButtonColor: '#b8860b'
-            });
-            continue;
-        }
+        if (!code) { currentCode = ''; continue; }
 
         try {
             const verifyResponse = await axios.post(
@@ -695,14 +759,13 @@ async function promptEmailVerification(email, initialCode = '') {
             const message = verifyData.error || verifyData.message || 'Verification failed. Please try again.';
             await Swal.fire({
                 icon: 'error',
-                title: 'Verification Failed',
+                title: 'Incorrect Code',
                 text: message,
                 confirmButtonColor: '#b8860b'
             });
+            currentCode = '';
 
-            if (verifyData.resend_required) {
-                continue;
-            }
+            if (verifyData.resend_required) { continue; }
         } catch (error) {
             const message = error?.response?.data?.error || error?.message || 'Verification failed. Please try again.';
             await Swal.fire({
@@ -711,6 +774,7 @@ async function promptEmailVerification(email, initialCode = '') {
                 text: message,
                 confirmButtonColor: '#b8860b'
             });
+            currentCode = '';
         }
     }
 }
@@ -1903,8 +1967,10 @@ async function promptPasswordChange(user, currentPassword) {
                         '<li>Include uppercase, lowercase, number and special character (!@#$%^&*)</li>' +
                     '</ul>' +
                 '</div>' +
-                '<input id="swal-new-password" class="swal2-input" type="password" placeholder="New password">' +
-                '<input id="swal-confirm-password" class="swal2-input" type="password" placeholder="Confirm new password">',
+               '<input id="swal-new-password" class="swal2-input" type="password" placeholder="New password">' +
+    '<i id="newPasswordEye" class="fas fa-eye" style="cursor:pointer;" onclick="togglePassword(\'swal-new-password\', \'newPasswordEye\')"></i>' +
+    '<input id="swal-confirm-password" class="swal2-input" type="password" placeholder="Confirm new password">' +
+    '<i id="confirmPasswordEye" class="fas fa-eye" style="cursor:pointer;" onclick="togglePassword(\'swal-confirm-password\', \'confirmPasswordEye\')"></i>',
             focusConfirm: false,
             allowOutsideClick: false,
             preConfirm: () => {
@@ -2303,6 +2369,7 @@ function renderStudentQrStatus(status) {
         missed: 'Session Missed',
         completed: 'Session Completed',
         schedule_frozen: 'Schedule Frozen',
+        room_required: 'Room Required',
         no_session: 'No Session Today'
     };
     const banner = document.getElementById('qrStatusBanner');
@@ -2314,6 +2381,7 @@ function renderStudentQrStatus(status) {
         missed: 'block border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200',
         completed: 'block border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200',
         schedule_frozen: 'block border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200',
+        room_required: 'block border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200',
         no_session: 'block border-zinc-300 bg-zinc-50 text-zinc-700 dark:border-zinc-500/30 dark:bg-zinc-500/10 dark:text-zinc-200'
     };
 
@@ -3978,9 +4046,8 @@ function initStudentRequestSection(student, requestMeta) {
         const sessions = Number(pkg.sessions || 0);
         const maxInst = Number(pkg.max_instruments || 1);
         const price = formatCurrencyPHP(pkg.price || 0);
-        const branchLabel = String(pkg.branch_name || requestMeta?.student?.branch_name || '').trim();
-        const branchText = branchLabel ? ` • ${escapeHtml(branchLabel)}` : '';
-        return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''})${branchText} - ${price}</option>`;
+        const instLabel = maxInst > 1 ? `up to ${maxInst} instruments` : '1 instrument';
+        return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} — ${sessions} sessions, ${instLabel} · ${price}</option>`;
     }).join('');
     if (packages.length === 0) {
         statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">No session package is available for enrollment request right now. Please contact desk/admin.</div>';
@@ -3993,37 +4060,46 @@ function initStudentRequestSection(student, requestMeta) {
         const sessions = Number(selected?.getAttribute('data-sessions') || 0);
         const paymentType = String(paymentModeEl.value || 'Partial Payment');
         const registrationFeeDue = getRegistrationFeeDueAmount(student);
-        const partialAmount = computeStudentRequestPayableNow(price, sessions, 'Partial Payment');
-        const fullAmount = computeStudentRequestPayableNow(price, sessions, 'Full Payment');
-        const installmentAmount = computeStudentRequestPayableNow(price, sessions, 'Installment');
         const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType, registrationFeeDue);
         const enrollmentNow = computeStudentRequestPayableNow(price, sessions, paymentType);
-        const selectedLabel = paymentType === 'Full Payment'
-            ? 'Full Payment'
-            : (paymentType === 'Installment' ? 'Installment (est. per session)' : 'Partial Payment');
-        amountEl.innerHTML = `
-            <div class="text-xs uppercase tracking-[0.2em] text-gold-700 dark:text-gold-300 font-bold">Payment Summary</div>
-            <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="rounded-xl bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-3 py-3">
-                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Registration Fee Due</div>
-                    <div class="mt-1 text-base font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(registrationFeeDue)}</div>
-                </div>
-                <div class="rounded-xl bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-3 py-3">
-                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Enrollment Fee</div>
-                    <div class="mt-1 text-base font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(enrollmentNow)}</div>
-                </div>
-                <div class="rounded-xl bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-3 py-3">
-                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Total Due Now</div>
-                    <div class="mt-1 text-base font-bold text-gold-700 dark:text-gold-300">${formatCurrencyPHP(payableNow)}</div>
-                </div>
-            </div>
-            <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                Mode: <span class="font-semibold text-zinc-700 dark:text-zinc-200">${escapeHtml(selectedLabel)}</span>
-            </div>
-        `;
+
+        if (!price) {
+            amountEl.innerHTML = `<p class="text-sm text-zinc-400 dark:text-zinc-500">Package details will appear here once you pick a package.</p>`;
+        } else {
+            // Only show the registration fee row when there's actually something due
+            const regFeeRow = registrationFeeDue > 0 ? `
+                <div class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-white/8">
+                    <div>
+                        <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Registration Fee</p>
+                        <p class="text-xs text-zinc-400">One-time lifetime fee</p>
+                    </div>
+                    <span class="text-sm font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(registrationFeeDue)}</span>
+                </div>` : `
+                <div class="flex items-center gap-2 py-2 border-b border-zinc-100 dark:border-white/8">
+                    <i class="fas fa-circle-check text-emerald-500 text-sm"></i>
+                    <p class="text-sm text-emerald-700 dark:text-emerald-400 font-semibold">Registration fee already paid ✓</p>
+                </div>`;
+
+            amountEl.innerHTML = `
+                <div class="space-y-1">
+                    ${regFeeRow}
+                    <div class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-white/8">
+                        <div>
+                            <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Lesson Package</p>
+                            <p class="text-xs text-zinc-400">${sessions} sessions · ${paymentType}</p>
+                        </div>
+                        <span class="text-sm font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(enrollmentNow)}</span>
+                    </div>
+                    <div class="flex items-center justify-between pt-2">
+                        <p class="text-sm font-black text-zinc-900 dark:text-white">Due now</p>
+                        <span class="text-lg font-black text-gold-600 dark:text-gold-400">${formatCurrencyPHP(payableNow)}</span>
+                    </div>
+                </div>`;
+        }
+
         instrumentsContainer.innerHTML = maxInst > 0
             ? renderStudentRequestInstrumentSelectors(maxInst, instruments)
-            : '<div class="text-sm text-zinc-500">Select a package first.</div>';
+            : '<div class="text-sm text-zinc-400 dark:text-zinc-500 text-center py-3">Choose a package first.</div>';
     };
 
     packageSelect.onchange = updateRequestPackageUI;

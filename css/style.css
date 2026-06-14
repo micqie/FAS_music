@@ -1,5 +1,44 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Inter:wght@300;400;600&display=swap');
 
+
+/* Make intl-tel-input full width */
+.iti {
+    width: 100%;
+}
+
+/* Fix input padding when flag is present */
+.iti input {
+    width: 100%;
+    padding-left: 85px !important;
+}
+
+/* Align flag dropdown height with Tailwind input */
+.iti__flag-container {
+    height: 100%;
+}
+
+/* Fix dark mode dropdown */
+.iti__country-list {
+    background-color: #27272a; /* zinc-800 */
+    color: white;
+    border: 1px solid #3f3f46;
+}
+
+/* Hover effect */
+.iti__country:hover {
+    background-color: #3f3f46;
+}
+
+/* Selected country */
+.iti__country.iti__highlight {
+    background-color: #52525b;
+}
+
+/* Dial code color */
+.iti__dial-code {
+    color: #a1a1aa; /* zinc-400 */
+}
+
 html {
     scroll-behavior: smooth;
 }

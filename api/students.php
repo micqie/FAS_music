@@ -1381,8 +1381,8 @@ class StudentsApi
             $sessionDate = (string)($slot['next_date'] ?? '');
             $startTime = (string)($slot['start_time'] ?? '');
             $endTime = (string)($slot['end_time'] ?? '');
-            $roomId = isset($slot['room_id']) && $slot['room_id'] !== null ? (int)$slot['room_id'] : null;
-            $roomName = $slot['room_name'] ?? null;
+            $roomId = null;
+            $roomName = null;
             if ($sessionDate === '' || $startTime === '' || $endTime === '') {
                 break;
             }
@@ -1545,7 +1545,7 @@ class StudentsApi
         }
     }
 
-    private function updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime, $roomName)
+    private function updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime)
     {
         $enrollmentId = (int)($enrollment['enrollment_id'] ?? 0);
         $teacherId = (int)($enrollment['assigned_teacher_id'] ?? 0);
@@ -1590,15 +1590,12 @@ class StudentsApi
         $slots[$targetOriginalIndex]['day_of_week'] = $newDay;
         $slots[$targetOriginalIndex]['start_time'] = $startTime;
         $slots[$targetOriginalIndex]['end_time'] = $endTime;
-        $slots[$targetOriginalIndex]['room_name'] = $roomName !== '' ? $roomName : null;
-
         $slotsInput = [];
         foreach ($slots as $slot) {
             $slotsInput[] = [
                 'day_of_week' => $slot['day_of_week'] ?? '',
                 'start_time' => $slot['start_time'] ?? '',
-                'end_time' => $slot['end_time'] ?? '',
-                'room_name' => $slot['room_name'] ?? ''
+                'end_time' => $slot['end_time'] ?? ''
             ];
         }
 
@@ -1619,14 +1616,13 @@ class StudentsApi
 
         $firstSlot = $normalizedSlots[0] ?? null;
         if ($firstSlot && $this->tableExists('tbl_enrollments')) {
-            $fixedRoomId = isset($firstSlot['room_id']) && $firstSlot['room_id'] !== null ? (int)$firstSlot['room_id'] : null;
             $summary = $this->formatScheduleSlotsSummary($normalizedSlots);
             $stmt = $this->conn->prepare("
                 UPDATE tbl_enrollments
                 SET fixed_day_of_week = ?,
                     fixed_start_time = ?,
                     fixed_end_time = ?,
-                    fixed_room_id = ?,
+                    fixed_room_id = NULL,
                     preferred_schedule = ?
                 WHERE enrollment_id = ?
             ");
@@ -1634,7 +1630,6 @@ class StudentsApi
                 $firstSlot['day_of_week'] ?? null,
                 $firstSlot['start_time'] ?? null,
                 $firstSlot['end_time'] ?? null,
-                $fixedRoomId,
                 $summary !== '' ? $summary : null,
                 $enrollmentId
             ]);
@@ -4400,10 +4395,7 @@ class StudentsApi
                 $this->sendJSON(['error' => 'Student already has another session at that time'], 400);
             }
 
-            $roomId = isset($cancelledSession['room_id']) ? (int)$cancelledSession['room_id'] : null;
-            if ($roomId !== null && $roomId > 0 && $this->hasRoomScheduleConflict($roomId, $sessionDate, $startTime, $endTime, [$sessionId])) {
-                $roomId = null;
-            }
+            $roomId = null;
 
             $historyNote = 'Rescheduled from cancelled session #' . (int)$cancelledSession['session_id'];
             $stmtInsert = $this->conn->prepare("
@@ -4483,7 +4475,6 @@ class StudentsApi
         $sessionDate = trim((string)($data['session_date'] ?? ''));
         $startTime = trim((string)($data['start_time'] ?? '09:00:00'));
         $endTime = trim((string)($data['end_time'] ?? '10:00:00'));
-        $roomName = trim((string)($data['room_name'] ?? ''));
         $isEditingExisting = filter_var(($data['edit_existing'] ?? false), FILTER_VALIDATE_BOOLEAN);
         $scopeBranchId = (int)($data['branch_id'] ?? $data['desk_branch_id'] ?? $data['manager_branch_id'] ?? 0);
         $editorRoleName = trim((string)($data['editor_role'] ?? ''));
@@ -4580,7 +4571,7 @@ class StudentsApi
                     (int)($fixed['fixed_schedule_locked'] ?? 1) === 1
                 ) {
                     if ($isEditingExisting && $existingSessionId > 0 && $canEditRecurringPattern) {
-                        $result = $this->updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime, $roomName);
+                        $result = $this->updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime);
                         $this->sendJSON([
                             'success' => true,
                             'message' => 'Recurring schedule updated successfully before classes started.',
@@ -4624,14 +4615,8 @@ class StudentsApi
             if ($requestedTeacherId > 0 && $requestedTeacherId !== $teacherId) {
                 $this->sendJSON(['error' => 'Teacher is fixed for this package and cannot be changed here'], 400);
             }
-            $branchId = (int)($enrollment['branch_id'] ?? 0);
             $roomId = null;
-            if ($roomName !== '') {
-                $roomId = $this->resolveRoomIdByName($branchId, $roomName);
-                if ($roomId === null) {
-                    $this->sendJSON(['error' => 'Selected room is not available in this branch'], 400);
-                }
-            }
+            $notes = null;
 
             $excludeSessionIds = [];
             if ($existingSessionId > 0) {
@@ -4681,7 +4666,7 @@ class StudentsApi
                     $startTime,
                     $endTime,
                     $roomId,
-                    $roomName !== '' ? $roomName : null,
+                    $notes,
                     $existingSessionId
                 ]);
             } else {
@@ -4709,7 +4694,7 @@ class StudentsApi
                     $endTime,
                     $instrumentId > 0 ? $instrumentId : null,
                     $roomId,
-                    $roomName !== '' ? $roomName : null
+                    $notes
                 ]);
             }
 
@@ -4798,7 +4783,7 @@ class StudentsApi
                         'day_of_week' => $computedAssignedDay,
                         'start_time' => $legacyStart,
                         'end_time' => $legacyEnd,
-                        'room_name' => $assignedRoom
+                        'room_name' => ''
                     ]];
                 }
             }
@@ -4845,7 +4830,7 @@ class StudentsApi
                     $assignedSlotsInput,
                     $teacherId,
                     (int)$req['branch_id'],
-                    $assignedRoom,
+                    '',
                     (int)$req['student_id'],
                     [],
                     $instrumentLookup
@@ -5235,10 +5220,7 @@ class StudentsApi
                 $this->sendJSON(['error' => 'Student already has another session at that time'], 400);
             }
 
-            $roomId = isset($sourceSession['room_id']) ? (int)$sourceSession['room_id'] : null;
-            if ($roomId !== null && $roomId > 0 && $this->hasRoomScheduleConflict($roomId, $sessionDate, $startTime, $endTime, [$sessionId])) {
-                $roomId = null;
-            }
+            $roomId = null;
 
             $historyNote = 'Rescheduled from session #' . (int)$sourceSession['session_id'] . ($reason !== '' ? ' - ' . $reason : '');
             $newStatus = $isTeacherCancelled ? 'rescheduled' : 'Scheduled';

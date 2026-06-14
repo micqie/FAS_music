@@ -291,84 +291,115 @@
                 </div>
                 <div class="overflow-y-auto max-h-[calc(100vh-73px)] sm:max-h-[calc(92vh-73px)] px-4 sm:px-6 py-5">
                     <div id="studentRequestStatus" class="mt-1"></div>
-                    <form id="studentPackageRequestForm" class="mt-5 space-y-4">
-                        <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-sm">
-                            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
-                                <div>
-                                    <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">1. Package & Payment</div>
-                                    <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Pick your lesson package first, then choose how you want to pay.</div>
+                    <form id="studentPackageRequestForm" class="mt-4 space-y-4">
+
+                        <!-- ── Step 1: Choose Package ── -->
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-sm">
+                            <div class="flex items-center gap-3 px-5 py-4 border-b border-zinc-100 dark:border-white/8 bg-zinc-50 dark:bg-white/3">
+                                <div class="h-7 w-7 rounded-full bg-gold-500 flex items-center justify-center shrink-0">
+                                    <span class="text-black text-xs font-black">1</span>
                                 </div>
-                                <div class="rounded-full bg-amber-50 dark:bg-gold-500/10 border border-gold-500/20 px-4 py-2 text-xs text-zinc-600 dark:text-zinc-300 whitespace-nowrap">
-                                    Fast flow: package, mode, method.
+                                <div>
+                                    <p class="text-sm font-bold text-zinc-900 dark:text-white">Choose a Package</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Pick the number of lessons that works for you.</p>
                                 </div>
                             </div>
-
-                            <div class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.9fr] gap-5 items-start">
-                                <div class="space-y-4">
-                                    <div>
-                                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Session Package *</label>
-                                        <select id="studentRequestPackage" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500/30">
-                                            <option value="">Choose a package...</option>
-                                        </select>
-                                        <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Choose the lesson package that matches your plan.</p>
-                                    </div>
-
-                                    <div id="studentRequestAmount" class="rounded-2xl border border-gold-500/25 bg-amber-50 dark:bg-gold-500/10 px-4 py-4 text-sm text-zinc-700 dark:text-zinc-100">
-                                        <div class="font-semibold text-gold-700 dark:text-gold-300">Choose a package first.</div>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Mode *</label>
-                                        <select id="studentRequestPaymentMode" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
-                                            <option value="Partial Payment" selected>Partial Payment</option>
-                                            <option value="Full Payment">Full Payment</option>
-                                            <option value="Installment">Installment</option>
-                                        </select>
-                                        <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Pick how you want to pay.</p>
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Method *</label>
-                                        <select id="studentRequestPaymentMethod" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
-                                            <option value="">Select payment method</option>
-                                            <option value="GCash">GCash</option>
-                                            <option value="Bank Transfer">Bank Transfer</option>
-                                        </select>
-                                        <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Use the method for your first enrollment payment.</p>
-                                    </div>
+                            <div class="px-5 py-4 space-y-3">
+                                <select id="studentRequestPackage"
+                                    class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-gold-500 transition-colors">
+                                    <option value="">Select a package…</option>
+                                </select>
+                                <!-- Package summary — filled by JS -->
+                                <div id="studentRequestAmount"
+                                    class="rounded-xl border border-gold-500/20 bg-amber-50 dark:bg-gold-500/10 px-4 py-3 text-sm text-zinc-700 dark:text-zinc-100">
+                                    <p class="text-zinc-500 dark:text-zinc-400">Package details will appear here.</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-sm">
-                            <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">2. Instruments & Proof</div>
-                            <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Select your instruments, then upload proof if you&apos;re paying online.</div>
-
-                            <div class="mt-5 grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-6 items-start">
-                                <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Select Instruments *</label>
-                                    <div id="studentRequestInstrumentContainer" class="space-y-3 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
-                                        <div class="rounded-xl border border-dashed border-zinc-300 dark:border-white/10 px-4 py-4 text-sm text-zinc-500 dark:text-zinc-400">Choose a package first.</div>
-                                    </div>
+                        <!-- ── Step 2: How do you want to pay? ── -->
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-sm">
+                            <div class="flex items-center gap-3 px-5 py-4 border-b border-zinc-100 dark:border-white/8 bg-zinc-50 dark:bg-white/3">
+                                <div class="h-7 w-7 rounded-full bg-gold-500 flex items-center justify-center shrink-0">
+                                    <span class="text-black text-xs font-black">2</span>
                                 </div>
-
                                 <div>
-                                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Proof</label>
-                                    <input type="file" id="studentRequestPaymentProof" name="package_payment_proof_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold">
-                                    <div class="text-xs text-zinc-500 mt-2">Required for GCash, bank transfer, and other non-cash payments.</div>
+                                    <p class="text-sm font-bold text-zinc-900 dark:text-white">How will you pay?</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Choose when and how you'll make your first payment.</p>
+                                </div>
+                            </div>
+                            <div class="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Payment Schedule</label>
+                                    <select id="studentRequestPaymentMode"
+                                        class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-gold-500 transition-colors">
+                                        <option value="Partial Payment" selected>Partial — pay a portion now</option>
+                                        <option value="Full Payment">Full — pay everything now</option>
+                                        <option value="Installment">Installment — pay per session</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Payment Method</label>
+                                    <select id="studentRequestPaymentMethod"
+                                        class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-gold-500 transition-colors">
+                                        <option value="">Select method…</option>
+                                        <option value="GCash">GCash</option>
+                                        <option value="Bank Transfer">Bank Transfer</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-1">
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Review, then submit.</p>
-                            <button type="submit" id="studentSubmitRequestBtn" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
-                                Submit Request
+
+                        <!-- ── Step 3: Instrument & Proof ── -->
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-sm">
+                            <div class="flex items-center gap-3 px-5 py-4 border-b border-zinc-100 dark:border-white/8 bg-zinc-50 dark:bg-white/3">
+                                <div class="h-7 w-7 rounded-full bg-gold-500 flex items-center justify-center shrink-0">
+                                    <span class="text-black text-xs font-black">3</span>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-bold text-zinc-900 dark:text-white">Pick your Instrument</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Choose what you want to learn, then upload your payment screenshot.</p>
+                                </div>
+                            </div>
+                            <div class="px-5 py-4 space-y-4">
+                                <!-- Instrument selectors — filled by JS -->
+                                <div id="studentRequestInstrumentContainer">
+                                    <div class="rounded-xl border border-dashed border-zinc-300 dark:border-white/10 px-4 py-4 text-sm text-zinc-400 dark:text-zinc-500 text-center">
+                                        Choose a package first to see instruments.
+                                    </div>
+                                </div>
+
+                                <!-- Payment proof upload -->
+                                <div>
+                                    <label class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">
+                                        Payment Screenshot
+                                        <span class="ml-1 text-zinc-400 normal-case font-normal tracking-normal">(required for GCash / Bank Transfer)</span>
+                                    </label>
+                                    <label class="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-5 cursor-pointer hover:border-gold-400 hover:bg-amber-50 dark:hover:bg-gold-500/5 transition-colors">
+                                        <i class="fas fa-cloud-arrow-up text-2xl text-zinc-400"></i>
+                                        <span class="text-sm text-zinc-500 dark:text-zinc-400">Click to upload your proof of payment</span>
+                                        <span class="text-xs text-zinc-400">JPG, PNG, or PDF</span>
+                                        <input type="file" id="studentRequestPaymentProof" name="package_payment_proof_file"
+                                            accept=".jpg,.jpeg,.png,.webp,.pdf" class="hidden">
+                                    </label>
+                                    <p id="studentRequestProofFileName" class="mt-2 text-xs text-gold-600 dark:text-gold-400 hidden"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── Submit ── -->
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+                            <p class="text-xs text-zinc-400 dark:text-zinc-500">
+                                <i class="fas fa-circle-info mr-1"></i>
+                                Your request will be reviewed by our staff. You'll be notified once it's approved.
+                            </p>
+                            <button type="submit" id="studentSubmitRequestBtn"
+                                class="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gold-500 hover:bg-gold-400 active:scale-[.98] text-black text-sm font-extrabold transition shadow-lg shadow-gold-500/20">
+                                <i class="fas fa-paper-plane mr-2"></i>Submit Request
                             </button>
                         </div>
-                    </form>
 
+                    </form>
                     <div id="studentAvailabilityCalendar" class="hidden"></div>
                 </div>
             </div>
@@ -420,6 +451,21 @@
     <script>
         // Mobile nav toggle for student portal
         document.addEventListener('DOMContentLoaded', () => {
+            // Show filename when proof file is selected
+            const proofInput = document.getElementById('studentRequestPaymentProof');
+            const proofLabel = document.getElementById('studentRequestProofFileName');
+            if (proofInput && proofLabel) {
+                proofInput.addEventListener('change', () => {
+                    const file = proofInput.files?.[0];
+                    if (file) {
+                        proofLabel.textContent = '✅ ' + file.name;
+                        proofLabel.classList.remove('hidden');
+                    } else {
+                        proofLabel.classList.add('hidden');
+                    }
+                });
+            }
+
             const toggleBtn = document.getElementById('studentMobileMenuToggle');
             const mobileMenu = document.getElementById('studentMobileMenu');
             if (toggleBtn && mobileMenu) {

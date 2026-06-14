@@ -462,6 +462,7 @@ class AttendanceApi
                 ts.session_date,
                 ts.start_time,
                 ts.end_time,
+                ts.room_id,
                 ts.status,
                 ts.attendance_status,
                 ts.absence_notice,
@@ -959,14 +960,28 @@ class AttendanceApi
             ];
         }
 
-        if ($todaySession && in_array((string)($todaySession['status'] ?? ''), ['Scheduled'], true)) {
+        $hasRoomAssigned = $todaySession && (int)($todaySession['room_id'] ?? 0) > 0;
+        if ($todaySession && in_array((string)($todaySession['status'] ?? ''), ['Scheduled'], true) && $hasRoomAssigned) {
             return [
                 'code' => 'valid_today',
                 'allow_attendance' => true,
                 'message' => 'QR is valid for today. Attendance may be recorded.',
                 'scheduled_date' => $todayYmd,
                 'next_session_date' => $nextSession['session_date'] ?? null,
-                'attendance' => $attendanceToday
+                'attendance' => $attendanceToday,
+                'room_id' => (int)($todaySession['room_id'] ?? 0)
+            ];
+        }
+
+        if ($todaySession && in_array((string)($todaySession['status'] ?? ''), ['Scheduled'], true) && !$hasRoomAssigned) {
+            return [
+                'code' => 'room_required',
+                'allow_attendance' => false,
+                'message' => 'This student has a session today, but no room has been assigned yet. Please assign a room before scanning the QR code.',
+                'scheduled_date' => $todayYmd,
+                'next_session_date' => $nextSession['session_date'] ?? null,
+                'attendance' => $attendanceToday,
+                'room_id' => null
             ];
         }
 

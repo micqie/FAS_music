@@ -1238,6 +1238,7 @@ class TeachersApi
                     ts.start_time,
                     ts.end_time,
                     ts.status,
+                    ts.attendance_status,
                     ts.notes,
                     ts.attendance_notes,
                     s.student_id,
@@ -1268,13 +1269,13 @@ class TeachersApi
             $params = [$teacherId];
 
             if ($filter === 'completed') {
-                $sql .= " AND ts.status = 'Completed' ";
+                $sql .= " AND ts.status = 'Completed' AND COALESCE(ts.attendance_status,'') = 'Present' ";
             } elseif ($filter === 'upcoming') {
                 $sql .= " AND ts.session_date >= CURDATE() ";
             } elseif ($filter === 'graded') {
                 $sql .= " AND prog.progress_id IS NOT NULL ";
             } elseif ($filter === 'ungraded') {
-                $sql .= " AND prog.progress_id IS NULL ";
+                $sql .= " AND ts.status = 'Completed' AND COALESCE(ts.attendance_status,'') = 'Present' AND prog.progress_id IS NULL ";
             }
 
             $sql .= " ORDER BY ts.session_date DESC, ts.start_time DESC, ts.session_id DESC ";

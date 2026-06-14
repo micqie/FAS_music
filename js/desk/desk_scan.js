@@ -179,7 +179,7 @@ async function postRecordByEmail(email) {
 
 function handleApiResponse(data, parsed, payload, isManual) {
     if (!data.success) {
-        const statusErrorCodes = ['EARLY', 'MISSED', 'NO_SESSION', 'SCHEDULE_FROZEN'];
+        const statusErrorCodes = ['EARLY', 'MISSED', 'NO_SESSION', 'SCHEDULE_FROZEN', 'ROOM_REQUIRED'];
         if (!statusErrorCodes.includes(String(data.error_code || '').toUpperCase())) {
             invalidScanCount += 1;
         }

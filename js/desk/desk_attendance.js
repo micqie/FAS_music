@@ -125,6 +125,67 @@
             return fixedTeacher || 'Instructor pending';
         }
 
+        function buildTeacherPackageSummary(student) {
+            const sessions = Array.isArray(student?.sessions_list) ? student.sessions_list : [];
+            const teacherMap = new Map();
+            const studentInstruments = Array.isArray(student?.instruments)
+                ? student.instruments.map((item) => String(item?.instrument_name || '').trim()).filter(Boolean)
+                : [];
+            const fallbackInstrumentText = studentInstruments.length
+                ? studentInstruments.join(', ')
+                : String(student?.instrument_name || '').trim();
+
+            sessions.forEach((slot) => {
+                const teacherName = `${String(slot?.teacher_first_name || '').trim()} ${String(slot?.teacher_last_name || '').trim()}`.trim();
+                if (!teacherName) return;
+                const instrumentName = String(slot?.instrument_name || student?.instrument_name || '').trim();
+                if (!teacherMap.has(teacherName)) {
+                    teacherMap.set(teacherName, new Set());
+                }
+                if (instrumentName) {
+                    teacherMap.get(teacherName).add(instrumentName);
+                }
+            });
+
+            if (!teacherMap.size) {
+                const teacherName = `${String(student?.teacher_first_name || '').trim()} ${String(student?.teacher_last_name || '').trim()}`.trim();
+                if (teacherName) {
+                    teacherMap.set(teacherName, new Set());
+                }
+            }
+
+            const rows = Array.from(teacherMap.entries()).map(([teacherName, instruments]) => ({
+                teacherName,
+                instruments: Array.from(instruments)
+            }));
+
+            if (!rows.length) {
+                return [];
+            }
+
+            return rows.map((row) => ({
+                teacherName: row.teacherName,
+                instrumentText: row.instruments.length ? row.instruments.join(', ') : (fallbackInstrumentText || String(student?.package_name || '—').trim()),
+                packageText: String(student?.package_name || '—').trim()
+            }));
+        }
+
+        function renderTeacherPackageSummary(student) {
+            const summaryRows = buildTeacherPackageSummary(student);
+            if (!summaryRows.length) {
+                return '<div class="text-sm text-slate-500">No teacher assigned yet.</div>';
+            }
+
+            return summaryRows.map((row) => `
+                <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                    <div class="text-sm font-semibold text-slate-900">${escapeHtml(row.teacherName)}</div>
+                    <div class="mt-1 text-xs text-slate-500">
+                        ${escapeHtml(row.instrumentText)}<span class="mx-1 text-slate-300">•</span>${escapeHtml(row.packageText)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
         function buildAttendanceCalendarEvents(rows) {
             return rows.flatMap(student => {
                 const sessionsList = Array.isArray(student.sessions_list) ? student.sessions_list : [];
@@ -768,25 +829,29 @@
                     const timeText = slot.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : 'Time pending';
                     const roomText = slot.room_name ? escapeHtml(slot.room_name) : 'Room pending';
                     return `
-                        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                             <div class="text-sm font-semibold text-slate-900">${escapeHtml(dateText)}</div>
-                            <div class="mt-1 text-sm text-slate-600">${escapeHtml(timeText)}</div>
-                            <div class="mt-1 text-xs text-slate-500">${roomText}</div>
+                            <div class="mt-1 text-xs text-slate-600">${escapeHtml(timeText)} <span class="mx-1 text-slate-300">•</span> ${roomText}</div>
                         </div>
                     `;
                 }).join('')
-                : '<div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">No upcoming sessions scheduled yet.</div>';
+                : '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">No upcoming sessions scheduled yet.</div>';
 
             Swal.fire({
                 title: `${studentName} Sessions`,
-                width: 720,
+                width: 600,
                 confirmButtonText: 'Close',
                 html: `
-                    <div class="text-left">
-                        <div class="mb-4 text-sm text-slate-600">
-                            Package: <span class="font-semibold text-slate-900">${escapeHtml(student.package_name || '—')}</span>
+                    <div class="text-left px-1 pb-1">
+                        <div class="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Package</div>
+                            <div class="mt-1 text-sm font-semibold text-slate-900">${escapeHtml(student.package_name || '—')}</div>
                         </div>
-                        <div class="space-y-3 max-h-[55vh] overflow-y-auto pr-1">${content}</div>
+                        <div class="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
+                            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Teachers</div>
+                            <div class="mt-2 space-y-2">${renderTeacherPackageSummary(student)}</div>
+                        </div>
+                        <div class="space-y-2 max-h-[46vh] overflow-y-auto pr-1">${content}</div>
                     </div>
                 `
             });
@@ -887,6 +952,7 @@
             const absenceCount = getAbsenceCount(student);
             const nextSessionLabel = getNextSessionLabel(student);
             const rows = [];
+            const teacherSummaryHtml = renderTeacherPackageSummary(student);
 
             for (let sessionNumber = 1; sessionNumber <= totalSessions; sessionNumber += 1) {
                 const slots = sessionsList.filter(slot => Number(slot.session_number) === sessionNumber);
@@ -894,19 +960,23 @@
                     ? slots.map(slot => {
                         const dateText = slot.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
                         const timeText = slot.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : '—';
-                        const roomText = slot.room_name ? ` • ${escapeHtml(slot.room_name)}` : '';
+                        const roomText = slot.room_name ? escapeHtml(slot.room_name) : 'Room pending';
                         return `
-                            <div class="rounded-lg border border-slate-200 bg-white px-3 py-3">
-                                <div class="flex flex-wrap items-center gap-2 mb-2">${getStatusBadge(slot.status)}</div>
-                                <div class="text-sm text-slate-700">${escapeHtml(dateText)} • ${escapeHtml(timeText)}${roomText}</div>
+                            <div class="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                                <div class="flex flex-wrap items-center gap-2 mb-1.5">${getStatusBadge(slot.status)}</div>
+                                <div class="text-sm text-slate-700">${escapeHtml(dateText)} <span class="text-slate-300">•</span> ${escapeHtml(timeText)}</div>
+                                <div class="mt-1 text-xs text-slate-500">${roomText}</div>
                             </div>
                         `;
                     }).join('')
                     : '<div class="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-sm text-slate-400">No date scheduled yet</div>';
 
                 rows.push(`
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <div class="text-sm font-semibold text-slate-800 mb-3">Session ${sessionNumber}</div>
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <div class="text-sm font-semibold text-slate-800">Session ${sessionNumber}</div>
+                            <div class="text-xs text-slate-500">${slots.length ? `${slots.length} item${slots.length === 1 ? '' : 's'}` : 'No schedule'}</div>
+                        </div>
                         <div class="space-y-2">${slotHtml}</div>
                     </div>
                 `);
@@ -914,19 +984,39 @@
 
             Swal.fire({
                 title: `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Attendance Details',
-                width: 900,
+                width: 760,
                 confirmButtonText: 'Close',
                 html: `
-                    <div class="text-left">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5 text-sm text-slate-700">
-                            <div><span class="font-semibold text-slate-900">Package:</span> ${escapeHtml(student.package_name || '—')}</div>
-                            <div><span class="font-semibold text-slate-900">Completed:</span> ${getCompletedCount(student)} / ${Number(student.sessions || 0)}</div>
-                            <div><span class="font-semibold text-slate-900">Remaining:</span> ${getRemainingCount(student)}</div>
-                            <div><span class="font-semibold text-slate-900">Absences:</span> <span class="${absenceCount > 0 ? 'text-rose-600 font-semibold' : ''}">${absenceCount}</span></div>
-                            <div><span class="font-semibold text-slate-900">Make-Up Threshold:</span> ${getMakeupThreshold(student)}</div>
-                            <div><span class="font-semibold text-slate-900">Next Session:</span> ${escapeHtml(nextSessionLabel)}</div>
+                    <div class="text-left px-1 pb-1">
+                        <div class="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                ${getStatusBadge(student.status || 'Active')}
+                                <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Active Enrollment</span>
+                            </div>
+                            <div class="mt-2 text-sm text-slate-600">
+                                Package: <span class="font-semibold text-slate-900">${escapeHtml(student.package_name || '—')}</span>
+                            </div>
+                            <div class="mt-2 text-xs text-slate-500">Completed ${getCompletedCount(student)} of ${Number(student.sessions || 0)} sessions. Next: ${escapeHtml(nextSessionLabel)}</div>
                         </div>
-                        <div class="space-y-3 max-h-[58vh] overflow-y-auto pr-1">${rows.join('')}</div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 mb-3 text-sm">
+                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Completed</div>
+                                <div class="mt-1 text-lg font-black text-slate-900">${getCompletedCount(student)}<span class="text-sm font-semibold text-slate-400">/${Number(student.sessions || 0)}</span></div>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Remaining</div>
+                                <div class="mt-1 text-lg font-black text-slate-900">${getRemainingCount(student)}</div>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Absences</div>
+                                <div class="mt-1 text-lg font-black ${absenceCount > 0 ? 'text-rose-600' : 'text-slate-900'}">${absenceCount}</div>
+                            </div>
+                        </div>
+                        <div class="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
+                            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Teachers / Instruments</div>
+                            <div class="mt-2 space-y-2">${teacherSummaryHtml}</div>
+                        </div>
+                        <div class="space-y-2 max-h-[52vh] overflow-y-auto pr-1">${rows.join('')}</div>
                     </div>
                 `
             });

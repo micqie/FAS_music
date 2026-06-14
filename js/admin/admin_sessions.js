@@ -267,20 +267,8 @@
             }
         }
 
-        async function populateAssignRoomDropdown(req) {
-            const roomEl = document.getElementById('assignRequestRoom');
-            if (!roomEl) return;
-
-            roomEl.innerHTML = '<option value="">Select room...</option>';
-            const rooms = await fetchRoomsForBranch(req?.branch_id || 0);
-            if (!rooms.length) {
-                roomEl.innerHTML = '<option value="">No available rooms in this branch</option>';
-                return;
-            }
-            roomEl.innerHTML = '<option value="">Select room...</option>' + rooms.map(room => {
-                const label = `${escapeHtml(room.room_name || 'Room')} (${escapeHtml(room.room_type || 'Room')}, cap ${Number(room.capacity || 1)})`;
-                return `<option value="${escapeHtml(room.room_name || '')}">${label}</option>`;
-            }).join('');
+        async function populateAssignRoomDropdown() {
+            return;
         }
 
         async function loadPendingRequests() {
@@ -587,10 +575,9 @@
             const teacherHelp = document.getElementById('assignRequestTeacherSearchHelp');
             const dateEl = document.getElementById('assignRequestDate');
             const slotsContainer = document.getElementById('assignRequestSlotsContainer');
-            const roomEl = document.getElementById('assignRequestRoom');
             const notesEl = document.getElementById('assignRequestNotes');
 
-            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !roomEl || !notesEl) return;
+            if (!modal || !info || !requestIdEl || !teacherSelect || !dateEl || !slotsContainer || !notesEl) return;
 
             const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
             const instrumentSummary = Array.isArray(req.instruments) && req.instruments.length
@@ -631,8 +618,6 @@
                 start_time: '',
                 end_time: ''
             });
-            await populateAssignRoomDropdown(req);
-            roomEl.value = '';
             notesEl.value = '';
 
             modal.classList.remove('hidden');
@@ -670,7 +655,6 @@
             const assignedDate = document.getElementById('assignRequestDate')?.value || '';
             const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
             const assignedSlots = collectAssignRequestSlots();
-            const assignedRoom = document.getElementById('assignRequestRoom')?.value?.trim() || '';
             const adminNotes = document.getElementById('assignRequestNotes')?.value?.trim() || '';
 
             if (!requestId || !teacherId || !assignedDate || !assignedSlots.length) {
@@ -701,7 +685,6 @@
                 assigned_start_time: primarySlot.start_time,
                 assigned_end_time: primarySlot.end_time,
                 assigned_slots: assignedSlots,
-                assigned_room: assignedRoom,
                 admin_notes: adminNotes
             });
         }
@@ -824,7 +807,6 @@
                 const teacherName = `${escapeHtml(session.teacher_first_name || '')} ${escapeHtml(session.teacher_last_name || '')}`.trim() || 'Teacher';
                 const originalTime = `${formatDateShort(session.session_date)} • ${formatTime12Hour(session.start_time)} - ${formatTime12Hour(session.end_time)}`;
                 const reason = session.cancellation_reason ? escapeHtml(session.cancellation_reason) : 'No reason provided.';
-                const roomText = session.room_name ? ` • ${escapeHtml(session.room_name)}` : '';
                 return `
                     <div class="rounded-2xl border border-rose-100 bg-rose-50/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div class="space-y-1">
@@ -833,7 +815,7 @@
                                 ${getSessionStatusBadge(session.status)}
                             </div>
                             <div class="text-xs text-slate-500">${escapeHtml(session.package_name || 'Package')} • Session ${Number(session.session_number || 0)}</div>
-                            <div class="text-sm text-slate-700">${teacherName}${roomText}</div>
+                            <div class="text-sm text-slate-700">${teacherName}</div>
                             <div class="text-sm text-slate-600">Cancelled slot: ${originalTime}</div>
                             <div class="text-xs text-slate-500">Reason: ${reason}</div>
                         </div>
@@ -912,7 +894,6 @@
             const sessionInput = document.getElementById('scheduleSessionNumber');
             const teacherInput = document.getElementById('scheduleTeacher');
             const teacherLabel = document.getElementById('scheduleTeacherLabel');
-            const roomSelect = document.getElementById('scheduleRoom');
             if (!modal || !body || !meta) return;
 
             const row = allStudents.find(r => Number(r.enrollment_id) === Number(enrollmentId));
@@ -933,7 +914,6 @@
                         ? slotHistory.map(slot => {
                             const dateText = slot?.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
                             const timeText = slot?.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : '—';
-                            const roomText = slot?.room_name ? ` • ${escapeHtml(slot.room_name)}` : '';
                             const teacherName = slot?.teacher_first_name || slot?.teacher_last_name
                                 ? `${escapeHtml(slot.teacher_first_name || '')} ${escapeHtml(slot.teacher_last_name || '')}`.trim()
                                 : '';
@@ -945,7 +925,7 @@
                                 <div class="rounded-lg border border-white/70 bg-white px-3 py-2">
                                     <div class="flex flex-wrap items-center gap-2">
                                         ${getSessionStatusBadge(slot.status)}
-                                        <div>${escapeHtml(dateText)} • ${escapeHtml(timeText)}${roomText}${teacherText}</div>
+                                        <div>${escapeHtml(dateText)} • ${escapeHtml(timeText)}${teacherText}</div>
                                     </div>
                                     ${reasonText}
                                 </div>
@@ -978,9 +958,6 @@
             if (teacherLabel) {
                 teacherLabel.value = teacherName;
             }
-            if (roomSelect) {
-                roomSelect.innerHTML = '<option value="">Read-only view</option>';
-            }
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -1009,7 +986,6 @@
             const startTime = document.getElementById('scheduleStart')?.value || '';
             const endTime = document.getElementById('scheduleEnd')?.value || '';
             const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
-            const roomName = document.getElementById('scheduleRoom')?.value || '';
 
             if (!enrollmentId || !sessionNumber || !sessionDate || !startTime || !endTime) {
                 showMessage('Please complete date and time before saving.', 'error');
@@ -1027,8 +1003,7 @@
                     session_date: sessionDate,
                     start_time: startTime,
                     end_time: endTime,
-                    teacher_id: teacherId,
-                    room_name: roomName
+                    teacher_id: teacherId
                 });
                 const data = response.data || {};
                 if (data.success) {

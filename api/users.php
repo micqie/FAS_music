@@ -398,6 +398,139 @@ class User
         }
     }
 
+    // ── Welcome email sent once after successful verification ─────────
+    private function sendWelcomeEmail($toEmail, $toName)
+    {
+        $this->ensurePhpMailerLoaded();
+        $this->lastMailError = null;
+        if (!$this->isMailConfigured()) {
+            return false; // silent — welcome email is non-critical
+        }
+
+        $mail = $this->getMailSettings();
+        if (!$this->isValidEmailAddress($toEmail)) {
+            return false;
+        }
+
+        try {
+            $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $this->configurePhpMailer($mailer, $mail);
+            $mailer->addAddress($toEmail, $toName ?: $toEmail);
+
+            $safeName  = htmlspecialchars($toName  ?: 'Student',  ENT_QUOTES, 'UTF-8');
+            $safeEmail = htmlspecialchars($toEmail, ENT_QUOTES, 'UTF-8');
+            $year      = date('Y');
+
+            $mailer->Subject = 'Welcome to Father & Sons Music School 🎵';
+            $mailer->isHTML(true);
+            $mailer->Body = '
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Welcome to Father &amp; Sons Music School</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+  <tr>
+    <td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 8px 32px rgba(15,23,42,.10);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#0b0f18 0%,#1a1d23 100%);padding:36px 40px;text-align:center;">
+            <p style="margin:0 0 6px;font-size:11px;letter-spacing:4px;font-weight:700;color:#d4af37;text-transform:uppercase;">Father &amp; Sons Music School</p>
+            <h1 style="margin:0;font-size:28px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">Welcome aboard! 🎶</h1>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 40px;">
+
+            <p style="margin:0 0 16px;font-size:16px;color:#0f172a;">Hello <strong>' . $safeName . '</strong>,</p>
+
+            <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.7;">
+              Congratulations! Your email has been successfully verified and your
+              <strong style="color:#0f172a;">Father &amp; Sons Music School</strong> account is now active.
+            </p>
+
+            <!-- Green checkmark box -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+              <tr>
+                <td style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:14px;padding:20px 24px;">
+                  <p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#16a34a;">You can now</p>
+                  <table cellpadding="0" cellspacing="0">
+                    <tr><td style="padding:4px 0;font-size:14px;color:#15803d;">
+                      <span style="margin-right:10px;font-size:15px;">✅</span> Log in to your account
+                    </td></tr>
+                    <tr><td style="padding:4px 0;font-size:14px;color:#15803d;">
+                      <span style="margin-right:10px;font-size:15px;">🎸</span> Enroll in music lessons
+                    </td></tr>
+                    <tr><td style="padding:4px 0;font-size:14px;color:#15803d;">
+                      <span style="margin-right:10px;font-size:15px;">📅</span> View your schedule
+                    </td></tr>
+                    <tr><td style="padding:4px 0;font-size:14px;color:#15803d;">
+                      <span style="margin-right:10px;font-size:15px;">🎓</span> Access your student portal
+                    </td></tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+            <!-- CTA button -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+              <tr>
+                <td align="center">
+                  <a href="http://localhost/FAS_music/index.html"
+                     style="display:inline-block;background:linear-gradient(135deg,#d4af37,#b8860b);color:#000000;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:50px;letter-spacing:0.3px;">
+                    Go to My Portal →
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 6px;font-size:15px;color:#475569;line-height:1.7;">
+              Welcome to the <strong style="color:#0f172a;">Father &amp; Sons Music School</strong> family!
+              We&rsquo;re excited to be part of your musical journey.
+            </p>
+            <p style="margin:0;font-size:13px;color:#94a3b8;">
+              This email was sent to <span style="color:#0f172a;font-weight:600;">' . $safeEmail . '</span>
+            </p>
+
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ' . $year . ' Father &amp; Sons Music School. All rights reserved.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>';
+
+            $mailer->AltBody = "Hello {$toName},\n\nCongratulations! Your email has been verified and your Father & Sons Music School account is now active.\n\nYou can now:\n✓ Log in to your account\n✓ Enroll in music lessons\n✓ View your schedule\n✓ Access your student portal\n\nWelcome to the Father & Sons Music School family!\n\n© {$year} Father & Sons Music School";
+
+            $mailer->send();
+            return true;
+        } catch (\PHPMailer\PHPMailer\Exception $e) {
+            error_log('Welcome email failed: ' . trim($e->getMessage() . ' ' . $mailer->ErrorInfo));
+            return false;
+        } catch (Exception $e) {
+            error_log('Welcome email failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     private function sendWalkInAccountEmail($toEmail, $toName, $loginEmail, $temporaryPassword)
     {
         $this->ensurePhpMailerLoaded();
@@ -1069,6 +1202,12 @@ class User
                 WHERE user_id = ?
             ");
             $update->execute([(int)$user['user_id']]);
+
+            // ── Send welcome email (non-blocking — failure doesn't stop success response) ──
+            $firstName  = trim((string)($user['first_name'] ?? ''));
+            $lastName   = trim((string)($user['last_name']  ?? ''));
+            $displayName = trim("$firstName $lastName") ?: ($user['email'] ?? $email);
+            $this->sendWelcomeEmail($user['email'] ?? $email, $displayName);
 
             $this->sendJSON([
                 'success' => true,
