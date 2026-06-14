@@ -3912,6 +3912,7 @@ class StudentsApi
                     e.package_id,
                     e.instrument_id,
                     COALESCE(inst.instrument_name, CONCAT('Instrument #', e.instrument_id)) AS instrument_name,
+                    COALESCE(it.type_name, 'Other') AS type_name,
                     COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
                     COALESCE(sp.sessions, e.total_sessions, 0) AS sessions,
                     COALESCE(sp.price, 0) AS total_amount,
@@ -3940,6 +3941,7 @@ class StudentsApi
                 INNER JOIN tbl_students s ON e.student_id = s.student_id
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
                 LEFT JOIN tbl_instruments inst ON inst.instrument_id = e.instrument_id
+                LEFT JOIN tbl_instrument_types it ON it.type_id = inst.type_id
                 LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id
                 LEFT JOIN (
                     SELECT

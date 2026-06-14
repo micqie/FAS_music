@@ -279,42 +279,6 @@ function renderBranchMovements(branches, registrations, enrollments, teachers) {
             const paid = Number(item.paid_amount || 0);
             return sum + Math.max(0, total - paid);
         }, 0);
-        const branchAbsenceRows = branchEnrollments
-            .map(item => ({
-                ...item,
-                usedAbsences: Number(item.used_absences || 0),
-                consecutiveAbsences: Number(item.consecutive_absences || 0),
-                allowedAbsences: Number(item.allowed_absences || 0)
-            }))
-            .filter(item => item.usedAbsences > 0)
-            .sort((a, b) =>
-                b.usedAbsences - a.usedAbsences ||
-                b.consecutiveAbsences - a.consecutiveAbsences ||
-                `${a.first_name || ''} ${a.last_name || ''}`.localeCompare(`${b.first_name || ''} ${b.last_name || ''}`)
-            );
-        const branchAbsencePreview = branchAbsenceRows.slice(0, 3);
-        const branchRedListHtml = branchAbsencePreview.length
-            ? branchAbsencePreview.map(item => {
-                const studentName = `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Student';
-                const teacherName = `${item.teacher_first_name || ''} ${item.teacher_last_name || ''}`.trim() || 'No teacher assigned';
-                const allowanceText = item.allowedAbsences > 0
-                    ? `${item.usedAbsences}/${item.allowedAbsences}`
-                    : `${item.usedAbsences}`;
-                return `
-                    <div class="flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-white px-3 py-3">
-                        <div class="min-w-0">
-                            <div class="truncate text-sm font-semibold text-slate-900">${escapeHtml(studentName)}</div>
-                            <div class="truncate text-xs text-red-700">${escapeHtml(teacherName)}</div>
-                        </div>
-                        <div class="shrink-0 text-right">
-                            <div class="text-sm font-black text-red-900">${allowanceText}</div>
-                            <div class="text-[11px] uppercase tracking-[0.16em] text-red-500 font-bold">Absences</div>
-                        </div>
-                    </div>
-                `;
-            }).join('')
-            : '<div class="rounded-2xl border border-dashed border-red-200 bg-white px-3 py-4 text-sm text-red-700">No students on this branch red list.</div>';
-
         return `
             <div class="rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm">
                 <div class="flex items-start justify-between gap-4">
@@ -370,178 +334,121 @@ function renderBranchMovements(branches, registrations, enrollments, teachers) {
     board.innerHTML = cards.join('');
 }
 
-function renderAbsenceRedList(enrollments) {
-    const list = document.getElementById('absenceRedList');
-    if (!list) return;
+function getInstrumentIcon(name) {
+    const key = String(name || '').toLowerCase();
+    if (key.includes('piano') || key.includes('keyboard')) return 'fa-keyboard';
+    if (key.includes('guitar') || key.includes('ukulele') || key.includes('bass')) return 'fa-guitar';
+    if (key.includes('violin') || key.includes('cello') || key.includes('viola')) return 'fa-music';
+    if (key.includes('drum') || key.includes('percussion')) return 'fa-drum';
+    if (key.includes('voice') || key.includes('vocal') || key.includes('singing')) return 'fa-microphone';
+    return 'fa-music';
+}
 
-    const absenceRows = (Array.isArray(enrollments) ? enrollments : [])
-        .map(item => ({
-            ...item,
-            usedAbsences: Number(item.used_absences || 0),
-            consecutiveAbsences: Number(item.consecutive_absences || 0),
-            allowedAbsences: Number(item.allowed_absences || 0)
-        }))
-        .filter(item => item.usedAbsences > 0)
-        .sort((a, b) =>
-            b.usedAbsences - a.usedAbsences ||
-            b.consecutiveAbsences - a.consecutiveAbsences
-        );
+function countEnrollmentsByField(rows, field, fallback = 'Unassigned') {
+    return rows.reduce((acc, item) => {
+        const key = String(item[field] || '').trim() || fallback;
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+    }, {});
+}
 
-    window.absenceStudents = absenceRows;
+function buildRankedInstrumentList(counts, limit = 8) {
+    return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, limit);
+}
 
-    if (!absenceRows.length) {
-        list.innerHTML = `
-            <div class="xl:col-span-2 rounded-2xl border border-dashed border-red-200 bg-red-50/40 px-4 py-8 text-center text-sm text-red-700">
-                No active students with recorded absences.
+function renderInstrumentRankColumn(title, subtitle, ranked, emptyMessage) {
+    if (!ranked.length) {
+        return `
+            <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center text-sm text-slate-500 h-full">
+                <i class="fas fa-music text-3xl text-slate-300 mb-3"></i>
+                <p class="font-semibold text-slate-700">${escapeHtml(title)}</p>
+                <p class="mt-1">${escapeHtml(emptyMessage)}</p>
+            </div>
+        `;
+    }
+
+    const topCount = Number(ranked[0][1] || 1);
+    const barColors = [
+        'from-gold-400 to-gold-600',
+        'from-indigo-400 to-indigo-600',
+        'from-sky-400 to-sky-600',
+        'from-emerald-400 to-emerald-600',
+        'from-violet-400 to-violet-600',
+        'from-rose-400 to-rose-600',
+        'from-amber-400 to-amber-600',
+        'from-slate-400 to-slate-600'
+    ];
+
+    return `
+        <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5 h-full">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h4 class="text-sm font-bold text-slate-900">${escapeHtml(title)}</h4>
+                    <p class="text-xs text-slate-500 mt-1">${escapeHtml(subtitle)}</p>
+                </div>
+                <span class="rounded-full bg-gold-500/10 px-2.5 py-1 text-[11px] font-bold text-gold-700">${ranked.length} shown</span>
+            </div>
+            <div class="mt-5 space-y-4">
+                ${ranked.map(([name, count], index) => {
+                    const width = Math.max(8, Math.round((Number(count) / topCount) * 100));
+                    const barColor = barColors[index % barColors.length];
+                    return `
+                        <div>
+                            <div class="flex items-center justify-between gap-3 mb-2">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <span class="text-xs font-bold text-slate-400 w-5">${index + 1}</span>
+                                    <i class="fas ${getInstrumentIcon(name)} text-gold-500"></i>
+                                    <span class="text-sm font-semibold text-slate-800 truncate">${escapeHtml(name)}</span>
+                                </div>
+                                <span class="text-sm font-bold text-slate-700 shrink-0">${Number(count).toLocaleString('en-PH')}</span>
+                            </div>
+                            <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
+                                <div class="h-full rounded-full bg-gradient-to-r ${barColor}" style="width: ${width}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function renderPopularInstruments(enrollments) {
+    const widget = document.getElementById('popularInstrumentsWidget');
+    if (!widget) return;
+
+    const rows = Array.isArray(enrollments) ? enrollments : [];
+    const categoryRanked = buildRankedInstrumentList(countEnrollmentsByField(rows, 'type_name', 'Other'));
+    const brandRanked = buildRankedInstrumentList(countEnrollmentsByField(rows, 'instrument_name', 'Unassigned Instrument'));
+
+    if (!categoryRanked.length && !brandRanked.length) {
+        widget.innerHTML = `
+            <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
+                <i class="fas fa-music text-3xl text-slate-300 mb-3"></i>
+                <p>No active enrollments yet.</p>
             </div>
         `;
         return;
     }
 
-    list.innerHTML = absenceRows.map((item, index) => {
-
-        const studentName =
-            `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Student';
-
-        return `
-            <button
-                onclick="openAbsenceModal(${index})"
-                class="w-full text-left flex items-center justify-between rounded-2xl border border-red-200 bg-white hover:bg-red-50 hover:border-red-400 transition-all duration-200 px-5 py-4">
-
-                <div>
-                    <div class="font-semibold text-slate-900">
-                        ${escapeHtml(studentName)}
-                    </div>
-
-                    <div class="text-xs text-slate-500 mt-1">
-                        ${escapeHtml(item.branch_name || 'No Branch')}
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
-                        ${item.usedAbsences} Absence${item.usedAbsences > 1 ? 's' : ''}
-                    </span>
-
-                    <i class="fas fa-chevron-right text-red-400"></i>
-                </div>
-
-            </button>
-        `;
-    }).join('');
-}
-function openAbsenceModal(index) {
-
-    const s = window.absenceStudents[index];
-
-    const studentName =
-        `${s.first_name || ''} ${s.last_name || ''}`.trim();
-
-    const teacherName =
-        `${s.teacher_first_name || ''} ${s.teacher_last_name || ''}`.trim()
-        || 'No teacher assigned';
-
-    document.getElementById('absenceModal').classList.remove('hidden');
-    document.getElementById('absenceModal').classList.add('flex');
-
-    document.getElementById('absenceModalContent').innerHTML = `
-        <div class="space-y-5">
-
-            <div>
-                <h2 class="text-2xl font-bold text-slate-900">
-                    ${escapeHtml(studentName)}
-                </h2>
-
-                <p class="text-sm text-slate-500">
-                    ${escapeHtml(s.branch_name || 'No Branch')}
-                </p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-
-                <div class="rounded-2xl bg-red-50 p-4">
-                    <div class="text-xs text-red-600 font-semibold">
-                        TOTAL ABSENCES
-                    </div>
-
-                    <div class="text-3xl font-black text-red-900 mt-1">
-                        ${s.usedAbsences}
-                    </div>
-                </div>
-
-                <div class="rounded-2xl bg-orange-50 p-4">
-                    <div class="text-xs text-orange-600 font-semibold">
-                        CONSECUTIVE
-                    </div>
-
-                    <div class="text-3xl font-black text-orange-900 mt-1">
-                        ${s.consecutiveAbsences}
-                    </div>
-                </div>
-
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 p-4">
-
-                <div class="grid gap-3">
-
-                    <div>
-                        <div class="text-xs text-slate-500">
-                            Instrument
-                        </div>
-
-                        <div class="font-semibold">
-                            ${escapeHtml(s.instrument_name || '-')}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="text-xs text-slate-500">
-                            Teacher
-                        </div>
-
-                        <div class="font-semibold">
-                            ${escapeHtml(teacherName)}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="text-xs text-slate-500">
-                            Allowed Absences
-                        </div>
-
-                        <div class="font-semibold">
-                            ${s.allowedAbsences}
-                        </div>
-                    </div>
-
-                </div>
-
-            </div>
-
-            ${
-                s.usedAbsences >= s.allowedAbsences && s.allowedAbsences > 0
-                ? `
-                    <div class="rounded-2xl border border-red-200 bg-red-50 p-4">
-                        <div class="font-bold text-red-800">
-                            Schedule Freeze Recommended
-                        </div>
-
-                        <div class="text-sm text-red-700 mt-1">
-                            This student has exceeded the allowed absence limit.
-                        </div>
-                    </div>
-                `
-                : ''
-            }
-
+    widget.innerHTML = `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            ${renderInstrumentRankColumn(
+                'Instrument Categories',
+                'Grouped by instrument type across all branches.',
+                categoryRanked,
+                'No category data available yet.'
+            )}
+            ${renderInstrumentRankColumn(
+                'Specific Brands',
+                'Individual instrument models and brands in use.',
+                brandRanked,
+                'No brand data available yet.'
+            )}
         </div>
     `;
-}
-
-function closeAbsenceModal() {
-    document.getElementById('absenceModal').classList.add('hidden');
-    document.getElementById('absenceModal').classList.remove('flex');
 }
 
 async function loadDashboardData() {
@@ -569,16 +476,16 @@ async function loadDashboardData() {
         displayRecentActivity(registrations);
         renderBranches(branches);
         renderBranchMovements(branches, registrations, enrollments, teachers);
-        renderAbsenceRedList(enrollments);
+        renderPopularInstruments(enrollments);
     } catch (error) {
         console.error('Failed to load dashboard stats:', error);
         const board = document.getElementById('branchMovementBoard');
         if (board) {
             board.innerHTML = '<div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">Failed to load branch movement.</div>';
         }
-        const absenceList = document.getElementById('absenceRedList');
-        if (absenceList) {
-            absenceList.innerHTML = '<div class="xl:col-span-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">Failed to load absence list.</div>';
+        const popularInstruments = document.getElementById('popularInstrumentsWidget');
+        if (popularInstruments) {
+            popularInstruments.innerHTML = '<div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">Failed to load popular instruments.</div>';
         }
         showMessage('Failed to load dashboard statistics', 'error');
     }
