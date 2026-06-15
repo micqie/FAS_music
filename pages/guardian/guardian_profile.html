@@ -32,7 +32,7 @@
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
+<body class="portal-easy bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
     <div id="guardianProfileRoot"></div>
 
     <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
@@ -52,7 +52,6 @@
             <div class="hidden md:flex items-center gap-4">
                 <div class="flex flex-col text-right">
                     <span id="guardianNavName" class="text-sm font-semibold text-zinc-900 dark:text-white">Guardian</span>
-                    <span class="text-[10px] uppercase tracking-widest text-gold-500 font-bold">Account</span>
                 </div>
                 <button onclick="logout()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
                     <i class="fas fa-sign-out-alt mr-2 text-gold-500"></i>Logout
@@ -76,7 +75,6 @@
                 <div class="mt-3 h-1.5 rounded-full bg-gold-500"></div>
             </div>
             <div>
-                <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Guardian Menu</h3>
                 <nav class="space-y-2">
                     <a href="guardian_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-gauge-high mr-3 text-zinc-500"></i> Dashboard</a>
                     <a href="guardian_students.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-user-graduate mr-3 text-zinc-500"></i> Students</a>
@@ -104,7 +102,6 @@
                     <div class="mt-3 h-1.5 rounded-full bg-gold-500"></div>
                 </div>
                 <div>
-                    <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Guardian Menu</h3>
                     <nav class="space-y-2">
                         <a href="guardian_students.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-user-graduate mr-3 text-zinc-500"></i> Students</a>
                         <a href="guardian_payments.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-wallet mr-3 text-zinc-500"></i> Payments</a>
@@ -124,9 +121,8 @@
 
     <main class="lg:ml-72 pt-24 pb-8 px-4 sm:px-6 lg:px-8">
         <div class="max-w-6xl mx-auto">
-            <div class="mb-8 sm:mb-10">
-                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">Guardian Profile</h1>
-                <p class="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-2">Keep your contact details updated so desk staff can coordinate about payments, schedules, and absences.</p>
+            <div class="mb-6">
+                <h1 class="portal-page-title text-zinc-900 dark:text-white">Profile</h1>
             </div>
 
             <section class="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
@@ -185,11 +181,10 @@
                         <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Address</span>
                         <textarea id="guardianProfileAddress" rows="4" class="mt-2 w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 outline-none focus:border-gold-400"></textarea>
                     </label>
-                    <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Changes here update the guardian account record used across the portal and admin views.</p>
+                    <div class="mt-6 flex justify-end">
                         <button id="guardianProfileSaveBtn" type="submit" class="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-zinc-800 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400">
                             <i class="fas fa-floppy-disk"></i>
-                            Save Profile
+                            Save
                         </button>
                     </div>
                 </form>

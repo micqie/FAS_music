@@ -33,7 +33,7 @@
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
+<body class="portal-easy bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
     <div id="studentSessionsRoot"></div>
 
     <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
@@ -154,41 +154,30 @@
 
     <main class="lg:ml-72 pt-28 p-8">
         <div class="max-w-7xl mx-auto">
-            <div class="mb-10">
-                <h1 class="text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">My Sessions</h1>
-                <p class="text-zinc-500 dark:text-zinc-400 mt-2">Track each session, your attendance, and the grades your teacher records.</p>
+            <div class="mb-6">
+                <h1 class="portal-page-title text-zinc-900 dark:text-white">My Sessions</h1>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <div class="lg:col-span-1 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Current Package</div>
+                    <div class="portal-stat-label">Package</div>
                     <div id="packageName" class="text-xl font-extrabold mt-2 text-zinc-900 dark:text-white">—</div>
                     <div id="packageSessions" class="text-sm text-zinc-500 dark:text-zinc-300 mt-1">—</div>
                     <div class="mt-6 grid grid-cols-2 gap-3">
                         <div class="rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                            <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-bold">Graded Sessions</div>
+                            <div class="portal-stat-label">Graded</div>
                             <div id="gradedSessionCount" class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">—</div>
                         </div>
                         <div class="rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                            <div class="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-bold">Average Grade</div>
+                            <div class="portal-stat-label">Average</div>
                             <div id="currentGradeAverage" class="mt-2 text-2xl font-black text-gold-400">—</div>
                         </div>
-                    </div>
-                    <div class="mt-4 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
-                        <div class="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-bold">Note</div>
-                        <div class="text-sm text-zinc-600 dark:text-zinc-200 mt-2">Every grade shown here comes from the teacher’s submitted session assessment in the live database.</div>
                     </div>
                 </div>
 
                 <div class="lg:col-span-2 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-xl dark:shadow-black/40">
-                    <div class="p-6 border-b border-zinc-200 dark:border-white/10 flex items-center justify-between">
-                        <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Session Performance Tracker</div>
-                            <div class="text-sm text-zinc-500 dark:text-zinc-300 mt-1">Compact list view — open any session for the full details modal</div>
-                        </div>
-                        <div class="h-10 w-10 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 grid place-items-center">
-                            <i class="fas fa-chart-line text-gold-400"></i>
-                        </div>
+                    <div class="p-6 border-b border-zinc-200 dark:border-white/10">
+                        <h2 class="portal-section-title text-zinc-900 dark:text-white">All Sessions</h2>
                     </div>
                     <div id="attendanceTableBody" class="p-4 sm:p-6 space-y-4">
                         <div class="rounded-3xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-6 py-10 text-center text-zinc-400">
@@ -200,28 +189,13 @@
             </div>
 
             <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Next Session</div>
-                        <div class="text-lg font-extrabold mt-2 text-zinc-900 dark:text-white">Add another session package</div>
-                    </div>
-                    <div class="h-12 w-12 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 grid place-items-center">
-                        <i class="fas fa-calendar-plus text-gold-400"></i>
-                    </div>
-                </div>
-
-                <div id="studentAdditionalSessionStatus" class="mt-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 text-sm text-zinc-600 dark:text-zinc-300">
-                    We will check first if you still have remaining sessions before allowing another session package.
-                </div>
-
-                <div class="mt-5 flex flex-wrap items-center gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <h2 class="portal-section-title text-zinc-900 dark:text-white">Add More Sessions</h2>
                     <button type="button" id="studentAddAnotherSessionBtn" class="px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
-                        Add Another Session
+                        Add Sessions
                     </button>
-                    <div class="text-xs text-zinc-500 dark:text-zinc-400">
-                        You can only continue once your current session package is fully completed.
-                    </div>
                 </div>
+                <div id="studentAdditionalSessionStatus" class="mt-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 text-sm text-zinc-600 dark:text-zinc-300"></div>
             </div>
         </div>
     </main>

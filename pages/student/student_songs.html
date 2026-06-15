@@ -34,16 +34,12 @@
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
+<body class="portal-easy bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
     <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-3 sm:gap-6">
             <a href="../../index.html" class="h-10 flex items-center">
                 <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
             </a>
-            <div class="hidden md:block">
-                <div class="text-xs uppercase tracking-[0.25em] text-gold-500 font-bold">Student Portal</div>
-                <div class="text-sm text-zinc-500 dark:text-zinc-300">My Songs</div>
-            </div>
         </div>
         <div class="flex items-center gap-3">
             <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-zinc-300 dark:border-white/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200" aria-label="Open menu">
@@ -52,7 +48,6 @@
             <div class="hidden md:flex items-center gap-4">
                 <div class="flex flex-col text-right">
                     <span id="studentNavName" class="text-sm font-semibold text-zinc-900 dark:text-white">Student</span>
-                    <span class="text-[10px] uppercase tracking-widest text-gold-500 font-bold">Account</span>
                 </div>
                 <button onclick="logout()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
                     <i class="fas fa-sign-out-alt mr-2 text-gold-500"></i>Logout
@@ -132,7 +127,6 @@
                     <div>
                         <div class="text-xs uppercase tracking-[0.25em] text-gold-500 font-bold">Repertoire</div>
                         <h1 class="mt-3 text-3xl font-black tracking-tight text-zinc-900 dark:text-white">My Assigned Songs</h1>
-                        <p class="mt-2 max-w-3xl text-sm text-zinc-500 dark:text-zinc-400">Review your assigned pieces, open your learning references, and see the lesson-by-lesson progress your teacher recorded.</p>
                     </div>
                     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 p-4">

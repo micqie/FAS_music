@@ -31,7 +31,7 @@
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
+<body class="portal-easy bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
     <div id="guardianDashboardRoot"></div>
 
     <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
@@ -39,15 +39,10 @@
             <a href="guardian_dashboard.html" class="h-10 flex items-center">
                 <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
             </a>
-            <div class="hidden lg:block">
-                <div class="text-xs uppercase tracking-[0.25em] text-gold-500 font-bold">Guardian Portal</div>
-                <div class="text-sm text-zinc-500 dark:text-zinc-300">Family Dashboard</div>
-            </div>
         </div>
         <div class="flex items-center gap-2 sm:gap-4">
             <div class="hidden md:flex flex-col text-right">
                 <span id="guardianNavName" class="text-sm font-semibold text-zinc-900 dark:text-white">Guardian</span>
-                <span class="text-[10px] uppercase tracking-widest text-gold-500 font-bold">Account</span>
             </div>
             <button id="guardianMobileMenuToggle" type="button" class="md:hidden grid h-10 w-10 place-items-center rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 text-zinc-700 dark:text-zinc-200">
                 <i class="fas fa-bars"></i>
@@ -60,20 +55,19 @@
 
     <aside class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-zinc-200 dark:border-white/5">
         <div class="px-6 space-y-8 flex-1 mt-4">
-            <div>
-                <div class="portal-sidebar-card rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-lg dark:shadow-black/30">
-                    <div class="flex items-start gap-3"><div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl shrink-0">
-                            <i class="fas fa-user"></i>
-                        </div>
-                        <div class="portal-sidebar-meta flex-1 min-w-0">
-                            <div id="guardianSidebarName" class="portal-sidebar-name text-base font-extrabold truncate text-zinc-900 dark:text-white">Guardian</div>
-                            <div id="guardianSidebarEmail" class="portal-sidebar-email text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">—</div>
-                            <div class="portal-profile-branch"><span class="portal-profile-branch-label">Branch</span><span id="guardianSidebarBranch" class="portal-profile-branch-value" data-portal-branch title="">—</span></div>
-                        </div>
+            <div class="portal-sidebar-card rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-lg dark:shadow-black/30">
+                <div class="flex items-start gap-3"><div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl shrink-0">
+                        <i class="fas fa-user"></i>
                     </div>
-                    <div class="mt-3 h-1.5 rounded-full bg-gold-500"></div>
+                    <div class="portal-sidebar-meta flex-1 min-w-0">
+                        <div id="guardianSidebarName" class="portal-sidebar-name text-base font-extrabold truncate text-zinc-900 dark:text-white">Guardian</div>
+                        <div id="guardianSidebarEmail" class="portal-sidebar-email text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">—</div>
+                        <div class="portal-profile-branch"><span class="portal-profile-branch-label">Branch</span><span id="guardianSidebarBranch" class="portal-profile-branch-value" data-portal-branch title="">—</span></div>
+                    </div>
                 </div>
-                <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Guardian Menu</h3>
+                <div class="mt-3 h-1.5 rounded-full bg-gold-500"></div>
+            </div>
+            <div>
                 <nav class="space-y-2">
                     <a href="guardian_dashboard.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
                         <i class="fas fa-gauge-high mr-3"></i> Dashboard
@@ -127,36 +121,36 @@
 
     <main class="lg:ml-72 pt-24 sm:pt-28 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
-            <div class="mb-8">
-                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-white">Family Dashboard</h1>
-                <p id="guardianDashboardGreeting" class="text-zinc-500 dark:text-zinc-400 mt-2">Your quick view of balances, upcoming lessons, and what needs attention.</p>
+            <div class="mb-6">
+                <h1 class="portal-page-title text-zinc-900 dark:text-white">Dashboard</h1>
+                <p id="guardianDashboardGreeting" class="text-zinc-500 dark:text-zinc-400 mt-1 text-sm"></p>
             </div>
 
             <div id="guardianDashboardAlerts" class="mb-6 space-y-3"></div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
-                    <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 font-bold">Linked Students</div>
-                    <div id="guardianDashboardStudentCount" class="mt-2 text-3xl font-black text-zinc-900 dark:text-white">0</div>
+            <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+                <div class="portal-stat-card rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
+                    <div class="portal-stat-label">Students</div>
+                    <div id="guardianDashboardStudentCount" class="portal-stat-value text-zinc-900 dark:text-white">0</div>
                 </div>
-                <div class="rounded-3xl border border-gold-200 dark:border-gold-500/20 bg-gold-50 dark:bg-gold-500/10 p-5 shadow-xl dark:shadow-black/40">
-                    <div class="text-xs uppercase tracking-[0.22em] text-gold-700 dark:text-gold-400 font-bold">Total Balance Due</div>
-                    <div id="guardianDashboardTotalBalance" class="mt-2 text-3xl font-black text-gold-600 dark:text-gold-400">₱0.00</div>
+                <div class="portal-stat-card rounded-3xl border border-gold-200 dark:border-gold-500/20 bg-gold-50 dark:bg-gold-500/10 p-5 shadow-xl dark:shadow-black/40">
+                    <div class="portal-stat-label text-gold-700 dark:text-gold-300">Balance Due</div>
+                    <div id="guardianDashboardTotalBalance" class="portal-stat-value text-gold-600 dark:text-gold-400">₱0.00</div>
                 </div>
-                <div class="rounded-3xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 p-5 shadow-xl dark:shadow-black/40">
-                    <div class="text-xs uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400 font-bold">Total Paid</div>
-                    <div id="guardianDashboardTotalPaid" class="mt-2 text-3xl font-black text-emerald-700 dark:text-emerald-300">₱0.00</div>
+                <div class="portal-stat-card rounded-3xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 p-5 shadow-xl dark:shadow-black/40">
+                    <div class="portal-stat-label text-emerald-700 dark:text-emerald-300">Paid</div>
+                    <div id="guardianDashboardTotalPaid" class="portal-stat-value text-emerald-700 dark:text-emerald-300">₱0.00</div>
                 </div>
-                <div class="rounded-3xl border border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 p-5 shadow-xl dark:shadow-black/40">
-                    <div class="text-xs uppercase tracking-[0.22em] text-blue-700 dark:text-blue-400 font-bold">Upcoming Sessions</div>
-                    <div id="guardianDashboardUpcomingCount" class="mt-2 text-3xl font-black text-blue-700 dark:text-blue-300">0</div>
+                <div class="portal-stat-card rounded-3xl border border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 p-5 shadow-xl dark:shadow-black/40">
+                    <div class="portal-stat-label text-blue-700 dark:text-blue-300">Upcoming</div>
+                    <div id="guardianDashboardUpcomingCount" class="portal-stat-value text-blue-700 dark:text-blue-300">0</div>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6 mb-8">
                 <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between gap-3 mb-4">
-                        <h2 class="text-lg font-extrabold text-zinc-900 dark:text-white"><i class="fas fa-calendar-days mr-2 text-gold-500"></i>Upcoming Lessons</h2>
+                        <h2 class="portal-section-title text-zinc-900 dark:text-white"><i class="fas fa-calendar-days mr-2 text-gold-500"></i>Upcoming Lessons</h2>
                         <a href="guardian_students.html" class="text-sm font-bold text-gold-600 dark:text-gold-400">View all</a>
                     </div>
                     <div id="guardianDashboardUpcomingList" class="space-y-3"></div>
@@ -164,35 +158,31 @@
 
                 <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between gap-3 mb-4">
-                        <h2 class="text-lg font-extrabold text-zinc-900 dark:text-white"><i class="fas fa-wallet mr-2 text-gold-500"></i>Balances to Review</h2>
-                        <a href="guardian_payments.html" class="text-sm font-bold text-gold-600 dark:text-gold-400">Pay / review</a>
+                        <h2 class="portal-section-title text-zinc-900 dark:text-white"><i class="fas fa-wallet mr-2 text-gold-500"></i>Balances</h2>
+                        <a href="guardian_payments.html" class="text-sm font-bold text-gold-600 dark:text-gold-400">View</a>
                     </div>
                     <div id="guardianDashboardBalanceList" class="space-y-3"></div>
                 </section>
             </div>
 
             <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                <h2 class="text-lg font-extrabold text-zinc-900 dark:text-white mb-4"><i class="fas fa-bolt mr-2 text-gold-500"></i>Quick Actions</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <a href="guardian_payments.html" class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 hover:border-gold-300 transition">
+                <h2 class="portal-section-title text-zinc-900 dark:text-white mb-4"><i class="fas fa-bolt mr-2 text-gold-500"></i>Quick Actions</h2>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <a href="guardian_payments.html" class="portal-action-card rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 hover:border-gold-300 transition">
                         <i class="fas fa-wallet text-gold-500"></i>
-                        <div class="mt-2 font-bold text-zinc-900 dark:text-white">Check Payments</div>
-                        <div class="text-xs text-zinc-500 mt-1">Registration & package balances</div>
+                        <span>Payments</span>
                     </a>
-                    <a href="guardian_students.html" class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 hover:border-gold-300 transition">
-                        <i class="fas fa-chart-line text-gold-500"></i>
-                        <div class="mt-2 font-bold text-zinc-900 dark:text-white">Track Sessions</div>
-                        <div class="text-xs text-zinc-500 mt-1">Attendance, grades & schedule</div>
+                    <a href="guardian_students.html" class="portal-action-card rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 hover:border-gold-300 transition">
+                        <i class="fas fa-user-graduate text-gold-500"></i>
+                        <span>Students</span>
                     </a>
-                    <a href="guardian_absences.html" class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 hover:border-gold-300 transition">
+                    <a href="guardian_absences.html" class="portal-action-card rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 hover:border-gold-300 transition">
                         <i class="fas fa-notes-medical text-gold-500"></i>
-                        <div class="mt-2 font-bold text-zinc-900 dark:text-white">Report Absence</div>
-                        <div class="text-xs text-zinc-500 mt-1">Notify the desk in advance</div>
+                        <span>Report Absence</span>
                     </a>
-                    <a href="guardian_profile.html" class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 hover:border-gold-300 transition">
+                    <a href="guardian_profile.html" class="portal-action-card rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 hover:border-gold-300 transition">
                         <i class="fas fa-user-pen text-gold-500"></i>
-                        <div class="mt-2 font-bold text-zinc-900 dark:text-white">Update Profile</div>
-                        <div class="text-xs text-zinc-500 mt-1">Keep your contact details current</div>
+                        <span>Profile</span>
                     </a>
                 </div>
             </section>

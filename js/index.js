@@ -2364,13 +2364,13 @@ async function fetchStudentQrStatus(studentId, email = '') {
 function renderStudentQrStatus(status) {
     const code = String(status?.code || 'no_session');
     const titleMap = {
-        valid_today: 'QR Ready For Today',
-        early: 'Not Yet Available',
-        missed: 'Session Missed',
-        completed: 'Session Completed',
-        schedule_frozen: 'Schedule Frozen',
-        room_required: 'Room Required',
-        no_session: 'No Session Today'
+        valid_today: 'Ready to scan',
+        early: 'Not yet',
+        missed: 'Missed today',
+        completed: 'Done for today',
+        schedule_frozen: 'On hold',
+        room_required: 'Ask the desk',
+        no_session: 'No class today'
     };
     const banner = document.getElementById('qrStatusBanner');
     const titleEl = document.getElementById('studentQrStatusTitle');
@@ -2385,11 +2385,12 @@ function renderStudentQrStatus(status) {
         no_session: 'block border-zinc-300 bg-zinc-50 text-zinc-700 dark:border-zinc-500/30 dark:bg-zinc-500/10 dark:text-zinc-200'
     };
 
-    if (titleEl) titleEl.textContent = titleMap[code] || 'QR Status';
-    if (messageEl) messageEl.textContent = status?.message || 'Please check back later.';
+    if (titleEl) titleEl.textContent = titleMap[code] || 'Status';
+    if (messageEl) messageEl.textContent = status?.message || '';
     if (banner) {
         banner.className = `w-full mb-4 rounded-2xl border px-4 py-3 text-sm font-medium ${styles[code] || styles.no_session}`;
-        banner.textContent = status?.message || 'Please check back later.';
+        banner.textContent = status?.message || '';
+        banner.classList.toggle('hidden', !status?.message);
     }
 }
 
@@ -2775,6 +2776,17 @@ function getGuardianPrimaryGuardian(portal, user = null) {
     return matched || guardians[0] || portal?.primary_guardian || null;
 }
 
+function getGuardianStudentBranchName(item) {
+    const student = item?.student || item || {};
+    return String(
+        student?.branch_name
+        || item?.branch_name
+        || item?.current_enrollment?.branch_name
+        || student?.current_enrollment?.branch_name
+        || ''
+    ).trim();
+}
+
 function getGuardianPortalBranchLabel(portal) {
     const directBranch = String(
         portal?.branch_name
@@ -2788,7 +2800,7 @@ function getGuardianPortalBranchLabel(portal) {
     const students = Array.isArray(portal?.students) ? portal.students : [];
     const uniqueBranches = Array.from(new Set(
         students
-            .map((item) => String(item?.branch_name || '').trim())
+            .map((item) => getGuardianStudentBranchName(item))
             .filter(Boolean)
     ));
     if (uniqueBranches.length === 0) return '—';
@@ -2826,19 +2838,13 @@ function applyStudentPortalIdentity(user, studentOrPortal = null) {
 
     setText('studentNavName', displayName);
     setText('studentMobileMenuName', displayName);
-    setText('studentSidebarName', displayName);
-    setText('studentSidebarEmail', email);
+    ['studentSidebarName', 'studentSidebarMobileName', 'studentName', 'studentNameMobile'].forEach((id) => setText(id, displayName));
+    ['studentSidebarEmail', 'studentSidebarMobileEmail', 'studentEmail', 'studentEmailMobile'].forEach((id) => setText(id, email));
     if (typeof window.setPortalBranchText === 'function') {
-        window.setPortalBranchText('#studentSidebarBranch, #studentBranch, #studentBranchMobile, #studentSidebarMobileBranch', branchName);
+        window.setPortalBranchText('#studentSidebarBranch, #studentSidebarMobileBranch, #studentBranch, #studentBranchMobile', branchName);
     } else {
-        setText('studentSidebarBranch', branchName);
-        setText('studentBranch', branchName);
-        setText('studentBranchMobile', branchName);
+        ['studentSidebarBranch', 'studentSidebarMobileBranch', 'studentBranch', 'studentBranchMobile'].forEach((id) => setText(id, branchName));
     }
-    setText('studentName', displayName);
-    setText('studentEmail', email);
-    setText('studentNameMobile', displayName);
-    setText('studentEmailMobile', email);
     if (typeof window.fitAllPortalBranchLabels === 'function') {
         window.fitAllPortalBranchLabels();
     }
@@ -3102,7 +3108,7 @@ function renderGuardianDashboardAlerts(students) {
     if (!alerts.length) {
         return `
             <div class="rounded-2xl border border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
-                <i class="fas fa-circle-check mr-2"></i>You're all caught up. No urgent balance or session alerts right now.
+                <i class="fas fa-circle-check mr-2"></i>All caught up for now.
             </div>
         `;
     }
@@ -3148,7 +3154,6 @@ function renderGuardianDashboardBalanceList(items) {
                     <div class="font-bold text-zinc-900 dark:text-white">${escapeHtml(name)}</div>
                     <div class="text-lg font-black text-gold-600 dark:text-gold-400">${formatCurrencyPHP(metrics.totalBalance)}</div>
                 </div>
-                <div class="mt-1 text-xs text-zinc-500">Registration + package balance</div>
             </a>
         `;
     }).join('');
@@ -3210,43 +3215,26 @@ function renderGuardianStudentCard(item, index) {
     const statusMetrics = getGuardianSessionStatusMetrics(item);
 
     return `
-        <button type="button" onclick="openGuardianStudentModal(${index})" class="w-full rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 text-left shadow-xl transition hover:border-gold-300 hover:shadow-2xl dark:shadow-black/40">
+        <button type="button" onclick="openGuardianStudentModal(${index})" class="w-full rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 text-left shadow-lg transition hover:border-gold-300">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Student</div>
-                    <div class="mt-2 text-xl font-extrabold text-zinc-900 underline decoration-gold-500/40 decoration-2 underline-offset-4 dark:text-white">${escapeHtml(studentName)}</div>
+                    <div class="text-xl font-extrabold text-zinc-900 dark:text-white">${escapeHtml(studentName)}</div>
                     <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">${escapeHtml(branch)} • ${escapeHtml(pkgName)}</div>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(regStatus)}">${escapeHtml(regStatus)}</span>
-                    <span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-3 py-1 text-xs font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-400">
-                        ${formatCurrencyPHP(paymentMetrics.totalBalance)} balance
-                    </span>
+                    ${paymentMetrics.totalBalance > 0 ? `<span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-3 py-1 text-xs font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-400">${formatCurrencyPHP(paymentMetrics.totalBalance)} due</span>` : ''}
                 </div>
             </div>
 
-            <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-                <div class="text-zinc-500 dark:text-zinc-400">
-                    Sessions attended: <span id="guardianProgressAttended-${studentId}" class="font-bold text-zinc-900 dark:text-white">—</span>
-                    <span class="text-zinc-400">/ ${attendanceTotal || '—'}</span>
-                    <span class="mx-2 text-zinc-300">•</span>
-                    Remaining: <span id="guardianProgressRemaining-${studentId}" class="font-bold text-zinc-900 dark:text-white">—</span>
-                </div>
-                <div class="inline-flex items-center gap-2 text-gold-600 dark:text-gold-400 font-bold">
-                    Open Student Tracker <i class="fas fa-arrow-right"></i>
-                </div>
+            <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-zinc-600 dark:text-zinc-300">
+                <span>Attended <strong id="guardianProgressAttended-${studentId}" class="text-zinc-900 dark:text-white">—</strong> / ${attendanceTotal || '—'}</span>
+                <span>•</span>
+                <span>Next: ${escapeHtml(formatGuardianNextSessionLabel(item))}</span>
+                <span class="ml-auto text-gold-600 dark:text-gold-400 font-bold">View <i class="fas fa-arrow-right"></i></span>
             </div>
-            <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold">
-                <span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">${statusMetrics.completed} completed</span>
-                <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">${statusMetrics.upcoming} upcoming</span>
-                <span class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-700">${statusMetrics.absent} absent</span>
-                <span class="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-slate-700">${statusMetrics.excused} excused</span>
-            </div>
-            <div class="mt-3 rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-blue-900 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100">
-                <i class="fas fa-calendar-day mr-1 text-blue-600 dark:text-blue-300"></i>
-                <span class="font-semibold">Next:</span> ${escapeHtml(formatGuardianNextSessionLabel(item))}
-            </div>
-            <div id="guardianProgressLast-${studentId}" class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Last attendance: —</div>
+            <div id="guardianProgressRemaining-${studentId}" class="portal-hide-tech" aria-hidden="true">—</div>
+            <div id="guardianProgressLast-${studentId}" class="portal-hide-tech" aria-hidden="true">—</div>
         </button>
     `;
 }
@@ -3456,8 +3444,7 @@ function renderGuardianPaymentCard(item, index) {
         <button type="button" onclick="openGuardianStudentModal(${index})" class="w-full rounded-3xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5 text-left transition hover:border-gold-300">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">Student</div>
-                    <div class="mt-2 text-xl font-black text-zinc-900 underline decoration-gold-500/40 decoration-2 underline-offset-4 dark:text-white">${escapeHtml(studentName)}</div>
+                    <div class="text-xl font-black text-zinc-900 dark:text-white">${escapeHtml(studentName)}</div>
                     <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(branchName)} • ${escapeHtml(packageName)}</div>
                 </div>
                 <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${badgeClassForRegistrationStatus(paymentStatus)}">${escapeHtml(paymentStatus)}</span>
@@ -3465,21 +3452,13 @@ function renderGuardianPaymentCard(item, index) {
 
             <div class="mt-4 grid grid-cols-2 gap-3">
                 <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-4">
-                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Total Paid</div>
+                    <div class="portal-stat-label">Paid</div>
                     <div class="mt-2 text-xl font-black text-emerald-600">${formatCurrencyPHP(metrics.totalPaid)}</div>
                 </div>
                 <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-4">
-                    <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Total Balance</div>
+                    <div class="portal-stat-label">Due</div>
                     <div class="mt-2 text-xl font-black text-gold-500">${formatCurrencyPHP(metrics.totalBalance)}</div>
                 </div>
-            </div>
-            <div class="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold">
-                <span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">${statusMetrics.completed} completed</span>
-                <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">${statusMetrics.upcoming} upcoming</span>
-                <span class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-700">${statusMetrics.absent} absent</span>
-            </div>
-            <div class="mt-4 inline-flex items-center gap-2 text-sm font-bold text-gold-600 dark:text-gold-400">
-                Open Payment Details <i class="fas fa-arrow-right"></i>
             </div>
         </button>
     `;
@@ -3616,7 +3595,7 @@ async function initGuardianDashboardPage() {
     guardianPortalStudents = students;
 
     const greetingName = `${guardian.first_name || ''}`.trim() || 'Guardian';
-    setText('guardianDashboardGreeting', `Welcome back, ${greetingName}. Here is what needs your attention today.`);
+    setText('guardianDashboardGreeting', greetingName ? `Hello, ${greetingName}.` : '');
 
     let totalBalance = 0;
     let totalPaid = 0;
@@ -3994,25 +3973,25 @@ function initStudentAdditionalSessionAction(student, portal, requestMeta, attend
     const remainingSessions = totalSessions > 0 ? Math.max(0, totalSessions - attendedSessions) : 0;
 
     if (hasPendingRequest) {
-        statusEl.innerHTML = '<span class="text-yellow-300 font-semibold">You already have a pending session request.</span> Please wait for desk/admin to review it first.';
+        statusEl.textContent = 'You already have a pending request. Please wait for approval.';
     } else if (totalSessions > 0) {
-        statusEl.innerHTML = `Current progress: <span class="text-white font-semibold">${attendedSessions}</span> attended out of <span class="text-white font-semibold">${totalSessions}</span> session(s). Remaining: <span class="text-gold-400 font-semibold">${remainingSessions}</span>.`;
+        statusEl.textContent = `${attendedSessions} of ${totalSessions} sessions done. ${remainingSessions} left.`;
     } else {
-        statusEl.innerHTML = 'No active session package was found. You can check if you are already allowed to add another session package.';
+        statusEl.textContent = 'Finish your current package before adding more sessions.';
     }
 
     addBtn.onclick = () => {
         if (hasPendingRequest) {
-            showMessage('You already have a pending request. Please wait for desk/admin approval first.', 'error');
+            showMessage('Please wait for your pending request to be approved.', 'error');
             return;
         }
 
         if (remainingSessions > 0) {
-            showMessage(`Cannot continue yet because you still have ${remainingSessions} remaining session(s) to finish.`, 'error');
+            showMessage(`You still have ${remainingSessions} session(s) left to finish.`, 'error');
             return;
         }
 
-        showMessage('You can finally add another session. Please contact desk/admin to process your next session package.', 'success');
+        showMessage('Contact the front desk to add more sessions.', 'success');
     };
 }
 
@@ -4606,42 +4585,48 @@ function renderStudentActionBanner(student, meta, portal) {
     }
 
     let title = 'Complete your registration';
-    let text = 'Start with your personal details and upload your registration payment so the staff can review your account.';
+    let text = '';
     let actions = `
-        <button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Open Registration</button>
-        <a href="student_profile.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Open Profile</a>
+        <button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Register</button>
+        <a href="student_profile.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Profile</a>
     `;
 
     if (reservationNotice) {
         title = reservationNotice.title;
-        text = `${reservationNotice.text} This keeps your schedule from being released after repeated absences.`;
+        text = reservationNotice.text;
         actions = `
-            <a href="student_attendance.html" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">View Attendance</a>
-            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Open Sessions</a>
+            <a href="student_attendance.html" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Attendance</a>
+            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Sessions</a>
         `;
     } else if (isRejected) {
-        title = 'Registration rejected by admin';
-        text = 'Your previous registration was rejected. Open the registration form to review the notice and start again.';
-        actions = `<button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-red-500 hover:bg-red-400 text-white text-sm font-extrabold transition">Open Registration</button>`;
+        title = 'Registration was rejected';
+        text = 'Open the form to try again.';
+        actions = `<button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-red-500 hover:bg-red-400 text-white text-sm font-extrabold transition">Register Again</button>`;
     } else if (profileComplete && !regPaid) {
-        title = 'Wait for registration approval';
-        text = 'Your details are complete. The next thing to check is your registration payment approval from the staff.';
-        actions = `<button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Check Registration</button>`;
+        title = 'Waiting for approval';
+        text = 'Your registration is being reviewed.';
+        actions = `<button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Check Status</button>`;
     } else if (profileComplete && regPaid && hasPendingReq) {
-        title = 'Wait for class approval';
-        text = 'Your class request was already sent. There is nothing else you need to do here until the staff approves it.';
-        actions = `<a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Open Sessions</a>`;
+        title = 'Class request sent';
+        text = 'Please wait for staff approval.';
+        actions = `<a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Sessions</a>`;
     } else if (profileComplete && regPaid) {
-        title = 'Choose your lesson package';
-        text = 'Your registration is approved. You can now open the class request form and choose your package and instruments.';
+        title = 'Request your classes';
+        text = 'Choose your package and instrument.';
         actions = `
-            <button type="button" onclick="openStudentRequestModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Open Class Request</button>
-            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">View Sessions Page</a>
+            <button type="button" onclick="openStudentRequestModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Request Classes</button>
+            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Sessions</a>
         `;
     }
 
     titleEl.textContent = title;
-    textEl.textContent = text;
+    if (text) {
+        textEl.textContent = text;
+        textEl.classList.remove('hidden');
+    } else {
+        textEl.textContent = '';
+        textEl.classList.add('hidden');
+    }
     buttonsEl.innerHTML = actions;
     banner.classList.remove('hidden');
 }
@@ -4677,12 +4662,11 @@ function renderStudentOnboardingSteps(student, meta, portal) {
             <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
                 <div class="flex items-center justify-between gap-2">
                     <div>
-                        <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Step 1</div>
-                        <div class="text-lg font-extrabold mt-2">Complete your details</div>
+                        <div class="text-lg font-extrabold">Your details</div>
                     </div>
                     ${registrationBadge}
                 </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">${isRejected ? 'Your last registration was rejected. Open the form to acknowledge it, then submit a fresh registration.' : 'Make sure your personal information is complete so the staff can review your account.'}</p>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2 hidden" aria-hidden="true"></p>
                 <div class="mt-4 flex flex-wrap gap-3">
                     <button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white/10 text-white text-sm font-semibold">Open Registration</button>
                     <a href="student_profile.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">Open Profile</a>
@@ -4692,12 +4676,11 @@ function renderStudentOnboardingSteps(student, meta, portal) {
             <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
                 <div class="flex items-center justify-between gap-2">
                     <div>
-                        <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Step 2</div>
-                        <div class="text-lg font-extrabold mt-2">Pay the registration fee</div>
+                        <div class="text-lg font-extrabold">Pay registration</div>
                     </div>
                     ${paymentBadge}
                 </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">${isRejected ? 'After you acknowledge the rejection, this step will reset so you can upload a new proof of payment.' : 'Upload your registration payment so the staff can approve your account for class requests.'}</p>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2 hidden" aria-hidden="true"></p>
                 <div class="mt-4 flex flex-wrap gap-3">
                     ${isRejected
                         ? `<button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-white text-sm font-bold">Restart Registration</button>`
@@ -4710,16 +4693,11 @@ function renderStudentOnboardingSteps(student, meta, portal) {
             <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
                 <div class="flex items-center justify-between gap-2">
                     <div>
-                        <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Step 3</div>
-                        <div class="text-lg font-extrabold mt-2">Request your classes</div>
+                        <div class="text-lg font-extrabold">Request classes</div>
                     </div>
                     ${enrollmentBadge}
                 </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
-                    ${regPaid
-                        ? 'After registration approval, choose your package and instruments, then wait for the staff to approve your class request.'
-                        : 'This step stays locked until your registration details and payment are approved.'}
-                </p>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2 hidden" aria-hidden="true"></p>
                 ${regPaid
                     ? `<div class="mt-4 flex flex-wrap gap-3">
                         <button type="button" onclick="openStudentRequestModal()" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold">Open Class Request</button>

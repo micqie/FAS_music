@@ -34,7 +34,7 @@
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
+<body class="portal-easy bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
     <div id="studentDashboardRoot"></div>
 
     <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
@@ -42,10 +42,6 @@
             <a href="../../index.html" class="h-10 flex items-center">
                 <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
             </a>
-            <div class="hidden md:block">
-                <div class="text-xs uppercase tracking-[0.25em] text-gold-500 font-bold">Student Portal</div>
-                <div class="text-sm text-zinc-500 dark:text-zinc-300">Dashboard</div>
-            </div>
         </div>
         <div class="flex items-center gap-3">
             <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-zinc-300 dark:border-white/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200" aria-label="Open menu">
@@ -54,7 +50,6 @@
             <div class="hidden md:flex items-center gap-4">
                 <div class="flex flex-col text-right">
                     <span id="studentNavName" class="text-sm font-semibold text-zinc-900 dark:text-white">Student</span>
-                    <span class="text-[10px] uppercase tracking-widest text-gold-500 font-bold">Account</span>
                 </div>
                 <button onclick="logout()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-semibold transition text-zinc-700 dark:text-zinc-200">
                     <i class="fas fa-sign-out-alt mr-2 text-gold-500"></i>Logout
@@ -65,24 +60,22 @@
 
     <!-- Desktop sidebar -->
     <aside class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-zinc-200 dark:border-white/5">
-        <div class="px-6 space-y-8  flex-1 mt-4">
-            <div>
-                <div class="portal-sidebar-card rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-lg dark:shadow-black/30">
-                    <div class="flex items-start gap-3"><div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl shrink-0">
-                            <i class="fas fa-user"></i>
-                        </div>
-                        <div class="portal-sidebar-meta flex-1 min-w-0">
-                            <div id="studentName" class="portal-sidebar-name text-base font-extrabold truncate text-zinc-900 dark:text-white">—</div>
-                            <div id="studentEmail" class="portal-sidebar-email text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">—</div>
-                            <div class="portal-profile-branch"><span class="portal-profile-branch-label">Branch</span><span id="studentBranch" class="portal-profile-branch-value" data-portal-branch title="">—</span></div>
-                        </div>
+        <div class="px-6 space-y-8 flex-1 mt-4">
+            <div class="portal-sidebar-card rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-lg dark:shadow-black/30">
+                <div class="flex items-start gap-3"><div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center font-black text-xl shrink-0">
+                        <i class="fas fa-user"></i>
                     </div>
-                    <div class="mt-3 h-1.5 rounded-full bg-gold-500"></div>
+                    <div class="portal-sidebar-meta flex-1 min-w-0">
+                        <div id="studentSidebarName" class="portal-sidebar-name text-base font-extrabold truncate text-zinc-900 dark:text-white">—</div>
+                        <div id="studentSidebarEmail" class="portal-sidebar-email text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">—</div>
+                        <div class="portal-profile-branch"><span class="portal-profile-branch-label">Branch</span><span id="studentSidebarBranch" class="portal-profile-branch-value" data-portal-branch title="">—</span></div>
+                    </div>
                 </div>
-
+                <div class="mt-3 h-1.5 rounded-full bg-gold-500"></div>
+            </div>
+            <div>
                 <nav class="space-y-2">
-
-                    <a href="student_dashboard.html" class=" mt-4 sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
+                    <a href="student_dashboard.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
                       <i class="fas fa-music mr-3"></i> Dashboard
                     </a>
                     <a href="student_songs.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
@@ -118,14 +111,13 @@
                             <i class="fas fa-user"></i>
                         </div>
                         <div class="portal-sidebar-meta flex-1 min-w-0">
-                            <div id="studentNameMobile" class="portal-sidebar-name text-base font-extrabold truncate text-zinc-900 dark:text-white">—</div>
-                            <div id="studentEmailMobile" class="portal-sidebar-email text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">—</div>
-                            <div class="portal-profile-branch"><span class="portal-profile-branch-label">Branch</span><span id="studentBranchMobile" class="portal-profile-branch-value" data-portal-branch title="">—</span></div>
+                            <div id="studentSidebarMobileName" class="portal-sidebar-name text-base font-extrabold truncate text-zinc-900 dark:text-white">—</div>
+                            <div id="studentSidebarMobileEmail" class="portal-sidebar-email text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">—</div>
+                            <div class="portal-profile-branch"><span class="portal-profile-branch-label">Branch</span><span id="studentSidebarMobileBranch" class="portal-profile-branch-value" data-portal-branch title="">—</span></div>
                         </div>
                     </div>
                     <div class="mt-3 h-1.5 rounded-full bg-gold-500"></div>
                 </div>
-                <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Navigation</h3>
                 <nav class="space-y-2">
                         <a href="student_dashboard.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
                             <i class="fas fa-music mr-3"></i> Dashboard
@@ -165,40 +157,25 @@
 
             </div>
 
-            <div id="studentActionBanner" class="hidden rounded-3xl border border-gold-500/25 bg-amber-50 dark:bg-gold-500/10 p-6 shadow-xl dark:shadow-black/40 mb-8">
+            <div id="studentActionBanner" class="hidden rounded-3xl border border-gold-500/25 bg-amber-50 dark:bg-gold-500/10 p-5 shadow-xl dark:shadow-black/40 mb-8">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div>
-                        <div class="text-xs uppercase tracking-[0.25em] text-gold-600 dark:text-gold-300 font-bold">Your Next Step</div>
-                        <div id="studentActionBannerTitle" class="text-xl font-extrabold text-zinc-900 dark:text-white mt-2">Finish your registration</div>
-                        <p id="studentActionBannerText" class="text-sm text-zinc-600 dark:text-zinc-300 mt-2">Complete one step at a time. The rest can wait until you&apos;re ready.</p>
+                        <div id="studentActionBannerTitle" class="text-lg font-extrabold text-zinc-900 dark:text-white">Finish your registration</div>
+                        <p id="studentActionBannerText" class="text-sm text-zinc-600 dark:text-zinc-300 mt-1 hidden"></p>
                     </div>
                     <div id="studentActionBannerButtons" class="flex flex-wrap gap-3"></div>
                 </div>
             </div>
 
             <div id="studentEnrollmentOverviewCard" class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40 mb-8">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Getting Started</div>
-                        <div class="text-lg font-extrabold mt-2">Follow these steps to unlock your classes</div>
-                    </div>
-                    <div class="text-xs text-zinc-500 dark:text-zinc-400">Complete profile → Pay registration → Request classes → Wait for approval</div>
-                </div>
-                <div id="studentOnboardingSteps" class="mt-6 space-y-6"></div>
+                <h2 class="portal-section-title text-zinc-900 dark:text-white">Getting Started</h2>
+                <div id="studentOnboardingSteps" class="mt-5 space-y-6"></div>
             </div>
 
             <div id="studentPerformanceCard" class="hidden rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40 mb-8">
-                <div class="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Student Performance Dashboard</div>
-                        <div class="text-lg font-extrabold mt-2 text-zinc-900 dark:text-white">See your progress by skill</div>
-                        <p id="studentPerformanceNote" class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">These bars update from your recorded session assessments.</p>
-                    </div>
-                    <div class="h-12 w-12 rounded-2xl bg-gold-500/15 border border-gold-500/20 grid place-items-center">
-                        <i class="fas fa-chart-bar text-gold-400"></i>
-                    </div>
-                </div>
-                <div id="studentPerformanceBars" class="mt-6 space-y-5"></div>
+                <h2 class="portal-section-title text-zinc-900 dark:text-white">Your Progress</h2>
+                <p id="studentPerformanceNote" class="portal-hide-tech text-sm text-zinc-500 dark:text-zinc-400 mt-1"></p>
+                <div id="studentPerformanceBars" class="mt-5 space-y-5"></div>
             </div>
 
             <div id="studentOverviewGrid" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -211,15 +188,8 @@
 
                 <!-- Upcoming Schedule Card -->
                 <div id="studentUpcomingScheduleCard" class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Upcoming Schedule</div>
-                            <div id="studentUpcomingDate" class="text-2xl font-black text-zinc-900 dark:text-white mt-2">Waiting for schedule</div>
-                        </div>
-                        <div class="h-12 w-12 rounded-2xl bg-gold-500/15 border border-gold-500/20 grid place-items-center">
-                            <i class="fas fa-calendar-day text-gold-400"></i>
-                        </div>
-                    </div>
+                    <h2 class="portal-section-title text-zinc-900 dark:text-white">Next Class</h2>
+                    <div id="studentUpcomingDate" class="text-2xl font-black text-zinc-900 dark:text-white mt-3">Waiting for schedule</div>
 
                     <div class="mt-6 grid grid-cols-2 gap-4">
                         <div class="rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 p-4">
@@ -242,17 +212,12 @@
                             <div id="packageName" class="text-sm font-bold text-zinc-900 dark:text-white mt-1">—</div>
                         </div>
                     </div>
-                    <p id="studentUpcomingNote" class="text-xs text-zinc-500 mt-4">Your next approved class will appear here.</p>
+                    <p id="studentUpcomingNote" class="portal-hide-tech text-xs text-zinc-500 mt-4"></p>
                 </div>
 
-                <!-- Simple Request Enrollment shortcut -->
                 <div id="studentRequestShortcutCard" class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between gap-4">
-                        <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400 font-bold">Class Request</div>
-                            <div class="text-lg font-extrabold mt-2">Choose your lesson package</div>
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Open the form only when you&apos;re ready. You do not need to finish everything at once.</p>
-                        </div>
+                        <h2 class="portal-section-title text-zinc-900 dark:text-white">Request Classes</h2>
                         <button type="button" onclick="openStudentRequestModal()" class="px-4 py-2 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition whitespace-nowrap">Open Form</button>
                     </div>
                 </div>
@@ -410,25 +375,18 @@
         <div class="max-w-7xl mx-auto">
             <div id="studentQrCard" class="rounded-3xl border-2 border-gold-500/30 bg-amber-50/50 dark:bg-gold-500/10 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between">
-                        <div>
-                            <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Attendance QR</div>
-                            <div class="text-lg font-extrabold mt-2">Show this when you arrive</div>
-                        </div>
+                        <h2 class="portal-section-title text-zinc-900 dark:text-white">Check-in QR</h2>
                         <a href="student_qr.html" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
-                            Open Fullscreen
+                            Fullscreen
                         </a>
                     </div>
 
-                    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                        <div class="rounded-2xl bg-white dark:bg-obsidian/60 border-2 border-gold-500/30 p-4 flex items-center justify-center">
+                    <div class="mt-6 flex justify-center">
+                        <div class="rounded-2xl bg-white dark:bg-obsidian/60 border-2 border-gold-500/30 p-4">
                             <div id="qrCodeBox" class="p-2 bg-white"></div>
                         </div>
-                        <div>
-                            <div class="text-sm text-zinc-700 dark:text-zinc-200 font-semibold">QR Data</div>
-                            <div id="qrPayloadText" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 break-all font-mono">—</div>
-                            <p class="mt-4 text-xs text-zinc-500">If scanning fails, show the QR page or ask the staff to verify your student ID.</p>
-                        </div>
                     </div>
+                    <span id="qrPayloadText" class="portal-hide-tech" aria-hidden="true"></span>
                 </div>
         </div>
     </div>
