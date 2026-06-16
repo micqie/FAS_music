@@ -5,6 +5,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
+require_once 'instrument_specialization_sync.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
@@ -79,6 +80,7 @@ class Instruments
             // Keep values aligned with music-db.sql enums.
             $this->conn->exec("UPDATE tbl_instruments SET status = 'Available' WHERE status IS NULL OR status = ''");
             $this->conn->exec("UPDATE tbl_instruments SET `condition` = 'Good' WHERE `condition` IS NULL OR `condition` = ''");
+            ensure_specialization_instrument_link($this->conn);
         } catch (PDOException $e) {
             // Schema may already be up to date; do not break API
         }
@@ -139,7 +141,8 @@ class Instruments
                 $data['description'] ?? null
             ]);
 
-            $typeId = $this->conn->lastInsertId();
+            $typeId = (int) $this->conn->lastInsertId();
+            upsert_specialization_for_instrument_type($this->conn, $typeId, (string) $data['type_name']);
 
             $this->sendJSON([
                 'success' => true,
@@ -258,10 +261,10 @@ class Instruments
         }
 
         try {
-            // Check if type exists
-            $checkStmt = $this->conn->prepare("SELECT type_id FROM tbl_instrument_types WHERE type_id = ?");
+            $checkStmt = $this->conn->prepare("SELECT type_id, type_name FROM tbl_instrument_types WHERE type_id = ?");
             $checkStmt->execute([$data['type_id']]);
-            if (!$checkStmt->fetch()) {
+            $existingType = $checkStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$existingType) {
                 $this->sendJSON(['error' => 'Instrument type not found'], 404);
             }
 
@@ -275,6 +278,13 @@ class Instruments
                 $data['description'] ?? null,
                 $data['type_id']
             ]);
+
+            rename_specialization_for_instrument_type(
+                $this->conn,
+                (int) $data['type_id'],
+                (string) ($existingType['type_name'] ?? ''),
+                (string) $data['type_name']
+            );
 
             $this->sendJSON([
                 'success' => true,

@@ -5,6 +5,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
+require_once 'instrument_specialization_sync.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
@@ -27,6 +28,7 @@ class StudentsApi
     public function __construct($pdo)
     {
         $this->conn = $pdo;
+        ensure_specialization_instrument_link($this->conn);
         $this->ensureEnrollmentAssignedTeacherColumn();
         $this->ensureEnrollmentFixedScheduleColumns();
         $this->ensureEnrollmentScheduleSlotsTable();
@@ -817,6 +819,29 @@ class StudentsApi
         }
     }
 
+    private function teacherSpecializationMatchesInstrument($specializationRaw, $keywordList)
+    {
+        $specNames = array_values(array_filter(array_map(function ($part) {
+            return strtolower(trim((string) $part));
+        }, explode(',', (string) $specializationRaw)), function ($part) {
+            return $part !== '';
+        }));
+
+        foreach ($specNames as $specName) {
+            foreach ((array) $keywordList as $kw) {
+                $keyword = strtolower(trim((string) $kw));
+                if ($keyword === '' || $specName === '') {
+                    continue;
+                }
+                if ($specName === $keyword || strpos($specName, $keyword) !== false || strpos($keyword, $specName) !== false) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private function buildTeacherCandidates($branchId, $instrumentIds = [], $instrumentKeywords = [])
     {
         $candidates = [];
@@ -825,6 +850,30 @@ class StudentsApi
         }
 
         try {
+            ensure_specialization_instrument_link($this->conn);
+
+            $instrumentIds = array_values(array_filter(array_map('intval', (array) $instrumentIds), function ($v) {
+                return $v > 0;
+            }));
+            $instrumentTypeIds = [];
+            if (!empty($instrumentIds)) {
+                $placeholders = implode(',', array_fill(0, count($instrumentIds), '?'));
+                $stmtTypes = $this->conn->prepare("SELECT DISTINCT type_id FROM tbl_instruments WHERE instrument_id IN ({$placeholders})");
+                $stmtTypes->execute($instrumentIds);
+                $instrumentTypeIds = array_values(array_unique(array_filter(array_map('intval', $stmtTypes->fetchAll(PDO::FETCH_COLUMN) ?: []), function ($v) {
+                    return $v > 0;
+                })));
+            }
+
+            $keywordList = [];
+            foreach ((array) $instrumentKeywords as $kw) {
+                $w = strtolower(trim((string) $kw));
+                if ($w !== '') {
+                    $keywordList[] = $w;
+                }
+            }
+            $keywordList = array_values(array_unique($keywordList));
+
             $teacherSql = "
                 SELECT
                     t.teacher_id,
@@ -833,7 +882,11 @@ class StudentsApi
                     COALESCE(
                         GROUP_CONCAT(DISTINCT s.specialization_name ORDER BY s.specialization_name SEPARATOR ', '),
                         ''
-                    ) AS specialization
+                    ) AS specialization,
+                    COALESCE(
+                        GROUP_CONCAT(DISTINCT s.type_id ORDER BY s.type_id SEPARATOR ','),
+                        ''
+                    ) AS specialization_type_ids
                 FROM tbl_teachers t
                 LEFT JOIN tbl_teacher_specializations ts ON ts.teacher_id = t.teacher_id
                 LEFT JOIN tbl_specialization s ON s.specialization_id = ts.specialization_id
@@ -846,18 +899,12 @@ class StudentsApi
             $stmtTeachers->execute([(int) $branchId]);
             $teachers = $stmtTeachers->fetchAll(PDO::FETCH_ASSOC);
 
-            $instrumentIds = array_values(array_filter(array_map('intval', (array)$instrumentIds), function ($v) { return $v > 0; }));
-            $keywordList = [];
-            foreach ((array)$instrumentKeywords as $kw) {
-                $w = strtolower(trim((string)$kw));
-                if ($w !== '') $keywordList[] = $w;
-            }
-            $keywordList = array_values(array_unique($keywordList));
-
             foreach ($teachers as $t) {
-                $teacherId = (int)($t['teacher_id'] ?? 0);
-                if ($teacherId < 1) continue;
-                $specializationRaw = trim((string)($t['specialization'] ?? ''));
+                $teacherId = (int) ($t['teacher_id'] ?? 0);
+                if ($teacherId < 1) {
+                    continue;
+                }
+                $specializationRaw = trim((string) ($t['specialization'] ?? ''));
                 $specialization = strtolower($specializationRaw);
 
                 $isAllAround = ($specialization !== '') && (
@@ -867,18 +914,16 @@ class StudentsApi
                     strpos($specialization, 'multi') !== false
                 );
 
-                $matchedByKeyword = false;
-                if (!empty($keywordList)) {
-                    foreach ($keywordList as $kw) {
-                        if (strpos($specialization, $kw) !== false) {
-                            $matchedByKeyword = true;
-                            break;
-                        }
-                    }
-                }
+                $teacherTypeIds = array_values(array_unique(array_filter(array_map('intval', explode(',', (string) ($t['specialization_type_ids'] ?? ''))), function ($v) {
+                    return $v > 0;
+                })));
+                $matchedByType = !empty($instrumentTypeIds) && !empty(array_intersect($teacherTypeIds, $instrumentTypeIds));
+                $matchedByKeyword = $this->teacherSpecializationMatchesInstrument($specializationRaw, $keywordList);
 
-                $eligible = empty($instrumentIds) || $matchedByKeyword || $isAllAround;
-                if (!$eligible) continue;
+                $eligible = empty($instrumentIds) || $matchedByType || $matchedByKeyword || $isAllAround;
+                if (!$eligible) {
+                    continue;
+                }
 
                 $candidates[] = [
                     'teacher_id' => $teacherId,
@@ -3849,7 +3894,7 @@ class StudentsApi
                 if (!empty($ids)) {
                     $placeholders = implode(',', array_fill(0, count($ids), '?'));
                     $stmtInst = $this->conn->prepare("
-                        SELECT i.instrument_id, i.instrument_name, it.type_name
+                        SELECT i.instrument_id, i.instrument_name, i.type_id, it.type_name
                         FROM tbl_instruments i
                         LEFT JOIN tbl_instrument_types it ON i.type_id = it.type_id
                         WHERE i.instrument_id IN ({$placeholders})
@@ -3860,6 +3905,7 @@ class StudentsApi
                     foreach ($instRows as $instRow) {
                         $detailsById[(int) $instRow['instrument_id']] = [
                             'instrument_name' => $instRow['instrument_name'] ?? null,
+                            'type_id' => (int) ($instRow['type_id'] ?? 0),
                             'type_name' => $instRow['type_name'] ?? null,
                         ];
                         if (!empty($instRow['instrument_name'])) $instrumentKeywords[] = $instRow['instrument_name'];
@@ -3870,6 +3916,7 @@ class StudentsApi
                             $row['instruments'][] = [
                                 'instrument_id' => $iid,
                                 'instrument_name' => $detailsById[$iid]['instrument_name'],
+                                'type_id' => $detailsById[$iid]['type_id'],
                                 'type_name' => $detailsById[$iid]['type_name'],
                             ];
                         }
@@ -4807,7 +4854,7 @@ class StudentsApi
             if (!empty($instrumentIds)) {
                 $placeholders = implode(',', array_fill(0, count($instrumentIds), '?'));
                 $stmtInst = $this->conn->prepare("
-                    SELECT i.instrument_id, i.instrument_name, it.type_name
+                    SELECT i.instrument_id, i.instrument_name, i.type_id, it.type_name
                     FROM tbl_instruments i
                     LEFT JOIN tbl_instrument_types it ON i.type_id = it.type_id
                     WHERE i.instrument_id IN ({$placeholders})
@@ -4820,6 +4867,7 @@ class StudentsApi
                     $instrumentLookup[$instId] = [
                         'instrument_id' => $instId,
                         'instrument_name' => (string)($instRow['instrument_name'] ?? ''),
+                        'type_id' => (int)($instRow['type_id'] ?? 0),
                         'type_name' => (string)($instRow['type_name'] ?? '')
                     ];
                     if (!empty($instRow['instrument_name'])) $instrumentKeywords[] = $instRow['instrument_name'];

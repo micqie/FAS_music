@@ -54,11 +54,32 @@
             return Array.from(new Set(keywords));
         }
 
+        function splitTeacherSpecializations(text) {
+            return String(text || '')
+                .split(',')
+                .map(part => normalizeText(part))
+                .filter(Boolean);
+        }
+
+        function keywordMatchesSpecialization(keyword, specialization) {
+            if (!keyword || !specialization) return false;
+            if (keyword === specialization) return true;
+            return specialization.includes(keyword) || keyword.includes(specialization);
+        }
+
         function teacherMatchesInstrument(teacher, instrument) {
-            const specialization = normalizeText(teacher?.specialization || '');
-            if (!specialization || isGeneralTeacherSpecialization(specialization)) return false;
+            if (!instrument) return false;
+            const specializations = splitTeacherSpecializations(teacher?.specialization || '');
+            if (!specializations.length) return false;
+            if (specializations.some(isGeneralTeacherSpecialization)) return false;
+
             const keywords = getInstrumentKeywords(instrument);
-            return keywords.some(keyword => specialization.includes(keyword));
+            const typeName = normalizeText(instrument?.type_name || '');
+
+            return specializations.some(spec => {
+                if (typeName && spec === typeName) return true;
+                return keywords.some(keyword => keywordMatchesSpecialization(keyword, spec));
+            });
         }
 
         function getTeachersForInstrument(instrument) {

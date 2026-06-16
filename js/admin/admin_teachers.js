@@ -4,10 +4,7 @@
         let allSpecializations = [];
 
         function esc(v) {
-            if (v == null) return '';
-            const d = document.createElement('div');
-            d.textContent = String(v);
-            return d.innerHTML;
+            return (window.TeacherFormUI && TeacherFormUI.esc) ? TeacherFormUI.esc(v) : String(v ?? '');
         }
 
         function showMessage(message, type = 'error') {
@@ -24,6 +21,49 @@
             return 'bg-slate-100 text-slate-700 border-slate-200';
         }
 
+        function refreshSpecializationChips(selectedIds = []) {
+            const grid = document.getElementById('specializationChipGrid');
+            if (!grid || !window.TeacherFormUI) return;
+            TeacherFormUI.renderSpecializationChips(grid, allSpecializations, selectedIds);
+        }
+
+        function getSelectedSpecializationIds() {
+            const grid = document.getElementById('specializationChipGrid');
+            return window.TeacherFormUI
+                ? TeacherFormUI.getSelectedSpecializationIdsFromChips(grid)
+                : [];
+        }
+
+        function setSelectedSpecializationIds(ids) {
+            refreshSpecializationChips(ids);
+        }
+
+        function updateAccountModeCards() {
+            const realCard = document.getElementById('accountModeRealCard');
+            const systemCard = document.getElementById('accountModeSystemCard');
+            const isReal = document.getElementById('accountModeReal')?.checked;
+            if (realCard) realCard.classList.toggle('is-selected', !!isReal);
+            if (systemCard) systemCard.classList.toggle('is-selected', !isReal);
+        }
+
+        function bindAccountModeCardClicks() {
+            document.getElementById('accountModeRealCard')?.addEventListener('click', () => {
+                const input = document.getElementById('accountModeReal');
+                if (input) input.checked = true;
+                TeacherFormUI.setAccountMode('real_email', false);
+                updateAccountModeCards();
+            });
+            document.getElementById('accountModeSystemCard')?.addEventListener('click', () => {
+                const input = document.getElementById('accountModeSystem');
+                if (input) input.checked = true;
+                TeacherFormUI.setAccountMode('system_account', false);
+                updateAccountModeCards();
+                TeacherFormUI.previewSystemLogin();
+            });
+            document.getElementById('accountModeReal')?.addEventListener('change', updateAccountModeCards);
+            document.getElementById('accountModeSystem')?.addEventListener('change', updateAccountModeCards);
+        }
+
         async function loadBranches() {
             const res = await axios.get(`${baseApiUrl}/branch.php?action=get-branches-all`);
             const data = res.data;
@@ -34,39 +74,15 @@
                 filter.innerHTML = '<option value="">All Branches</option>' + allBranches.map(b => `<option value="${Number(b.branch_id)}">${esc(b.branch_name)}</option>`).join('');
             }
             if (formSel) {
-                formSel.innerHTML = '<option value="">Select Branch</option>' + allBranches.map(b => `<option value="${Number(b.branch_id)}">${esc(b.branch_name)}</option>`).join('');
+                formSel.innerHTML = '<option value="">Select branch</option>' + allBranches.map(b => `<option value="${Number(b.branch_id)}">${esc(b.branch_name)}</option>`).join('');
             }
         }
 
-        async function loadSpecializations(selectedId = '') {
+        async function loadSpecializations(selectedIds = []) {
             const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-specializations`);
             const data = res.data;
             allSpecializations = (data.success && Array.isArray(data.specializations)) ? data.specializations : [];
-            const sel = document.getElementById('specializationIds');
-            if (!sel) return;
-            sel.innerHTML = allSpecializations
-                .map(s => `<option value="${Number(s.specialization_id)}">${esc(s.specialization_name)}${String(s.status) === 'Inactive' ? ' (Inactive)' : ''}</option>`)
-                .join('');
-            if (selectedId !== '') {
-                setSelectedSpecializationIds(Array.isArray(selectedId) ? selectedId : [selectedId]);
-            }
-        }
-
-        function getSelectedSpecializationIds() {
-            const sel = document.getElementById('specializationIds');
-            if (!sel) return [];
-            return Array.from(sel.selectedOptions || [])
-                .map(opt => Number(opt.value || 0))
-                .filter(v => v > 0);
-        }
-
-        function setSelectedSpecializationIds(ids) {
-            const wanted = new Set((Array.isArray(ids) ? ids : []).map(v => Number(v)).filter(v => v > 0));
-            const sel = document.getElementById('specializationIds');
-            if (!sel) return;
-            Array.from(sel.options).forEach(opt => {
-                opt.selected = wanted.has(Number(opt.value || 0));
-            });
+            refreshSpecializationChips(selectedIds);
         }
 
         async function loadTeachers() {
@@ -206,10 +222,17 @@
             const modal = document.getElementById('teacherModal');
             const form = document.getElementById('teacherForm');
             const title = document.getElementById('teacherModalTitle');
+            const subtitle = document.getElementById('teacherModalSubtitle');
             if (form) form.reset();
             document.getElementById('teacherId').value = '';
             setSelectedSpecializationIds([]);
             if (title) title.textContent = 'Add Teacher';
+            if (subtitle) subtitle.textContent = 'Set profile details, specializations, and portal login.';
+            if (window.TeacherFormUI) {
+                TeacherFormUI.setAccountMode('real_email', false);
+                TeacherFormUI.previewSystemLogin();
+                updateAccountModeCards();
+            }
             if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
         }
 
@@ -230,19 +253,78 @@
                 ? t.specialization_ids
                 : String(t.specialization_ids_csv || '').split(',').map(v => Number(v || 0)).filter(v => v > 0);
             setSelectedSpecializationIds(ids);
-            document.getElementById('email').value = t.email || '';
+            document.getElementById('email').value = (t.email || '').includes('@fas.com') ? '' : (t.email || '');
             document.getElementById('phone').value = t.phone || '';
             document.getElementById('status').value = t.status || 'Active';
             document.getElementById('teacherModalTitle').textContent = 'Edit Teacher';
+            document.getElementById('teacherModalSubtitle').textContent = 'Update teacher profile and specializations.';
+            if (window.TeacherFormUI) {
+                TeacherFormUI.setAccountMode('real_email', true);
+            }
             const modal = document.getElementById('teacherModal');
             if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+        }
+
+        function validateTeacherForm(isEdit) {
+            const specializationIds = getSelectedSpecializationIds();
+            if (!specializationIds.length) {
+                showMessage('Please select at least one specialization.', 'error');
+                return false;
+            }
+            if (!isEdit && window.TeacherFormUI) {
+                const mode = document.getElementById('accountModeReal')?.checked ? 'real_email' : 'system_account';
+                const email = String(document.getElementById('email')?.value || '').trim();
+                if (mode === 'real_email' && !email) {
+                    showMessage('Please enter the teacher email for a real email account.', 'error');
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function showTeacherCreatedDialog(data) {
+            const username = data.username || data.login_identifier || '';
+            const tempPassword = data.temp_password || '';
+            const accountMode = data.account_mode || '';
+            const emailSent = !!data.email_sent;
+
+            if (accountMode === 'real_email') {
+                Swal.fire({
+                    icon: emailSent ? 'success' : 'warning',
+                    title: emailSent ? 'Teacher Created' : 'Teacher Created (Email Not Sent)',
+                    html: emailSent
+                        ? `Login details were emailed to <strong>${esc(username)}</strong>.<br><br>Temporary password: <span class="font-mono">${esc(tempPassword)}</span>`
+                        : `Account created for <strong>${esc(username)}</strong>, but the email could not be sent.<br><br>Share these credentials manually:<br><strong>Username:</strong> ${esc(username)}<br><strong>Temporary password:</strong> <span class="font-mono">${esc(tempPassword)}</span>${data.email_error ? `<br><br><span class="text-xs text-slate-500">${esc(data.email_error)}</span>` : ''}`,
+                    confirmButtonColor: '#b8860b'
+                });
+                return;
+            }
+
+            if (username && tempPassword) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Teacher Account Created',
+                    html: `<div class="text-left text-sm space-y-2">
+                        <p><strong>Login:</strong> <span class="font-mono">${esc(username)}</span></p>
+                        <p><strong>Temporary password:</strong> <span class="font-mono">${esc(tempPassword)}</span></p>
+                        <p class="text-xs text-slate-500">Share these with the teacher. They must change the password on first login.</p>
+                    </div>`,
+                    confirmButtonColor: '#b8860b'
+                });
+                return;
+            }
+
+            showMessage('Teacher saved successfully', 'success');
         }
 
         async function saveTeacher(event) {
             event.preventDefault();
             const teacherId = Number(document.getElementById('teacherId').value || 0);
+            const isEdit = teacherId > 0;
+            if (!validateTeacherForm(isEdit)) return;
+
             const payload = {
-                action: teacherId > 0 ? 'update-teacher' : 'add-teacher',
+                action: isEdit ? 'update-teacher' : 'add-teacher',
                 teacher_id: teacherId,
                 first_name: document.getElementById('firstName').value.trim(),
                 last_name: document.getElementById('lastName').value.trim(),
@@ -251,9 +333,10 @@
                 specialization_ids: getSelectedSpecializationIds(),
                 email: document.getElementById('email').value.trim(),
                 phone: document.getElementById('phone').value.trim(),
-                status: document.getElementById('status').value
+                status: document.getElementById('status').value,
+                ...(window.TeacherFormUI ? TeacherFormUI.getAccountModePayload(isEdit) : {})
             };
-            const endpoint = teacherId > 0 ? 'update-teacher' : 'add-teacher';
+            const endpoint = isEdit ? 'update-teacher' : 'add-teacher';
             const res = await axios.post(`${baseApiUrl}/teachers.php?action=${endpoint}`, payload);
             const data = res.data;
             if (!data.success) {
@@ -261,13 +344,8 @@
                 return;
             }
             closeTeacherModal();
-            if (data.temp_password && data.username) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Teacher Account Created',
-                    html: `Login credentials:<br><br><strong>Username:</strong> ${esc(data.username)}<br><strong>Temporary Password:</strong> ${esc(data.temp_password)}<br><br>They will be required to change this on first login.`,
-                    confirmButtonColor: '#b8860b'
-                });
+            if (!isEdit && (data.username || data.login_identifier)) {
+                showTeacherCreatedDialog(data);
             } else {
                 showMessage('Teacher saved successfully', 'success');
             }
@@ -296,6 +374,11 @@
                 const displayName = user.username || user.email || 'Admin';
                 if (userNameNav) userNameNav.textContent = displayName;
                 if (profileMenuName) profileMenuName.textContent = displayName;
+            }
+            if (window.TeacherFormUI) {
+                TeacherFormUI.bindAccountModeControls();
+                TeacherFormUI.bindSystemLoginPreview();
+                bindAccountModeCardClicks();
             }
             await loadBranches();
             await loadSpecializations();

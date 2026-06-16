@@ -187,8 +187,9 @@
                     </select>
                 </div>
                 <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Specializations * (Ctrl/Cmd + Click for multiple)</label>
-                    <select id="specializationIds" multiple required class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white min-h-[120px]"></select>
+                    <label class="block text-sm font-medium text-zinc-300 mb-1">Specializations *</label>
+                    <p class="text-xs text-zinc-500 mb-2">Tap to select one or more.</p>
+                    <div id="specializationChipGrid" class="rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 flex flex-wrap gap-2 max-h-40 overflow-y-auto"></div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-zinc-300 mb-1">Email</label>
@@ -218,6 +219,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/index.js"></script>
+    <script src="../../js/shared/teacher_form_ui.js"></script>
     <script src="../../js/manager/dashboard.js"></script>
     <script>
         let allTeachers = [];
@@ -260,31 +262,19 @@
             const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-specializations`);
             const data = res.data;
             allSpecializations = (data.success && Array.isArray(data.specializations)) ? data.specializations : [];
-            const sel = document.getElementById('specializationIds');
-            if (!sel) return;
-            sel.innerHTML = allSpecializations
-                .map(s => `<option value="${Number(s.specialization_id)}">${esc(s.specialization_name)}${String(s.status) === 'Inactive' ? ' (Inactive)' : ''}</option>`)
-                .join('');
-            if (Array.isArray(selectedIds) && selectedIds.length) {
-                setSelectedSpecializationIds(selectedIds);
+            const grid = document.getElementById('specializationChipGrid');
+            if (grid && window.TeacherFormUI) {
+                TeacherFormUI.renderSpecializationChips(grid, allSpecializations, selectedIds);
             }
         }
 
         function getSelectedSpecializationIds() {
-            const sel = document.getElementById('specializationIds');
-            if (!sel) return [];
-            return Array.from(sel.selectedOptions || [])
-                .map(opt => Number(opt.value || 0))
-                .filter(v => v > 0);
+            const grid = document.getElementById('specializationChipGrid');
+            return window.TeacherFormUI ? TeacherFormUI.getSelectedSpecializationIdsFromChips(grid) : [];
         }
 
         function setSelectedSpecializationIds(ids) {
-            const wanted = new Set((Array.isArray(ids) ? ids : []).map(v => Number(v)).filter(v => v > 0));
-            const sel = document.getElementById('specializationIds');
-            if (!sel) return;
-            Array.from(sel.options).forEach(opt => {
-                opt.selected = wanted.has(Number(opt.value || 0));
-            });
+            loadSpecializations(Array.isArray(ids) ? ids : []);
         }
 
         async function loadTeachers() {
@@ -383,19 +373,26 @@
             event.preventDefault();
             if (!requireManagerBranch()) return;
             const teacherId = Number(document.getElementById('teacherId').value || 0);
+            const isEdit = teacherId > 0;
+            const specializationIds = getSelectedSpecializationIds();
+            if (!specializationIds.length) {
+                showMessage('Please select at least one specialization.', 'error');
+                return;
+            }
             const payload = {
-                action: teacherId > 0 ? 'update-teacher' : 'add-teacher',
+                action: isEdit ? 'update-teacher' : 'add-teacher',
                 teacher_id: teacherId,
                 first_name: document.getElementById('firstName').value.trim(),
                 last_name: document.getElementById('lastName').value.trim(),
                 branch_id: Number(managerBranchId || 0),
                 employment_type: document.getElementById('employmentType').value,
-                specialization_ids: getSelectedSpecializationIds(),
+                specialization_ids: specializationIds,
                 email: document.getElementById('email').value.trim(),
                 phone: document.getElementById('phone').value.trim(),
-                status: document.getElementById('status').value
+                status: document.getElementById('status').value,
+                ...(window.TeacherFormUI ? TeacherFormUI.getAccountModePayload(isEdit) : {})
             };
-            const endpoint = teacherId > 0 ? 'update-teacher' : 'add-teacher';
+            const endpoint = isEdit ? 'update-teacher' : 'add-teacher';
             const res = await axios.post(`${baseApiUrl}/teachers.php?action=${endpoint}`, payload);
             const data = res.data;
             if (!data.success) {
@@ -403,7 +400,16 @@
                 return;
             }
             closeTeacherModal();
-            showMessage('Teacher saved successfully', 'success');
+            if (!isEdit && data.username) {
+                Swal.fire({
+                    icon: data.email_sent === false && data.account_mode === 'real_email' ? 'warning' : 'success',
+                    title: 'Teacher Created',
+                    html: `<p><strong>Login:</strong> ${esc(data.username)}</p><p><strong>Temporary password:</strong> <span class="font-mono">${esc(data.temp_password || 'fasmusic@2020')}</span></p>`,
+                    confirmButtonColor: '#b8860b'
+                });
+            } else {
+                showMessage('Teacher saved successfully', 'success');
+            }
             await loadTeachers();
         }
 

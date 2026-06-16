@@ -768,6 +768,7 @@ CREATE TABLE `tbl_song_library` (
 CREATE TABLE `tbl_specialization` (
   `specialization_id` int(11) NOT NULL,
   `specialization_name` varchar(100) NOT NULL,
+  `type_id` int(11) DEFAULT NULL,
   `status` enum('Active','Inactive') DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -776,12 +777,18 @@ CREATE TABLE `tbl_specialization` (
 -- Dumping data for table `tbl_specialization`
 --
 
-INSERT INTO `tbl_specialization` (`specialization_id`, `specialization_name`, `status`, `created_at`) VALUES
-(1, 'Piano', 'Active', '2026-02-23 09:45:38'),
-(2, 'Guitar', 'Active', '2026-02-23 09:45:38'),
-(3, 'Drums', 'Active', '2026-02-23 09:45:38'),
-(4, 'Violin', 'Active', '2026-02-23 09:45:38'),
-(5, 'General', 'Active', '2026-02-23 09:45:38');
+INSERT INTO `tbl_specialization` (`specialization_id`, `specialization_name`, `type_id`, `status`, `created_at`) VALUES
+(1, 'Piano', 23, 'Active', '2026-02-23 09:45:38'),
+(2, 'Guitar', 24, 'Active', '2026-02-23 09:45:38'),
+(3, 'Drums', 29, 'Active', '2026-02-23 09:45:38'),
+(4, 'Violin', 28, 'Active', '2026-02-23 09:45:38'),
+(5, 'General', NULL, 'Active', '2026-02-23 09:45:38'),
+(6, 'Voice', 30, 'Active', '2026-02-23 09:45:38'),
+(7, 'Ukulele', 31, 'Active', '2026-02-23 09:45:38'),
+(8, 'Cello', 32, 'Active', '2026-02-23 09:45:38'),
+(9, 'Bass Guitar', 33, 'Active', '2026-02-23 09:45:38'),
+(10, 'Flute', 34, 'Active', '2026-02-23 09:45:38'),
+(11, 'Saxophone', 35, 'Active', '2026-02-23 09:45:38');
 
 -- --------------------------------------------------------
 
@@ -1324,7 +1331,8 @@ ALTER TABLE `tbl_song_library`
 --
 ALTER TABLE `tbl_specialization`
   ADD PRIMARY KEY (`specialization_id`),
-  ADD UNIQUE KEY `uniq_specialization_name` (`specialization_name`);
+  ADD UNIQUE KEY `uniq_specialization_name` (`specialization_name`),
+  ADD KEY `idx_spec_type_id` (`type_id`);
 
 --
 -- Indexes for table `tbl_students`
@@ -1582,7 +1590,7 @@ ALTER TABLE `tbl_song_library`
 -- AUTO_INCREMENT for table `tbl_specialization`
 --
 ALTER TABLE `tbl_specialization`
-  MODIFY `specialization_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `specialization_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `tbl_students`
