@@ -371,7 +371,7 @@
             const cls = registrationStatus === 'Approved' || registrationStatus === 'Fee Paid'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                 : 'border-amber-200 bg-amber-50 text-amber-700';
-            return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${cls}">${escapeHtml(registrationStatus)}</span>`;
+            return `<span class="inline-flex items-center rounded-sm border px-2.5 py-1 text-sm font-bold ${cls}">${escapeHtml(registrationStatus)}</span>`;
         }
 
         function updateWalkinSelectedStudentCard(student) {
@@ -413,7 +413,7 @@
 
             if (!walkinStudents.length) {
                 listEl.innerHTML = `
-                    <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                    <div class="desk-modal-list-item text-center text-slate-500 py-4">
                         No walk-in students are currently available for enrollment in this branch.
                     </div>
                 `;
@@ -422,7 +422,7 @@
 
             if (!rows.length) {
                 listEl.innerHTML = `
-                    <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                    <div class="desk-modal-list-item text-center text-slate-500 py-4">
                         No student matched that search.
                     </div>
                 `;
@@ -436,18 +436,18 @@
                 return `
                     <button
                         type="button"
-                        class="walkin-student-result w-full rounded-2xl border px-4 py-4 text-left transition ${isSelected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/60'}"
+                        class="walkin-student-result w-full desk-modal-list-item text-left transition ${isSelected ? 'border-gold-500 bg-amber-50' : 'hover:bg-slate-50'}"
                         data-student-index="${index}"
                     >
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
-                                <div class="text-base font-black text-slate-900">${escapeHtml(`${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student')}</div>
-                                <div class="mt-1 text-sm text-slate-500">${escapeHtml(student.email || 'No email on file')}</div>
-                                <div class="mt-2 text-xs text-slate-500">${escapeHtml(branchName)} • ${escapeHtml(student.phone || 'No phone')}</div>
+                                <div class="text-lg font-bold text-slate-900">${escapeHtml(`${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student')}</div>
+                                <div class="mt-1 text-base text-slate-600">${escapeHtml(student.email || 'No email on file')}</div>
+                                <div class="mt-1.5 text-sm text-slate-500">${escapeHtml(branchName)} • ${escapeHtml(student.phone || 'No phone')}</div>
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
                                 ${getWalkinStudentStatusBadge(student)}
-                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-700">Walk-In</span>
+                                <span class="inline-flex items-center rounded-sm border border-slate-200 bg-slate-50 px-2.5 py-1 text-sm font-bold text-slate-700">Walk-In</span>
                             </div>
                         </div>
                     </button>
@@ -748,30 +748,30 @@
                     return `
                         <tr class="hover:bg-slate-50/80 transition">
                             <td class="px-6 py-4">
-                                <div class="font-medium text-slate-900">${studentName || 'Student'}</div>
-                                <div class="text-sm text-slate-500">${escapeHtml(r.email || '')}</div>
-                                <div class="text-xs text-slate-400">${escapeHtml(r.branch_name || '')}</div>
+                                <div class="font-semibold text-base text-slate-900">${studentName || 'Student'}</div>
+                                <div class="text-base text-slate-600">${escapeHtml(r.email || '')}</div>
+                                <div class="text-sm text-slate-500">${escapeHtml(r.branch_name || '')}</div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${pkg}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${instruments}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">Based on instructor availability</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">
+                            <td class="px-6 py-4 text-base text-slate-700">${pkg}</td>
+                            <td class="px-6 py-4 text-base text-slate-700">${instruments}</td>
+                            <td class="px-6 py-4 text-base text-slate-700">Based on instructor availability</td>
+                            <td class="px-6 py-4 text-base text-slate-700">
                                 <div class="space-y-2">
                                    
-                                    <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition">
+                                    <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 transition">
                                         Payment Info
                                     </button>
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <div class="flex items-center gap-2">
-                                    <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-bold">
                                         View
                                     </button>
-                                    <button onclick="(window.onPendingRequestAssignClick || openAssignRequestModal)(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-xs font-bold">
+                                    <button onclick="(window.onPendingRequestAssignClick || openAssignRequestModal)(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-sm font-bold">
                                         ${window.pendingRequestActionLabel || 'Assign & Approve'}
                                     </button>
-                                    <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold">
+                                    <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-sm font-bold">
                                         Reject
                                     </button>
                                 </div>
@@ -904,34 +904,34 @@
                 .map(option => `<option value="${option}"${option === day ? ' selected' : ''}>${option}</option>`)
                 .join('');
             return `
-                <div class="assign-request-slot grid grid-cols-1 md:grid-cols-[1.15fr_1.25fr_0.95fr_0.95fr_0.95fr_auto] gap-3 items-end rounded-xl border border-slate-200 bg-white p-3 transition" data-instrument-id="${instrument?.instrument_id || ''}">
+                <div class="assign-request-slot desk-modal-slot transition" data-instrument-id="${instrument?.instrument_id || ''}">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Instrument</label>
-                        <div class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">${escapeHtml(label)}</div>
+                        <label class="desk-modal-label">Instrument</label>
+                        <div class="desk-modal-input bg-slate-50 font-semibold">${escapeHtml(label)}</div>
                         <input type="hidden" class="assign-request-slot-instrument" value="${escapeHtml(String(instrument?.instrument_id || slot.instrument_id || ''))}">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Teacher</label>
-                        <select class="assign-request-slot-teacher w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                        <label class="desk-modal-label">Teacher</label>
+                        <select class="assign-request-slot-teacher desk-modal-input">
                             ${renderTeacherOptionsForInstrument(instrument, teacherId)}
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Day</label>
-                        <select class="assign-request-slot-day w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            <option value="">Select day...</option>
+                        <label class="desk-modal-label">Day</label>
+                        <select class="assign-request-slot-day desk-modal-input">
+                            <option value="">Day...</option>
                             ${dayOptions}
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Start</label>
-                        <input type="time" class="assign-request-slot-start w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500" value="${escapeHtml(start)}">
+                        <label class="desk-modal-label">Start</label>
+                        <input type="time" class="assign-request-slot-start desk-modal-input" value="${escapeHtml(start)}">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">End</label>
-                        <input type="time" class="assign-request-slot-end w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500" value="${escapeHtml(end)}">
+                        <label class="desk-modal-label">End</label>
+                        <input type="time" class="assign-request-slot-end desk-modal-input" value="${escapeHtml(end)}">
                     </div>
-                    <button type="button" class="assign-request-slot-remove px-3 py-2 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-semibold">Remove</button>
+                    <button type="button" class="assign-request-slot-remove desk-modal-btn desk-modal-btn-secondary text-xs">Remove</button>
                 </div>
             `;
         }
@@ -1213,7 +1213,7 @@
             const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
             const cells = [];
             for (let i = 0; i < firstWeekday; i += 1) {
-                cells.push('<div class="h-20 rounded-xl border border-transparent bg-transparent"></div>');
+                cells.push('<div class="h-16 rounded-sm border border-transparent bg-transparent"></div>');
             }
             for (let day = 1; day <= daysInMonth; day += 1) {
                 const dateKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -1227,7 +1227,7 @@
                     <button
                         type="button"
                         ${hasSlots ? `onclick="selectAssignRequestAvailabilityDate('${dateKey}')"` : 'disabled'}
-                        class="h-20 rounded-xl border p-2 text-left transition ${baseClass} ${hasSlots ? '' : 'cursor-not-allowed'}"
+                        class="h-16 rounded-sm border p-1.5 text-left text-xs transition ${baseClass} ${hasSlots ? '' : 'cursor-not-allowed'}"
                     >
                         <div class="flex items-start justify-between gap-2">
                             <span class="text-sm font-semibold ${hasSlots ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
@@ -1258,7 +1258,7 @@
                     <div class="grid grid-cols-7 gap-2">
                         ${cells.join('')}
                     </div>
-                    <div class="rounded-xl border border-slate-200 bg-white p-3">
+                    <div class="border border-slate-200 rounded-sm bg-white p-2">
                         <div class="flex items-center justify-between gap-3">
                             <div>
                                 <div class="text-sm font-semibold text-slate-900">${escapeHtml(formatDateLong(resolvedSelectedDate) || resolvedSelectedDate)}</div>
@@ -1279,7 +1279,7 @@
                                 <button
                                     type="button"
                                     ${isLocked ? 'disabled' : `onclick="applyAssignRequestAvailabilitySlot('${escapeHtml(String(slot.session_date || ''))}','${escapeHtml(String(slot.day_of_week || ''))}','${escapeHtml(String(slot.start_time || ''))}','${escapeHtml(String(slot.end_time || ''))}')"`}
-                                    class="rounded-xl border px-3 py-3 text-left transition ${isLocked ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-70' : 'border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100'}"
+                                    class="rounded-sm border px-2 py-2 text-left text-xs transition ${isLocked ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-70' : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'}"
                                 >
                                     <div class="text-sm font-semibold ${isLocked ? 'text-slate-500' : 'text-emerald-800'}">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div>
                                     <div class="mt-1 text-xs ${isLocked ? 'text-slate-400' : 'text-slate-500'}">${escapeHtml(slot.day_of_week || '')} • ${isLocked ? 'Locked by current selection' : 'Weekly recurring'}</div>
@@ -1644,15 +1644,15 @@
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-6 py-4">
-                            <div class="font-medium text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
-                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                            <div class="font-semibold text-base text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
+                            <div class="text-base text-slate-600">${escapeHtml(student.email || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-slate-700">${escapeHtml(packageName)}</td>
-                        <td class="px-6 py-4 text-slate-700 font-medium">${formatCurrencyPHP(totalAmount)}</td>
-                        <td class="px-6 py-4 text-emerald-700 font-medium">${formatCurrencyPHP(paidAmount)}</td>
-                        <td class="px-6 py-4 ${balance > 0 ? 'text-red-600' : 'text-slate-700'} font-medium">${formatCurrencyPHP(balance)}</td>
+                        <td class="px-6 py-4 text-base text-slate-700">${escapeHtml(packageName)}</td>
+                        <td class="px-6 py-4 text-base text-slate-700 font-semibold">${formatCurrencyPHP(totalAmount)}</td>
+                        <td class="px-6 py-4 text-base text-emerald-700 font-semibold">${formatCurrencyPHP(paidAmount)}</td>
+                        <td class="px-6 py-4 text-base ${balance > 0 ? 'text-red-600' : 'text-slate-700'} font-semibold">${formatCurrencyPHP(balance)}</td>
                         <td class="px-6 py-4">
-                            <button type="button" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold" onclick="openEnrollmentDetailsModal(${Number(student.enrollment_id)})">
+                            <button type="button" class="px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-sm font-bold" onclick="openEnrollmentDetailsModal(${Number(student.enrollment_id)})">
                                 More Details
                             </button>
                         </td>
@@ -1723,7 +1723,6 @@
             const hasFirstSession = Boolean(student.first_session_date);
             const firstSession    = hasFirstSession ? formatDateOnly(student.first_session_date) : 'No session scheduled yet';
 
-            const balanceCardClass  = balance > 0 ? 'border-red-200 bg-red-50/80' : 'border-slate-200 bg-slate-50';
             const balanceValueClass = balance > 0 ? 'text-red-600' : 'text-slate-900';
 
             // ── Build teacher list from schedule_slots (one slot per instrument/teacher) ──
@@ -1767,116 +1766,63 @@
                 teacherRows.push({ name: fallback || '—', instrument: '', day: '', time: '' });
             }
 
-            // ── Render teacher cards ──
-            const teacherCardsHtml = teacherRows.map((t, idx) => `
-                <div class="flex items-start gap-3 px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50">
-                    <div class="h-9 w-9 shrink-0 rounded-xl bg-gold-100 text-gold-600 flex items-center justify-center mt-0.5">
-                        <i class="fas fa-chalkboard-user text-sm"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 mb-0.5">
-                            ${teacherRows.length > 1 ? `Teacher ${idx + 1}` : 'Assigned Teacher'}
-                        </p>
-                        <p class="text-sm font-bold text-slate-900">${escapeHtml(t.name)}</p>
-                        ${t.day || t.time ? `<p class="text-xs text-slate-500 mt-0.5">${[t.day, t.time].filter(Boolean).map(v => escapeHtml(v)).join(' · ')}</p>` : ''}
-                    </div>
+            // ── Render teacher rows ──
+            const teacherListHtml = teacherRows.map((t, idx) => `
+                <div class="desk-modal-list-item">
+                    <span class="font-semibold text-slate-900">${escapeHtml(t.name)}</span>
+                    ${t.day || t.time ? `<span class="text-slate-500"> · ${[t.day, t.time].filter(Boolean).map(v => escapeHtml(v)).join(' · ')}</span>` : ''}
                 </div>
             `).join('');
 
+            const paymentBadge = balance <= 0
+                ? '<span class="text-emerald-700 font-semibold">Fully paid</span>'
+                : '<span class="text-red-600 font-semibold">Balance due</span>';
+
             Swal.fire({
                 title: 'Enrollment Details',
-                width: 860,
-                confirmButtonText: 'Close Details',
+                width: 760,
+                confirmButtonText: 'Close',
                 confirmButtonColor: '#b8860b',
                 customClass: {
-                    popup: 'enrollment-details-popup',
-                    title: 'text-xl font-black tracking-tight text-slate-900',
-                    htmlContainer: 'px-1',
-                    confirmButton: 'rounded-2xl px-8 py-3 text-sm font-bold'
+                    popup: 'enrollment-details-popup enrollment-details-readable',
+                    title: 'text-xl font-bold text-slate-900',
+                    htmlContainer: 'px-0',
+                    confirmButton: 'desk-modal-btn desk-modal-btn-gold'
                 },
                 html: `
-                    <div class="text-left space-y-4 text-sm text-slate-700">
+                    <div class="text-left text-base text-slate-700">
+                        <div class="desk-modal-summary" style="border-radius:0;border-left:none;border-right:none;">
+                            <span><b>Student</b> ${studentName}</span>
+                            <span><b>Package</b> ${packageName}</span>
+                            <span><b>Branch</b> ${branchName}</span>
+                            <span><b>Payment</b> ${paymentType}</span>
+                        </div>
 
-                        <!-- ── Hero card ── -->
-                        <div class="rounded-[1.75rem] px-5 py-5 text-white shadow-sm" style="background: linear-gradient(135deg, #0b0f18 0%, #1a1d23 100%);">
-                            <div class="flex items-start gap-4">
-                                <div class="h-12 w-12 shrink-0 rounded-2xl bg-gold-500/20 text-gold-400 flex items-center justify-center">
-                                    <i class="fas fa-user-graduate text-lg"></i>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <div class="inline-flex items-center gap-1.5 rounded-full bg-gold-500/20 border border-gold-500/30 px-2.5 py-0.5 mb-2">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-gold-400 inline-block"></span>
-                                        <span class="text-[10px] uppercase tracking-[0.24em] text-gold-400 font-bold">Active Enrollment</span>
-                                    </div>
-                                    <div class="text-2xl font-black truncate">${studentName}</div>
-                                    <div class="mt-1.5 text-sm text-slate-300">${packageName} <span class="text-slate-500">•</span> ${branchName}</div>
-                                </div>
+                        <div class="px-5 py-4 border-b border-slate-100">
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                <span class="text-sm font-semibold uppercase tracking-wide text-slate-500">Sessions</span>
+                                <span class="text-sm text-slate-600">${sessionPercent}% · ${sessionProgress.used} / ${sessionProgress.total}</span>
+                            </div>
+                            <div class="h-3 rounded-sm bg-slate-100 overflow-hidden">
+                                <div class="h-full rounded-sm bg-gold-500" style="width:${sessionPercent}%"></div>
                             </div>
                         </div>
 
-                        <!-- ── Attendance progress ── -->
-                        <div class="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                            <div class="flex items-center justify-between gap-3">
-                                <p class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">Attendance Progress</p>
-                                <span class="text-xs font-bold text-slate-500">${sessionPercent}% complete</span>
-                            </div>
-                            <div class="flex items-end gap-2">
-                                <span class="text-3xl font-black text-slate-900">${sessionProgress.used}</span>
-                                <span class="pb-1 text-sm font-semibold text-slate-400">/ ${sessionProgress.total} sessions</span>
-                            </div>
-                            <div class="h-3 rounded-full bg-slate-100 overflow-hidden">
-                                <div class="h-full rounded-full transition-all duration-700"
-                                     style="width:${sessionPercent}%; background: linear-gradient(90deg, #b8860b, #d4af37);"></div>
-                            </div>
-                            <p class="text-xs text-slate-500">${studentName} has attended <strong>${sessionProgress.used}</strong> out of <strong>${sessionProgress.total}</strong> sessions.</p>
+                        <div class="px-5 py-4 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                            <div><span class="block text-slate-400 font-semibold uppercase mb-1">Fee</span><span class="text-lg font-bold text-slate-900">${formatCurrencyPHP(totalAmount)}</span></div>
+                            <div><span class="block text-slate-400 font-semibold uppercase mb-1">Paid</span><span class="text-lg font-bold text-emerald-700">${formatCurrencyPHP(paidAmount)}</span></div>
+                            <div><span class="block text-slate-400 font-semibold uppercase mb-1">Balance</span><span class="text-lg font-bold ${balanceValueClass}">${formatCurrencyPHP(balance)}</span> · ${paymentBadge}</div>
                         </div>
 
-                        <!-- ── Payment status ── -->
-                        <div class="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm space-y-4">
-                            <div class="flex items-center justify-between gap-3">
-                                <p class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">Payment Status</p>
-                                ${balance <= 0
-                                    ? `<span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700"><i class="fas fa-circle-check text-emerald-500"></i> Fully Paid</span>`
-                                    : `<span class="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-700"><i class="fas fa-circle-exclamation text-red-400"></i> Balance Due</span>`
-                                }
-                            </div>
-                            <div class="grid grid-cols-3 gap-3">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
-                                    <p class="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-bold">Enrollment Fee</p>
-                                    <p class="mt-1.5 text-base font-black text-slate-900">${formatCurrencyPHP(totalAmount)}</p>
-                                </div>
-                                <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-left">
-                                    <p class="text-[10px] uppercase tracking-[0.18em] text-emerald-600 font-bold">Amount Paid</p>
-                                    <p class="mt-1.5 text-base font-black text-emerald-700">${formatCurrencyPHP(paidAmount)}</p>
-                                </div>
-                                <div class="rounded-2xl border ${balanceCardClass} px-4 py-3 text-left">
-                                    <p class="text-[10px] uppercase tracking-[0.18em] ${balance > 0 ? 'text-red-500' : 'text-slate-400'} font-bold">Remaining Balance</p>
-                                    <p class="mt-1.5 text-base font-black ${balanceValueClass}">${formatCurrencyPHP(balance)}</p>
-                                </div>
-                            </div>
+                        <div class="px-5 py-4 border-b border-slate-100">
+                            <div class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2">${teacherRows.length > 1 ? 'Teachers' : 'Teacher'}</div>
+                            <div class="space-y-2">${teacherListHtml}</div>
                         </div>
 
-                        <!-- ── Teachers ── -->
-                        <div class="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                            <p class="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">
-                                ${teacherRows.length > 1 ? 'Assigned Teachers' : 'Assigned Teacher'}
-                            </p>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                ${teacherCardsHtml}
-                            </div>
+                        <div class="px-5 py-4 text-sm">
+                            <span class="text-slate-400 font-semibold uppercase">Start date</span>
+                            <span class="ml-2 text-base font-semibold ${hasFirstSession ? 'text-slate-900' : 'text-slate-400'}">${escapeHtml(firstSession)}</span>
                         </div>
-
-                        <!-- ── Start date ── -->
-                        <div class="rounded-2xl border ${hasFirstSession ? 'border-blue-200 bg-blue-50/70' : 'border-dashed border-slate-200 bg-slate-50'} px-4 py-3 flex items-center gap-3">
-                            <div class="h-10 w-10 shrink-0 rounded-xl ${hasFirstSession ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center">
-                                <i class="fas fa-calendar-day text-sm"></i>
-                            </div>
-                            <div>
-                                <p class="text-[10px] uppercase tracking-[0.18em] ${hasFirstSession ? 'text-blue-600' : 'text-slate-400'} font-bold">Start Date</p>
-                                <p class="mt-0.5 text-sm font-semibold ${hasFirstSession ? 'text-slate-900' : 'text-slate-400'}">${escapeHtml(firstSession)}</p>
-                            </div>
-                        </div>
-
                     </div>
                 `
             });

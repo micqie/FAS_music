@@ -8,6 +8,7 @@
  <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../../css/desk-premium.css">
+    <link rel="stylesheet" href="../../css/desk-modals.css">
     <script>
         tailwind.config = {
             theme: {
@@ -81,10 +82,6 @@
         <div class="max-w-6xl mx-auto">
             <div class="mb-6">
                 <h1 id="sessionsPageTitle" class="text-2xl sm:text-3xl font-bold text-slate-900">Sessions</h1>
-                <p id="sessionsPageSubtitle" class="text-slate-500 text-sm mt-1">View and manage active enrolled students in your branch.</p>
-                <div class="desk-branch-pill mt-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                    Desk branch: <span id="managerBranchNotice">—</span>
-                </div>
             </div>
 
         <!-- Messages -->
@@ -125,65 +122,50 @@
     </div>
 
     <!-- Schedule Modal -->
-    <div id="scheduleModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-6xl p-6 relative max-h-[92vh] overflow-hidden">
-            <button id="closeScheduleModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-            <h3 class="text-2xl font-bold text-slate-900">Session Schedule</h3>
-            <p id="scheduleModalMeta" class="text-slate-500 text-sm mt-1">Loading schedule...</p>
-
-            <div class="mt-5 grid grid-cols-1 xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)] gap-6 items-start">
-                <div class="space-y-4 xl:sticky xl:top-0">
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <div class="text-sm font-semibold text-slate-800">Session Summary</div>
-                                <div id="nextSessionHint" class="text-xs text-slate-500 mt-1">Review past sessions and add the next schedule for this student.</div>
-                            </div>
-                            <button type="button" id="toggleAddScheduleBtn" class="px-4 py-2 rounded-lg bg-gold-500 text-white hover:bg-gold-600 text-sm font-semibold transition">
-                                Schedule Session
-                            </button>
-                        </div>
-                    </div>
-
-                    <form id="addScheduleForm" class="hidden rounded-2xl border border-slate-200 bg-white p-4 space-y-4 shadow-sm">
-                        <input type="hidden" id="scheduleEnrollmentId" value="">
-                        <input type="hidden" id="scheduleEditExisting" value="0">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">Session #</label>
-                                <input type="number" id="scheduleSessionNumber" min="1" readonly class="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">Teacher</label>
-                                <input type="hidden" id="scheduleTeacher" value="">
-                                <input type="text" id="scheduleTeacherLabel" readonly class="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-700">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">Date *</label>
-                                <input type="date" id="scheduleDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            </div>
-                        </div>
-                        <input type="hidden" id="scheduleStart" value="09:00">
-                        <input type="hidden" id="scheduleEnd" value="10:00">
-                        <div class="text-xs text-slate-500">Date-only scheduling is active. The saved date controls QR attendance and session validity.</div>
-                        <div class="flex items-center justify-end gap-3">
-                            <button type="button" id="cancelAddScheduleBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition">
-                                Cancel
-                            </button>
-                            <button type="submit" id="saveScheduleBtn" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition">
-                                Save Session
-                            </button>
-                        </div>
-                    </form>
+    <div id="scheduleModal" class="desk-modal fixed inset-0 z-50 hidden items-center justify-center bg-black/60">
+        <div class="desk-modal-panel max-w-4xl max-h-[92vh] overflow-hidden flex flex-col">
+            <div class="desk-modal-header">
+                <div>
+                    <h3>Session Schedule</h3>
+                    <p id="scheduleModalMeta">Loading schedule...</p>
                 </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="toggleAddScheduleBtn" class="desk-modal-btn desk-modal-btn-gold">Add session</button>
+                    <button type="button" id="closeScheduleModalBtn" class="desk-modal-close" aria-label="Close"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
 
-                <div class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/40 p-4">
-                    <div class="text-sm font-semibold text-slate-800 mb-3">Schedule List</div>
-                    <div id="scheduleModalBody" class="space-y-2 max-h-[62vh] overflow-y-auto pr-1">
-                        <div class="text-slate-500 text-sm">Loading...</div>
+            <form id="addScheduleForm" class="hidden desk-modal-body border-b border-slate-200 bg-slate-50">
+                <input type="hidden" id="scheduleEnrollmentId" value="">
+                <input type="hidden" id="scheduleEditExisting" value="0">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="desk-modal-label">Session #</label>
+                        <input type="number" id="scheduleSessionNumber" min="1" readonly class="desk-modal-input">
                     </div>
+                    <div>
+                        <label class="desk-modal-label">Teacher</label>
+                        <input type="hidden" id="scheduleTeacher" value="">
+                        <input type="text" id="scheduleTeacherLabel" readonly class="desk-modal-input">
+                    </div>
+                    <div>
+                        <label class="desk-modal-label">Date *</label>
+                        <input type="date" id="scheduleDate" class="desk-modal-input">
+                    </div>
+                </div>
+                <input type="hidden" id="scheduleStart" value="09:00">
+                <input type="hidden" id="scheduleEnd" value="10:00">
+                <p class="desk-modal-hint mt-2">Date controls attendance and session validity.</p>
+                <div class="desk-modal-footer" style="margin-top:0.5rem;padding-top:0.5rem;">
+                    <button type="button" id="cancelAddScheduleBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
+                    <button type="submit" id="saveScheduleBtn" class="desk-modal-btn desk-modal-btn-primary">Save</button>
+                </div>
+            </form>
+
+            <div class="desk-modal-body flex-1 min-h-0 overflow-hidden">
+                <p id="nextSessionHint" class="desk-modal-hint mb-2">Review sessions and add the next date.</p>
+                <div id="scheduleModalBody" class="desk-modal-list max-h-[58vh] space-y-1">
+                    <div class="text-slate-500 text-sm">Loading...</div>
                 </div>
             </div>
         </div>
@@ -226,83 +208,64 @@
     </div>
 
     <!-- Assign Request Modal -->
-    <div id="assignRequestModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-4xl p-6 relative">
-            <button id="closeAssignRequestModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-            <h3 class="text-2xl font-bold text-slate-900">Assign Student Request</h3>
-            <p id="assignRequestStudentInfo" class="text-slate-500 text-sm mt-1">Finalize teacher and schedule before approval.</p>
-
-            <div class="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Student</div>
-                    <div id="assignRequestStudentName" class="mt-2 text-sm font-semibold text-slate-900">Student</div>
+    <div id="assignRequestModal" class="desk-modal fixed inset-0 z-50 hidden items-center justify-center bg-black/60">
+        <div class="desk-modal-panel max-w-3xl max-h-[92vh] overflow-y-auto">
+            <div class="desk-modal-header">
+                <div>
+                    <h3>Assign Student Request</h3>
+                    <p id="assignRequestStudentInfo">Set teacher and weekly schedule.</p>
                 </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Branch</div>
-                    <div id="assignRequestStudentBranch" class="mt-2 text-sm font-semibold text-slate-900">Branch</div>
-                </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Package</div>
-                    <div id="assignRequestStudentPackage" class="mt-2 text-sm font-semibold text-slate-900">Package</div>
-                </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Instrument</div>
-                    <div id="assignRequestStudentInstrument" class="mt-2 text-sm font-semibold text-slate-900">Instrument</div>
-                </div>
+                <button type="button" id="closeAssignRequestModalBtn" class="desk-modal-close" aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
 
-            <form id="assignRequestForm" class="mt-5 space-y-4">
+            <div class="desk-modal-summary">
+                <span><b>Student</b> <span id="assignRequestStudentName">—</span></span>
+                <span><b>Branch</b> <span id="assignRequestStudentBranch">—</span></span>
+                <span><b>Package</b> <span id="assignRequestStudentPackage">—</span></span>
+                <span><b>Instrument</b> <span id="assignRequestStudentInstrument">—</span></span>
+            </div>
+
+            <form id="assignRequestForm" class="desk-modal-body space-y-3">
                 <input type="hidden" id="assignRequestId" value="">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div class="relative">
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Teacher *</label>
+                        <label class="desk-modal-label">Teacher *</label>
                         <input type="hidden" id="assignRequestTeacherSelect" value="">
-                        <input type="text" id="assignRequestTeacherSearch" placeholder="Search teacher or specialization..." class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                        <div id="assignRequestTeacherSearchHelp" class="mt-2 text-xs text-slate-500">Recommended teachers will appear here based on the student's requested instrument.</div>
-                        <div id="assignRequestTeacherSuggestions" class="hidden absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl max-h-64 overflow-y-auto"></div>
+                        <input type="text" id="assignRequestTeacherSearch" placeholder="Search teacher..." class="desk-modal-input">
+                        <div id="assignRequestTeacherSearchHelp" class="desk-modal-hint">Matching instructors for this instrument.</div>
+                        <div id="assignRequestTeacherSuggestions" class="hidden absolute z-20 mt-1 w-full border border-slate-200 bg-white shadow-lg max-h-48 overflow-y-auto rounded-sm"></div>
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Date *</label>
-                        <input type="date" id="assignRequestDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                        <label class="desk-modal-label">Start date *</label>
+                        <input type="date" id="assignRequestDate" class="desk-modal-input">
                     </div>
                 </div>
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:p-5 space-y-3">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700">Weekly Fixed Slots *</label>
-                            <div class="text-xs text-slate-500 mt-1">Add one or more recurring slots like Tuesday and Thursday for the same student.</div>
-                        </div>
-                        <button type="button" id="addAssignRequestSlotBtn" class="px-3 py-2 rounded-lg bg-gold-500 text-white hover:bg-gold-600 text-xs font-semibold">
-                            Add Slot
-                        </button>
+
+                <div class="desk-modal-section">
+                    <div class="desk-modal-toolbar">
+                        <div class="desk-modal-label mb-0">Weekly slots *</div>
+                        <button type="button" id="addAssignRequestSlotBtn" class="desk-modal-btn desk-modal-btn-gold">Add slot</button>
                     </div>
-                    <div id="assignRequestSlotsContainer" class="space-y-3"></div>
+                    <div id="assignRequestSlotsContainer" class="space-y-2"></div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Notes</label>
-                        <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Instructor Availability</label>
-                        <div id="assignRequestAvailabilityHint" class="text-xs text-slate-500 mt-1">Choose an instructor to see their available one-hour slots and avoid conflicts.</div>
-                    </div>
+
+                <div>
+                    <label class="desk-modal-label">Notes</label>
+                    <input type="text" id="assignRequestNotes" placeholder="Optional" class="desk-modal-input">
                 </div>
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div id="assignRequestAvailabilityList" class="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
+
+                <div>
+                    <div class="desk-modal-label">Availability</div>
+                    <p id="assignRequestAvailabilityHint" class="desk-modal-hint mb-2">Select a teacher to see open slots.</p>
+                    <div id="assignRequestAvailabilityList" class="desk-modal-list max-h-40">
                         <div class="text-sm text-slate-500">No instructor selected yet.</div>
                     </div>
                 </div>
-                <div class="text-xs text-slate-500">Each weekly slot must be exactly 1 hour.</div>
-                <div class="flex items-center justify-end gap-3 pt-2">
-                    <button type="button" id="cancelAssignRequestBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold">
-                        Cancel
-                    </button>
-                    <button type="submit" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">
-                        Assign & Approve
-                    </button>
+
+                <div class="desk-modal-footer">
+                    <button type="button" id="cancelAssignRequestBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
+                    <button type="submit" class="desk-modal-btn desk-modal-btn-primary">Assign &amp; Approve</button>
                 </div>
             </form>
         </div>
@@ -473,79 +436,89 @@
         </div>
     </div>
 
-    <div id="walkinEnrollmentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-3xl p-6 relative my-8">
-            <button id="closeWalkinEnrollmentModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-
-            <h3 class="text-2xl font-bold text-slate-900">Walk-In Enrollment</h3>
-            <p class="text-slate-500 text-sm mt-1">Select a walk-in student from your branch, choose a package, and submit the enrollment request for scheduling.</p>
-
-            <div id="walkinEnrollmentMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
-
-            <form id="walkinEnrollmentForm" class="mt-5 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Walk-In Student *</label>
-                        <input type="text" id="walkinStudentSearch" list="walkinStudentOptions" placeholder="Search student..." class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                        <datalist id="walkinStudentOptions"></datalist>
-                        <input type="hidden" id="walkinStudentSelect" value="">
-                        <p id="walkinStatusInfo" class="mt-2 text-xs text-slate-500"></p>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Session Package *</label>
-                        <select id="walkinPackageSelect" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            <option value="">Select package...</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Payment Type *</label>
-                        <select id="walkinPaymentType" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            <option value="Partial Payment">Partial Payment</option>
-                            <option value="Full Payment">Full Payment</option>
-                            <option value="Installment">Installment</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Payment Method *</label>
-                        <select id="walkinPaymentMethod" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            <option value="">Select payment method</option>
-                            <option value="Cash">Cash</option>
-                            <option value="GCash">GCash</option>
-                            <option value="Bank Transfer">Bank Transfer</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    Final schedule will be based on instructor availability.
-                </div>
-
+    <div id="walkinEnrollmentModal" class="desk-modal fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 overflow-y-auto">
+        <div class="desk-modal-panel max-w-4xl max-h-[92vh] overflow-y-auto my-4">
+            <div class="desk-modal-header">
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">Instruments *</label>
-                    <div id="walkinInstrumentsContainer" class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <div class="text-sm text-slate-500">Select a package first.</div>
+                    <h3>Walk-In Enrollment</h3>
+                    <p>Pick a student, package, payment, and instruments.</p>
+                </div>
+                <button type="button" id="closeWalkinEnrollmentModalBtn" class="desk-modal-close" aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div id="walkinEnrollmentMessage" class="hidden mx-4 mt-3 p-2 rounded text-sm border"></div>
+
+            <form id="walkinEnrollmentForm" class="desk-modal-body">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="desk-modal-label">Walk-in student *</label>
+                            <input type="text" id="walkinStudentSearch" placeholder="Search name or login..." class="desk-modal-input">
+                            <input type="hidden" id="walkinStudentSelect" value="">
+                        </div>
+
+                        <div id="walkinSelectedStudentCard" class="hidden desk-modal-note" style="border-color:#bbf7d0;background:#f0fdf4;color:#166534;">
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <div class="text-[11px] font-bold uppercase tracking-wide opacity-70">Selected</div>
+                                    <div id="walkinSelectedStudentName" class="font-semibold text-slate-900 mt-1">—</div>
+                                    <div id="walkinSelectedStudentMeta" class="text-xs mt-0.5">—</div>
+                                </div>
+                                <button type="button" id="walkinClearStudentBtn" class="desk-modal-btn desk-modal-btn-secondary text-xs">Change</button>
+                            </div>
+                        </div>
+
+                        <div id="walkinStudentResults" class="desk-modal-list max-h-56">
+                            <div class="text-sm text-slate-500 text-center py-4">Type to search students.</div>
+                        </div>
+                        <p id="walkinStatusInfo" class="desk-modal-hint"></p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="desk-modal-label">Package *</label>
+                                <select id="walkinPackageSelect" class="desk-modal-input"><option value="">Select package...</option></select>
+                            </div>
+                            <div>
+                                <label class="desk-modal-label">Payment type *</label>
+                                <select id="walkinPaymentType" class="desk-modal-input">
+                                    <option value="Partial Payment">Partial Payment</option>
+                                    <option value="Full Payment">Full Payment</option>
+                                    <option value="Installment">Installment</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="desk-modal-label">Payment method *</label>
+                            <select id="walkinPaymentMethod" class="desk-modal-input">
+                                <option value="">Select method</option>
+                                <option value="Cash">Cash</option>
+                                <option value="GCash">GCash</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="desk-modal-label">Instruments *</label>
+                            <div id="walkinInstrumentsContainer" class="desk-modal-list min-h-[5rem]">
+                                <div class="text-sm text-slate-500">Select a package first.</div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="desk-modal-label">Proof of payment</label>
+                            <input type="file" id="walkinPaymentProof" accept="image/*,.pdf" class="desk-modal-input">
+                            <p class="desk-modal-hint">Cash walk-ins can skip proof upload.</p>
+                        </div>
+                        <div id="walkinAmountInfo" class="desk-modal-note" style="border-color:#f9f1d5;background:#fdfaf1;color:#334155;">
+                            Estimated amount: <span class="font-bold">₱0.00</span>
+                        </div>
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">Proof of Payment</label>
-                    <input type="file" id="walkinPaymentProof" accept="image/*,.pdf" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 bg-white focus:outline-none focus:border-gold-500">
-                    <p class="mt-2 text-xs text-slate-500">Cash walk-ins can be submitted without uploading proof.</p>
-                </div>
-
-                <div id="walkinAmountInfo" class="rounded-xl border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-slate-700">
-                    Estimated package amount: <span class="font-bold">₱0.00</span>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 pt-2">
-                    <button type="button" id="cancelWalkinEnrollmentBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold">Cancel</button>
-                    <button type="submit" id="submitWalkinEnrollmentBtn" class="px-5 py-2 bg-gold-500 hover:bg-gold-400 text-black rounded-lg text-sm font-semibold">Submit Walk-In Enrollment</button>
+                <div class="desk-modal-footer">
+                    <button type="button" id="cancelWalkinEnrollmentBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
+                    <button type="submit" id="submitWalkinEnrollmentBtn" class="desk-modal-btn desk-modal-btn-gold">Submit enrollment</button>
                 </div>
             </form>
         </div>
@@ -814,20 +787,154 @@
 
         function populateWalkinStudentSelect() {
             const input = document.getElementById('walkinStudentSearch');
-            const dataList = document.getElementById('walkinStudentOptions');
             const hidden = document.getElementById('walkinStudentSelect');
-            if (!input || !dataList || !hidden) return;
+            if (!input || !hidden) return;
 
             walkinStudentLookup = new Map();
-            dataList.innerHTML = walkinStudents.map(student => {
+            walkinStudents.forEach(student => {
                 const name = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
                 const email = student.email || '';
                 const label = email ? `${name} (${email})` : name;
                 walkinStudentLookup.set(label, student);
-                return `<option value="${escapeHtml(label)}"></option>`;
-            }).join('');
+                if (email) walkinStudentLookup.set(email.toLowerCase(), student);
+                walkinStudentLookup.set(name.toLowerCase(), student);
+            });
             input.value = '';
             hidden.value = '';
+            renderWalkinStudentResults('');
+            updateWalkinSelectedStudentCard(null);
+        }
+
+        function getWalkinStudentLabel(student) {
+            const name = `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || 'Student';
+            const email = String(student?.email || '').trim();
+            return email ? `${name} (${email})` : name;
+        }
+
+        function getWalkinStudentStatusBadge(student) {
+            const registrationStatus = String(student?.registration_status || 'Pending');
+            const cls = registrationStatus === 'Approved' || registrationStatus === 'Fee Paid'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-amber-200 bg-amber-50 text-amber-700';
+            return `<span class="inline-flex items-center rounded-sm border px-2 py-0.5 text-[11px] font-bold ${cls}">${escapeHtml(registrationStatus)}</span>`;
+        }
+
+        function updateWalkinSelectedStudentCard(student) {
+            const card = document.getElementById('walkinSelectedStudentCard');
+            const nameEl = document.getElementById('walkinSelectedStudentName');
+            const metaEl = document.getElementById('walkinSelectedStudentMeta');
+            if (!card || !nameEl || !metaEl) return;
+
+            if (!student) {
+                card.classList.add('hidden');
+                nameEl.textContent = '—';
+                metaEl.textContent = '—';
+                return;
+            }
+
+            const branch = student.branch_name || managerBranchName || 'Assigned branch';
+            const phone = student.phone || 'No phone';
+            nameEl.textContent = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
+            metaEl.textContent = `${student.email || 'No email'} • ${phone} • ${branch}`;
+            card.classList.remove('hidden');
+        }
+
+        function renderWalkinStudentResults(query) {
+            const listEl = document.getElementById('walkinStudentResults');
+            const hidden = document.getElementById('walkinStudentSelect');
+            if (!listEl) return;
+
+            const term = String(query || '').trim().toLowerCase();
+            const rows = !term
+                ? walkinStudents.slice(0, 8)
+                : walkinStudents.filter((student) => {
+                    const haystack = [
+                        `${student.first_name || ''} ${student.last_name || ''}`,
+                        student.email || '',
+                        student.phone || ''
+                    ].join(' ').toLowerCase();
+                    return haystack.includes(term);
+                }).slice(0, 10);
+
+            if (!walkinStudents.length) {
+                listEl.innerHTML = '<div class="desk-modal-list-item text-center text-slate-500 py-4">No walk-in students available in this branch.</div>';
+                return;
+            }
+
+            if (!rows.length) {
+                listEl.innerHTML = '<div class="desk-modal-list-item text-center text-slate-500 py-4">No student matched that search.</div>';
+                return;
+            }
+
+            const selectedEmail = String(hidden?.value || '').trim().toLowerCase();
+            listEl.innerHTML = rows.map((student, index) => {
+                const isSelected = selectedEmail && selectedEmail === String(student.email || '').trim().toLowerCase();
+                const branchName = student.branch_name || managerBranchName || 'Assigned branch';
+                return `
+                    <button type="button" class="walkin-student-result w-full desk-modal-list-item text-left transition ${isSelected ? 'border-gold-500 bg-amber-50' : 'hover:bg-slate-50'}" data-student-index="${index}">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <div class="font-semibold text-slate-900">${escapeHtml(`${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student')}</div>
+                                <div class="text-xs text-slate-500 mt-0.5">${escapeHtml(student.email || 'No email')} • ${escapeHtml(branchName)}</div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                ${getWalkinStudentStatusBadge(student)}
+                                <span class="inline-flex items-center rounded-sm border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-700">Walk-In</span>
+                            </div>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        async function selectWalkinStudent(student) {
+            const hidden = document.getElementById('walkinStudentSelect');
+            const statusEl = document.getElementById('walkinStatusInfo');
+            const packageSelect = document.getElementById('walkinPackageSelect');
+            const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
+            const submitBtn = document.getElementById('submitWalkinEnrollmentBtn');
+            const input = document.getElementById('walkinStudentSearch');
+            if (!hidden || !packageSelect || !instrumentsContainer) return;
+
+            hidden.value = student ? String(student.email || '') : '';
+            if (input) input.value = student ? getWalkinStudentLabel(student) : '';
+            updateWalkinSelectedStudentCard(student);
+            renderWalkinStudentResults(input?.value || '');
+
+            if (!student || !hidden.value) {
+                packageSelect.innerHTML = '<option value="">Select package...</option>';
+                instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
+                if (statusEl) statusEl.textContent = '';
+                if (submitBtn) submitBtn.disabled = false;
+                walkinMeta = null;
+                return;
+            }
+
+            const meta = await fetchStudentRequestMetaByEmail(hidden.value);
+            if (!meta?.success) {
+                if (statusEl) statusEl.textContent = meta?.error || 'Failed to load student request details.';
+                walkinMeta = null;
+                return;
+            }
+
+            walkinMeta = meta;
+            const packages = Array.isArray(meta.packages) ? meta.packages : [];
+            packageSelect.innerHTML = '<option value="">Select package...</option>' + packages.map(pkg => {
+                const sessions = Number(pkg.sessions || 0);
+                const maxInst = Number(pkg.max_instruments || 1);
+                const price = formatCurrencyPHP(pkg.price || 0);
+                return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''}) - ${price}</option>`;
+            }).join('');
+
+            const latest = meta.latest_request || null;
+            const hasPending = latest && String(latest.status || '') === 'Pending';
+            if (statusEl) {
+                statusEl.textContent = hasPending
+                    ? 'This student already has a pending request. Please schedule it first.'
+                    : 'Student selected. Continue with package, instrument, and payment.';
+            }
+            if (submitBtn) submitBtn.disabled = hasPending;
+            updateWalkinPackageUI();
         }
 
         function resolveWalkinSelectedStudent() {
@@ -835,7 +942,7 @@
             const hidden = document.getElementById('walkinStudentSelect');
             if (!input || !hidden) return null;
             const label = String(input.value || '').trim();
-            const student = walkinStudentLookup.get(label) || null;
+            const student = walkinStudentLookup.get(label) || walkinStudentLookup.get(label.toLowerCase()) || null;
             hidden.value = student ? String(student.email || '') : '';
             return student;
         }
@@ -869,6 +976,8 @@
             if (hiddenSelect) hiddenSelect.value = '';
             if (packageSelect) packageSelect.innerHTML = '<option value="">Select package...</option>';
             if (instrumentsContainer) instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
+            updateWalkinSelectedStudentCard(null);
+            renderWalkinStudentResults('');
         }
 
         function updateWalkinPackageUI() {
@@ -901,53 +1010,21 @@
         }
 
         async function handleWalkinStudentChange() {
-            const hidden = document.getElementById('walkinStudentSelect');
             const statusEl = document.getElementById('walkinStatusInfo');
-            const packageSelect = document.getElementById('walkinPackageSelect');
-            const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
-            const submitBtn = document.getElementById('submitWalkinEnrollmentBtn');
-            if (!hidden || !packageSelect || !instrumentsContainer) return;
+            const input = document.getElementById('walkinStudentSearch');
+            const term = String(input?.value || '').trim();
+            renderWalkinStudentResults(term);
 
             const selectedStudent = resolveWalkinSelectedStudent();
-            const email = hidden.value || '';
-            if (!email) {
-                packageSelect.innerHTML = '<option value="">Select package...</option>';
-                instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
-                if (statusEl) {
-                    statusEl.textContent = selectedStudent === null && (document.getElementById('walkinStudentSearch')?.value || '').trim()
-                        ? 'Please select a walk-in student from the suggestions.'
-                        : '';
-                }
-                if (submitBtn) submitBtn.disabled = false;
-                walkinMeta = null;
+            if (selectedStudent && term) {
+                await selectWalkinStudent(selectedStudent);
                 return;
             }
 
-            const meta = await fetchStudentRequestMetaByEmail(email);
-            if (!meta?.success) {
-                if (statusEl) statusEl.textContent = meta?.error || 'Failed to load student request details.';
-                walkinMeta = null;
-                return;
-            }
-
-            walkinMeta = meta;
-            const packages = Array.isArray(meta.packages) ? meta.packages : [];
-            packageSelect.innerHTML = '<option value="">Select package...</option>' + packages.map(pkg => {
-                const sessions = Number(pkg.sessions || 0);
-                const maxInst = Number(pkg.max_instruments || 1);
-                const price = formatCurrencyPHP(pkg.price || 0);
-                return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''}) - ${price}</option>`;
-            }).join('');
-
-            const latest = meta.latest_request || null;
-            const hasPending = latest && String(latest.status || '') === 'Pending';
+            updateWalkinSelectedStudentCard(null);
             if (statusEl) {
-                statusEl.textContent = hasPending
-                    ? 'This student already has a pending request. Please schedule it first.'
-                    : '';
+                statusEl.textContent = term ? 'Choose a student from the list below.' : '';
             }
-            if (submitBtn) submitBtn.disabled = hasPending;
-            updateWalkinPackageUI();
         }
 
         async function submitWalkinEnrollment(e) {
@@ -1327,23 +1404,23 @@
                 .map(option => `<option value="${option}"${option === day ? ' selected' : ''}>${option}</option>`)
                 .join('');
             return `
-                <div class="assign-request-slot grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr_auto] gap-3 items-end rounded-xl border border-slate-200 bg-white p-3 transition">
+                <div class="assign-request-slot desk-modal-slot grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr_auto] gap-2 items-end transition">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Day</label>
-                        <select class="assign-request-slot-day w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                            <option value="">Select day...</option>
+                        <label class="desk-modal-label">Day</label>
+                        <select class="assign-request-slot-day desk-modal-input">
+                            <option value="">Day...</option>
                             ${dayOptions}
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Start</label>
-                        <input type="time" class="assign-request-slot-start w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500" value="${escapeHtml(start)}">
+                        <label class="desk-modal-label">Start</label>
+                        <input type="time" class="assign-request-slot-start desk-modal-input" value="${escapeHtml(start)}">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">End</label>
-                        <input type="time" class="assign-request-slot-end w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500" value="${escapeHtml(end)}">
+                        <label class="desk-modal-label">End</label>
+                        <input type="time" class="assign-request-slot-end desk-modal-input" value="${escapeHtml(end)}">
                     </div>
-                    <button type="button" class="assign-request-slot-remove px-3 py-2 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-semibold">Remove</button>
+                    <button type="button" class="assign-request-slot-remove desk-modal-btn desk-modal-btn-secondary text-xs">Remove</button>
                 </div>
             `;
         }
@@ -1568,7 +1645,7 @@
             const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
             const cells = [];
             for (let i = 0; i < firstWeekday; i += 1) {
-                cells.push('<div class="h-20 rounded-xl border border-transparent bg-transparent"></div>');
+                cells.push('<div class="h-16 rounded-sm border border-transparent bg-transparent"></div>');
             }
             for (let day = 1; day <= daysInMonth; day += 1) {
                 const dateKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -1582,7 +1659,7 @@
                     <button
                         type="button"
                         ${hasSlots ? `onclick="selectAssignRequestAvailabilityDate('${dateKey}')"` : 'disabled'}
-                        class="h-20 rounded-xl border p-2 text-left transition ${baseClass} ${hasSlots ? '' : 'cursor-not-allowed'}"
+                        class="h-16 rounded-sm border p-1.5 text-left text-xs transition ${baseClass} ${hasSlots ? '' : 'cursor-not-allowed'}"
                     >
                         <div class="flex items-start justify-between gap-2">
                             <span class="text-sm font-semibold ${hasSlots ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
@@ -1613,7 +1690,7 @@
                     <div class="grid grid-cols-7 gap-2">
                         ${cells.join('')}
                     </div>
-                    <div class="rounded-xl border border-slate-200 bg-white p-3">
+                    <div class="border border-slate-200 rounded-sm bg-white p-2">
                         <div class="flex items-center justify-between gap-3">
                             <div>
                                 <div class="text-sm font-semibold text-slate-900">${escapeHtml(formatDateLong(resolvedSelectedDate) || resolvedSelectedDate)}</div>
@@ -1634,7 +1711,7 @@
                                 <button
                                     type="button"
                                     ${isLocked ? 'disabled' : `onclick="applyAssignRequestAvailabilitySlot('${escapeHtml(String(slot.session_date || ''))}','${escapeHtml(String(slot.day_of_week || ''))}','${escapeHtml(String(slot.start_time || ''))}','${escapeHtml(String(slot.end_time || ''))}')"`}
-                                    class="rounded-xl border px-3 py-3 text-left transition ${isLocked ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-70' : 'border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100'}"
+                                    class="rounded-sm border px-2 py-2 text-left text-xs transition ${isLocked ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-70' : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'}"
                                 >
                                     <div class="text-sm font-semibold ${isLocked ? 'text-slate-500' : 'text-emerald-800'}">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div>
                                     <div class="mt-1 text-xs ${isLocked ? 'text-slate-400' : 'text-slate-500'}">${escapeHtml(slot.day_of_week || '')} • ${isLocked ? 'Locked by current selection' : 'Available'}</div>
@@ -2017,7 +2094,7 @@
                                 ? `<div class="text-[11px] text-slate-500 mt-1">Reason: ${escapeHtml(slot.cancellation_reason)}</div>`
                                 : '';
                             return `
-                                <div class="rounded-lg border border-white/70 bg-white px-3 py-2">
+                                <div class="desk-modal-list-item py-2">
                                     <div class="flex flex-wrap items-center gap-2">
                                         ${getSessionStatusBadge(slot.status)}
                                         <div>${escapeHtml(dateText)}${teacherText}</div>
@@ -2028,11 +2105,11 @@
                                 </div>
                             `;
                         }).join('')
-                        : '<div class="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-slate-400">Unscheduled</div>';
+                        : '<div class="desk-modal-list-item text-slate-400 py-2">Unscheduled</div>';
                     rows.push(`
-                        <div class="rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-3 text-xs text-slate-600">
-                            <div class="font-semibold text-slate-700 mb-2">Session ${i}</div>
-                            <div class="space-y-2">${slotHtml}</div>
+                        <div class="desk-modal-list-item">
+                            <div class="font-semibold text-slate-700 mb-1 text-sm">Session ${i}</div>
+                            <div class="space-y-1">${slotHtml}</div>
                         </div>
                     `);
                 }
@@ -2401,6 +2478,27 @@
                 document.getElementById('walkinEnrollmentForm')?.addEventListener('submit', submitWalkinEnrollment);
                 document.getElementById('walkinStudentSearch')?.addEventListener('input', handleWalkinStudentChange);
                 document.getElementById('walkinStudentSearch')?.addEventListener('change', handleWalkinStudentChange);
+                document.getElementById('walkinStudentResults')?.addEventListener('click', async (event) => {
+                    const btn = event.target.closest('.walkin-student-result');
+                    if (!btn) return;
+                    const index = Number(btn.dataset.studentIndex || -1);
+                    const student = walkinStudents[index];
+                    if (!student) return;
+                    const input = document.getElementById('walkinStudentSearch');
+                    const hidden = document.getElementById('walkinStudentSelect');
+                    if (input) input.value = getWalkinStudentLabel(student);
+                    if (hidden) hidden.value = String(student.email || '');
+                    await selectWalkinStudent(student);
+                    renderWalkinStudentResults('');
+                });
+                document.getElementById('walkinClearStudentBtn')?.addEventListener('click', async () => {
+                    const input = document.getElementById('walkinStudentSearch');
+                    const hidden = document.getElementById('walkinStudentSelect');
+                    if (input) input.value = '';
+                    if (hidden) hidden.value = '';
+                    await selectWalkinStudent(null);
+                    renderWalkinStudentResults('');
+                });
                 document.getElementById('walkinPackageSelect')?.addEventListener('change', updateWalkinPackageUI);
                 document.getElementById('walkinPaymentType')?.addEventListener('change', updateWalkinPackageUI);
             }

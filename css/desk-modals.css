@@ -1,0 +1,450 @@
+/* Compact desk staff modals — less padding, sharper corners, fewer nested cards */
+
+.desk-modal {
+    padding: 0.75rem;
+}
+
+.desk-modal-panel {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+    width: 100%;
+    position: relative;
+}
+
+.desk-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.desk-modal-header h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.3;
+}
+
+.desk-modal-header p {
+    margin-top: 0.125rem;
+    font-size: 0.8125rem;
+    color: #64748b;
+}
+
+.desk-modal-close {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    color: #64748b;
+    background: #fff;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.desk-modal-close:hover {
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.desk-modal-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    background: #f8fafc;
+    font-size: 0.8125rem;
+    color: #334155;
+}
+
+.desk-modal-summary span {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.desk-modal-summary b {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.desk-modal-body {
+    padding: 0.875rem 1rem 1rem;
+}
+
+.desk-modal-section {
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.desk-modal-section:first-child {
+    padding-top: 0;
+    margin-top: 0;
+    border-top: none;
+}
+
+.desk-modal-label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.25rem;
+}
+
+.desk-modal-hint {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+.desk-modal-input,
+.desk-modal-panel select {
+    width: 100%;
+    padding: 0.4375rem 0.625rem;
+    font-size: 0.875rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    color: #0f172a;
+    background: #fff;
+}
+
+.desk-modal-input:focus,
+.desk-modal-panel select:focus {
+    outline: none;
+    border-color: #b8860b;
+}
+
+.desk-modal-input[readonly],
+.desk-modal-panel select:disabled {
+    background: #f8fafc;
+    color: #475569;
+}
+
+.desk-modal-note {
+    padding: 0.5rem 0.625rem;
+    font-size: 0.75rem;
+    color: #166534;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 0.25rem;
+}
+
+.desk-modal-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.desk-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.desk-modal-btn {
+    padding: 0.4375rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+    transition: background 0.15s ease;
+}
+
+.desk-modal-btn-secondary {
+    background: #f1f5f9;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+
+.desk-modal-btn-secondary:hover {
+    background: #e2e8f0;
+}
+
+.desk-modal-btn-primary {
+    background: #16a34a;
+    color: #fff;
+}
+
+.desk-modal-btn-primary:hover {
+    background: #15803d;
+}
+
+.desk-modal-btn-gold {
+    background: #b8860b;
+    color: #000;
+}
+
+.desk-modal-btn-gold:hover {
+    background: #d4af37;
+}
+
+.desk-modal-slot {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    background: #fafafa;
+}
+
+@media (min-width: 768px) {
+    .desk-modal-slot {
+        grid-template-columns: 1.1fr 1.2fr 0.9fr 0.9fr 0.9fr auto;
+        align-items: end;
+    }
+}
+
+.desk-modal-list {
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    background: #fafafa;
+}
+
+.desk-modal-list-item {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.625rem;
+    background: #fff;
+    font-size: 0.8125rem;
+}
+
+.desk-modal-list-item + .desk-modal-list-item {
+    margin-top: 0.375rem;
+}
+
+.desk-modal-panel .assign-request-slot {
+    border-radius: 0.25rem !important;
+    padding: 0.5rem !important;
+    background: #fafafa !important;
+}
+
+.desk-modal-panel .assign-request-slot select,
+.desk-modal-panel .assign-request-slot input {
+    border-radius: 0.25rem !important;
+    padding: 0.4375rem 0.5rem !important;
+    font-size: 0.8125rem !important;
+}
+
+/* SweetAlert enrollment details — match desk modal compact style */
+.enrollment-details-popup {
+    border-radius: 0.25rem !important;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.enrollment-details-popup .swal2-title {
+    padding: 0.875rem 1rem 0.5rem !important;
+    margin: 0 !important;
+}
+
+.enrollment-details-popup .swal2-html-container {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.enrollment-details-popup .swal2-actions {
+    padding: 0.75rem 1rem 1rem !important;
+    margin: 0 !important;
+    border-top: 1px solid #f1f5f9;
+}
+
+/* ── Readable / senior-friendly sizing (enrollment page) ── */
+.desk-modal-readable .desk-modal-header {
+    padding: 1.125rem 1.5rem;
+    gap: 1rem;
+}
+
+.desk-modal-readable .desk-modal-header h3 {
+    font-size: 1.5rem;
+}
+
+.desk-modal-readable .desk-modal-header p {
+    font-size: 1rem;
+    margin-top: 0.375rem;
+    line-height: 1.5;
+}
+
+.desk-modal-readable .desk-modal-close {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.125rem;
+}
+
+.desk-modal-readable .desk-modal-summary {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+    gap: 0.625rem 1.5rem;
+}
+
+.desk-modal-readable .desk-modal-summary b {
+    font-size: 0.75rem;
+}
+
+.desk-modal-readable .desk-modal-body {
+    padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.desk-modal-readable .desk-modal-label {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.desk-modal-readable .desk-modal-hint {
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+.desk-modal-readable .desk-modal-input,
+.desk-modal-readable .desk-modal-panel select {
+    padding: 0.75rem 0.875rem;
+    font-size: 1.0625rem;
+    min-height: 3rem;
+}
+
+.desk-modal-readable .desk-modal-note {
+    padding: 0.75rem 0.875rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+.desk-modal-readable .desk-modal-btn {
+    padding: 0.75rem 1.375rem;
+    font-size: 1rem;
+    min-height: 3rem;
+}
+
+.desk-modal-readable .desk-modal-footer {
+    gap: 0.75rem;
+    padding-top: 1rem;
+    margin-top: 1rem;
+}
+
+.desk-modal-readable .desk-modal-section {
+    padding-top: 1rem;
+    margin-top: 1rem;
+}
+
+.desk-modal-readable .desk-modal-slot {
+    gap: 0.75rem;
+    padding: 0.875rem;
+}
+
+.desk-modal-readable .desk-modal-list {
+    padding: 0.75rem;
+}
+
+.desk-modal-readable .desk-modal-list-item {
+    padding: 0.875rem 1rem;
+    font-size: 1rem;
+    line-height: 1.45;
+}
+
+.desk-modal-readable .desk-modal-list-item + .desk-modal-list-item {
+    margin-top: 0.5rem;
+}
+
+.desk-modal-readable .assign-request-slot select,
+.desk-modal-readable .assign-request-slot input {
+    padding: 0.75rem 0.75rem !important;
+    font-size: 1rem !important;
+    min-height: 3rem !important;
+}
+
+.desk-modal-readable #assignRequestAvailabilityList .h-16 {
+    height: 4.75rem;
+}
+
+.desk-modal-readable #assignRequestAvailabilityList .text-xs,
+.desk-modal-readable #assignRequestAvailabilityList .text-\[11px\],
+.desk-modal-readable #assignRequestAvailabilityList .text-\[10px\] {
+    font-size: 0.9375rem !important;
+}
+
+.desk-modal-readable #assignRequestAvailabilityList .text-sm {
+    font-size: 1.0625rem !important;
+}
+
+.desk-modal-readable #assignRequestAvailabilityList button.rounded-lg {
+    padding: 0.625rem 1rem;
+    font-size: 0.9375rem;
+}
+
+.enrollment-details-readable {
+    width: 44rem !important;
+    max-width: calc(100vw - 2rem) !important;
+}
+
+.enrollment-details-readable .swal2-title {
+    font-size: 1.5rem !important;
+    padding: 1.125rem 1.5rem 0.625rem !important;
+}
+
+.enrollment-details-readable .swal2-actions {
+    padding: 1rem 1.5rem 1.25rem !important;
+}
+
+.enrollment-details-readable .swal2-actions .desk-modal-btn {
+    min-width: 7rem;
+    font-size: 1rem;
+    padding: 0.75rem 1.5rem;
+}
+
+.enrollment-details-readable .desk-modal-summary {
+    font-size: 1rem;
+    padding: 0.875rem 1.5rem;
+}
+
+.enrollment-details-readable .desk-modal-list-item {
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+}
+
+/* Enrollment page tables & actions */
+.desk-enrollment-page #message {
+    font-size: 1rem;
+    padding: 0.875rem 1rem;
+}
+
+.desk-enrollment-page .desk-panel h3 {
+    font-size: 1.375rem;
+}
+
+.desk-enrollment-page table {
+    font-size: 1rem;
+}
+
+.desk-enrollment-page thead th {
+    font-size: 0.8125rem;
+    padding: 1rem 1.5rem;
+}
+
+.desk-enrollment-page tbody td {
+    padding: 1rem 1.5rem;
+}
+
+.desk-enrollment-page tbody button,
+.desk-enrollment-page tbody a.inline-flex {
+    font-size: 0.9375rem !important;
+    padding: 0.5rem 0.875rem !important;
+}

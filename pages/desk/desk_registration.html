@@ -84,10 +84,6 @@
             <div class="mb-6 flex items-end justify-between gap-4 flex-wrap">
                 <div>
                     <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Registrations</h1>
-                    <p class="text-slate-500 text-sm mt-1">Manage branch registrations, online payment reviews, and walk-in registration payments.</p>
-                    <div class="desk-branch-pill mt-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                        Desk branch: <span id="managerBranchNamePill">—</span>
-                    </div>
                 </div>
                 <button id="openRegisterStudentModalBtn"
                     class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/25 transition-all duration-200">
@@ -104,7 +100,6 @@
             <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between gap-4 flex-wrap">
                 <div>
                     <h3 class="text-xl font-bold text-slate-800" id="tableTitle"><i class="fas fa-list mr-2 text-gold-500"></i>Pending Online Registrations</h3>
-                    <p class="text-xs text-slate-500 mt-1" id="tableSubtitle">Showing online registrations that are waiting for branch review and payment confirmation.</p>
                 </div>
                 <div class="flex gap-2">
                     <a href="#pending" id="btnPending" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-semibold text-sm transition">
@@ -837,7 +832,6 @@
 
             if (mode === 'active') {
                 if (title) title.textContent = 'Active Registrations';
-                if (subtitle) subtitle.textContent = 'Showing branch registrations that are already confirmed, whether they came from online or walk-in.';
                 if (btnActive) btnActive.className = activeBtnClass;
                 if (btnPending) btnPending.className = normalBtnClass;
                 loadManagerActiveRegistrations().catch(error => {
@@ -845,7 +839,6 @@
                 });
             } else {
                 if (title) title.textContent = 'Pending Online Registrations';
-                if (subtitle) subtitle.textContent = 'Showing online registrations that are waiting for branch review and payment confirmation.';
                 if (btnPending) btnPending.className = activeBtnClass;
                 if (btnActive) btnActive.className = normalBtnClass;
                 loadManagerPendingRegistrations().catch(error => {

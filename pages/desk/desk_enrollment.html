@@ -8,6 +8,7 @@
  <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../../css/desk-premium.css">
+    <link rel="stylesheet" href="../../css/desk-modals.css">
     <script>
         tailwind.config = {
             theme: {
@@ -30,7 +31,7 @@
         .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
     </style>
 </head>
-<body class="desk-app bg-slate-100 text-slate-900">
+<body class="desk-app desk-enrollment-page bg-slate-100 text-slate-900">
     <div class="min-h-screen flex">
     <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden flex-col sidebar-scroll">
         <div class="desk-sidebar-brand px-2 pb-4 mb-3 border-b border-white/10">
@@ -78,24 +79,20 @@
     <div id="deskTopNavMount"></div>
     <!-- Main Content -->
     <main class="desk-main flex-1 px-4 sm:px-6 lg:px-8 py-6">
-        <div class="max-w-6xl mx-auto">
+        <div class="max-w-7xl mx-auto">
             <div class="mb-6">
-                <h1 id="sessionsPageTitle" class="text-2xl sm:text-3xl font-bold text-slate-900">Enrollments</h1>
-                <p id="sessionsPageSubtitle" class="text-slate-500 text-sm mt-1">Manage pending and active enrollments</p>
-                <div class="desk-branch-pill mt-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                    Desk branch: <span id="managerBranchNamePill">—</span>
-                </div>
+                <h1 id="sessionsPageTitle" class="text-3xl sm:text-4xl font-bold text-slate-900">Enrollments</h1>
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-                    <div class="desk-toolbar-pill inline-flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-                        <button id="viewNavPending" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Pending</button>
-                        <button id="viewNavActive" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Active</button>
+                    <div class="desk-toolbar-pill inline-flex items-center bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm">
+                        <button id="viewNavPending" class="px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Pending</button>
+                        <button id="viewNavActive" class="px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Active</button>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <button id="openWalkinRegistrationModalBtn" class="inline-flex items-center px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button id="openWalkinRegistrationModalBtn" class="inline-flex items-center px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold rounded-xl shadow-sm transition">
                             <i class="fas fa-user-plus mr-2"></i>
                             Walk-In Registration
                         </button>
-                        <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/20 transition">
+                        <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center px-5 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-base font-bold rounded-xl shadow-lg shadow-gold-500/20 transition">
                             <i class="fas fa-list-check mr-2"></i>
                             Walk-In Enrollment
                         </button>
@@ -106,21 +103,11 @@
         <!-- Messages -->
         <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
 
-        <!-- Branch Notice -->
-        <div class="mb-6">
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <div class="text-sm text-slate-700">
-                    <span id="managerBranchScopeLabel">Sessions are locked to your branch:</span>
-                    <span class="font-semibold text-slate-900" id="managerBranchNotice">—</span>
-                </div>
-            </div>
-        </div>
-
         <!-- Pending Student Requests -->
         <div id="pendingSessionsSection" class="desk-panel bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden mb-6">
             <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
                 <h3 id="pendingSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Student Requests</h3>
-                <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
+                <span class="text-sm text-slate-600" id="pendingRequestCount">Loading...</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -150,7 +137,7 @@
         <div id="activeSessionsSection" class="desk-panel bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
             <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
                 <h3 id="activeSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-box mr-2 text-gold-500"></i>Active Enrollments</h3>
-                <span class="text-xs text-slate-500" id="studentCount">Loading...</span>
+                <span class="text-sm text-slate-600" id="studentCount">Loading...</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -217,81 +204,67 @@
     </div>
 
     <!-- Assign Request Modal -->
-    <div id="assignRequestModal" class="fixed inset-0 z-[1100] hidden items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-[96rem] max-h-[94vh] overflow-y-auto overflow-x-hidden p-5 sm:p-6 lg:p-8 relative">
-            <button id="closeAssignRequestModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-            <h3 class="text-2xl font-bold text-slate-900">Assign Student Request</h3>
-            <p id="assignRequestStudentInfo" class="text-slate-500 text-sm mt-1">Finalize teacher and schedule before approval.</p>
-
-            <div class="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Student</div>
-                    <div id="assignRequestStudentName" class="mt-2 text-sm font-semibold text-slate-900">Student</div>
+    <div id="assignRequestModal" class="desk-modal desk-modal-readable fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 p-3 sm:p-5">
+        <div class="desk-modal-panel max-w-7xl max-h-[94vh] overflow-y-auto">
+            <div class="desk-modal-header">
+                <div>
+                    <h3>Assign Student Request</h3>
+                    <p id="assignRequestStudentInfo">Set teacher and weekly schedule before approval.</p>
                 </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Branch</div>
-                    <div id="assignRequestStudentBranch" class="mt-2 text-sm font-semibold text-slate-900">Branch</div>
-                </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Package</div>
-                    <div id="assignRequestStudentPackage" class="mt-2 text-sm font-semibold text-slate-900">Package</div>
-                </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">Instrument</div>
-                    <div id="assignRequestStudentInstrument" class="mt-2 text-sm font-semibold text-slate-900">Instrument</div>
-                </div>
+                <button type="button" id="closeAssignRequestModalBtn" class="desk-modal-close" aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
 
-            <form id="assignRequestForm" class="mt-5 space-y-4">
+            <div class="desk-modal-summary">
+                <span><b>Student</b> <span id="assignRequestStudentName">—</span></span>
+                <span><b>Branch</b> <span id="assignRequestStudentBranch">—</span></span>
+                <span><b>Package</b> <span id="assignRequestStudentPackage">—</span></span>
+                <span><b>Instrument</b> <span id="assignRequestStudentInstrument">—</span></span>
+            </div>
+
+            <form id="assignRequestForm" class="desk-modal-body">
                 <input type="hidden" id="assignRequestId" value="">
-                <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(440px,0.85fr)] gap-6 items-start">
-                    <div class="space-y-4 min-w-0">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">Assigned Date *</label>
-                                <input type="date" id="assignRequestDate" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
-                                <div class="mt-2 text-xs text-slate-500">Each selected instrument gets its own specialist teacher row below.</div>
-                            </div>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:p-5 space-y-3">
-                            <div class="flex items-center justify-between gap-3">
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700">Weekly Fixed Slots *</label>
-                                    <div class="text-xs text-slate-500 mt-1">Choose a teacher for each instrument, then set the recurring day and time.</div>
-                                </div>
-                                <button type="button" id="addAssignRequestSlotBtn" class="px-3 py-2 rounded-lg bg-gold-500 text-white hover:bg-gold-600 text-xs font-semibold">
-                                    Add Teacher Slot
-                                </button>
-                            </div>
-                            <div id="assignRequestSlotsContainer" class="space-y-3"></div>
-                        </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4">
+                    <div class="space-y-3 min-w-0">
                         <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Notes</label>
-                            <input type="text" id="assignRequestNotes" placeholder="Optional note" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500">
+                            <label class="desk-modal-label">Start date *</label>
+                            <input type="date" id="assignRequestDate" class="desk-modal-input">
+                            <p class="desk-modal-hint">Each instrument row below gets its own teacher and weekly time.</p>
                         </div>
-                        <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
-                            <div class="text-sm font-semibold text-emerald-900">Weekly Assignment Rule</div>
-                            <div id="assignRequestRecurringSummary" class="text-xs text-emerald-800 mt-1">Choose a one-hour slot. Once assigned, that instructor time becomes reserved weekly for this student to avoid conflicts.</div>
+
+                        <div class="desk-modal-section">
+                            <div class="desk-modal-toolbar">
+                                <div>
+                                    <div class="desk-modal-label mb-0">Weekly slots *</div>
+                                    <p class="desk-modal-hint">One hour per slot.</p>
+                                </div>
+                                <button type="button" id="addAssignRequestSlotBtn" class="desk-modal-btn desk-modal-btn-gold">Add slot</button>
+                            </div>
+                            <div id="assignRequestSlotsContainer" class="space-y-2"></div>
+                        </div>
+
+                        <div>
+                            <label class="desk-modal-label">Notes</label>
+                            <input type="text" id="assignRequestNotes" placeholder="Optional" class="desk-modal-input">
+                        </div>
+
+                        <div class="desk-modal-note">
+                            <span id="assignRequestRecurringSummary">Pick a teacher and time for each instrument. Those slots stay reserved weekly for this student.</span>
                         </div>
                     </div>
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:p-5 xl:sticky xl:top-4 min-w-0">
-                        <div class="text-sm font-semibold text-slate-800">Teacher Availability</div>
-                        <div id="assignRequestAvailabilityHint" class="text-xs text-slate-500 mt-1">Choose a teacher in the active instrument row to see available one-hour weekly slots and avoid conflicts.</div>
-                        <div id="assignRequestAvailabilityList" class="mt-4 space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+
+                    <div class="min-w-0">
+                        <div class="desk-modal-label">Teacher availability</div>
+                        <p id="assignRequestAvailabilityHint" class="desk-modal-hint mb-2">Select a teacher in a slot row to see open times.</p>
+                        <div id="assignRequestAvailabilityList" class="desk-modal-list">
                             <div class="text-sm text-slate-500">No instructor selected yet.</div>
                         </div>
                     </div>
                 </div>
-                <div class="text-xs text-slate-500">Each weekly slot must be exactly 1 hour.</div>
-                <div class="flex items-center justify-end gap-3 pt-2">
-                    <button type="button" id="cancelAssignRequestBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold">
-                        Cancel
-                    </button>
-                    <button type="submit" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">
-                        Assign & Approve
-                    </button>
+
+                <div class="desk-modal-footer">
+                    <button type="button" id="cancelAssignRequestBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
+                    <button type="submit" class="desk-modal-btn desk-modal-btn-primary">Assign &amp; Approve</button>
                 </div>
             </form>
         </div>
@@ -463,118 +436,84 @@
         </div>
     </div>
 
-    <div id="walkinEnrollmentModal" class="fixed inset-0 z-[1100] hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-        <div class="bg-white border border-slate-200 rounded-[2rem] shadow-2xl w-full max-w-6xl p-6 lg:p-8 relative my-8">
-            <button id="closeWalkinEnrollmentModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-
-            <div class="max-w-3xl pr-10">
-                <h3 class="text-3xl font-black tracking-tight text-slate-900">Walk-In Enrollment</h3>
-                <p class="text-slate-500 text-base mt-2">Pick a walk-in student from your branch, review their status at a glance, then choose a package and payment setup before sending the enrollment request for scheduling.</p>
+    <div id="walkinEnrollmentModal" class="desk-modal desk-modal-readable fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 overflow-y-auto p-3 sm:p-5">
+        <div class="desk-modal-panel max-w-6xl max-h-[94vh] overflow-y-auto my-4">
+            <div class="desk-modal-header">
+                <div>
+                    <h3>Walk-In Enrollment</h3>
+                    <p>Pick a student, package, payment, and instruments.</p>
+                </div>
+                <button type="button" id="closeWalkinEnrollmentModalBtn" class="desk-modal-close" aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
 
-            <div id="walkinEnrollmentMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+            <div id="walkinEnrollmentMessage" class="hidden mx-4 mt-3 p-2 rounded text-sm border"></div>
 
-            <form id="walkinEnrollmentForm" class="mt-5 space-y-4">
-                <div class="grid grid-cols-1 xl:grid-cols-[1.05fr_1.35fr] gap-6 items-start">
-                    <section class="rounded-3xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 shadow-sm">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <div class="text-xs uppercase tracking-[0.22em] text-slate-400 font-bold">Student Finder</div>
-                                <div class="mt-2 text-xl font-black text-slate-900">Choose Walk-In Student</div>
-                            </div>
-                            <div class="h-12 w-12 rounded-2xl bg-blue-50 text-blue-600 grid place-items-center">
-                                <i class="fas fa-user-magnifying-glass text-lg"></i>
-                            </div>
-                        </div>
-
-                        <div class="mt-5">
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">Walk-In Student *</label>
-                            <div class="relative">
-                                <i class="fas fa-search pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                <input type="text" id="walkinStudentSearch" placeholder="Search by student name or email..." class="w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 py-3 text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-4 focus:ring-gold-100">
-                            </div>
+            <form id="walkinEnrollmentForm" class="desk-modal-body">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="desk-modal-label">Walk-in student *</label>
+                            <input type="text" id="walkinStudentSearch" placeholder="Search name or login..." class="desk-modal-input">
                             <input type="hidden" id="walkinStudentSelect" value="">
-                            <p class="mt-2 text-xs text-slate-500">The list below updates instantly so staff can scan students faster.</p>
                         </div>
 
-                        <div id="walkinSelectedStudentCard" class="mt-4 hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                            <div class="flex items-start justify-between gap-3">
+                        <div id="walkinSelectedStudentCard" class="hidden desk-modal-note" style="border-color:#bbf7d0;background:#f0fdf4;color:#166534;">
+                            <div class="flex items-start justify-between gap-2">
                                 <div>
-                                    <div class="text-xs uppercase tracking-[0.18em] text-emerald-600 font-bold">Selected Student</div>
-                                    <div id="walkinSelectedStudentName" class="mt-2 text-lg font-black text-slate-900">—</div>
-                                    <div id="walkinSelectedStudentMeta" class="mt-1 text-sm text-slate-600">—</div>
+                                    <div class="text-[11px] font-bold uppercase tracking-wide opacity-70">Selected</div>
+                                    <div id="walkinSelectedStudentName" class="font-semibold text-slate-900 mt-1">—</div>
+                                    <div id="walkinSelectedStudentMeta" class="text-xs mt-0.5">—</div>
                                 </div>
-                                <button type="button" id="walkinClearStudentBtn" class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition">
-                                    <i class="fas fa-rotate-left"></i>
-                                    Change
-                                </button>
+                                <button type="button" id="walkinClearStudentBtn" class="desk-modal-btn desk-modal-btn-secondary">Change</button>
                             </div>
                         </div>
 
-                        <div id="walkinStudentResults" class="mt-4 max-h-[24rem] overflow-y-auto space-y-3 pr-1">
-                            <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                                Start typing to find a walk-in student.
-                            </div>
+                        <div id="walkinStudentResults" class="desk-modal-list max-h-72">
+                            <div class="text-sm text-slate-500 text-center py-4">Type to search students.</div>
                         </div>
+                        <p id="walkinStatusInfo" class="desk-modal-hint"></p>
+                    </div>
 
-                        <p id="walkinStatusInfo" class="mt-4 text-sm text-slate-600"></p>
-                    </section>
-
-                    <section class="rounded-3xl border border-slate-200 bg-white p-5 lg:p-6 shadow-sm space-y-5">
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Session Package *</label>
-                                <select id="walkinPackageSelect" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-4 focus:ring-gold-100">
-                                    <option value="">Select package...</option>
-                                </select>
+                                <label class="desk-modal-label">Package *</label>
+                                <select id="walkinPackageSelect" class="desk-modal-input"><option value="">Select package...</option></select>
                             </div>
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                                <div class="text-xs uppercase tracking-[0.18em] text-slate-400 font-bold">Scheduling Rule</div>
-                                <div class="mt-2 font-medium text-slate-700">Final schedule will be based on instructor availability.</div>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Payment Type *</label>
-                                <select id="walkinPaymentType" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-4 focus:ring-gold-100">
+                                <label class="desk-modal-label">Payment type *</label>
+                                <select id="walkinPaymentType" class="desk-modal-input">
                                     <option value="Partial Payment">Partial Payment</option>
                                     <option value="Full Payment">Full Payment</option>
                                     <option value="Installment">Installment</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Payment Method *</label>
-                                <select id="walkinPaymentMethod" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-4 focus:ring-gold-100">
-                                    <option value="">Select payment method</option>
-                                    <option value="Cash">Cash</option>
-                                    <option value="GCash">GCash</option>
-                                    <option value="Bank Transfer">Bank Transfer</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
                         </div>
-
                         <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">Instruments *</label>
-                            <div id="walkinInstrumentsContainer" class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 min-h-[7rem]">
+                            <label class="desk-modal-label">Payment method *</label>
+                            <select id="walkinPaymentMethod" class="desk-modal-input">
+                                <option value="">Select method</option>
+                                <option value="Cash">Cash</option>
+                                <option value="GCash">GCash</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="desk-modal-label">Instruments *</label>
+                            <div id="walkinInstrumentsContainer" class="desk-modal-list min-h-[5rem]">
                                 <div class="text-sm text-slate-500">Select a package first.</div>
                             </div>
                         </div>
-
-                        <div class="grid grid-cols-1 gap-4 items-start">
-                            <div id="walkinAmountInfo" class="rounded-2xl border border-gold-200 bg-[linear-gradient(180deg,_#fffdf5_0%,_#fdf7e6_100%)] px-4 py-4 text-sm text-slate-700 min-h-[7rem]">
-                                Estimated package amount: <span class="font-bold">₱0.00</span>
-                            </div>
+                        <div id="walkinAmountInfo" class="desk-modal-note" style="border-color:#f9f1d5;background:#fdfaf1;color:#334155;">
+                            Estimated amount: <span class="font-bold">₱0.00</span>
                         </div>
-                    </section>
+                    </div>
                 </div>
 
-                <div class="flex items-center justify-end gap-3 pt-2">
-                    <button type="button" id="cancelWalkinEnrollmentBtn" class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-sm font-semibold">Cancel</button>
-                    <button type="submit" id="submitWalkinEnrollmentBtn" class="px-6 py-3 bg-gold-500 hover:bg-gold-400 text-black rounded-2xl text-sm font-semibold shadow-sm">Submit Walk-In Enrollment</button>
+                <div class="desk-modal-footer">
+                    <button type="button" id="cancelWalkinEnrollmentBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
+                    <button type="submit" id="submitWalkinEnrollmentBtn" class="desk-modal-btn desk-modal-btn-gold">Submit enrollment</button>
                 </div>
             </form>
         </div>
