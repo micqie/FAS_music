@@ -37,9 +37,6 @@
 <!-- ══ Navbar ════════════════════════════════════════════════════════ -->
 <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
     <div class="flex items-center gap-4">
-        <button class="admin-mobile-menu-toggle" id="adminMobileMenuBtn" aria-label="Open menu">
-            <i class="fas fa-bars text-white text-lg"></i>
-        </button>
         <a href="admin_dashboard.html" class="h-10 flex items-center">
             <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
         </a>
@@ -347,5 +344,7 @@
         loadAuditLogs(1);
     });
 </script>
+    <script src="../../js/session_timeout.js"></script>
 </body>
 </html>
+

@@ -146,22 +146,7 @@
                     </a>
                 </nav>
 
-                <!-- User footer — name, email, sign out -->
-                <div class="px-4 py-4 border-t border-white/8">
-                    <div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/4 mb-2">
-                        <div class="h-9 w-9 rounded-full bg-[#2a1f00] border border-gold-500/40 flex items-center justify-center shrink-0">
-                            <i class="fas fa-user text-gold-400 text-sm"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <p id="deskDrawerUserName" class="text-sm font-bold text-white truncate">Desk Staff</p>
-                            <p id="deskDrawerUserEmail" class="text-[11px] text-slate-400 truncate">—</p>
-                        </div>
-                    </div>
-                    <button type="button" onclick="logout()"
-                        class="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-300 hover:text-red-200 hover:bg-red-400/10 transition">
-                        <i class="fas fa-sign-out-alt w-4 text-center"></i> Sign Out
-                    </button>
-                </div>
+            
             </div>
         `;
 

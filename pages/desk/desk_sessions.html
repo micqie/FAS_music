@@ -321,19 +321,15 @@
         </div>
     </div>
 
-    <div id="registerStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-4xl p-8 relative my-8">
-            <button id="closeRegisterStudentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
-                <i class="fas fa-times text-xl"></i>
+    <div id="registerStudentModal" class="desk-modal desk-modal-readable fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-5">
+        <div class="desk-modal-panel w-full max-w-4xl p-8 relative my-4">
+            <button id="closeRegisterStudentModalBtn" class="absolute top-4 right-4 desk-modal-close" aria-label="Close">
+                <i class="fas fa-times"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2">Register Student (Desk)</h3>
-            <p class="text-zinc-400 text-xs mb-4">
-                This will create a student account using the student's email as username with temporary password
-                <span class="font-mono font-semibold">fas@123</span>.
-                If a guardian account is created, its temporary password will be
-                <span class="font-mono font-semibold">fasmusic@2020</span>.
-                The registration is locked to your assigned branch.
+            <h3 class="text-2xl font-bold text-slate-900 mb-2">Register Student (Desk)</h3>
+            <p class="text-sm text-slate-600 mb-4">
+                Creates a student account with a temporary password. If needed, guardian information will appear. Registration is locked to your assigned branch.
             </p>
 
             <div id="walkinMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
@@ -427,8 +423,8 @@
                 </div>
 
                 <div class="pt-4 flex items-center justify-end gap-3">
-                    <button type="button" id="cancelRegisterStudentBtn" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">Cancel</button>
-                    <button type="submit" id="walkinSubmitBtn" class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                    <button type="button" id="cancelRegisterStudentBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
+                    <button type="submit" id="walkinSubmitBtn" class="desk-modal-btn desk-modal-btn-gold">
                         <span id="walkinSubmitBtnText">Proceed Payment</span>
                     </button>
                 </div>
@@ -2506,7 +2502,9 @@
             document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
         });
     </script>
+    <script src="../../js/session_timeout.js"></script>
 </body>
 </html>
+
 
 

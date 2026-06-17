@@ -42,11 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeSidebar = () => {
         document.body.classList.remove('admin-sidebar-open');
         menuButton.setAttribute('aria-expanded', 'false');
+        menuButton.innerHTML = '<i class="fas fa-bars text-sm"></i>';
     };
 
     const openSidebar = () => {
         document.body.classList.add('admin-sidebar-open');
         menuButton.setAttribute('aria-expanded', 'true');
+        menuButton.innerHTML = '<i class="fas fa-times text-sm"></i>';
     };
 
     menuButton.addEventListener('click', () => {

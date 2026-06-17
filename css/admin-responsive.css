@@ -14,7 +14,7 @@ body.admin-responsive-ready {
     opacity: 0;
     pointer-events: none;
     transition: opacity 180ms ease;
-    z-index: 45;
+    z-index: 49; /* above sidebar, below nav */
 }
 
 body.admin-sidebar-open {
@@ -31,41 +31,52 @@ body.admin-sidebar-open .admin-sidebar-backdrop {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 2.75rem;
-        height: 2.75rem;
-        border-radius: 0.9rem;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.75rem;
         border: 1px solid rgba(255, 255, 255, 0.12);
         background: rgba(255, 255, 255, 0.06);
         color: #fff;
         flex-shrink: 0;
+        transition: background 0.15s ease;
+    }
+
+    .admin-mobile-menu-toggle:hover {
+        background: rgba(255, 255, 255, 0.12);
+    }
+
+    /* Change hamburger icon to × when sidebar is open */
+    body.admin-sidebar-open .admin-mobile-menu-toggle .fa-bars::before {
+        content: '\f00d'; /* fa-times */
     }
 
     body > nav {
-        padding: 0.75rem 1rem !important;
+        padding: 0.65rem 1rem !important;
         gap: 0.75rem;
     }
 
     body > nav img {
-        max-height: 2.25rem;
+        max-height: 2rem;
     }
 
     body > aside {
         display: flex !important;
-        width: min(20rem, calc(100vw - 1.25rem)) !important;
-        max-width: 20rem;
+        /* On tablet (≥768px) use 280px; on phone use near-full width */
+        width: min(280px, calc(100vw - 2rem)) !important;
         transform: translateX(calc(-100% - 1rem));
-        transition: transform 180ms ease;
-        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
-        z-index: 46 !important;
+        transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 4px 0 40px rgba(0, 0, 0, 0.5);
+        z-index: 51 !important; /* above backdrop (49) and nav (50) */
     }
 
     body.admin-sidebar-open > aside {
         transform: translateX(0);
     }
 
+    /* Main content — no left margin on mobile/tablet */
     body > main {
         margin-left: 0 !important;
-        padding: 5.75rem 1rem 1.5rem !important;
+        padding: 5.25rem 1rem 1.5rem !important;
     }
 
     body > main .max-w-7xl {
@@ -84,8 +95,8 @@ body.admin-sidebar-open .admin-sidebar-backdrop {
 
 @media (min-width: 640px) and (max-width: 1023px) {
     body > nav {
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
     }
 
     body > main {

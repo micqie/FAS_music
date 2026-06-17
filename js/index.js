@@ -4505,10 +4505,10 @@ function renderStudentRegistrationModal(student, portal) {
                         <textarea id="regAddress" rows="3" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500"></textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Branch *</label>
-                        <select id="regBranch" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
-                            <option value="">Choose branch...</option>
-                        </select>
+                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Branch</label>
+                        <div id="regBranch" class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-700 dark:text-zinc-300 text-sm cursor-not-allowed">—</div>
+                        <input type="hidden" id="regBranchId">
+                        <p class="mt-1.5 text-xs text-zinc-400 dark:text-zinc-500">Branch is set during account creation and cannot be changed here.</p>
                     </div>
                 </form>
             </div>
@@ -4794,7 +4794,11 @@ function wireStudentOnboardingActions(student, meta, portal) {
     }
 
     if (regBranch) {
-        populateBranchSelect(regBranch, student?.branch_id || '');
+        // Branch is locked to what was chosen during account creation — display only
+        const branchName = student?.branch_name || '—';
+        regBranch.textContent = branchName;
+        const branchIdInput = document.getElementById('regBranchId');
+        if (branchIdInput) branchIdInput.value = String(student?.branch_id || '');
     }
 
     // Prefill registration fields from current student record
@@ -4873,7 +4877,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 phone: document.getElementById('regPhone')?.value?.trim() || '',
                 address: document.getElementById('regAddress')?.value?.trim() || '',
                 date_of_birth: document.getElementById('regDob')?.value || null,
-                branch_id: Number(document.getElementById('regBranch')?.value || 0)
+                branch_id: Number(document.getElementById('regBranchId')?.value || student?.branch_id || 0)
             };
             payload.age = computeAgeFromDob(payload.date_of_birth);
 

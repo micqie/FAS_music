@@ -269,6 +269,68 @@
     border-top: 1px solid #f1f5f9;
 }
 
+/* Light / readable “Register Student (Desk)” modal */
+#registerStudentModal.desk-modal-readable,
+#registerStudentModal {
+    /* keep text readable even if inner markup uses text-zinc-* classes */
+    color: #0f172a;
+}
+
+#registerStudentModal h3,
+#registerStudentModal h4 {
+    color: #0f172a !important;
+    font-size: 1.25rem !important;
+}
+
+#registerStudentModal p {
+    color: #334155 !important;
+    font-size: 0.98rem !important;
+    line-height: 1.5;
+}
+
+#registerStudentModal label {
+    color: #334155 !important;
+    font-size: 1rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+#registerStudentModal input,
+#registerStudentModal select,
+#registerStudentModal textarea,
+#registerStudentModal #walkin_student_age_display {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #0f172a !important;
+    border-radius: 0.25rem !important;
+    padding: 0.75rem 0.875rem !important;
+    font-size: 1.0625rem !important;
+    min-height: 3rem !important;
+}
+
+#registerStudentModal #walkin_student_age_display {
+    background: #f8fafc !important;
+    color: #334155 !important;
+}
+
+#registerStudentModal #walkinMessage {
+    font-size: 0.95rem !important;
+}
+
+#registerStudentModal .desk-modal-close {
+    background: #ffffff !important;
+}
+
+#registerStudentModal .desk-modal-btn {
+    min-height: 3rem !important;
+}
+
+/* If other desk pages still render this modal with a black panel */
+#registerStudentModal [class*="bg-black/90"],
+#registerStudentModal [class*="bg-black\\/90"] {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+}
+
 /* ── Readable / senior-friendly sizing (enrollment page) ── */
 .desk-modal-readable .desk-modal-header {
     padding: 1.125rem 1.5rem;

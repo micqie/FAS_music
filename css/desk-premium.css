@@ -410,11 +410,53 @@
 .desk-topnav {
     position: fixed;
     top: 0;
-    left: 16rem;
+    left: 0;
     right: 0;
     z-index: 999;
     background: linear-gradient(180deg, #0b0f18 0%, #121a2a 100%);
     box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.45);
+}
+
+/* Force the profile dropdown to always be dark — prevent any inherited white bg */
+.desk-topnav details > div,
+.desk-topnav details[open] > div {
+    background: #0f1115 !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    color: #e2e8f0 !important;
+    backdrop-filter: blur(16px);
+}
+
+/* Dropdown links & buttons always light text */
+.desk-topnav details > div a,
+.desk-topnav details > div button {
+    color: #cbd5e1 !important;
+}
+
+.desk-topnav details > div a:hover,
+.desk-topnav details > div button:hover {
+    background: rgba(255,255,255,0.06) !important;
+    color: #ffffff !important;
+}
+
+/* Sign out button keeps its red colour */
+.desk-topnav details > div button:last-child,
+.desk-topnav details > div button[onclick="logout()"] {
+    color: #fca5a5 !important;
+}
+
+.desk-topnav details > div button:last-child:hover,
+.desk-topnav details > div button[onclick="logout()"]:hover {
+    background: rgba(239,68,68,0.10) !important;
+    color: #f87171 !important;
+}
+
+/* Name and email in dropdown header */
+.desk-topnav details > div p {
+    color: #e2e8f0;
+}
+
+.desk-topnav details > div p + p {
+    color: #94a3b8;
 }
 
 .desk-topnav summary::-webkit-details-marker {
