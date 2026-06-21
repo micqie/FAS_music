@@ -106,10 +106,6 @@
                 <div>
                     <h1 class="text-3xl font-black text-slate-900 tracking-tight">Branch Teachers</h1>
                     <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
-                    <p class="text-slate-500 mt-2">Manage teachers for your branch only.</p>
-                    <div class="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                        Branch: <span id="managerBranchName">—</span>
-                    </div>
                 </div>
                 <div class="flex items-center gap-3">
                     <button id="openTeacherModalBtn" class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/25 transition-all duration-200">
@@ -158,52 +154,59 @@
         </div>
     </main>
 
-    <div id="teacherModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
-            <button id="closeTeacherModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
-            <h3 id="teacherModalTitle" class="text-2xl font-bold text-white mb-2">Add Teacher</h3>
-            <p class="text-zinc-400 text-xs mb-4">Teachers are added to your branch only.</p>
-            <form id="teacherForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div id="teacherModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/45 backdrop-blur-sm">
+        <div class="w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+            <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
+                <div>
+                    <h3 id="teacherModalTitle" class="text-2xl font-bold text-slate-900 mb-1">Add Teacher</h3>
+                    <p class="text-sm text-slate-500">Teachers are added to your branch only.</p>
+                </div>
+                <button id="closeTeacherModalBtn" class="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition" aria-label="Close modal">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <form id="teacherForm" class="grid grid-cols-1 md:grid-cols-2 gap-5 p-6">
                 <input type="hidden" id="teacherId">
                 <input type="hidden" id="branchId">
+                <input type="hidden" id="status" value="Active">
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">First Name *</label>
-                    <input id="firstName" required class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">First Name *</label>
+                    <input id="firstName" required class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-gold-400 focus:ring-4 focus:ring-gold-100">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Last Name *</label>
-                    <input id="lastName" required class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Last Name *</label>
+                    <input id="lastName" required class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-gold-400 focus:ring-4 focus:ring-gold-100">
                 </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Branch</label>
-                    <div class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white" id="branchNameDisplay">—</div>
-                </div>
+
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Employment Type *</label>
-                    <select id="employmentType" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Employment Type *</label>
+                    <select id="employmentType" class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none transition focus:border-gold-400 focus:ring-4 focus:ring-gold-100">
                         <option value="Full-time">Full-time</option>
                         <option value="Part-time">Part-time</option>
                         <option value="Contract">Contract</option>
                     </select>
                 </div>
                 <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Specializations *</label>
-                    <p class="text-xs text-zinc-500 mb-2">Tap to select one or more.</p>
-                    <div id="specializationChipGrid" class="rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 flex flex-wrap gap-2 max-h-40 overflow-y-auto"></div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Specializations *</label>
+                    <div class="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p id="specializationSelectionSummary" class="text-sm text-slate-500">Tap one or more instruments this teacher can teach</p>
+                        <p class="mt-1 text-xs text-slate-400">Pick all that apply. You can change this later.</p>
+                    </div>
+                    <div id="specializationChipGrid" class="max-h-44 flex flex-wrap gap-2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3"></div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Email</label>
-                    <input id="email" type="email" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
+                    <input id="email" type="email" class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-gold-400 focus:ring-4 focus:ring-gold-100">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Phone</label>
-                    <input id="phone" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Phone</label>
+                    <input id="phone" class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-gold-400 focus:ring-4 focus:ring-gold-100">
                 </div>
-          
 
-                <div class="md:col-span-2 flex items-center justify-end gap-3 pt-4">
-                    <button type="button" id="cancelTeacherBtn" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">Cancel</button>
-                    <button type="submit" id="submitTeacherBtn" class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+
+                <div class="md:col-span-2 flex items-center justify-end gap-3 pt-2">
+                    <button type="button" id="cancelTeacherBtn" class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition">Cancel</button>
+                    <button type="submit" id="submitTeacherBtn" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-semibold rounded-xl shadow-lg shadow-gold-500/20 transition">
                         <span id="submitTeacherBtnText">Save Teacher</span>
                     </button>
                 </div>
@@ -332,7 +335,7 @@
             if (form) form.reset();
             document.getElementById('teacherId').value = '';
             document.getElementById('branchId').value = String(managerBranchId || '');
-            document.getElementById('branchNameDisplay').textContent = managerBranchName || '—';
+
             setSelectedSpecializationIds([]);
             if (title) title.textContent = 'Add Teacher';
             if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
@@ -440,8 +443,7 @@
                 managerBranchName = user.branch_name || '';
                 document.getElementById('managerNameNav').textContent = displayName;
                 document.getElementById('profileMenuName').textContent = displayName;
-                document.getElementById('managerBranchName').textContent = managerBranchName || '—';
-                document.getElementById('branchNameDisplay').textContent = managerBranchName || '—';
+
                 if (window.syncManagerShell) {
                     window.syncManagerShell(displayName, managerBranchName, user.email);
                 }

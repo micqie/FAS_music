@@ -1,11 +1,24 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
+    if (!pathname.includes('/pages/admin/')) return;
+
     const nav = document.querySelector('body > nav');
     const sidebar = document.querySelector('body > aside');
 
     if (!nav || !sidebar) return;
 
+    if (sidebar.dataset.mobileMenuEnhanced === '1' || document.querySelector('.admin-mobile-menu-toggle')) {
+        return;
+    }
+
+    sidebar.dataset.mobileMenuEnhanced = '1';
     document.body.classList.add('admin-responsive-ready');
     sidebar.setAttribute('data-admin-sidebar', 'true');
+
+    const existingBackdrop = document.getElementById('adminSidebarBackdrop') || document.querySelector('.admin-sidebar-backdrop');
+    if (existingBackdrop) {
+        return;
+    }
 
     const backdrop = document.createElement('button');
     backdrop.type = 'button';

@@ -85,6 +85,34 @@ class User
         }
     }
 
+    private function calculateAgeFromDateOfBirth($dateOfBirth)
+    {
+        $dateOfBirth = trim((string) $dateOfBirth);
+        if ($dateOfBirth === '') {
+            return null;
+        }
+
+        try {
+            $dob = new DateTime($dateOfBirth);
+            $now = new DateTime();
+            return (int) $now->diff($dob)->y;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    private function assertMinimumStudentAge($dateOfBirth, $context = 'register or enroll')
+    {
+        $age = $this->calculateAgeFromDateOfBirth($dateOfBirth);
+        if ($age === null) {
+            $this->sendJSON(['error' => 'Date of birth is required to verify age.'], 400);
+        }
+        if ($age < 3) {
+            $this->sendJSON(['error' => 'Students must be at least 3 years old to ' . $context . '.'], 400);
+        }
+        return $age;
+    }
+
     private function ensureUserVerificationColumns()
     {
         if ($this->hasUserColumn('email_verified_at') && $this->hasUserColumn('email_verification_code_hash') && $this->hasUserColumn('email_verification_code_expires_at') && $this->hasUserColumn('email_verification_sent_at')) {
@@ -1493,7 +1521,7 @@ class User
             $this->sendJSON(['error' => 'Invalid request data'], 400);
         }
 
-        foreach (['student_first_name', 'student_last_name', 'student_email', 'student_phone', 'branch_id'] as $k) {
+        foreach (['student_first_name', 'student_last_name', 'student_email', 'student_phone', 'branch_id', 'student_date_of_birth'] as $k) {
             if (isset($data[$k]) && is_string($data[$k])) {
                 $data[$k] = trim($data[$k]);
             }
@@ -1524,6 +1552,9 @@ class User
             $this->sendJSON(['error' => 'Email address is too long (max 254 characters)'], 400);
         }
 
+        $dateOfBirth = trim((string)($data['student_date_of_birth'] ?? ''));
+        $age = $this->assertMinimumStudentAge($dateOfBirth, 'register or enroll');
+
         $password = (string)($data['password'] ?? '');
         if (strlen($password) < 8) {
             $this->sendJSON(['error' => 'Password must be at least 8 characters long'], 400);
@@ -1553,18 +1584,30 @@ class User
             if (!$role) throw new Exception("Student role not found");
             $roleId = (int)$role['role_id'];
 
-            $stmtStudent = $this->conn->prepare("
-                INSERT INTO tbl_students (
-                    branch_id, first_name, last_name, phone, email, status
-                ) VALUES (?, ?, ?, ?, ?, 'Inactive')
-            ");
-            $stmtStudent->execute([
+            $studentColumns = ['branch_id', 'first_name', 'last_name', 'phone', 'email', 'status'];
+            $studentValues = [
                 (int)$data['branch_id'],
                 $data['student_first_name'],
                 $data['student_last_name'],
                 $data['student_phone'],
-                $email
-            ]);
+                $email,
+                'Inactive'
+            ];
+            if ($this->hasStudentColumn('date_of_birth')) {
+                $studentColumns[] = 'date_of_birth';
+                $studentValues[] = $dateOfBirth;
+            }
+            if ($this->hasStudentColumn('age')) {
+                $studentColumns[] = 'age';
+                $studentValues[] = $age;
+            }
+
+            $studentPlaceholders = implode(', ', array_fill(0, count($studentColumns), '?'));
+            $stmtStudent = $this->conn->prepare("
+                INSERT INTO tbl_students (" . implode(', ', $studentColumns) . ")
+                VALUES ({$studentPlaceholders})
+            ");
+            $stmtStudent->execute($studentValues);
             $studentId = (int)$this->conn->lastInsertId();
 
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
@@ -1693,19 +1736,14 @@ class User
         }
         $data['student_email'] = $loginEmail;
 
-        foreach (['student_first_name', 'student_last_name', 'student_phone', 'branch_id'] as $field) {
+        foreach (['student_first_name', 'student_last_name', 'student_phone', 'branch_id', 'student_date_of_birth'] as $field) {
             if (($data[$field] ?? '') === '') {
                 $this->sendJSON(['error' => ucfirst(str_replace('_', ' ', $field)) . ' is required'], 400);
             }
         }
 
         $dateOfBirth = $data['student_date_of_birth'] ?? null;
-        $age = null;
-        if (!empty($dateOfBirth)) {
-            $dob = new DateTime($dateOfBirth);
-            $now = new DateTime();
-            $age = $now->diff($dob)->y;
-        }
+        $age = $this->assertMinimumStudentAge($dateOfBirth, 'register or enroll');
         $isMinor = ($age !== null) && ($age <= 18);
         if ($isMinor) {
             foreach (['guardian_first_name', 'guardian_last_name', 'guardian_relationship', 'guardian_phone'] as $field) {

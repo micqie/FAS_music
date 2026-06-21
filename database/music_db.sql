@@ -224,7 +224,6 @@ CREATE TABLE `tbl_instruments` (
   `branch_id` int(11) NOT NULL,
   `instrument_name` varchar(100) NOT NULL,
   `type_id` int(11) NOT NULL,
-  `serial_number` varchar(50) DEFAULT NULL,
   `condition` enum('Excellent','Good','Fair','Poor') DEFAULT 'Good',
   `status` enum('Available','In Use','Under Repair','Inactive') DEFAULT 'Available'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -233,27 +232,27 @@ CREATE TABLE `tbl_instruments` (
 -- Dumping data for table `tbl_instruments`
 --
 
-INSERT INTO `tbl_instruments` (`instrument_id`, `branch_id`, `instrument_name`, `type_id`, `serial_number`, `condition`, `status`) VALUES
-(9, 5, 'Kawai K-200 Piano', 23, 'P-5001', 'Good', 'Available'),
-(10, 5, 'Taylor Acoustic Guitar', 24, 'G-5001', 'Good', 'Available'),
-(11, 5, 'Yamaha Violin V5', 28, 'V-5001', 'Good', 'Available'),
-(12, 6, 'Roland FP-30X', 23, 'P-6001', 'Excellent', 'Available'),
-(13, 6, 'Ibanez RG421', 24, 'G-6001', 'Good', 'Available'),
-(14, 6, 'Mapex Drum Kit', 29, 'D-6001', 'Good', 'Available'),
-(15, 5, 'Student Cello', 32, 'C-5001', 'Good', 'Available'),
-(16, 5, 'Fender Bass Guitar', 33, 'B-5001', 'Good', 'Available'),
-(17, 5, 'Kala Ukulele', 31, 'U-5001', 'Good', 'Available'),
-(18, 5, 'Pearl Drum Kit', 29, 'D-5002', 'Good', 'Available'),
-(19, 5, 'Yamaha Flute', 34, 'F-5001', 'Good', 'Available'),
-(20, 5, 'Alto Saxophone', 35, 'S-5001', 'Good', 'Available'),
-(21, 5, 'Voice Lessons', 30, NULL, 'Good', 'Available'),
-(22, 6, 'Yamaha Violin V5', 28, 'V-6001', 'Good', 'Available'),
-(23, 6, 'Student Cello', 32, 'C-6001', 'Good', 'Available'),
-(24, 6, 'Fender Bass Guitar', 33, 'B-6001', 'Good', 'Available'),
-(25, 6, 'Kala Ukulele', 31, 'U-6001', 'Good', 'Available'),
-(26, 6, 'Yamaha Flute', 34, 'F-6001', 'Good', 'Available'),
-(27, 6, 'Alto Saxophone', 35, 'S-6001', 'Good', 'Available'),
-(28, 6, 'Voice Lessons', 30, NULL, 'Good', 'Available');
+INSERT INTO `tbl_instruments` (`instrument_id`, `branch_id`, `instrument_name`, `type_id`, `condition`, `status`) VALUES
+(9, 5, 'Kawai K-200 Piano', 23, 'Good', 'Available'),
+(10, 5, 'Taylor Acoustic Guitar', 24, 'Good', 'Available'),
+(11, 5, 'Yamaha Violin V5', 28, 'Good', 'Available'),
+(12, 6, 'Roland FP-30X', 23, 'Excellent', 'Available'),
+(13, 6, 'Ibanez RG421', 24, 'Good', 'Available'),
+(14, 6, 'Mapex Drum Kit', 29, 'Good', 'Available'),
+(15, 5, 'Student Cello', 32, 'Good', 'Available'),
+(16, 5, 'Fender Bass Guitar', 33, 'Good', 'Available'),
+(17, 5, 'Kala Ukulele', 31, 'Good', 'Available'),
+(18, 5, 'Pearl Drum Kit', 29, 'Good', 'Available'),
+(19, 5, 'Yamaha Flute', 34, 'Good', 'Available'),
+(20, 5, 'Alto Saxophone', 35, 'Good', 'Available'),
+(21, 5, 'Voice Lessons', 30, 'Good', 'Available'),
+(22, 6, 'Yamaha Violin V5', 28, 'Good', 'Available'),
+(23, 6, 'Student Cello', 32, 'Good', 'Available'),
+(24, 6, 'Fender Bass Guitar', 33, 'Good', 'Available'),
+(25, 6, 'Kala Ukulele', 31, 'Good', 'Available'),
+(26, 6, 'Yamaha Flute', 34, 'Good', 'Available'),
+(27, 6, 'Alto Saxophone', 35, 'Good', 'Available'),
+(28, 6, 'Voice Lessons', 30, 'Good', 'Available');
 
 -- --------------------------------------------------------
 
@@ -597,7 +596,6 @@ CREATE TABLE `tbl_school_instruments` (
   `instrument_id` int(11) NOT NULL,
   `instrument_name` varchar(100) DEFAULT NULL,
   `brand` varchar(100) DEFAULT NULL,
-  `serial_number` varchar(50) DEFAULT NULL,
   `purchase_date` date DEFAULT NULL,
   `purchase_cost` decimal(10,2) DEFAULT NULL,
   `condition` enum('Excellent','Good','Fair','Poor') DEFAULT 'Good',

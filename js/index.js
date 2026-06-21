@@ -1138,6 +1138,18 @@ function initRegisterForm() {
             }
         }
 
+        const computedAge = calculateAgeFromBirthdate(dateOfBirth);
+        if (computedAge === null) {
+            showRegisterMessage('Date of birth is required to verify age.', 'error');
+            registerForm.dataset.submitting = '0';
+            return;
+        }
+        if (computedAge < 3) {
+            showRegisterMessage('Students must be at least 3 years old to register or enroll.', 'error');
+            registerForm.dataset.submitting = '0';
+            return;
+        }
+
         // Initial registration fee is fixed.
         formData.set('registration_source', 'public');
         formData.set('registration_fee_amount', '1000');
@@ -1547,8 +1559,13 @@ function calculateAge(dateOfBirth) {
         return;
     }
 
-    document.getElementById('calculatedAge').textContent = `${age} years old`;
-    document.getElementById('calculatedAge').className = 'text-gold-400 font-semibold';
+    if (age < 3) {
+        document.getElementById('calculatedAge').textContent = `${age} years old - minimum age is 3`;
+        document.getElementById('calculatedAge').className = 'text-red-400 font-semibold';
+    } else {
+        document.getElementById('calculatedAge').textContent = `${age} years old`;
+        document.getElementById('calculatedAge').className = 'text-gold-400 font-semibold';
+    }
     document.getElementById('student_age').value = age;
 }
 
@@ -4091,11 +4108,17 @@ function initStudentRequestSection(student, requestMeta) {
 
     const regStatus = String(student.registration_status || 'Pending');
     const profileComplete = isRegistrationProfileComplete(student);
+    const studentAge = calculateAgeFromBirthdate(student.date_of_birth) ?? (Number.isFinite(Number(student.age)) ? Number(student.age) : null);
+    const underMinimumAge = studentAge === null || studentAge < 3;
 
     if (String(student.status || '') !== 'Active') {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
         statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Your student account is not active yet. Please contact desk/admin.</div>';
+    } else if (underMinimumAge) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
+        statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Students must be at least 3 years old to register or enroll.</div>';
     } else if (!profileComplete) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
@@ -4116,6 +4139,11 @@ function initStudentRequestSection(student, requestMeta) {
     form.onsubmit = async (e) => {
         e.preventDefault();
         if (submitBtn.disabled) return;
+
+        if (underMinimumAge) {
+            showMessage('Students must be at least 3 years old to register or enroll.', 'error');
+            return;
+        }
 
         const packageId = parseInt(packageSelect.value, 10);
         const paymentType = String(paymentModeEl.value || '').trim();
@@ -6125,17 +6153,29 @@ function calculateAgeFromBirthdate(dateStr) {
     return age;
 }
 
+function isBelowMinimumStudentAge(dateStr, minimumAge = 3) {
+    const age = calculateAgeFromBirthdate(dateStr);
+    return age !== null && age < minimumAge;
+}
+
 function updatePublicGuardianRequiredState() {
     const dobInput = document.getElementById('student_date_of_birth');
     const guardianFields = document.querySelectorAll('.guardian-field-public');
     const guardianLabels = document.querySelectorAll('.guardian-label-public');
     const badge = document.getElementById('guardian_required_badge_public');
+    const submitBtn = document.getElementById('registerSubmitBtn');
     if (!dobInput) return;
 
     const age = calculateAgeFromBirthdate(dobInput.value);
     const isMinorOr18Below = age !== null && age <= 18;
+    const underMinimumAge = age !== null && age < 3;
 
     if (badge) badge.classList.toggle('hidden', !isMinorOr18Below);
+    if (submitBtn) {
+        submitBtn.disabled = underMinimumAge;
+        submitBtn.classList.toggle('opacity-60', underMinimumAge);
+        submitBtn.classList.toggle('cursor-not-allowed', underMinimumAge);
+    }
 
     guardianFields.forEach(el => {
         if (isMinorOr18Below) el.setAttribute('required', 'required');
@@ -6155,19 +6195,32 @@ function updateWalkinAgeAndGuardianRequired() {
     const guardianFields = document.querySelectorAll('.guardian-field');
     const guardianLabels = document.querySelectorAll('.guardian-label');
     const badge = document.getElementById('guardian_required_badge');
+    const submitBtn = document.getElementById('walkinSubmitBtn');
 
     if (!dobInput || !ageDisplay) return;
 
     const age = calculateAgeFromBirthdate(dobInput.value);
     const isMinor = age !== null && age <= 18;
+    const underMinimumAge = age !== null && age < 3;
 
     if (age !== null) {
-        ageDisplay.textContent = age + ' years old';
+        ageDisplay.textContent = underMinimumAge
+            ? `${age} years old - minimum age is 3`
+            : age + ' years old';
+        ageDisplay.classList.toggle('text-red-400', underMinimumAge);
+        ageDisplay.classList.toggle('text-zinc-300', !underMinimumAge);
     } else {
         ageDisplay.textContent = '— Select date of birth —';
+        ageDisplay.classList.remove('text-red-400');
+        ageDisplay.classList.add('text-zinc-300');
     }
 
     if (badge) badge.classList.toggle('hidden', !isMinor);
+    if (submitBtn) {
+        submitBtn.disabled = underMinimumAge;
+        submitBtn.classList.toggle('opacity-60', underMinimumAge);
+        submitBtn.classList.toggle('cursor-not-allowed', underMinimumAge);
+    }
 
     guardianFields.forEach(el => {
         if (isMinor) {
@@ -6398,6 +6451,22 @@ function initWalkinPage() {
             data[key] = value;
         }
         data['registration_fee_amount'] = 1000;
+
+        const walkinAge = calculateAgeFromBirthdate(data['student_date_of_birth']);
+        if (walkinAge === null) {
+            showMessage('Date of birth is required to verify age.', 'error');
+            form.dataset.submitting = '0';
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.textContent = 'Proceed Payment';
+            return;
+        }
+        if (walkinAge < 3) {
+            showMessage('Students must be at least 3 years old to register or enroll.', 'error');
+            form.dataset.submitting = '0';
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.textContent = 'Proceed Payment';
+            return;
+        }
 
         try {
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;

@@ -64,17 +64,25 @@
                     <td class="px-6 py-4 text-slate-700">${escapeHtml(b.email || '—')}</td>
                     <td class="px-6 py-4">${statusBadge}</td>
                     <td class="px-6 py-4">
-                        <button onclick="openEditBranch(${b.branch_id})" class="text-gold-500 hover:text-gold-400 mr-3" title="Edit">
-                            <i class="fas fa-edit"></i>
+                        <div class="flex items-center gap-2 whitespace-nowrap">
+                        <button onclick="openEditBranch(${b.branch_id})"
+                            class="inline-flex items-center px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 hover:border-amber-300 transition"
+                            title="Edit Branch">
+                            Edit
                         </button>
                         ${b.status === 'Active'
-                            ? `<button onclick="deactivateBranch(${b.branch_id})" class="text-red-500 hover:text-red-400" title="Deactivate">
-                                    <i class="fas fa-user-slash"></i>
-                               </button>`
-                            : `<button onclick="activateBranch(${b.branch_id})" class="text-green-500 hover:text-green-400" title="Activate">
-                                    <i class="fas fa-user-check"></i>
-                               </button>`
+                            ? `<button onclick="deactivateBranch(${b.branch_id})"
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-[11px] font-semibold text-red-700 hover:bg-red-100 hover:border-red-300 transition"
+                                title="Deactivate Branch">
+                                Deactivate
+                            </button>`
+                            : `<button onclick="activateBranch(${b.branch_id})"
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition"
+                                title="Activate Branch">
+                                Activate
+                            </button>`
                         }
+                        </div>
                     </td>
                 </tr>
             `;

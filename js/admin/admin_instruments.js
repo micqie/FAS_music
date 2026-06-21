@@ -148,7 +148,7 @@
                 } else {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="5" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-inbox text-2xl mb-2"></i>
                                 <p>No instruments found</p>
                             </td>
@@ -164,7 +164,7 @@
                 if (tableBody) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
+                            <td colspan="5" class="px-6 py-8 text-center text-red-500 dark:text-red-400">
                                 <i class="fas fa-exclamation-circle text-2xl mb-2 text-red-500"></i>
                                 <p>Failed to load instruments</p>
                             </td>
@@ -182,7 +182,7 @@
             if (!filteredInstruments || filteredInstruments.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                        <td colspan="5" class="px-6 py-8 text-center text-slate-500">
                             <i class="fas fa-inbox text-2xl mb-2"></i>
                             <p>No instruments found</p>
                         </td>
@@ -208,8 +208,6 @@
                         </td>
                         <td class="px-6 py-4 text-slate-900">${instrument.type_name || 'N/A'}</td>
                         <td class="px-6 py-4 text-slate-900">${instrument.branch_name || 'N/A'}</td>
-                        <td class="px-6 py-4 text-slate-500">${instrument.serial_number || '-'}</td>
-
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
                                 ${instrument.status || 'N/A'}
@@ -399,8 +397,7 @@
                 const formData = {
                     branch_id: document.getElementById('instrumentBranchId').value,
                     instrument_name: document.getElementById('instrumentName').value.trim(),
-                    type_id: document.getElementById('instrumentTypeId').value,
-                    serial_number: document.getElementById('serialNumber').value.trim() || null
+                    type_id: document.getElementById('instrumentTypeId').value
                 };
 
                 const response = await axios.post(`${baseApiUrl}/instruments.php?action=add-instrument`, formData);
@@ -502,7 +499,6 @@
             document.getElementById('editInstrumentBranchId').value = String(instrument.branch_id || '');
             document.getElementById('editInstrumentTypeId').value = String(instrument.type_id || '');
             document.getElementById('editInstrumentName').value = instrument.instrument_name || '';
-            document.getElementById('editSerialNumber').value = instrument.serial_number || '';
             document.getElementById('editInstrumentStatus').value = instrument.status || 'Available';
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -525,7 +521,6 @@
                 branch_id: Number(document.getElementById('editInstrumentBranchId')?.value || 0),
                 type_id: Number(document.getElementById('editInstrumentTypeId')?.value || 0),
                 instrument_name: document.getElementById('editInstrumentName')?.value?.trim() || '',
-                serial_number: document.getElementById('editSerialNumber')?.value?.trim() || null,
                 status: document.getElementById('editInstrumentStatus')?.value || 'Available'
             };
             if (!payload.instrument_id || !payload.branch_id || !payload.type_id || !payload.instrument_name) {

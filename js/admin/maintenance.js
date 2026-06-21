@@ -72,7 +72,7 @@
                 if (branchId && String(i.branch_id) !== String(branchId)) return false;
                 if (status && String(i.status || '') !== status) return false;
                 if (keyword) {
-                    const hay = `${i.instrument_name || ''} ${i.serial_number || ''} ${i.type_name || ''} ${i.branch_name || ''}`.toLowerCase();
+                    const hay = `${i.instrument_name || ''} ${i.type_name || ''} ${i.branch_name || ''}`.toLowerCase();
                     if (!hay.includes(keyword)) return false;
                 }
                 return true;
@@ -90,7 +90,7 @@
             if (!filteredInstruments.length) {
                 table.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-10 text-center text-slate-500">
+                        <td colspan="5" class="px-6 py-10 text-center text-slate-500">
                             <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
                             <p>No instruments found for current filters.</p>
                         </td>
@@ -103,7 +103,6 @@
                     <td class="px-6 py-4 text-slate-900 font-medium">${escapeHtml(i.instrument_name || 'N/A')}</td>
                     <td class="px-6 py-4 text-slate-700">${escapeHtml(i.type_name || '-')}</td>
                     <td class="px-6 py-4 text-slate-700">${escapeHtml(i.branch_name || '-')}</td>
-                    <td class="px-6 py-4 text-slate-700">${escapeHtml(i.serial_number || '-')}</td>
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 rounded text-xs font-semibold ${statusBadgeClass(i.status)}">${escapeHtml(i.status || 'N/A')}</span>
                     </td>

@@ -79,6 +79,37 @@ class StudentsApi
         }
     }
 
+    private function calculateAgeFromDateOfBirth($dateOfBirth)
+    {
+        $dateOfBirth = trim((string) $dateOfBirth);
+        if ($dateOfBirth === '') {
+            return null;
+        }
+
+        try {
+            $dob = new DateTime($dateOfBirth);
+            $now = new DateTime();
+            return (int) $now->diff($dob)->y;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    private function assertMinimumStudentAge(array $student, $context = 'enroll')
+    {
+        $age = $this->calculateAgeFromDateOfBirth($student['date_of_birth'] ?? null);
+        if ($age === null && isset($student['age']) && $student['age'] !== '') {
+            $age = (int) $student['age'];
+        }
+        if ($age === null) {
+            $this->sendJSON(['error' => 'Date of birth is required before a student can ' . $context . '.'], 400);
+        }
+        if ($age < 3) {
+            $this->sendJSON(['error' => 'Students must be at least 3 years old to ' . $context . '.'], 400);
+        }
+        return $age;
+    }
+
     private function isWalkInStudentRecord(array $student)
     {
         $source = strtolower(trim((string)($student['registration_source'] ?? '')));
@@ -2642,7 +2673,6 @@ class StudentsApi
                     si.instrument_id,
                     si.priority_order,
                     i.instrument_name,
-                    i.serial_number,
                     i.`condition`,
                     i.status,
                     it.type_name
@@ -3668,6 +3698,8 @@ class StudentsApi
                     s.student_id,
                     s.branch_id,
                     s.status,
+                    s.date_of_birth,
+                    s.age,
                     COALESCE(rf.registration_status, 'Pending') AS registration_status
                 FROM tbl_students s
                 LEFT JOIN (
@@ -3693,6 +3725,8 @@ class StudentsApi
             if ($student['status'] !== 'Active') {
                 $this->sendJSON(['error' => 'Student account is not active yet'], 400);
             }
+
+            $this->assertMinimumStudentAge($student, 'enroll');
 
             $stmtExisting = $this->conn->prepare("
                 SELECT enrollment_id
@@ -5452,8 +5486,5 @@ switch ($action) {
     default:
         $studentsApi->sendJSON(['error' => 'Invalid action'], 400);
 }
-
-
-
 
 
