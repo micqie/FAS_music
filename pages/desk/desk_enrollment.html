@@ -33,6 +33,48 @@
 </head>
 <body class="desk-app desk-enrollment-page bg-slate-100 text-slate-900">
     <div class="min-h-screen flex">
+    <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden flex-col sidebar-scroll">
+        <div class="desk-sidebar-brand px-2 pb-4 mb-3 border-b border-white/10">
+            <a href="desk_scanner.html" class="inline-flex h-10 items-center" aria-label="Father & Sons Music home">
+                 <div class="flex flex-col items-center  justify-center py-8 ml-6">
+    <img src="../../assets/fas-logo.png"
+         alt="Father & Sons Music"
+         class="h-14 w-auto object-contain">
+</div>
+            </a>
+            <div data-old-branch-wrap="1" class="desk-topnav-branch inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200 w-fit mt-3">
+                Branch:
+                <i class="fas fa-location-dot text-gold-400"></i>
+                <span>—</span>
+            </div>
+            <span id="sessionsSidePanelTitle" class="hidden" aria-hidden="true"></span>
+        </div>
+        <nav class="desk-sidebar-nav overflow-x-hidden space-y-1.5">
+              <a href="desk_attendance.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-clipboard-check text-slate-400"></i> Attendance
+                </a>
+                <a href="desk_makeup.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-triangle-exclamation text-slate-400"></i> Make-Up List
+                </a>
+            <a id="navDashboardLink" href="desk_scanner.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <i class="fas fa-qrcode text-slate-400"></i> Scanner
+            </a>
+            <a href="desk_enrollment.html?view=active" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600/30 text-white border border-blue-500/40">
+                <i class="fas fa-user-graduate text-blue-200"></i> Enrollments
+            </a>
+            <a href="desk_sessions.html?page=sessions" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <i class="fas fa-calendar-check text-slate-400"></i> Sessions
+            </a>
+            <a href="desk_registration.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <i class="fas fa-id-card text-slate-400"></i> Registrations
+            </a>
+                  <a href="desk_featured_posts.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-photo-film text-slate-400"></i> Featured Posts
+                </a>
+        </nav>
+
+    </aside>
+
     <div class="flex-1 flex flex-col min-w-0">
     <div id="deskTopNavMount"></div>
     <!-- Main Content -->
@@ -46,10 +88,6 @@
                         <button id="viewNavActive" class="px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Active</button>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
-                        <button id="openWalkinRegistrationModalBtn" class="inline-flex items-center px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold rounded-xl shadow-sm transition">
-                            <i class="fas fa-user-plus mr-2"></i>
-                            Walk-In Registration
-                        </button>
                         <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center px-5 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-base font-bold rounded-xl shadow-lg shadow-gold-500/20 transition">
                             <i class="fas fa-list-check mr-2"></i>
                             Walk-In Enrollment
@@ -163,68 +201,102 @@
 
     <!-- Assign Request Modal -->
     <div id="assignRequestModal" class="desk-modal desk-modal-readable fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 p-3 sm:p-5">
-        <div class="desk-modal-panel max-w-7xl max-h-[94vh] overflow-y-auto">
-            <div class="desk-modal-header">
+        <div class="desk-modal-panel max-w-[1400px] max-h-[96vh] flex flex-col overflow-hidden p-0">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50/80 rounded-t-2xl">
                 <div>
-                    <h3>Assign Student Request</h3>
-                    <p id="assignRequestStudentInfo">Set teacher and weekly schedule before approval.</p>
+                    <h3 class="text-xl font-black text-slate-900 tracking-tight">Schedule Student Request</h3>
+                    <p id="assignRequestStudentInfo" class="text-slate-500 text-xs mt-0.5">Select a teacher, pick a start date, then click a free slot on the calendar to assign.</p>
                 </div>
-                <button type="button" id="closeAssignRequestModalBtn" class="desk-modal-close" aria-label="Close"><i class="fas fa-times"></i></button>
+                <button type="button" id="closeAssignRequestModalBtn" class="desk-modal-close" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
 
-            <div class="desk-modal-summary">
-                <span><b>Student</b> <span id="assignRequestStudentName">—</span></span>
-                <span><b>Branch</b> <span id="assignRequestStudentBranch">—</span></span>
-                <span><b>Package</b> <span id="assignRequestStudentPackage">—</span></span>
-                <span><b>Instrument</b> <span id="assignRequestStudentInstrument">—</span></span>
+            <!-- Student info strip -->
+            <div class="px-5 py-3 border-b border-slate-100 bg-white shrink-0">
+                <div class="desk-modal-summary">
+                    <span>👤 <b>Student</b> <span id="assignRequestStudentName">—</span></span>
+                    <span>📍 <b>Branch</b> <span id="assignRequestStudentBranch">—</span></span>
+                    <span>📦 <b>Package</b> <span id="assignRequestStudentPackage">—</span></span>
+                    <span>🎸 <b>Instrument</b> <span id="assignRequestStudentInstrument">—</span></span>
+                </div>
             </div>
 
-            <form id="assignRequestForm" class="desk-modal-body">
-                <input type="hidden" id="assignRequestId" value="">
+            <!-- Two-column body -->
+            <div class="flex-1 overflow-hidden grid grid-cols-1 xl:grid-cols-[460px_1fr]">
 
-                <div class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4">
-                    <div class="space-y-3 min-w-0">
+                <!-- LEFT — form -->
+                <div class="overflow-y-auto border-r border-slate-100 p-5">
+                    <form id="assignRequestForm" class="desk-modal-body space-y-4">
+                        <input type="hidden" id="assignRequestId" value="">
+
+                        <!-- Start date -->
                         <div>
-                            <label class="desk-modal-label">Start date *</label>
+                            <label class="desk-modal-label">
+                                <i class="fas fa-calendar-day text-gold-500 mr-1.5"></i>Start Date *
+                            </label>
                             <input type="date" id="assignRequestDate" class="desk-modal-input">
-                            <p class="desk-modal-hint">Each instrument row below gets its own teacher and weekly time.</p>
+                            <p class="desk-modal-hint">Sessions will be generated weekly from this date.</p>
                         </div>
 
+                        <!-- Weekly slots -->
                         <div class="desk-modal-section">
                             <div class="desk-modal-toolbar">
                                 <div>
-                                    <div class="desk-modal-label mb-0">Weekly slots *</div>
-                                    <p class="desk-modal-hint">One hour per slot.</p>
+                                    <div class="desk-modal-label mb-0">
+                                        <i class="fas fa-clock text-gold-500 mr-1.5"></i>Weekly Slots *
+                                    </div>
+                                    <p class="desk-modal-hint">Click a slot on the calendar → fills here automatically.</p>
                                 </div>
-                                <button type="button" id="addAssignRequestSlotBtn" class="desk-modal-btn desk-modal-btn-gold">Add slot</button>
+                                <button type="button" id="addAssignRequestSlotBtn" class="desk-modal-btn desk-modal-btn-gold">
+                                    + Add Slot
+                                </button>
                             </div>
                             <div id="assignRequestSlotsContainer" class="space-y-2"></div>
                         </div>
 
+                        <!-- Notes -->
                         <div>
-                            <label class="desk-modal-label">Notes</label>
-                            <input type="text" id="assignRequestNotes" placeholder="Optional" class="desk-modal-input">
+                            <label class="desk-modal-label">Notes <span class="font-normal text-slate-400">(optional)</span></label>
+                            <input type="text" id="assignRequestNotes" placeholder="Any notes for this assignment…" class="desk-modal-input">
                         </div>
 
                         <div class="desk-modal-note">
-                            <span id="assignRequestRecurringSummary">Pick a teacher and time for each instrument. Those slots stay reserved weekly for this student.</span>
+                            <span id="assignRequestRecurringSummary">Pick a teacher and time for each slot. Those times stay reserved weekly for this student.</span>
                         </div>
-                    </div>
 
-                    <div class="min-w-0">
-                        <div class="desk-modal-label">Teacher availability</div>
-                        <p id="assignRequestAvailabilityHint" class="desk-modal-hint mb-2">Select a teacher in a slot row to see open times.</p>
-                        <div id="assignRequestAvailabilityList" class="desk-modal-list">
-                            <div class="text-sm text-slate-500">No instructor selected yet.</div>
+                        <!-- Actions -->
+                        <div class="desk-modal-footer pt-2">
+                            <button type="button" id="cancelAssignRequestBtn" class="desk-modal-btn desk-modal-btn-secondary">
+                                Cancel
+                            </button>
+                            <button type="submit" class="desk-modal-btn desk-modal-btn-primary">
+                                <i class="fas fa-check mr-1.5"></i>Assign &amp; Approve
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- RIGHT — availability calendar always visible -->
+                <div class="overflow-y-auto p-5 bg-slate-50/50 flex flex-col gap-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-calendar-check text-gold-500 text-sm"></i>
+                        <span class="text-sm font-bold text-slate-800">Instructor Availability</span>
+                    </div>
+                    <p id="assignRequestAvailabilityHint" class="desk-modal-hint -mt-1">
+                        Select a teacher to see free slots. Green = available. Click a slot to auto-fill the schedule.
+                    </p>
+                    <div id="assignRequestAvailabilityList" class="flex-1 desk-modal-list">
+                        <div class="text-sm text-slate-400 text-center py-10">
+                            <i class="fas fa-user-clock text-3xl text-slate-200 block mb-3"></i>
+                            No instructor selected yet.
                         </div>
                     </div>
                 </div>
 
-                <div class="desk-modal-footer">
-                    <button type="button" id="cancelAssignRequestBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
-                    <button type="submit" class="desk-modal-btn desk-modal-btn-primary">Assign &amp; Approve</button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -338,9 +410,9 @@
                     </div>
                 </div>
 
-                <div id="walkin_guardian_section">
+                <div id="walkin_guardian_section" class="hidden">
                     <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
-                        Guardian Information <span id="guardian_required_badge" class="text-xs font-normal text-zinc-500 ml-2 hidden">(Required for age 18 and below)</span>
+                        Guardian Information <span id="guardian_required_badge" class="text-xs font-normal text-zinc-500 ml-2 hidden">(Required for minors)</span>
                     </h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -478,10 +550,5 @@
 <script src="../../js/index.js"></script>
     <script src="../../js/desk/desk_nav.js"></script>
     <script src="../../js/desk/desk_enrollment.js"></script>
-    <script src="../../js/session_timeout.js"></script>
 </body>
 </html>
-
-
-
-

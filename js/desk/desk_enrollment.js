@@ -599,7 +599,6 @@
             const selectedStudent = resolveWalkinSelectedStudent();
             const email = studentSelect.value || '';
             const studentId = Number(selectedStudent?.student_id || 0);
-            const studentAge = calculateAgeFromBirthdate(selectedStudent?.date_of_birth || '') ?? (Number.isFinite(Number(selectedStudent?.age)) ? Number(selectedStudent.age) : null);
             const packageId = parseInt(packageSelect.value, 10);
             const paymentType = String(paymentTypeEl.value || '').trim();
             const paymentMethod = String(paymentMethodEl.value || '').trim();
@@ -610,14 +609,6 @@
 
             if (!email || !studentId || !packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
                 showMessage('Please complete student, package, instruments, payment type, and payment method.', 'error');
-                return;
-            }
-            if (studentAge === null) {
-                showMessage('The selected student is missing a valid date of birth. Please update the student profile first.', 'error');
-                return;
-            }
-            if (studentAge < 3) {
-                showMessage('Students must be at least 3 years old to register or enroll.', 'error');
                 return;
             }
 
@@ -1391,7 +1382,7 @@
                 : 'Loading available one-hour slots for the selected teacher.';
 
             try {
-                let url = `${baseApiUrl}/students.php?action=get-teacher-available-slots&teacher_id=${encodeURIComponent(teacherId)}&branch_id=${encodeURIComponent(activeAssignRequest.branch_id || managerBranchId || 0)}&student_id=${encodeURIComponent(activeAssignRequest.student_id || 0)}`;
+                let url = `${baseApiUrl}/students.php?action=get-teacher-available-slots&teacher_id=${encodeURIComponent(teacherId)}&branch_id=${encodeURIComponent(activeAssignRequest.branch_id || managerBranchId || 0)}&student_id=${encodeURIComponent(activeAssignRequest.student_id || 0)}&days_ahead=365`;
                 if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
                 const response = await axios.get(url);
                 const data = response.data || {};

@@ -64,9 +64,8 @@ class Instruments
                 $columns[] = 'type_id';
             }
 
-            if (in_array('serial_number', $columns)) {
-                $this->conn->exec("ALTER TABLE tbl_instruments DROP COLUMN serial_number");
-                $columns = array_values(array_filter($columns, fn($column) => $column !== 'serial_number'));
+            if (!in_array('serial_number', $columns)) {
+                $this->conn->exec("ALTER TABLE tbl_instruments ADD COLUMN serial_number VARCHAR(50) NULL");
             }
             if (!in_array('condition', $columns)) {
                 $this->conn->exec("ALTER TABLE tbl_instruments ADD COLUMN `condition` VARCHAR(50) NULL");
@@ -176,6 +175,7 @@ class Instruments
                     i.branch_id,
                     i.instrument_name,
                     i.type_id,
+                    i.serial_number,
                     i.`condition`,
                     i.status,
                     b.branch_name,
@@ -362,6 +362,7 @@ class Instruments
                     i.branch_id,
                     i.instrument_name,
                     i.type_id,
+                    i.serial_number,
                     i.`condition`,
                     i.status,
                     b.branch_name,
@@ -429,14 +430,16 @@ class Instruments
 
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_instruments (
-                    branch_id, instrument_name, type_id, `condition`, status
+                    branch_id, instrument_name, type_id, serial_number, 
+                    `condition`, status
                 )
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['branch_id'],
                 $data['instrument_name'],
                 $data['type_id'],
+                $data['serial_number'] ?? null,
                 $condition,
                 $status
             ]);
@@ -521,6 +524,10 @@ class Instruments
             if (isset($data['type_id'])) {
                 $updateFields[] = "type_id = ?";
                 $params[] = $data['type_id'];
+            }
+            if (isset($data['serial_number'])) {
+                $updateFields[] = "serial_number = ?";
+                $params[] = $data['serial_number'] ?: null;
             }
             if (isset($data['condition'])) {
                 $updateFields[] = "`condition` = ?";
@@ -649,4 +656,5 @@ switch ($action) {
         $instruments->sendJSON(['error' => 'Invalid action'], 400);
 }
 ?>
+
 

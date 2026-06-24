@@ -33,6 +33,48 @@
 </head>
 <body class="desk-app bg-slate-100 text-slate-900">
     <div class="min-h-screen flex">
+    <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden flex-col sidebar-scroll">
+        <div class="desk-sidebar-brand px-2 pb-4 mb-3 border-b border-white/10">
+            <a href="desk_scanner.html" class="inline-flex h-10 items-center" aria-label="Father & Sons Music home">
+              <div class="flex flex-col items-center  justify-center py-8 ml-6">
+    <img src="../../assets/fas-logo.png"
+         alt="Father & Sons Music"
+         class="h-14 w-auto object-contain">
+</div>
+            </a>
+            <div data-old-branch-wrap="1" class="desk-topnav-branch inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200 w-fit mt-3">
+                Branch:
+                <i class="fas fa-location-dot text-gold-400"></i>
+                <span>—</span>
+            </div>
+            <span id="sessionsSidePanelTitle" class="hidden" aria-hidden="true"></span>
+        </div>
+        <nav class="desk-sidebar-nav overflow-x-hidden space-y-1.5">
+          <a href="desk_attendance.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-clipboard-check text-slate-400"></i> Attendance
+                </a>
+                <a href="desk_makeup.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-triangle-exclamation text-slate-400"></i> Make-Up List
+                </a>
+            <a id="navDashboardLink" href="desk_scanner.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <i class="fas fa-qrcode text-slate-400"></i> Scanner
+            </a>
+            <a href="desk_enrollment.html?view=active" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <i class="fas fa-user-graduate text-slate-400"></i> Enrollments
+            </a>
+            <a href="desk_sessions.html?page=sessions" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600/30 text-white border border-blue-500/40">
+                <i class="fas fa-calendar-check text-blue-200"></i> Sessions
+            </a>
+            <a href="desk_registration.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                <i class="fas fa-id-card text-slate-400"></i> Registrations
+            </a>
+                  <a href="desk_featured_posts.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-photo-film text-slate-400"></i> Featured Posts
+                </a>
+        </nav>
+
+    </aside>
+
     <div class="flex-1 flex flex-col min-w-0">
     <div id="deskTopNavMount"></div>
     <!-- Main Content -->
@@ -81,7 +123,7 @@
 
     <!-- Schedule Modal -->
     <div id="scheduleModal" class="desk-modal fixed inset-0 z-50 hidden items-center justify-center bg-black/60">
-        <div class="desk-modal-panel max-w-4xl max-h-[92vh] overflow-hidden flex flex-col">
+        <div class="desk-modal-panel w-[96vw] max-w-[1500px] max-h-[92vh] overflow-hidden flex flex-col">
             <div class="desk-modal-header">
                 <div>
                     <h3>Session Schedule</h3>
@@ -166,66 +208,113 @@
     </div>
 
     <!-- Assign Request Modal -->
-    <div id="assignRequestModal" class="desk-modal fixed inset-0 z-50 hidden items-center justify-center bg-black/60">
-        <div class="desk-modal-panel max-w-3xl max-h-[92vh] overflow-y-auto">
-            <div class="desk-modal-header">
+    <div id="assignRequestModal" class="desk-modal fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 p-3 sm:p-5">
+        <div class="desk-modal-panel w-[96vw] max-w-[1600px] max-h-[96vh] flex flex-col overflow-hidden p-0">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between gap-4 px-5 py-4 border-b border-slate-100 shrink-0 bg-slate-50/80 rounded-t-2xl">
                 <div>
-                    <h3>Assign Student Request</h3>
-                    <p id="assignRequestStudentInfo">Set teacher and weekly schedule.</p>
+                    <h3 class="text-xl font-black text-slate-900 tracking-tight">Schedule Student Request</h3>
+                    <p id="assignRequestStudentInfo" class="text-slate-500 text-xs mt-0.5">Select a teacher, pick a start date, then click a free slot to assign.</p>
                 </div>
-                <button type="button" id="closeAssignRequestModalBtn" class="desk-modal-close" aria-label="Close"><i class="fas fa-times"></i></button>
+                <button type="button" id="closeAssignRequestModalBtn" class="desk-modal-close" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
 
-            <div class="desk-modal-summary">
-                <span><b>Student</b> <span id="assignRequestStudentName">—</span></span>
-                <span><b>Branch</b> <span id="assignRequestStudentBranch">—</span></span>
-                <span><b>Package</b> <span id="assignRequestStudentPackage">—</span></span>
-                <span><b>Instrument</b> <span id="assignRequestStudentInstrument">—</span></span>
+            <!-- Student strip -->
+            <div class="px-5 py-3 border-b border-slate-100 bg-white shrink-0">
+                <div class="desk-modal-summary">
+                    <span>👤 <b>Student</b> <span id="assignRequestStudentName">—</span></span>
+                    <span>📍 <b>Branch</b> <span id="assignRequestStudentBranch">—</span></span>
+                    <span>📦 <b>Package</b> <span id="assignRequestStudentPackage">—</span></span>
+                    <span>🎸 <b>Instrument</b> <span id="assignRequestStudentInstrument">—</span></span>
+                </div>
             </div>
 
-            <form id="assignRequestForm" class="desk-modal-body space-y-3">
-                <input type="hidden" id="assignRequestId" value="">
+            <!-- Two-column body -->
+            <div class="flex-1 overflow-hidden grid grid-cols-1 xl:grid-cols-[460px_1fr]">
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div class="relative">
-                        <label class="desk-modal-label">Teacher *</label>
-                        <input type="hidden" id="assignRequestTeacherSelect" value="">
-                        <input type="text" id="assignRequestTeacherSearch" placeholder="Search teacher..." class="desk-modal-input">
-                        <div id="assignRequestTeacherSearchHelp" class="desk-modal-hint">Matching instructors for this instrument.</div>
-                        <div id="assignRequestTeacherSuggestions" class="hidden absolute z-20 mt-1 w-full border border-slate-200 bg-white shadow-lg max-h-48 overflow-y-auto rounded-sm"></div>
+                <!-- LEFT — form -->
+                <div class="overflow-y-auto border-r border-slate-100 p-5">
+                    <form id="assignRequestForm" class="desk-modal-body space-y-4">
+                        <input type="hidden" id="assignRequestId" value="">
+
+                        <!-- Teacher search -->
+                        <div class="relative">
+                            <label class="desk-modal-label">
+                                <i class="fas fa-chalkboard-user text-gold-500 mr-1.5"></i>Teacher *
+                            </label>
+                            <input type="hidden" id="assignRequestTeacherSelect" value="">
+                            <input type="text" id="assignRequestTeacherSearch"
+                                placeholder="Search by name or specialization…" class="desk-modal-input">
+                            <div id="assignRequestTeacherSearchHelp" class="desk-modal-hint">Instructors matching this student's instrument.</div>
+                            <div id="assignRequestTeacherSuggestions" class="hidden absolute z-30 mt-1 w-full border border-slate-200 bg-white shadow-xl max-h-52 overflow-y-auto rounded-xl"></div>
+                        </div>
+
+                        <!-- Start date -->
+                        <div>
+                            <label class="desk-modal-label">
+                                <i class="fas fa-calendar-day text-gold-500 mr-1.5"></i>Start Date *
+                            </label>
+                            <input type="date" id="assignRequestDate" class="desk-modal-input">
+                            <p class="desk-modal-hint">Sessions generated weekly from this date.</p>
+                        </div>
+
+                        <!-- Weekly slots -->
+                        <div class="desk-modal-section">
+                            <div class="desk-modal-toolbar">
+                                <div>
+                                    <div class="desk-modal-label mb-0">
+                                        <i class="fas fa-clock text-gold-500 mr-1.5"></i>Weekly Slots *
+                                    </div>
+                                    <p class="desk-modal-hint">Click a slot on the calendar → fills here.</p>
+                                </div>
+                                <button type="button" id="addAssignRequestSlotBtn" class="desk-modal-btn desk-modal-btn-gold">
+                                    + Add Slot
+                                </button>
+                            </div>
+                            <div id="assignRequestSlotsContainer" class="space-y-2"></div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div>
+                            <label class="desk-modal-label">Notes <span class="font-normal text-slate-400">(optional)</span></label>
+                            <input type="text" id="assignRequestNotes" placeholder="Any notes…" class="desk-modal-input">
+                        </div>
+
+                        <div class="desk-modal-note">
+                            <span id="assignRequestRecurringSummary">Pick a teacher and time. Those slots stay reserved weekly for this student.</span>
+                        </div>
+
+                        <!-- Footer actions -->
+                        <div class="desk-modal-footer pt-2">
+                            <button type="button" id="cancelAssignRequestBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
+                            <button type="submit" class="desk-modal-btn desk-modal-btn-primary">
+                                <i class="fas fa-check mr-1.5"></i>Assign &amp; Approve
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- RIGHT — availability calendar always visible -->
+                <div class="overflow-y-auto p-5 bg-slate-50/50 flex flex-col gap-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-calendar-check text-gold-500 text-sm"></i>
+                        <span class="text-sm font-bold text-slate-800">Instructor Availability</span>
                     </div>
-                    <div>
-                        <label class="desk-modal-label">Start date *</label>
-                        <input type="date" id="assignRequestDate" class="desk-modal-input">
+                    <p id="assignRequestAvailabilityHint" class="desk-modal-hint -mt-1">
+                        Select a teacher to see free slots. Green = available. Click a slot to auto-fill.
+                    </p>
+                    <div id="assignRequestAvailabilityList" class="desk-modal-list flex-1">
+                        <div class="text-sm text-slate-400 text-center py-10">
+                            <i class="fas fa-user-clock text-3xl text-slate-200 block mb-3"></i>
+                            No instructor selected yet.
+                        </div>
                     </div>
                 </div>
 
-                <div class="desk-modal-section">
-                    <div class="desk-modal-toolbar">
-                        <div class="desk-modal-label mb-0">Weekly slots *</div>
-                        <button type="button" id="addAssignRequestSlotBtn" class="desk-modal-btn desk-modal-btn-gold">Add slot</button>
-                    </div>
-                    <div id="assignRequestSlotsContainer" class="space-y-2"></div>
-                </div>
-
-                <div>
-                    <label class="desk-modal-label">Notes</label>
-                    <input type="text" id="assignRequestNotes" placeholder="Optional" class="desk-modal-input">
-                </div>
-
-                <div>
-                    <div class="desk-modal-label">Availability</div>
-                    <p id="assignRequestAvailabilityHint" class="desk-modal-hint mb-2">Select a teacher to see open slots.</p>
-                    <div id="assignRequestAvailabilityList" class="desk-modal-list max-h-40">
-                        <div class="text-sm text-slate-500">No instructor selected yet.</div>
-                    </div>
-                </div>
-
-                <div class="desk-modal-footer">
-                    <button type="button" id="cancelAssignRequestBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
-                    <button type="submit" class="desk-modal-btn desk-modal-btn-primary">Assign &amp; Approve</button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -274,117 +363,6 @@
                         <span id="confirmPaymentBtnText">Confirm Payment</span>
                     </button>
                     <button type="button" onclick="closePaymentModal()" class="px-6 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold py-3 border border-white/10 transition">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="registerStudentModal" class="desk-modal desk-modal-readable fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-5">
-        <div class="desk-modal-panel w-full max-w-4xl p-8 relative my-4">
-            <button id="closeRegisterStudentModalBtn" class="absolute top-4 right-4 desk-modal-close" aria-label="Close">
-                <i class="fas fa-times"></i>
-            </button>
-
-            <h3 class="text-2xl font-bold text-slate-900 mb-2">Register Student (Desk)</h3>
-            <p class="text-sm text-slate-600 mb-4">
-                Creates a student account with a temporary password. If needed, guardian information will appear. Registration is locked to your assigned branch.
-            </p>
-
-            <div id="walkinMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
-
-            <form id="walkinForm" class="space-y-8 max-h-[70vh] overflow-y-auto pr-1">
-                <div>
-                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">Student Information</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">First Name *</label>
-                            <input type="text" name="student_first_name" required class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Last Name *</label>
-                            <input type="text" name="student_last_name" required class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Middle Name</label>
-                            <input type="text" name="student_middle_name" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Date of Birth *</label>
-                            <input type="date" name="student_date_of_birth" id="walkin_student_dob" required class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Age</label>
-                            <div id="walkin_student_age_display" class="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-sm text-zinc-300 text-sm">— Select date of birth —</div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Email *</label>
-                            <input type="email" name="student_email" required class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Phone *</label>
-                            <input type="text" name="student_phone" required class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Branch *</label>
-                            <select name="branch_id" id="walkin_branch_id" required class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                                <option value="">Loading branch...</option>
-                            </select>
-                            <p class="mt-2 text-xs text-zinc-500">Managers can only register students under their own branch.</p>
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Address</label>
-                        <textarea name="student_address" rows="2" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
-                    </div>
-                </div>
-
-                <div id="walkin_guardian_section">
-                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
-                        Guardian Information <span id="guardian_required_badge" class="text-xs font-normal text-zinc-500 ml-2 hidden">(Required for age 18 and below)</span>
-                    </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">First Name</label>
-                            <input type="text" name="guardian_first_name" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">Last Name</label>
-                            <input type="text" name="guardian_last_name" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">Relationship</label>
-                            <select name="guardian_relationship" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
-                                <option value="">Select Relationship</option>
-                                <option value="Father">Father</option>
-                                <option value="Mother">Mother</option>
-                                <option value="Legal Guardian">Legal Guardian</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">Phone</label>
-                            <input type="text" name="guardian_phone" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Email</label>
-                            <input type="email" name="guardian_email" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Occupation</label>
-                            <input type="text" name="guardian_occupation" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Address</label>
-                        <textarea name="guardian_address" rows="2" class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
-                    </div>
-                </div>
-
-                <div class="pt-4 flex items-center justify-end gap-3">
-                    <button type="button" id="cancelRegisterStudentBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
-                    <button type="submit" id="walkinSubmitBtn" class="desk-modal-btn desk-modal-btn-gold">
-                        <span id="walkinSubmitBtnText">Proceed Payment</span>
-                    </button>
                 </div>
             </form>
         </div>
@@ -675,52 +653,6 @@
             applySessionView();
 
             openAssignRequestModal(requestId);
-        }
-
-        async function lockWalkinBranchToManager() {
-            const branchSelect = document.getElementById('walkin_branch_id');
-            if (!branchSelect || !managerBranchId) return;
-            if (!branchSelect.options.length || branchSelect.options[0].textContent === 'Loading branch...') {
-                await loadWalkinBranches();
-            }
-            branchSelect.value = String(managerBranchId);
-            branchSelect.dataset.lockedBranchId = String(managerBranchId);
-            branchSelect.title = managerBranchName ? `Locked to ${managerBranchName}` : 'Locked to your branch';
-            branchSelect.classList.add('bg-zinc-800/60');
-            if (!branchSelect.dataset.managerLockBound) {
-                branchSelect.addEventListener('change', function() {
-                    this.value = this.dataset.lockedBranchId || '';
-                });
-                branchSelect.dataset.managerLockBound = '1';
-            }
-        }
-
-        async function openWalkinRegistrationModal() {
-            const modal = document.getElementById('registerStudentModal');
-            const form = document.getElementById('walkinForm');
-            if (!modal || !form) return;
-            await lockWalkinBranchToManager();
-            form.dataset.paymentRedirectTemplate = 'desk_enrollment.html?view=active&assign_student_id={student_id}';
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            updateWalkinAgeAndGuardianRequired();
-        }
-
-        function closeWalkinRegistrationModal() {
-            const modal = document.getElementById('registerStudentModal');
-            const form = document.getElementById('walkinForm');
-            const msgDiv = document.getElementById('walkinMessage');
-            if (modal) {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            }
-            if (form) {
-                form.reset();
-                form.dataset.paymentRedirectTemplate = 'desk_enrollment.html?view=active&assign_student_id={student_id}';
-            }
-            if (msgDiv) msgDiv.classList.add('hidden');
-            updateWalkinAgeAndGuardianRequired();
-            lockWalkinBranchToManager();
         }
 
         async function loadWalkinStudents() {
@@ -1718,7 +1650,7 @@
             listEl.innerHTML = '<div class="text-sm text-slate-500">Loading available slots...</div>';
 
             try {
-                let url = `${baseApiUrl}/students.php?action=get-teacher-available-slots&teacher_id=${encodeURIComponent(teacherId)}&branch_id=${encodeURIComponent(activeAssignRequest.branch_id || managerBranchId || 0)}&student_id=${encodeURIComponent(activeAssignRequest.student_id || 0)}`;
+                let url = `${baseApiUrl}/students.php?action=get-teacher-available-slots&teacher_id=${encodeURIComponent(teacherId)}&branch_id=${encodeURIComponent(activeAssignRequest.branch_id || managerBranchId || 0)}&student_id=${encodeURIComponent(activeAssignRequest.student_id || 0)}&days_ahead=365`;
                 if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
                 const response = await axios.get(url);
                 const data = response.data || {};
@@ -2041,9 +1973,6 @@
                             const editBtn = editableThisSlot
                                 ? `<button type="button" class="edit-schedule-btn ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold shadow-sm transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}"><i class="fas fa-pen"></i><span>Edit Schedule</span></button>`
                                 : '';
-                            const rescheduleBtn = editableThisSlot && Number(slot?.session_id || 0) > 0
-                                ? `<button type="button" class="reschedule-session-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-sky-500 hover:bg-sky-600 text-white text-[11px] font-bold shadow-sm transition" data-session-id="${Number(slot?.session_id || 0)}"><i class="fas fa-calendar-day"></i><span>Reschedule</span></button>`
-                                : '';
                             const reasonText = slot?.cancellation_reason
                                 ? `<div class="text-[11px] text-slate-500 mt-1">Reason: ${escapeHtml(slot.cancellation_reason)}</div>`
                                 : '';
@@ -2052,7 +1981,6 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         ${getSessionStatusBadge(slot.status)}
                                         <div>${escapeHtml(dateText)}${teacherText}</div>
-                                        ${rescheduleBtn}
                                         ${editBtn}
                                     </div>
                                     ${reasonText}
@@ -2114,13 +2042,6 @@
                     if (saveBtn) saveBtn.textContent = `Update Session ${btn.dataset.sessionNumber || ''}`;
                     form.classList.remove('hidden');
                     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                });
-            });
-            body.querySelectorAll('.reschedule-session-btn').forEach((btn) => {
-                btn.addEventListener('click', async () => {
-                    const sessionId = Number(btn.dataset.sessionId || 0);
-                    if (!sessionId) return;
-                    await openStudentReschedulePicker(sessionId, enrollmentId);
                 });
             });
 
@@ -2380,8 +2301,6 @@
             }
 
             initPaymentForm();
-            initWalkinPage();
-            await lockWalkinBranchToManager();
 
             await Promise.all([
                 loadSessionPackages(),
@@ -2423,9 +2342,6 @@
                     window.history.replaceState({}, '', viewUrl.toString());
                     applySessionView();
                 });
-                document.getElementById('openWalkinRegistrationModalBtn')?.addEventListener('click', openWalkinRegistrationModal);
-                document.getElementById('closeRegisterStudentModalBtn')?.addEventListener('click', closeWalkinRegistrationModal);
-                document.getElementById('cancelRegisterStudentBtn')?.addEventListener('click', closeWalkinRegistrationModal);
                 document.getElementById('openWalkinEnrollmentModalBtn')?.addEventListener('click', openWalkinEnrollmentModal);
                 document.getElementById('closeWalkinEnrollmentModalBtn')?.addEventListener('click', closeWalkinEnrollmentModal);
                 document.getElementById('cancelWalkinEnrollmentBtn')?.addEventListener('click', closeWalkinEnrollmentModal);
@@ -2460,10 +2376,5 @@
             document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
         });
     </script>
-    <script src="../../js/session_timeout.js"></script>
 </body>
 </html>
-
-
-
-

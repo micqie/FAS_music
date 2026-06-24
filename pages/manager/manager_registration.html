@@ -37,6 +37,28 @@
             color: #d4af37;
         }
         .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+        .walkin-modal-shell {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        }
+        .walkin-panel {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.14);
+        }
+        .walkin-section {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 1rem;
+            padding: 0.875rem;
+        }
+        .walkin-kicker {
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            font-size: 10px;
+            font-weight: 700;
+            color: #b8860b;
+        }
     </style>
     <script src="manager_shared.js" defer></script>
 </head>
@@ -265,145 +287,145 @@
     </div>
 
     <!-- Register Student Modal -->
-    <div id="registerStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-4xl p-8 relative my-8">
-            <button id="closeRegisterStudentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
-                <i class="fas fa-times text-xl"></i>
+    <div id="registerStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/45 backdrop-blur-sm overflow-y-auto">
+        <div class="walkin-panel w-full max-w-3xl relative my-6 overflow-hidden">
+            <button id="closeRegisterStudentModalBtn" class="absolute top-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition">
+                <i class="fas fa-times text-lg"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2">Register Student (Manager)</h3>
-            <p class="text-zinc-400 text-xs mb-4">
-                This will create a student account using the student's email as username with temporary password
-                <span class="font-mono font-semibold">fas@123</span>.
-                If a guardian account is created, its temporary password will be
-                <span class="font-mono font-semibold">fasmusic@2020</span>.
-                The registration is locked to your assigned branch.
-                On first login, both accounts will be <span class="font-semibold text-gold-400">required to change their passwords</span>
-                for security.
-            </p>
+            <div class="walkin-modal-shell p-5 md:p-6">
+                <div class="max-w-2xl">
+                    <p class="walkin-kicker mb-2">Quick Registration</p>
+                    <h3 class="text-2xl font-bold text-slate-900 mb-2">Register Student</h3>
+                    <p class="text-sm text-slate-600 leading-6">
+                        Fill in the student details, use a simple login name if needed, and the system will turn it into a
+                        <span class="font-semibold text-slate-900">@fas.com</span> account automatically.
+                        The registration stays tied to your branch.
+                    </p>
+                </div>
 
-            <div id="walkinMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+                <div id="walkinMessage" class="hidden mt-4 p-3 rounded-xl text-sm"></div>
 
-            <form id="walkinForm" class="space-y-8 max-h-[70vh] overflow-y-auto pr-1">
-                <!-- Student Information -->
-                <div>
-                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
-                        Student Information
-                    </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">First Name *</label>
-                            <input type="text" name="student_first_name" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Last Name *</label>
-                            <input type="text" name="student_last_name" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Middle Name</label>
-                            <input type="text" name="student_middle_name"
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Date of Birth *</label>
-                            <input type="date" name="student_date_of_birth" id="walkin_student_dob" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Age</label>
-                            <div id="walkin_student_age_display" class="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-sm text-zinc-300 text-sm">
-                                — Select date of birth —
+                <form id="walkinForm" class="mt-5 space-y-5 max-h-[65vh] overflow-y-auto pr-1">
+                    <div class="walkin-section">
+                        <h4 class="text-sm font-bold text-slate-900 mb-3 uppercase tracking-[0.16em]">Student Information</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">First Name *</label>
+                                <input type="text" name="student_first_name" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Last Name *</label>
+                                <input type="text" name="student_last_name" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Middle Name</label>
+                                <input type="text" name="student_middle_name" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Date of Birth *</label>
+                                <input type="date" name="student_date_of_birth" id="walkin_student_dob" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Age</label>
+                                <div id="walkin_student_age_display" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-sm">
+                                    - Select date of birth -
+                                </div>
+                                <p class="mt-1.5 text-xs text-amber-600">Minimum age to register or enroll is 3 years old.</p>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label id="walkin_student_email_label" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Login Name (Becomes @fas.com)</label>
+                                <input type="text" id="walkin_student_email" name="student_email" placeholder="Example: juan or juan.dela.cruz" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                <p id="walkin_student_email_hint" class="mt-1.5 text-xs text-slate-500">Enter a simple name or username. The system will turn it into a <code>@fas.com</code> login automatically.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Phone *</label>
+                                <input type="text" name="student_phone" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Branch *</label>
+                                <select name="branch_id" id="walkin_branch_id" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                    <option value="">Loading branches...</option>
+                                </select>
+                                <p class="mt-1.5 text-xs text-slate-500">Managers can only register students under their own branch.</p>
                             </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Email *</label>
-                            <input type="email" name="student_email" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Phone *</label>
-                            <input type="text" name="student_phone" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Branch *</label>
-                            <select name="branch_id" id="walkin_branch_id" required
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                                <option value="">Loading branches...</option>
-                            </select>
+                        <div class="mt-3">
+                            <input type="hidden" name="student_address" id="walkin_student_address">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Address</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">Street:</label>
+                                    <input type="text" name="student_street" id="walkin_student_street" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">Barangay:</label>
+                                    <input type="text" name="student_barangay" id="walkin_student_barangay" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">City:</label>
+                                    <input type="text" name="student_city" id="walkin_student_city" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">Province:</label>
+                                    <input type="text" name="student_province" id="walkin_student_province" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="mt-4">
-                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Address</label>
-                        <textarea name="student_address" rows="2"
-                            class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
-                    </div>
-                </div>
 
-                <!-- Guardian Information (required only if student is age 18 and below) -->
-                <div id="walkin_guardian_section">
-                    <h4 class="text-sm font-bold text-white mb-4 flex items-center uppercase tracking-widest border-b border-zinc-800 pb-2">
-                        Guardian Information <span id="guardian_required_badge" class="text-xs font-normal text-zinc-500 ml-2 hidden">(Required for age 18 and below)</span>
-                    </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">First Name</label>
-                            <input type="text" name="guardian_first_name"
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
+                    <div id="walkin_guardian_section" class="walkin-section hidden">
+                        <h4 class="text-sm font-bold text-slate-900 mb-3 uppercase tracking-[0.16em]">
+                            Guardian Information <span id="guardian_required_badge" class="text-xs font-medium text-amber-600 ml-2 hidden">(Required for minors)</span>
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em] guardian-label">First Name</label>
+                                <input type="text" name="guardian_first_name" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 guardian-field">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em] guardian-label">Last Name</label>
+                                <input type="text" name="guardian_last_name" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 guardian-field">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em] guardian-label">Relationship</label>
+                                <select name="guardian_relationship" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 guardian-field">
+                                    <option value="">Select Relationship</option>
+                                    <option value="Father">Father</option>
+                                    <option value="Mother">Mother</option>
+                                    <option value="Legal Guardian">Legal Guardian</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em] guardian-label">Phone</label>
+                                <input type="text" name="guardian_phone" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 guardian-field">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Email</label>
+                                <input type="email" name="guardian_email" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Occupation</label>
+                                <input type="text" name="guardian_occupation" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">Last Name</label>
-                            <input type="text" name="guardian_last_name"
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">Relationship</label>
-                            <select name="guardian_relationship"
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
-                                <option value="">Select Relationship</option>
-                                <option value="Father">Father</option>
-                                <option value="Mother">Mother</option>
-                                <option value="Legal Guardian">Legal Guardian</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider guardian-label">Phone</label>
-                            <input type="text" name="guardian_phone"
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400 guardian-field">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Email</label>
-                            <input type="email" name="guardian_email"
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Occupation</label>
-                            <input type="text" name="guardian_occupation"
-                                class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400">
+                        <div class="mt-3">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Address</label>
+                            <textarea name="guardian_address" rows="2" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"></textarea>
                         </div>
                     </div>
-                    <div class="mt-4">
-                        <label class="block text-xs font-semibold text-zinc-300 mb-2 uppercase tracking-wider">Address</label>
-                        <textarea name="guardian_address" rows="2"
-                            class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-sm text-white focus:outline-none focus:border-gold-400"></textarea>
-                    </div>
-                </div>
 
-                <!-- Actions -->
-                <div class="pt-4 flex items-center justify-end gap-3">
-                    <button type="button" id="cancelRegisterStudentBtn"
-                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
-                        Cancel
-                    </button>
-                    <button type="submit" id="walkinSubmitBtn"
-                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
-                        <span id="walkinSubmitBtnText">Proceed Payment</span>
-                    </button>
-                </div>
-            </form>
+                    <div class="pt-2 flex items-center justify-end gap-3">
+                        <button type="button" id="cancelRegisterStudentBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-lg transition">
+                            Cancel
+                        </button>
+                        <button type="submit" id="walkinSubmitBtn" class="inline-flex items-center px-6 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-lg shadow-lg shadow-gold-500/20 transition">
+                            <span id="walkinSubmitBtnText">Proceed Payment</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -946,7 +968,7 @@
                 const branchId = getManagerBranchId();
                 if (!branchSelect || branchId < 1) return;
                 branchSelect.value = String(branchId);
-                branchSelect.disabled = false;
+                branchSelect.disabled = true;
                 branchSelect.style.pointerEvents = 'none';
                 branchSelect.style.opacity = '0.85';
                 branchSelect.dispatchEvent(new Event('change'));
@@ -972,6 +994,12 @@
                 if (walkinForm) {
                     walkinForm.reset();
                     if (typeof updateWalkinAgeAndGuardianRequired === 'function') updateWalkinAgeAndGuardianRequired();
+                }
+                const branchSelect = document.getElementById('walkin_branch_id');
+                if (branchSelect) {
+                    branchSelect.disabled = false;
+                    branchSelect.style.pointerEvents = '';
+                    branchSelect.style.opacity = '';
                 }
                 const msgDiv = document.getElementById('walkinMessage');
                 if (msgDiv) msgDiv.classList.add('hidden');
@@ -1007,4 +1035,3 @@
     <script src="../../js/session_timeout.js"></script>
 </body>
 </html>
-

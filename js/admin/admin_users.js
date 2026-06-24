@@ -107,6 +107,61 @@
                 .replace(/\r?\n/g, ' ');
         }
 
+        function getAdminCreationFormRolePrefix(formId) {
+            return formId === 'adminAddManagerForm' ? 'manager' : 'staff';
+        }
+
+        function getAdminCreationFormCardIds(formId) {
+            if (formId === 'adminAddManagerForm') {
+                return {
+                    real: 'adminAddManagerRealCard',
+                    system: 'adminAddManagerSystemCard'
+                };
+            }
+
+            return {
+                real: 'adminAddStaffRealCard',
+                system: 'adminAddStaffSystemCard'
+            };
+        }
+
+        function slugifyAdminLoginName(value) {
+            return String(value || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '.')
+                .replace(/^\.+|\.+$/g, '')
+                .replace(/\.{2,}/g, '.');
+        }
+
+        function getAdminCreationLoginPreview(formId) {
+            const form = document.getElementById(formId);
+            if (!form) return '';
+
+            const prefix = getAdminCreationFormRolePrefix(formId);
+            const custom = form.querySelector('input[name="system_login_name"]')?.value || '';
+            const firstName = form.querySelector('input[name="first_name"]')?.value || '';
+            const lastName = form.querySelector('input[name="last_name"]')?.value || '';
+            const base = custom || [firstName, lastName].filter(Boolean).join('.') || `${prefix}.name`;
+            const slug = slugifyAdminLoginName(base) || `${prefix}.name`;
+            return `${slug}@fas.com`;
+        }
+
+        function updateAdminCreationLoginPreview(formId) {
+            const preview = document.getElementById(formId === 'adminAddManagerForm' ? 'adminAddManagerSystemPreview' : 'adminAddStaffSystemPreview');
+            if (preview) {
+                preview.textContent = getAdminCreationLoginPreview(formId);
+            }
+        }
+
+        function updateAdminCreationCardState(formId, mode) {
+            const cards = getAdminCreationFormCardIds(formId);
+            const realCard = document.getElementById(cards.real);
+            const systemCard = document.getElementById(cards.system);
+
+            if (realCard) realCard.classList.toggle('is-selected', mode === 'real_email');
+            if (systemCard) systemCard.classList.toggle('is-selected', mode !== 'real_email');
+        }
+
         function closeAdminUserPasswordModal() {
             const modal = document.getElementById('adminUserPasswordModal');
             if (modal) modal.classList.add('hidden');
@@ -200,6 +255,79 @@
             }
         }
 
+        function getAdminCreationFormMode(form) {
+            if (!form) return 'system_account';
+            return form.querySelector('input[name="account_mode"]:checked')?.value === 'real_email'
+                ? 'real_email'
+                : 'system_account';
+        }
+
+        function setAdminCreationFormMode(formId, mode) {
+            const form = document.getElementById(formId);
+            if (!form) return;
+
+            const normalized = mode === 'real_email' ? 'real_email' : 'system_account';
+            const realPanel = form.querySelector('[data-account-panel="real_email"]');
+            const systemPanel = form.querySelector('[data-account-panel="system_account"]');
+            const emailInput = form.querySelector('input[name="email"]');
+            const systemLoginInput = form.querySelector('input[name="system_login_name"]');
+
+            form.querySelectorAll('input[name="account_mode"]').forEach((radio) => {
+                radio.checked = radio.value === normalized;
+            });
+
+            if (realPanel) realPanel.classList.toggle('hidden', normalized !== 'real_email');
+            if (systemPanel) systemPanel.classList.toggle('hidden', normalized !== 'system_account');
+            updateAdminCreationCardState(formId, normalized);
+
+            if (emailInput) {
+                if (!emailInput.dataset.originalPlaceholder) {
+                    emailInput.dataset.originalPlaceholder = emailInput.getAttribute('placeholder') || 'staff@example.com';
+                }
+                emailInput.required = normalized === 'real_email';
+                emailInput.placeholder = normalized === 'real_email'
+                    ? emailInput.dataset.originalPlaceholder
+                    : 'Not needed for school login';
+                if (normalized !== 'real_email') {
+                    emailInput.value = '';
+                }
+            }
+
+            if (systemLoginInput) {
+                if (!systemLoginInput.dataset.originalPlaceholder) {
+                    systemLoginInput.dataset.originalPlaceholder = systemLoginInput.getAttribute('placeholder') || 'e.g. juan.delacruz';
+                }
+                systemLoginInput.required = false;
+                systemLoginInput.placeholder = normalized === 'system_account'
+                    ? systemLoginInput.dataset.originalPlaceholder
+                    : 'Not needed for real email';
+                if (normalized !== 'system_account') {
+                    systemLoginInput.value = '';
+                }
+            }
+
+            updateAdminCreationLoginPreview(formId);
+        }
+
+        function resetAdminCreationForm(formId) {
+            const form = document.getElementById(formId);
+            if (!form) return;
+            form.reset();
+            setAdminCreationFormMode(formId, 'system_account');
+
+            const message = document.getElementById(formId === 'adminAddStaffForm' ? 'adminAddStaffMessage' : 'adminAddManagerMessage');
+            if (message) {
+                message.textContent = '';
+                message.classList.add('hidden');
+            }
+            const matchLabel = document.getElementById(formId === 'adminAddStaffForm' ? 'adminAddStaffPasswordMatch' : 'adminAddManagerPasswordMatch');
+            if (matchLabel) {
+                matchLabel.textContent = '';
+                matchLabel.className = 'text-[11px] mt-1';
+            }
+            updateAdminCreationLoginPreview(formId);
+        }
+
         function bindAdminUsersPage() {
             const roleFilter = document.getElementById('adminUsersRoleFilter');
             const searchInput = document.getElementById('adminUsersSearch');
@@ -211,12 +339,14 @@
 
             if (openStaffBtn) {
                 openStaffBtn.addEventListener('click', () => {
+                    resetAdminCreationForm('adminAddStaffForm');
                     openModal('adminAddStaffModal');
                     loadAdminUserBranchesInto('adminAddStaffBranch');
                 });
             }
             if (openManagerBtn) {
                 openManagerBtn.addEventListener('click', () => {
+                    resetAdminCreationForm('adminAddManagerForm');
                     openModal('adminAddManagerModal');
                     loadAdminUserBranchesInto('adminAddManagerBranch');
                 });
@@ -707,8 +837,28 @@
                 return;
             }
 
+            const accountMode = getAdminCreationFormMode(form);
+            const emailInput = form.querySelector('input[name="email"]');
+            const systemLoginInput = form.querySelector('input[name="system_login_name"]');
+            if (accountMode === 'real_email' && emailInput && !emailInput.checkValidity()) {
+                showInlineMessage(msgEl, 'error', 'Please enter a valid email address.');
+                emailInput.focus();
+                return;
+            }
+            if (accountMode === 'system_account' && systemLoginInput && systemLoginInput.value.includes('@')) {
+                showInlineMessage(msgEl, 'error', 'Use the email field for real email addresses.');
+                systemLoginInput.focus();
+                return;
+            }
+
             const payload = {};
             formData.forEach((v, k) => { payload[k] = v; });
+            payload.account_mode = accountMode;
+            if (accountMode === 'real_email') {
+                payload.system_login_name = '';
+            } else {
+                payload.email = '';
+            }
 
             try {
                 if (btn && btnText && btnIcon) {
@@ -724,8 +874,19 @@
                     showInlineMessage(msgEl, 'error', (data && data.error) || 'Failed to create user.');
                     return;
                 }
-                showInlineMessage(msgEl, 'success', data.message || 'User created successfully.');
+                const createdLogin = data.username || data.email || '';
+                const baseMessage = data.message || 'User created successfully.';
+                const loginMessage = createdLogin ? ` Login: ${createdLogin}.` : '';
+                const emailWarning = data.send_email && data.email_sent === false
+                    ? ` Email delivery failed: ${data.email_error || 'SMTP is not configured.'}`
+                    : '';
+                showInlineMessage(
+                    msgEl,
+                    data.send_email && data.email_sent === false ? 'info' : 'success',
+                    `${baseMessage}${loginMessage}${emailWarning}`
+                );
                 form.reset();
+                setAdminCreationFormMode(formId, 'system_account');
                 if (typeof loadAdminUsers === 'function') {
                     await loadAdminUsers();
                 }
@@ -748,6 +909,17 @@
         function bindAdminUsersCreationForms() {
             const staffForm = document.getElementById('adminAddStaffForm');
             if (staffForm) {
+                setAdminCreationFormMode('adminAddStaffForm', 'system_account');
+                staffForm.querySelectorAll('input[name="account_mode"]').forEach((radio) => {
+                    radio.addEventListener('change', () => {
+                        setAdminCreationFormMode('adminAddStaffForm', getAdminCreationFormMode(staffForm));
+                    });
+                });
+                ['first_name', 'last_name', 'system_login_name'].forEach((fieldName) => {
+                    const field = staffForm.querySelector(`input[name="${fieldName}"]`);
+                    if (field) field.addEventListener('input', () => updateAdminCreationLoginPreview('adminAddStaffForm'));
+                });
+
                 staffForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     submitAdminUserForm('adminAddStaffForm', 'adminAddStaffMessage', 'adminAddStaffSubmit', 'adminAddStaffSubmitText', 'adminAddStaffSubmitIcon');
@@ -775,6 +947,17 @@
 
             const managerForm = document.getElementById('adminAddManagerForm');
             if (managerForm) {
+                setAdminCreationFormMode('adminAddManagerForm', 'system_account');
+                managerForm.querySelectorAll('input[name="account_mode"]').forEach((radio) => {
+                    radio.addEventListener('change', () => {
+                        setAdminCreationFormMode('adminAddManagerForm', getAdminCreationFormMode(managerForm));
+                    });
+                });
+                ['first_name', 'last_name', 'system_login_name'].forEach((fieldName) => {
+                    const field = managerForm.querySelector(`input[name="${fieldName}"]`);
+                    if (field) field.addEventListener('input', () => updateAdminCreationLoginPreview('adminAddManagerForm'));
+                });
+
                 managerForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     submitAdminUserForm('adminAddManagerForm', 'adminAddManagerMessage', 'adminAddManagerSubmit', 'adminAddManagerSubmitText', 'adminAddManagerSubmitIcon');

@@ -3,6 +3,10 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
+if (!ini_get('date.timezone') || ini_get('date.timezone') === 'UTC') {
+    date_default_timezone_set('Asia/Manila');
+}
+
 require_once 'db_connect.php';
 require_once 'instrument_specialization_sync.php';
 

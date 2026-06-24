@@ -16,8 +16,12 @@
     'use strict';
 
     /* ── Configuration ─────────────────────────────────────────── */
-    const IDLE_MS = (window.SESSION_TIMEOUT_MINUTES || 30) * 60 * 1000;
-    const WARN_MS = (window.SESSION_WARN_SECONDS    || 60) * 1000;
+    const DEFAULT_IDLE_MINUTES = 30;
+    const DEFAULT_WARN_SECONDS = 60;
+    const configuredIdleMinutes = Number(window.SESSION_TIMEOUT_MINUTES || DEFAULT_IDLE_MINUTES);
+    const configuredWarnSeconds = Number(window.SESSION_WARN_SECONDS || DEFAULT_WARN_SECONDS);
+    const IDLE_MS = (Number.isFinite(configuredIdleMinutes) && configuredIdleMinutes > 0 ? configuredIdleMinutes : DEFAULT_IDLE_MINUTES) * 60 * 1000;
+    const WARN_MS = (Number.isFinite(configuredWarnSeconds) && configuredWarnSeconds > 0 ? configuredWarnSeconds : DEFAULT_WARN_SECONDS) * 1000;
 
     /* ── Guard: skip on the public login/landing page ──────────── */
     function isPortalPage() {

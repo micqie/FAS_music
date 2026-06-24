@@ -1553,7 +1553,7 @@ class User
         }
 
         $dateOfBirth = trim((string)($data['student_date_of_birth'] ?? ''));
-        $age = $this->assertMinimumStudentAge($dateOfBirth, 'register or enroll');
+        $age = $this->calculateAgeFromDateOfBirth($dateOfBirth);
 
         $password = (string)($data['password'] ?? '');
         if (strlen($password) < 8) {

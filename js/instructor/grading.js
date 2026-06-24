@@ -159,6 +159,16 @@ function getGradeStateClasses(session) {
     return 'bg-slate-100 text-slate-500';
 }
 
+function getGradeSessionSortRank(session) {
+    if (Number(session?.progress_id || 0) > 0) return 2;
+    if (isGradeable(session)) return 0;
+    return 1;
+}
+
+function getGradeSessionSortTime(session) {
+    return new Date(`${session?.session_date || ''}T${session?.start_time || '00:00:00'}`).getTime() || 0;
+}
+
 // ── Score buttons ──────────────────────────────────────────────────
 function initScoreButtons() {
     document.querySelectorAll('.score-btn').forEach(btn => {
@@ -235,6 +245,7 @@ function updateScorePreview() {
     const badgeEl    = document.getElementById('gradeAverageBadge');
     const previewBox = document.getElementById('avgPreviewBox');
     const avg        = computeAverageFromInputs();
+    const selectedSession = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
 
     if (!previewEl) return;
 
@@ -242,6 +253,9 @@ function updateScorePreview() {
         previewEl.textContent = '—';
         if (previewBox) previewBox.classList.add('hidden');
         if (badgeEl)    { badgeEl.classList.add('hidden'); badgeEl.querySelector('span').textContent = ''; }
+        if (selectedSession) {
+            renderAnalytics(selectedSession);
+        }
         return;
     }
 
@@ -254,6 +268,37 @@ function updateScorePreview() {
         const span = badgeEl.querySelector('span');
         if (span) span.textContent = `Avg ${avg.toFixed(2)}`;
     }
+
+    if (selectedSession) {
+        renderAnalytics(selectedSession);
+    }
+}
+
+function getAnalyticsPreviewSession(session) {
+    if (!session) return null;
+
+    const preview = { ...session };
+    let hasAnyScore = false;
+
+    SCORE_FIELDS.forEach((field) => {
+        const inputId = getFieldInputId(field.key);
+        const value = Number(document.getElementById(inputId)?.value || 0);
+        if (value > 0) {
+            preview[field.key] = value;
+            hasAnyScore = true;
+        } else {
+            preview[field.key] = 0;
+        }
+    });
+
+    preview.skill_level = document.getElementById('skillLevelInput')?.value || preview.skill_level || '';
+    preview.remarks = document.getElementById('remarksInput')?.value || preview.remarks || '';
+
+    const previewAverage = computeAverageFromInputs();
+    preview.average_score = previewAverage !== null ? previewAverage : null;
+    preview.__has_live_preview = hasAnyScore;
+
+    return preview;
 }
 
 // ── Grade form ─────────────────────────────────────────────────────
@@ -349,9 +394,14 @@ function getVisibleGradeSessions() {
         })
         .slice()
         .sort((a, b) => {
-            const da = new Date(a.session_date || 0).getTime();
-            const db = new Date(b.session_date || 0).getTime();
-            return db !== da ? db - da : Number(b.session_id) - Number(a.session_id);
+            const rankDiff = getGradeSessionSortRank(a) - getGradeSessionSortRank(b);
+            if (rankDiff !== 0) return rankDiff;
+
+            const da = getGradeSessionSortTime(a);
+            const db = getGradeSessionSortTime(b);
+            if (da !== db) return da - db;
+
+            return Number(a.session_id) - Number(b.session_id);
         });
 }
 
@@ -513,10 +563,18 @@ function renderAnalytics(session) {
     if (!session) { panel.classList.add('hidden'); return; }
     panel.classList.remove('hidden');
 
+    const previewSession = getAnalyticsPreviewSession(session);
     const studentId   = Number(session.student_id || 0);
     const studentName = `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student';
     const history     = getStudentGradedHistory(studentId);
     const isGraded    = Number(session.progress_id || 0) > 0;
+    const hasPreviewScores = SCORE_FIELDS.some(field => Number(previewSession?.[field.key] || 0) > 0);
+    const radarSource = hasPreviewScores ? previewSession : (isGraded ? session : null);
+    const trendHistory = history.slice();
+
+    if (!isGraded && previewSession?.average_score !== null) {
+        trendHistory.push(previewSession);
+    }
 
     setGradeText('analyticsStudentLabel', `${studentName} — ${session.instrument_name || 'Instrument'}`);
     setGradeText('analyticsSessionCount', `${history.length} graded session${history.length === 1 ? '' : 's'}`);
@@ -525,7 +583,7 @@ function renderAnalytics(session) {
     const radarCanvas = document.getElementById('radarChart');
     const radarEmpty  = document.getElementById('radarEmpty');
     if (_radarChartInstance) { _radarChartInstance.destroy(); _radarChartInstance = null; }
-    if (!isGraded) {
+    if (!radarSource) {
         if (radarCanvas) radarCanvas.style.display = 'none';
         if (radarEmpty)  { radarEmpty.style.display = ''; radarEmpty.classList.remove('hidden'); }
     } else {
@@ -538,7 +596,7 @@ function renderAnalytics(session) {
                     labels: SCORE_FIELDS.map(f => f.label),
                     datasets: [{
                         label: 'This Session',
-                        data: SCORE_FIELDS.map(f => Number(session[f.key] || 0)),
+                        data: SCORE_FIELDS.map(f => Number(radarSource[f.key] || 0)),
                         backgroundColor: 'rgba(212,175,55,0.15)',
                         borderColor: '#d4af37',
                         pointBackgroundColor: '#d4af37',
@@ -565,18 +623,21 @@ function renderAnalytics(session) {
     const trendCanvas = document.getElementById('trendChart');
     const trendEmpty  = document.getElementById('trendEmpty');
     if (_trendChartInstance) { _trendChartInstance.destroy(); _trendChartInstance = null; }
-    if (history.length < 2) {
+    if (trendHistory.length < 2) {
         if (trendCanvas) trendCanvas.style.display = 'none';
         if (trendEmpty)  { trendEmpty.style.display = ''; trendEmpty.classList.remove('hidden'); }
     } else {
         if (trendEmpty)  trendEmpty.style.display = 'none';
         if (trendCanvas) {
             trendCanvas.style.display = '';
-            const tData = history.map(s => Number(s.average_score || 0));
+            const tData = trendHistory.map(s => Number(s.average_score || 0));
             _trendChartInstance = new Chart(trendCanvas, {
                 type: 'line',
                 data: {
-                    labels: history.map((_, i) => `Session ${i + 1}`),
+                    labels: trendHistory.map((entry, i) => {
+                        if (!isGraded && entry === previewSession) return 'Current Draft';
+                        return `Session ${i + 1}`;
+                    }),
                     datasets: [{
                         label: 'Avg Score', data: tData,
                         borderColor: '#d4af37', backgroundColor: 'rgba(212,175,55,0.10)',
@@ -603,11 +664,11 @@ function renderAnalytics(session) {
     // ── Category bars ──
     const barsEl = document.getElementById('categoryBars');
     if (barsEl) {
-        if (!history.length) {
+        if (!trendHistory.length) {
             barsEl.innerHTML = '<p class="text-sm text-slate-400 text-center py-2">No graded sessions yet.</p>';
         } else {
             barsEl.innerHTML = SCORE_FIELDS.map(field => {
-                const vals  = history.map(s => Number(s[field.key] || 0)).filter(v => v > 0);
+                const vals  = trendHistory.map(s => Number(s[field.key] || 0)).filter(v => v > 0);
                 const mean  = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
                 const pct   = (mean / 5) * 100;
                 const color = mean <= 2 ? 'bg-rose-400' : mean <= 3 ? 'bg-amber-400' : 'bg-emerald-500';
@@ -628,7 +689,7 @@ function renderAnalytics(session) {
     // ── Tips ──
     const tipsEl = document.getElementById('improvementTips');
     if (tipsEl) {
-        const source = isGraded ? session : (history.length ? history[history.length - 1] : null);
+        const source = hasPreviewScores ? previewSession : (isGraded ? session : (history.length ? history[history.length - 1] : null));
         if (!source) {
             tipsEl.innerHTML = '<p class="text-sm text-slate-400 text-center py-2">Grade this session to see personalised tips.</p>';
         } else {
@@ -667,4 +728,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('gradeFilter')?.addEventListener('change', e => loadGradeSessions(e.target.value));
     document.getElementById('gradeSearch')?.addEventListener('input',  () => renderGradeSessions());
     document.getElementById('gradingForm')?.addEventListener('submit',  saveSessionGrade);
+    document.getElementById('skillLevelInput')?.addEventListener('change', () => {
+        const selectedSession = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
+        if (selectedSession) renderAnalytics(selectedSession);
+    });
+    document.getElementById('remarksInput')?.addEventListener('input', () => {
+        const selectedSession = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
+        if (selectedSession) renderAnalytics(selectedSession);
+    });
 });

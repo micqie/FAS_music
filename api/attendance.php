@@ -431,6 +431,31 @@ class AttendanceApi
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    private function resolveTeacherId($teacherId, $userId)
+    {
+        $teacherId = (int)$teacherId;
+        $userId = (int)$userId;
+        if ($teacherId > 0) {
+            return $teacherId;
+        }
+        if ($userId < 1 || !$this->tableExists('tbl_teachers')) {
+            return 0;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT teacher_id
+                FROM tbl_teachers
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$userId]);
+            return (int)($stmt->fetchColumn() ?: 0);
+        } catch (PDOException $e) {
+            return 0;
+        }
+    }
+
     private function getStudentAttendanceForDate($studentId, $dateYmd)
     {
         if (!$this->ensureAttendanceTable()) {
@@ -1264,6 +1289,223 @@ class AttendanceApi
         }
     }
 
+    private function roomHasScheduleConflict($roomId, $sessionDate, $startTime, $endTime, $excludeSessionId = 0)
+    {
+        if ($roomId < 1 || !$this->tableExists('tbl_sessions')) {
+            return false;
+        }
+
+        $conflictStmt = $this->conn->prepare("
+            SELECT COUNT(*)
+            FROM tbl_sessions
+            WHERE room_id = ?
+              AND session_id <> ?
+              AND session_date = ?
+              AND status NOT IN ('Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled')
+              AND start_time < ?
+              AND end_time > ?
+        ");
+        $conflictStmt->execute([
+            (int)$roomId,
+            (int)$excludeSessionId,
+            $sessionDate,
+            $endTime,
+            $startTime
+        ]);
+
+        return (int)$conflictStmt->fetchColumn() > 0;
+    }
+
+    public function getSessionAvailableRooms()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $sessionId = (int)($_GET['session_id'] ?? 0);
+        if ($sessionId < 1) {
+            $this->sendJSON(['error' => 'session_id is required'], 400);
+        }
+        if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_rooms')) {
+            $this->sendJSON(['success' => true, 'rooms' => [], 'unavailable_rooms' => []]);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    ts.session_id,
+                    ts.session_date,
+                    ts.start_time,
+                    ts.end_time,
+                    ts.status,
+                    e.student_id,
+                    s.branch_id,
+                    s.first_name AS student_first_name,
+                    s.last_name AS student_last_name
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                WHERE ts.session_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$sessionId]);
+            $session = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$session) {
+                $this->sendJSON(['error' => 'Scheduled session not found'], 404);
+            }
+
+            $branchId = (int)($session['branch_id'] ?? 0);
+            $sessionDate = (string)($session['session_date'] ?? '');
+            $startTime = (string)($session['start_time'] ?? '');
+            $endTime = (string)($session['end_time'] ?? '');
+
+            if ($sessionDate === '' || $startTime === '' || $endTime === '') {
+                $this->sendJSON(['error' => 'Session date and time are required to check room availability'], 400);
+            }
+
+            $roomStmt = $this->conn->prepare("
+                SELECT room_id, branch_id, room_name, capacity, room_type, status
+                FROM tbl_rooms
+                WHERE status = 'Available'
+                  AND branch_id = ?
+                ORDER BY room_name ASC, room_id ASC
+            ");
+            $roomStmt->execute([$branchId]);
+            $branchRooms = $roomStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $availableRooms = [];
+            $unavailableRooms = [];
+            foreach ($branchRooms as $room) {
+                $roomId = (int)($room['room_id'] ?? 0);
+                if ($roomId < 1) {
+                    continue;
+                }
+
+                if ($this->roomHasScheduleConflict($roomId, $sessionDate, $startTime, $endTime, $sessionId)) {
+                    $unavailableRooms[] = [
+                        'room_id' => $roomId,
+                        'room_name' => $room['room_name'] ?? '',
+                        'reason' => 'Already booked for this time'
+                    ];
+                    continue;
+                }
+
+                $availableRooms[] = $room;
+            }
+
+            $studentName = trim(((string)($session['student_first_name'] ?? '')) . ' ' . ((string)($session['student_last_name'] ?? '')));
+
+            $this->sendJSON([
+                'success' => true,
+                'rooms' => $availableRooms,
+                'unavailable_rooms' => $unavailableRooms,
+                'session' => [
+                    'session_id' => $sessionId,
+                    'session_date' => $sessionDate,
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                    'branch_id' => $branchId,
+                    'student_name' => $studentName
+                ]
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function assignSessionRoom()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $sessionId = (int)($data['session_id'] ?? 0);
+        $roomId = (int)($data['room_id'] ?? 0);
+        $scopeBranchId = (int)($data['branch_id'] ?? 0);
+
+        if ($sessionId < 1 || $roomId < 1) {
+            $this->sendJSON(['error' => 'session_id and room_id are required'], 400);
+        }
+        if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_rooms')) {
+            $this->sendJSON(['error' => 'Session room assignment is unavailable on this schema'], 500);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    ts.session_id,
+                    ts.session_date,
+                    ts.start_time,
+                    ts.end_time,
+                    ts.status,
+                    e.student_id,
+                    s.branch_id
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                WHERE ts.session_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$sessionId]);
+            $session = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$session) {
+                $this->sendJSON(['error' => 'Scheduled session not found'], 404);
+            }
+
+            $sessionBranchId = (int)($session['branch_id'] ?? 0);
+            if ($scopeBranchId > 0 && $sessionBranchId > 0 && $scopeBranchId !== $sessionBranchId) {
+                $this->sendJSON(['error' => 'This session belongs to a different branch'], 403);
+            }
+
+            $status = strtolower(trim((string)($session['status'] ?? '')));
+            if (in_array($status, ['completed', 'cancelled', 'no show', 'cancelled_by_teacher', 'rescheduled'], true)) {
+                $this->sendJSON(['error' => 'Room can only be assigned to an active scheduled session'], 400);
+            }
+
+            $roomStmt = $this->conn->prepare("
+                SELECT room_id, branch_id, room_name, status
+                FROM tbl_rooms
+                WHERE room_id = ?
+                LIMIT 1
+            ");
+            $roomStmt->execute([$roomId]);
+            $room = $roomStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$room) {
+                $this->sendJSON(['error' => 'Room not found'], 404);
+            }
+            if ((int)($room['branch_id'] ?? 0) !== $sessionBranchId) {
+                $this->sendJSON(['error' => 'Selected room does not belong to this branch'], 400);
+            }
+            if (strcasecmp((string)($room['status'] ?? ''), 'Available') !== 0) {
+                $this->sendJSON(['error' => 'Selected room is not available'], 400);
+            }
+
+            if ($this->roomHasScheduleConflict(
+                $roomId,
+                (string)($session['session_date'] ?? ''),
+                (string)($session['start_time'] ?? ''),
+                (string)($session['end_time'] ?? ''),
+                $sessionId
+            )) {
+                $this->sendJSON(['error' => 'Selected room is already assigned for that time'], 400);
+            }
+
+            $update = $this->conn->prepare("UPDATE tbl_sessions SET room_id = ? WHERE session_id = ?");
+            $update->execute([$roomId, $sessionId]);
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Room assigned successfully.',
+                'session_id' => $sessionId,
+                'room_id' => $roomId,
+                'room_name' => $room['room_name'] ?? ''
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     /**
      * Record attendance (optional utility endpoint).
      * POST body: { student_id, status?, source?, notes? }
@@ -1606,6 +1848,113 @@ class AttendanceApi
         }
     }
 
+    public function markPresentByInstructor()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $sessionId = (int)($data['session_id'] ?? 0);
+
+        if ($teacherId < 1 || $sessionId < 1) {
+            $this->sendJSON(['success' => false, 'error' => 'Instructor and session are required.'], 400);
+        }
+        if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_enrollments')) {
+            $this->sendJSON(['success' => false, 'error' => 'Session records are unavailable.'], 400);
+        }
+        if (!$this->ensureAttendanceTable()) {
+            $this->sendJSON(['success' => false, 'error' => 'Attendance records are unavailable.'], 400);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    ts.session_id,
+                    ts.session_date,
+                    ts.status,
+                    ts.attendance_status,
+                    e.student_id,
+                    s.first_name,
+                    s.last_name,
+                    s.email,
+                    s.branch_id,
+                    b.branch_name
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
+                WHERE ts.session_id = ?
+                  AND ts.teacher_id = ?
+                  AND e.status = 'Active'
+                LIMIT 1
+            ");
+            $stmt->execute([$sessionId, $teacherId]);
+            $session = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$session) {
+                $this->sendJSON(['success' => false, 'error' => 'Session not found for this instructor.'], 404);
+            }
+
+            $todayYmd = date('Y-m-d');
+            if ((string)($session['session_date'] ?? '') !== $todayYmd) {
+                $this->sendJSON(['success' => false, 'error' => 'Only today\'s assigned session can be marked present by the instructor.'], 400);
+            }
+
+            $status = strtolower(trim((string)($session['status'] ?? '')));
+            $attendanceStatus = strtolower(trim((string)($session['attendance_status'] ?? '')));
+            if (in_array($status, ['cancelled_by_teacher', 'rescheduled', 'cancelled', 'no show'], true)) {
+                $this->sendJSON(['success' => false, 'error' => 'This session cannot be marked present because it is not active.'], 400);
+            }
+
+            $studentId = (int)($session['student_id'] ?? 0);
+            $branchId = (int)($session['branch_id'] ?? 0);
+            if ($status === 'completed' && $attendanceStatus === 'present') {
+                $this->sendJSON([
+                    'success' => true,
+                    'already_marked' => true,
+                    'message' => 'This student is already marked present.',
+                    'student' => $session
+                ]);
+            }
+
+            $this->conn->beginTransaction();
+
+            $existing = $this->getStudentAttendanceForDate($studentId, $todayYmd);
+            $attendanceId = $existing ? (int)$existing['attendance_id'] : null;
+            if (!$existing) {
+                $insert = $this->conn->prepare("
+                    INSERT INTO tbl_attendance (student_id, branch_id, status, source, notes)
+                    VALUES (?, ?, 'Present', 'Instructor', ?)
+                ");
+                $insert->execute([
+                    $studentId,
+                    $branchId > 0 ? $branchId : null,
+                    'Marked present by instructor after missed desk scan.'
+                ]);
+                $attendanceId = (int)$this->conn->lastInsertId();
+            }
+
+            $this->applySessionAttendanceOutcome($studentId, $todayYmd, 'present', [
+                'note' => 'Completed from instructor attendance mark'
+            ]);
+
+            $this->conn->commit();
+            $this->sendJSON([
+                'success' => true,
+                'already_marked' => (bool)$existing,
+                'attendance_id' => $attendanceId,
+                'message' => $existing ? 'Attendance was already recorded. Session is now marked present.' : 'Student marked present.',
+                'student' => $session
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['success' => false, 'error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function getQrStatus()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -1741,6 +2090,12 @@ switch ($action) {
     case 'get-student-attendance':
         $api->getStudentAttendance();
         break;
+    case 'get-session-available-rooms':
+        $api->getSessionAvailableRooms();
+        break;
+    case 'assign-session-room':
+        $api->assignSessionRoom();
+        break;
     case 'record':
         $api->record();
         break;
@@ -1750,6 +2105,9 @@ switch ($action) {
         break;
     case 'record-by-email':
         $api->recordByEmail();
+        break;
+    case 'mark-present-by-instructor':
+        $api->markPresentByInstructor();
         break;
     case 'qr-status':
         $api->getQrStatus();

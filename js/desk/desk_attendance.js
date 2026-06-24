@@ -215,7 +215,9 @@
                             dateKey,
                             startTime: String(slot.start_time || ''),
                             endTime: String(slot.end_time || ''),
-                            roomName: String(slot.room_name || student.assigned_room || ''),
+                            roomId: Number(slot.room_id || 0),
+                            roomName: String(slot.room_name || '').trim(),
+                            branchId: Number(student.branch_id || deskBranchId || 0),
                             teacherName: getTeacherLabel(slot, student),
                             packageName: String(student.package_name || '—'),
                             studentName,
@@ -246,6 +248,116 @@
             if (normalized === 'absent') return 'border-red-200 bg-red-50 text-red-700';
             if (normalized === 'excused') return 'border-slate-200 bg-slate-100 text-slate-700';
             return 'border-sky-200 bg-sky-50 text-sky-700';
+        }
+
+        function getSessionRoomDisplayLabel(event) {
+            if (!event) return '';
+            const roomId = Number(event.roomId || 0);
+            const roomName = String(event.roomName || '').trim();
+            if (roomName) return roomName;
+            if (roomId > 0) return `Room #${roomId}`;
+            return '';
+        }
+
+        function renderSessionRoomControl(event) {
+            if (!event || Number(event.sessionId || 0) < 1) {
+                return '';
+            }
+
+            const roomLabel = getSessionRoomDisplayLabel(event);
+            if (roomLabel) {
+                return `
+                    <span class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">
+                        <i class="fas fa-door-closed"></i>
+                        ${escapeHtml(roomLabel)}
+                    </span>
+                `;
+            }
+
+            return `
+                <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-200 transition" onclick="openAttendanceRoomAssignment(${Number(event.sessionId)})">
+                    <i class="fas fa-door-open"></i>
+                    Assign Room
+                </button>
+            `;
+        }
+
+        async function fetchSessionAvailableRooms(sessionId) {
+            const response = await axios.get(`${baseApiUrl}/attendance.php?action=get-session-available-rooms&session_id=${encodeURIComponent(sessionId)}`);
+            const data = response?.data || {};
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to load available rooms.');
+            }
+            return data;
+        }
+
+        async function openAttendanceRoomAssignment(sessionId) {
+            const event = attendanceCalendarEvents.find(item => Number(item.sessionId || 0) === Number(sessionId));
+            if (!event) {
+                showMessage('Scheduled session not found.', 'error');
+                return;
+            }
+
+            try {
+                const roomData = await fetchSessionAvailableRooms(sessionId);
+                const rooms = Array.isArray(roomData.rooms) ? roomData.rooms : [];
+                const unavailableRooms = Array.isArray(roomData.unavailable_rooms) ? roomData.unavailable_rooms : [];
+                if (!rooms.length) {
+                    const message = unavailableRooms.length
+                        ? 'All rooms are already booked for this date and time.'
+                        : 'No available rooms found for this branch.';
+                    showMessage(message, 'error');
+                    return;
+                }
+
+                const inputOptions = {};
+                rooms.forEach(room => {
+                    inputOptions[String(room.room_id)] = room.room_name || `Room #${room.room_id}`;
+                });
+
+                const scheduleDate = event.dateKey ? formatDateShort(event.dateKey) : '';
+                const scheduleTime = event.startTime
+                    ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}`
+                    : 'Time pending';
+                const scheduleLabel = scheduleDate ? `${scheduleDate} • ${scheduleTime}` : scheduleTime;
+
+                const result = await Swal.fire({
+                    title: 'Assign Room',
+                    text: `${event.studentName} • ${scheduleLabel}`,
+                    input: 'select',
+                    inputOptions,
+                    inputPlaceholder: 'Choose a room',
+                    showCancelButton: true,
+                    confirmButtonText: 'Assign Room',
+                    confirmButtonColor: '#16a34a',
+                    inputValidator: value => value ? null : 'Please choose a room.'
+                });
+                if (!result.isConfirmed) return;
+
+                const response = await axios.post(`${baseApiUrl}/attendance.php?action=assign-session-room`, {
+                    session_id: Number(sessionId),
+                    room_id: Number(result.value),
+                    branch_id: Number(event.branchId || deskBranchId || 0)
+                });
+                const data = response.data || {};
+                if (!data.success) {
+                    showMessage(data.error || 'Failed to assign room.', 'error');
+                    return;
+                }
+
+                const assignedRoomName = String(data.room_name || '').trim()
+                    || (rooms.find(room => Number(room.room_id) === Number(result.value))?.room_name || '')
+                    || `Room #${Number(result.value)}`;
+                event.roomId = Number(data.room_id || result.value || 0);
+                event.roomName = assignedRoomName;
+                renderSelectedDateSchedule();
+                renderAttendanceCalendar();
+
+                showMessage(data.message || 'Room assigned successfully.', 'success');
+                await loadAttendanceRows(true);
+            } catch (error) {
+                showMessage(error?.response?.data?.error || 'Failed to assign room.', 'error');
+            }
         }
 
         function openAttendanceRoomTrackerModal() {
@@ -545,7 +657,7 @@
                         <div class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
                             <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Session</div>
                             <div class="mt-2 text-sm font-semibold text-slate-900">${event.startTime ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}` : 'Time pending'}</div>
-                            <div class="mt-1 text-xs text-slate-500">Session ${event.sessionNumber || '—'} • ${escapeHtml(event.roomName || 'Room pending')}</div>
+                            <div class="mt-1 text-xs text-slate-500">Session ${event.sessionNumber || '—'} • ${escapeHtml(getSessionRoomDisplayLabel(event) || 'Room pending')}</div>
                         </div>
                         <div class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
                             <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Teacher & Package</div>
@@ -559,10 +671,13 @@
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-rose-600 border border-rose-100">Absences ${event.absences}</span>
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-amber-600 border border-amber-100">Remaining ${event.remainingCount}</span>
                         </div>
-                        <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-200 transition" onclick="openAttendanceDetails(${Number(event.enrollmentId)})">
-                            <i class="fas fa-up-right-from-square"></i>
-                            View Attendance
-                        </button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-200 transition" onclick="openAttendanceDetails(${Number(event.enrollmentId)})">
+                                <i class="fas fa-up-right-from-square"></i>
+                                View Attendance
+                            </button>
+                            ${renderSessionRoomControl(event)}
+                        </div>
                     </div>
                 </article>
             `).join('') + '<div aria-hidden="true" class="h-2"></div>';
@@ -592,7 +707,7 @@
                         <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                             <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Schedule</div>
                             <div class="mt-2 text-sm font-semibold text-slate-900">${event.startTime ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}` : 'Time pending'}</div>
-                            <div class="mt-1 text-xs text-slate-500">${escapeHtml(event.roomName || 'Room pending')} • Session ${event.sessionNumber || '—'}</div>
+                            <div class="mt-1 text-xs text-slate-500">${escapeHtml(getSessionRoomDisplayLabel(event) || 'Room pending')} • Session ${event.sessionNumber || '—'}</div>
                         </div>
                         <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                             <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Instructor & Package</div>
@@ -606,10 +721,13 @@
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-rose-600 border border-rose-100">Absences ${event.absences}</span>
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-amber-600 border border-amber-100">Remaining ${event.remainingCount}</span>
                         </div>
-                        <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-200 transition" onclick="openAttendanceDetails(${Number(event.enrollmentId)})">
-                            <i class="fas fa-up-right-from-square"></i>
-                            View Attendance
-                        </button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-200 transition" onclick="openAttendanceDetails(${Number(event.enrollmentId)})">
+                                <i class="fas fa-up-right-from-square"></i>
+                                View Attendance
+                            </button>
+                            ${renderSessionRoomControl(event)}
+                        </div>
                     </div>
                 </article>
             `).join('');
@@ -1039,7 +1157,9 @@
             return { rows, attendedKeys, excusedKeys };
         }
 
-        async function loadAttendanceRows() {
+        async function loadAttendanceRows(preserveSelection = false) {
+            const previousDate = attendanceSelectedDate;
+            const previousMonth = attendanceCalendarMonth;
             try {
                 let url = `${baseApiUrl}/students.php?action=get-active-enrollments`;
                 if (deskBranchId > 0) {
@@ -1059,8 +1179,13 @@
                 }));
                 attendanceByStudentId = Object.fromEntries(historyEntries);
                 attendanceCalendarEvents = buildAttendanceCalendarEvents(attendanceRows);
-                attendanceSelectedDate = getTodayDateKey();
-                attendanceCalendarMonth = getMonthKeyFromDate(attendanceSelectedDate);
+                if (preserveSelection && previousDate) {
+                    attendanceSelectedDate = previousDate;
+                    attendanceCalendarMonth = previousMonth || getMonthKeyFromDate(previousDate);
+                } else {
+                    attendanceSelectedDate = getTodayDateKey();
+                    attendanceCalendarMonth = getMonthKeyFromDate(attendanceSelectedDate);
+                }
                 updateAttendanceSummary(attendanceRows);
                 syncAttendanceCalendarView();
             } catch (error) {
@@ -1141,3 +1266,4 @@
         window.openMakeupSummaryModal = openMakeupSummaryModal;
         window.openSessionDatesModal = openSessionDatesModal;
         window.selectAttendanceCalendarDate = selectAttendanceCalendarDate;
+        window.openAttendanceRoomAssignment = openAttendanceRoomAssignment;

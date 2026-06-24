@@ -4,6 +4,11 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
+// ── Timezone: set explicitly so date calculations match the Philippines (UTC+8) ──
+if (!ini_get('date.timezone') || ini_get('date.timezone') === 'UTC') {
+    date_default_timezone_set('Asia/Manila');
+}
+
 require_once 'db_connect.php';
 require_once 'instrument_specialization_sync.php';
 
@@ -77,37 +82,6 @@ class StudentsApi
         } catch (PDOException $e) {
             return false;
         }
-    }
-
-    private function calculateAgeFromDateOfBirth($dateOfBirth)
-    {
-        $dateOfBirth = trim((string) $dateOfBirth);
-        if ($dateOfBirth === '') {
-            return null;
-        }
-
-        try {
-            $dob = new DateTime($dateOfBirth);
-            $now = new DateTime();
-            return (int) $now->diff($dob)->y;
-        } catch (Exception $e) {
-            return null;
-        }
-    }
-
-    private function assertMinimumStudentAge(array $student, $context = 'enroll')
-    {
-        $age = $this->calculateAgeFromDateOfBirth($student['date_of_birth'] ?? null);
-        if ($age === null && isset($student['age']) && $student['age'] !== '') {
-            $age = (int) $student['age'];
-        }
-        if ($age === null) {
-            $this->sendJSON(['error' => 'Date of birth is required before a student can ' . $context . '.'], 400);
-        }
-        if ($age < 3) {
-            $this->sendJSON(['error' => 'Students must be at least 3 years old to ' . $context . '.'], 400);
-        }
-        return $age;
     }
 
     private function isWalkInStudentRecord(array $student)
@@ -1440,12 +1414,14 @@ class StudentsApi
             ) VALUES (?, ?, ?, ?, ?, ?, 'Regular', ?, ?, 'Scheduled', ?, ?)
         ");
 
-        $created = 0;
-        $updated = 0;
+        $created    = 0;
+        $updated    = 0;
+        $skipped    = 0;       // consecutive skips (conflict protection)
         $sessionNumber = 1;
-        $safety = 0;
+        $safety     = 0;
+        $maxSafety  = max(200, $totalSessions * 60); // generous — handles up to 50 sessions + conflicts
         $lastGeneratedDate = null;
-        while ($sessionNumber <= $totalSessions && $safety < ($totalSessions * 50)) {
+        while ($sessionNumber <= $totalSessions && $safety < $maxSafety) {
             usort($slotQueue, function ($a, $b) {
                 $cmpDate = strcmp((string)($a['next_date'] ?? ''), (string)($b['next_date'] ?? ''));
                 if ($cmpDate !== 0) return $cmpDate;
@@ -1525,7 +1501,12 @@ class StudentsApi
             // Ignore post-generation metadata update failures.
         }
 
-        return ['created' => $created, 'updated' => $updated];
+        return [
+            'created' => $created,
+            'updated' => $updated,
+            'required' => $totalSessions,
+            'complete' => (($created + $updated) >= $totalSessions)
+        ];
     }
 
     private function canEditEnrollmentScheduleBeforeFirstWeek($enrollmentId)
@@ -1629,6 +1610,7 @@ class StudentsApi
         $studentId = (int)($enrollment['student_id'] ?? 0);
         $startBase = trim((string)($enrollment['start_date'] ?? ''));
         $slots = $this->getEnrollmentScheduleSlots($enrollmentId);
+        $updatedStartDate = null;
 
         if ($enrollmentId < 1 || $teacherId < 1 || empty($slots)) {
             throw new InvalidArgumentException('Fixed weekly schedule was not found for this enrollment.');
@@ -1666,6 +1648,14 @@ class StudentsApi
         $slots[$targetOriginalIndex]['day_of_week'] = $newDay;
         $slots[$targetOriginalIndex]['start_time'] = $startTime;
         $slots[$targetOriginalIndex]['end_time'] = $endTime;
+
+        // If the first recurring session is being moved, anchor the entire
+        // enrollment to the new date so generated sessions follow it.
+        if ($sessionNumber === 1) {
+            $updatedStartDate = $sessionDate;
+            $startBase = $sessionDate;
+        }
+
         $slotsInput = [];
         foreach ($slots as $slot) {
             $slotsInput[] = [
@@ -1693,22 +1683,30 @@ class StudentsApi
         $firstSlot = $normalizedSlots[0] ?? null;
         if ($firstSlot && $this->tableExists('tbl_enrollments')) {
             $summary = $this->formatScheduleSlotsSummary($normalizedSlots);
-            $stmt = $this->conn->prepare("
+            $updateSql = "
                 UPDATE tbl_enrollments
                 SET fixed_day_of_week = ?,
                     fixed_start_time = ?,
                     fixed_end_time = ?,
                     fixed_room_id = NULL,
                     preferred_schedule = ?
-                WHERE enrollment_id = ?
-            ");
-            $stmt->execute([
+            ";
+            $updateParams = [
                 $firstSlot['day_of_week'] ?? null,
                 $firstSlot['start_time'] ?? null,
                 $firstSlot['end_time'] ?? null,
-                $summary !== '' ? $summary : null,
-                $enrollmentId
-            ]);
+                $summary !== '' ? $summary : null
+            ];
+            if ($updatedStartDate !== null) {
+                $updateSql .= ", start_date = ?";
+                $updateParams[] = $updatedStartDate;
+            }
+            $updateSql .= " WHERE enrollment_id = ?";
+            $updateParams[] = $enrollmentId;
+            $stmt = $this->conn->prepare("
+                {$updateSql}
+            ");
+            $stmt->execute($updateParams);
         }
 
         return $this->generateFixedScheduleSessions($enrollmentId);
@@ -1807,7 +1805,7 @@ class StudentsApi
                 FROM tbl_sessions
                 WHERE teacher_id = ?
                   AND session_date = ?
-                  AND status NOT IN ('Cancelled', 'No Show', 'cancelled_by_teacher')
+                  AND status NOT IN ('Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled')
                   AND start_time < ?
                   AND end_time > ?
             ";
@@ -1837,7 +1835,7 @@ class StudentsApi
                 FROM tbl_sessions
                 WHERE room_id = ?
                   AND session_date = ?
-                  AND status NOT IN ('Cancelled', 'No Show', 'cancelled_by_teacher')
+                  AND status NOT IN ('Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled')
                   AND start_time < ?
                   AND end_time > ?
             ";
@@ -1869,7 +1867,7 @@ class StudentsApi
                 INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
                 WHERE te.student_id = ?
                   AND ts.session_date = ?
-                  AND ts.status NOT IN ('Cancelled', 'No Show', 'cancelled_by_teacher')
+                  AND ts.status NOT IN ('Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled')
                   AND ts.start_time < ?
                   AND ts.end_time > ?
             ";
@@ -1895,16 +1893,23 @@ class StudentsApi
         }
 
         try {
+            // Only block if the recurring slot has at least one upcoming (future/today) scheduled session
+            // This prevents completed/expired enrollments from permanently blocking a teacher's slot
             $sql = "
                 SELECT COUNT(*) AS conflict_count
                 FROM tbl_enrollment_schedule_slots ess
                 INNER JOIN tbl_enrollments e ON e.enrollment_id = ess.enrollment_id
+                INNER JOIN tbl_sessions s ON s.enrollment_id = ess.enrollment_id
                 WHERE ess.teacher_id = ?
                   AND ess.day_of_week = ?
                   AND ess.status = 'Active'
                   AND e.status = 'Active'
                   AND ess.start_time < ?
                   AND ess.end_time > ?
+                  AND s.session_date >= CURDATE()
+                  AND s.start_time = ess.start_time
+                  AND s.end_time   = ess.end_time
+                  AND s.status NOT IN ('Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled', 'Completed')
             ";
             $params = [(int)$teacherId, $dayOfWeek, $endTime, $startTime];
             $excludeIds = $this->normalizeExcludedIds($excludeEnrollmentIds);
@@ -1961,16 +1966,22 @@ class StudentsApi
         }
 
         try {
+            // Only block if there's an actual upcoming scheduled session for this slot
             $sql = "
                 SELECT COUNT(*) AS conflict_count
                 FROM tbl_enrollment_schedule_slots ess
                 INNER JOIN tbl_enrollments e ON e.enrollment_id = ess.enrollment_id
+                INNER JOIN tbl_sessions s ON s.enrollment_id = ess.enrollment_id
                 WHERE e.student_id = ?
                   AND ess.day_of_week = ?
                   AND ess.status = 'Active'
                   AND e.status = 'Active'
                   AND ess.start_time < ?
                   AND ess.end_time > ?
+                  AND s.session_date >= CURDATE()
+                  AND s.start_time = ess.start_time
+                  AND s.end_time   = ess.end_time
+                  AND s.status NOT IN ('Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled', 'Completed')
             ";
             $params = [(int)$studentId, $dayOfWeek, $endTime, $startTime];
             $excludeIds = $this->normalizeExcludedIds($excludeEnrollmentIds);
@@ -1992,7 +2003,7 @@ class StudentsApi
         $teacherId = (int)$teacherId;
         $branchId = (int)$branchId;
         $studentId = (int)$studentId;
-        $daysAhead = max(1, min(60, (int)$daysAhead));
+        $daysAhead = max(1, min(365, (int)$daysAhead));
         if ($teacherId < 1 || !$this->tableExists('tbl_teacher_availability')) {
             return [];
         }
@@ -2110,7 +2121,7 @@ class StudentsApi
         $studentId = (int)($_GET['student_id'] ?? 0);
         $roomName = trim((string)($_GET['room_name'] ?? ''));
         $startDate = trim((string)($_GET['start_date'] ?? ''));
-        $daysAhead = (int)($_GET['days_ahead'] ?? 21);
+        $daysAhead = (int)($_GET['days_ahead'] ?? 365); // default a full year for long packages
 
         if ($teacherId < 1) {
             $this->sendJSON(['error' => 'teacher_id is required'], 400);
@@ -2673,6 +2684,7 @@ class StudentsApi
                     si.instrument_id,
                     si.priority_order,
                     i.instrument_name,
+                    i.serial_number,
                     i.`condition`,
                     i.status,
                     it.type_name
@@ -2751,25 +2763,19 @@ class StudentsApi
                             s.notes,
                             s.teacher_id
                         FROM tbl_sessions s
-                        LEFT JOIN tbl_sessions earlier
-                            ON earlier.enrollment_id = s.enrollment_id
-                           AND earlier.session_date >= " . $this->conn->quote($todayYmd) . "
-                           AND earlier.status NOT IN ({$excludedUpcomingStatuses})
-                           AND (
-                               earlier.session_date < s.session_date
-                               OR (
-                                   earlier.session_date = s.session_date
-                                   AND COALESCE(earlier.start_time, '00:00:00') < COALESCE(s.start_time, '00:00:00')
-                               )
-                               OR (
-                                   earlier.session_date = s.session_date
-                                   AND COALESCE(earlier.start_time, '00:00:00') = COALESCE(s.start_time, '00:00:00')
-                                   AND earlier.session_id < s.session_id
-                               )
-                           )
+                        INNER JOIN (
+                            SELECT
+                                enrollment_id,
+                                MIN(CONCAT(session_date, ' ', COALESCE(start_time, '00:00:00'), ' ', LPAD(session_id, 10, '0'))) AS first_sort_key
+                            FROM tbl_sessions
+                            WHERE session_date >= " . $this->conn->quote($todayYmd) . "
+                              AND status NOT IN ({$excludedUpcomingStatuses})
+                            GROUP BY enrollment_id
+                        ) first_row
+                            ON first_row.enrollment_id = s.enrollment_id
+                           AND CONCAT(s.session_date, ' ', COALESCE(s.start_time, '00:00:00'), ' ', LPAD(s.session_id, 10, '0')) = first_row.first_sort_key
                         WHERE s.session_date >= " . $this->conn->quote($todayYmd) . "
                           AND s.status NOT IN ({$excludedUpcomingStatuses})
-                          AND earlier.session_id IS NULL
                     ) fs ON fs.enrollment_id = e.enrollment_id
                 ";
                 $firstDateExpr = "fs.session_date";
@@ -3698,8 +3704,6 @@ class StudentsApi
                     s.student_id,
                     s.branch_id,
                     s.status,
-                    s.date_of_birth,
-                    s.age,
                     COALESCE(rf.registration_status, 'Pending') AS registration_status
                 FROM tbl_students s
                 LEFT JOIN (
@@ -3725,8 +3729,6 @@ class StudentsApi
             if ($student['status'] !== 'Active') {
                 $this->sendJSON(['error' => 'Student account is not active yet'], 400);
             }
-
-            $this->assertMinimumStudentAge($student, 'enroll');
 
             $stmtExisting = $this->conn->prepare("
                 SELECT enrollment_id
@@ -4074,11 +4076,13 @@ class StudentsApi
                     $placeholders = implode(',', array_fill(0, count($enrollmentIds), '?'));
                     $stmtSessions = $this->conn->prepare("
                         SELECT
+                            s.session_id,
                             s.enrollment_id,
                             s.session_number,
                             s.session_date,
                             s.start_time,
                             s.end_time,
+                            s.room_id,
                             s.session_type,
                             s.status,
                             s.attendance_status,
@@ -4655,6 +4659,12 @@ class StudentsApi
                 ) {
                     if ($isEditingExisting && $existingSessionId > 0 && $canEditRecurringPattern) {
                         $result = $this->updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime);
+                        $generatedCount = (int)($result['created'] ?? 0) + (int)($result['updated'] ?? 0);
+                        if ($generatedCount < $totalSessions) {
+                            $this->sendJSON([
+                                'error' => 'Selected instructor does not have enough available slots to regenerate the full recurring schedule.'
+                            ], 400);
+                        }
                         $this->sendJSON([
                             'success' => true,
                             'message' => 'Recurring schedule updated successfully before classes started.',
@@ -4664,6 +4674,12 @@ class StudentsApi
 
                     if (!$isEditingExisting) {
                         $result = $this->generateFixedScheduleSessions($enrollmentId);
+                        $generatedCount = (int)($result['created'] ?? 0) + (int)($result['updated'] ?? 0);
+                        if ($generatedCount < $totalSessions) {
+                            $this->sendJSON([
+                                'error' => 'Selected instructor does not have enough available slots to generate the full package schedule.'
+                            ], 400);
+                        }
                         $this->sendJSON([
                             'success' => true,
                             'message' => 'Fixed weekly schedule is active. Sessions were refreshed automatically.',
@@ -4942,9 +4958,9 @@ class StudentsApi
                 $stmtPackage->execute([(int)$req['package_id']]);
                 $pkg = $stmtPackage->fetch(PDO::FETCH_ASSOC);
                 if ($pkg) {
-                    $packagePrice = (float)($pkg['price'] ?? 0);
-                    $packageSessions = (int)($pkg['sessions'] ?? 0);
-                    $packageName = trim((string)($pkg['package_name'] ?? 'Lesson Package')) ?: 'Lesson Package';
+                    $packagePrice    = (float)($pkg['price']    ?? 0);
+                    $packageSessions = max(1, (int)($pkg['sessions'] ?? 0)); // never 0
+                    $packageName     = trim((string)($pkg['package_name'] ?? 'Lesson Package')) ?: 'Lesson Package';
                 }
             }
 
@@ -5146,7 +5162,14 @@ class StudentsApi
             }
 
             $this->saveEnrollmentScheduleSlots($newEnrollmentId, $normalizedAssignedSlots);
-            $this->generateFixedScheduleSessions($newEnrollmentId);
+            $generationResult = $this->generateFixedScheduleSessions($newEnrollmentId);
+            $generatedCount = (int)($generationResult['created'] ?? 0) + (int)($generationResult['updated'] ?? 0);
+            if ($generatedCount < $packageSessions) {
+                $this->conn->rollBack();
+                $this->sendJSON([
+                    'error' => 'Selected instructor does not have enough available slots to complete the full package schedule. Please choose a different instructor or adjust the weekly slots.'
+                ], 400);
+            }
 
             $this->conn->commit();
 
@@ -5486,5 +5509,3 @@ switch ($action) {
     default:
         $studentsApi->sendJSON(['error' => 'Invalid action'], 400);
 }
-
-

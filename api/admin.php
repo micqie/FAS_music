@@ -19,6 +19,7 @@ if (!isset($conn) || $conn === null) {
 class Admin
 {
     private $conn;
+    private $lastMailError = null;
 
     public function __construct($pdo)
     {
@@ -76,6 +77,290 @@ class Admin
             $stmt->execute([$columnName]);
             return $stmt->rowCount() > 0;
         } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function sanitizeAdminLoginBase($input, array $fallbackParts = [])
+    {
+        $base = strtolower(trim((string)$input));
+        if ($base !== '') {
+            $base = preg_replace('/[^a-z0-9._-]+/i', '.', $base);
+        }
+
+        if ($base === '') {
+            $parts = array_filter(array_map(static function ($part) {
+                return trim((string)$part);
+            }, $fallbackParts), static function ($part) {
+                return $part !== '';
+            });
+            $base = strtolower(implode('.', $parts));
+            $base = preg_replace('/[^a-z0-9._-]+/i', '.', $base);
+        }
+
+        $base = preg_replace('/[.]{2,}/', '.', (string)$base);
+        $base = trim((string)$base, ".-_");
+
+        return $base !== '' ? $base : 'user';
+    }
+
+    private function ensurePhpMailerLoaded()
+    {
+        static $loaded = false;
+        if ($loaded) {
+            return;
+        }
+
+        require_once dirname(__DIR__) . '/phpmailer/src/Exception.php';
+        require_once dirname(__DIR__) . '/phpmailer/src/PHPMailer.php';
+        require_once dirname(__DIR__) . '/phpmailer/src/SMTP.php';
+        $loaded = true;
+    }
+
+    private function isValidEmailAddress($email)
+    {
+        return filter_var(trim((string) $email), FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    private function isPlaceholderMailHost($host)
+    {
+        $host = strtolower(trim((string) $host));
+        if ($host === '') {
+            return true;
+        }
+
+        return in_array($host, ['smtp.example.com', 'example.com', 'localhost', '127.0.0.1'], true);
+    }
+
+    private function getMailSettings()
+    {
+        $env = static function ($key, $default = '') {
+            $value = getenv($key);
+            if ($value === false || $value === null || $value === '') {
+                $value = $_ENV[$key] ?? $_SERVER[$key] ?? $default;
+            }
+            return is_string($value) ? trim($value) : $default;
+        };
+
+        $fileConfig = [];
+        $mailConfigPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'mail_config.php';
+        if (is_file($mailConfigPath)) {
+            $loadedConfig = include $mailConfigPath;
+            if (is_array($loadedConfig)) {
+                $fileConfig = $loadedConfig;
+            }
+        }
+
+        $fileValue = static function ($key, $default = '') use ($fileConfig) {
+            $value = $fileConfig[$key] ?? $default;
+            return is_string($value) ? trim($value) : $value;
+        };
+
+        $username = $fileValue('MAIL_USERNAME', $env('MAIL_USERNAME', ''));
+        $fromAddress = $fileValue('MAIL_FROM_ADDRESS', $env('MAIL_FROM_ADDRESS', ''));
+        if (!$this->isValidEmailAddress($fromAddress) && $this->isValidEmailAddress($username)) {
+            $fromAddress = $username;
+        }
+
+        $replyTo = $fileValue('MAIL_REPLY_TO', $env('MAIL_REPLY_TO', ''));
+        if (!$this->isValidEmailAddress($replyTo)) {
+            $replyTo = $fromAddress;
+        }
+
+        return [
+            'host' => $fileValue('MAIL_HOST', $env('MAIL_HOST', '')),
+            'port' => (int) $fileValue('MAIL_PORT', $env('MAIL_PORT', '587')),
+            'username' => $username,
+            'password' => preg_replace('/\s+/', '', (string) $fileValue('MAIL_PASSWORD', $env('MAIL_PASSWORD', ''))),
+            'encryption' => strtolower($fileValue('MAIL_ENCRYPTION', $env('MAIL_ENCRYPTION', 'tls'))),
+            'from_address' => $fromAddress,
+            'from_name' => $fileValue('MAIL_FROM_NAME', $env('MAIL_FROM_NAME', 'Father & Sons Music Academy')),
+            'reply_to' => $replyTo,
+            'verify_peer' => filter_var($fileValue('MAIL_VERIFY_PEER', $env('MAIL_VERIFY_PEER', 'true')), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE),
+            'debug' => filter_var($fileValue('MAIL_DEBUG', $env('MAIL_DEBUG', 'false')), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE),
+        ];
+    }
+
+    private function isMailConfigured()
+    {
+        $mail = $this->getMailSettings();
+        if ($this->isPlaceholderMailHost($mail['host'])) {
+            return false;
+        }
+        if (!$this->isValidEmailAddress($mail['from_address'])) {
+            return false;
+        }
+        if ($mail['username'] !== '' && strtolower($mail['password']) === 'password') {
+            return false;
+        }
+        return true;
+    }
+
+    private function configurePhpMailer($mailer, array $mail)
+    {
+        $mailer->CharSet = 'UTF-8';
+        $mailer->isHTML(true);
+        $mailer->setFrom($mail['from_address'], $mail['from_name']);
+        if ($this->isValidEmailAddress($mail['reply_to'])) {
+            $mailer->addReplyTo($mail['reply_to'], $mail['from_name']);
+        }
+
+        $mailer->isSMTP();
+        $mailer->Host = $mail['host'];
+        $mailer->Port = $mail['port'] > 0 ? $mail['port'] : 587;
+        $mailer->SMTPAuth = true;
+        $mailer->Username = $mail['username'];
+        $mailer->Password = $mail['password'];
+        $mailer->Timeout = 20;
+        $mailer->SMTPOptions = [
+            'ssl' => [
+                'verify_peer' => $mail['verify_peer'] !== false,
+                'verify_peer_name' => $mail['verify_peer'] !== false,
+                'allow_self_signed' => $mail['verify_peer'] === false,
+            ],
+        ];
+
+        if ($mail['encryption'] === 'ssl') {
+            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+        } elseif ($mail['encryption'] === 'tls') {
+            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        } else {
+            $mailer->SMTPSecure = '';
+            $mailer->SMTPAutoTLS = false;
+        }
+    }
+
+    private function adminSystemEmailExists($email)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT user_id
+            FROM tbl_users
+            WHERE LOWER(username) = LOWER(?)
+               OR LOWER(email) = LOWER(?)
+            LIMIT 1
+        ");
+        $stmt->execute([$email, $email]);
+        return (int)($stmt->fetchColumn() ?: 0) > 0;
+    }
+
+    private function buildAdminSystemEmail($roleName, $firstName = '', $lastName = '', $systemLoginName = '')
+    {
+        $roleKey = strtolower(trim((string) $roleName));
+        $rolePrefix = 'user';
+        if (in_array($roleKey, ['manager', 'branch manager'], true)) {
+            $rolePrefix = 'manager';
+        } elseif ($roleKey === 'staff') {
+            $rolePrefix = 'staff';
+        }
+
+        $fallbackBase = $systemLoginName !== ''
+            ? $systemLoginName
+            : "{$rolePrefix}.{$firstName}.{$lastName}";
+        $base = $this->sanitizeAdminLoginBase($fallbackBase, [$rolePrefix, $firstName, $lastName]);
+
+        for ($i = 0; $i < 100; $i++) {
+            $candidateBase = $i === 0 ? $base : $base . $i;
+            $candidateEmail = $candidateBase . '@fas.com';
+            if (!$this->adminSystemEmailExists($candidateEmail)) {
+                return $candidateEmail;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveAdminAccountMode($accountMode, $email)
+    {
+        $accountMode = strtolower(trim((string) $accountMode));
+        if (in_array($accountMode, ['real_email', 'system_account'], true)) {
+            return $accountMode;
+        }
+
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) && !$this->isWalkInSystemEmail($email)) {
+            return 'real_email';
+        }
+
+        return 'system_account';
+    }
+
+    private function resolveAdminAccountCredentials($firstName, $lastName, $email, $roleName, $accountMode, $systemLoginName = '')
+    {
+        $accountMode = $this->resolveAdminAccountMode($accountMode, $email);
+
+        if ($accountMode === 'real_email') {
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $this->sendJSON(['error' => 'A valid email address is required for a real email account'], 400);
+            }
+            if ($this->isWalkInSystemEmail($email)) {
+                $this->sendJSON(['error' => 'Use the school login option for @fas.com accounts'], 400);
+            }
+
+            return [
+                'username' => $email,
+                'email' => $email,
+                'account_mode' => 'real_email',
+                'send_email' => true,
+            ];
+        }
+
+        $loginEmail = $this->buildAdminSystemEmail($roleName, $firstName, $lastName, $systemLoginName);
+        if ($loginEmail === null) {
+            $this->sendJSON(['error' => 'That school login is already in use. Please choose another name.'], 400);
+        }
+
+        return [
+            'username' => $loginEmail,
+            'email' => $loginEmail,
+            'account_mode' => 'system_account',
+            'send_email' => false,
+        ];
+    }
+
+    private function sendAdminCredentialsEmail($toEmail, $toName, $username, $tempPassword, $roleLabel)
+    {
+        $this->ensurePhpMailerLoaded();
+        $this->lastMailError = null;
+        if (!$this->isMailConfigured() || !$this->isValidEmailAddress($toEmail)) {
+            $this->lastMailError = 'SMTP is not configured on the server.';
+            return false;
+        }
+
+        $mail = $this->getMailSettings();
+
+        try {
+            $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $this->configurePhpMailer($mailer, $mail);
+            $mailer->addAddress($toEmail, $toName ?: $toEmail);
+
+            $safeName = htmlspecialchars($toName ?: 'User', ENT_QUOTES, 'UTF-8');
+            $safeUsername = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
+            $safePassword = htmlspecialchars($tempPassword, ENT_QUOTES, 'UTF-8');
+            $safeRole = htmlspecialchars($roleLabel ?: 'account', ENT_QUOTES, 'UTF-8');
+
+            $mailer->Subject = 'Your Father & Sons ' . $safeRole . ' login';
+            $mailer->Body = '
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 560px;">
+                    <h2 style="margin: 0 0 12px; color: #0f172a;">Welcome to Father & Sons Music Academy</h2>
+                    <p>Hello ' . $safeName . ',</p>
+                    <p>Your ' . $safeRole . ' account has been created. Use the credentials below to sign in:</p>
+                    <div style="background:#fdfaf1;border:1px solid #f9f1d5;border-radius:12px;padding:16px 18px;margin:18px 0;">
+                        <p style="margin:0 0 8px;"><strong>Username:</strong> ' . $safeUsername . '</p>
+                        <p style="margin:0;"><strong>Temporary password:</strong> ' . $safePassword . '</p>
+                    </div>
+                    <p>Please change your password after your first login.</p>
+                    <p>If you did not expect this email, contact the academy office.</p>
+                </div>
+            ';
+            $mailer->AltBody = "Username: {$username}\nTemporary password: {$tempPassword}\nPlease change your password after first login.";
+            $mailer->send();
+            return true;
+        } catch (\PHPMailer\PHPMailer\Exception $e) {
+            $this->lastMailError = trim($e->getMessage() . ' ' . $mailer->ErrorInfo);
+            error_log('Admin credentials email failed: ' . $this->lastMailError);
+            return false;
+        } catch (Exception $e) {
+            $this->lastMailError = $e->getMessage();
+            error_log('Admin credentials email failed: ' . $this->lastMailError);
             return false;
         }
     }
@@ -1048,13 +1333,21 @@ class Admin
         $roleName  = trim((string)($data['role'] ?? ''));
         $password  = (string)($data['password'] ?? '');
         $branchId  = isset($data['branch_id']) ? (int) $data['branch_id'] : 0;
+        $accountMode = trim((string)($data['account_mode'] ?? ''));
+        $systemLoginName = trim((string)($data['system_login_name'] ?? ''));
 
-        if ($firstName === '' || $lastName === '' || $email === '' || $roleName === '' || $password === '') {
-            $this->sendJSON(['error' => 'first_name, last_name, email, role and password are required'], 400);
+        if ($firstName === '' || $lastName === '' || $roleName === '' || $password === '') {
+            $this->sendJSON(['error' => 'first_name, last_name, role and password are required'], 400);
         }
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $this->sendJSON(['error' => 'Invalid email address'], 400);
+        $resolvedAccountMode = $this->resolveAdminAccountMode($accountMode, $email);
+        if ($resolvedAccountMode === 'real_email') {
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $this->sendJSON(['error' => 'A valid real email address is required'], 400);
+            }
+            if ($this->isWalkInSystemEmail($email)) {
+                $this->sendJSON(['error' => 'Use the school login option for @fas.com accounts'], 400);
+            }
         }
 
         try {
@@ -1075,15 +1368,27 @@ class Admin
             }
             $roleId = (int)$role['role_id'];
 
+            $account = $this->resolveAdminAccountCredentials(
+                $firstName,
+                $lastName,
+                $email,
+                $roleName,
+                $resolvedAccountMode,
+                $systemLoginName
+            );
+            $username = (string)($account['username'] ?? '');
+            $storedEmail = (string)($account['email'] ?? '');
+            $resolvedAccountMode = (string)($account['account_mode'] ?? $resolvedAccountMode);
+
             // Prevent duplicate username/email
             $dupCheck = $this->conn->prepare("
                 SELECT user_id FROM tbl_users
                 WHERE username = ? OR email = ?
                 LIMIT 1
             ");
-            $dupCheck->execute([$email, $email]);
+            $dupCheck->execute([$username, $storedEmail]);
             if ($dupCheck->fetch()) {
-                $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
+                $this->sendJSON(['error' => 'This login or email is already registered. Please use a different value.'], 400);
             }
 
             $hashed = password_hash($password, PASSWORD_DEFAULT);
@@ -1103,13 +1408,13 @@ class Admin
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active')
                 ");
                 $stmt->execute([
-                    $email,
+                    $username,
                     $hashed,
                     $roleId,
                     $branchId > 0 ? $branchId : null,
                     $firstName,
                     $lastName,
-                    $email,
+                    $storedEmail,
                     $phone
                 ]);
             } else {
@@ -1120,35 +1425,51 @@ class Admin
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
                 ");
                 $stmt->execute([
-                    $email,
+                    $username,
                     $hashed,
                     $roleId,
                     $firstName,
                     $lastName,
-                    $email,
+                    $storedEmail,
                     $phone
                 ]);
             }
 
             $userId = (int)$this->conn->lastInsertId();
+            $emailSent = false;
+            if (!empty($account['send_email'])) {
+                $emailSent = $this->sendAdminCredentialsEmail(
+                    $storedEmail,
+                    trim($firstName . ' ' . $lastName),
+                    $username,
+                    $password,
+                    $roleName
+                );
+            }
 
             AuditLogs::record(
                 $this->conn,
                 'User Created',
                 'Users',
-                "New user account created: {$email} with role {$roleName}.",
-                'user', $userId, $email,
-                'info', null, ['name' => "{$firstName} {$lastName}", 'email' => $email, 'role' => $roleName]
+                "New user account created: {$username} with role {$roleName}.",
+                'user', $userId, $username,
+                'info', null, ['name' => "{$firstName} {$lastName}", 'email' => $storedEmail, 'username' => $username, 'role' => $roleName]
             );
 
             $this->sendJSON([
                 'success' => true,
                 'message' => 'User created successfully.',
-                'user_id' => $userId
+                'user_id' => $userId,
+                'username' => $username,
+                'email' => $storedEmail,
+                'account_mode' => $resolvedAccountMode,
+                'send_email' => !empty($account['send_email']),
+                'email_sent' => $emailSent,
+                'email_error' => $emailSent ? null : $this->lastMailError
             ]);
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') {
-                $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
+                $this->sendJSON(['error' => 'This login or email is already registered. Please use a different value.'], 400);
             }
             $this->sendJSON(['error' => 'Failed to create user: ' . $e->getMessage()], 500);
         }
