@@ -2121,7 +2121,7 @@ class StudentsApi
         $studentId = (int)($_GET['student_id'] ?? 0);
         $roomName = trim((string)($_GET['room_name'] ?? ''));
         $startDate = trim((string)($_GET['start_date'] ?? ''));
-        $daysAhead = (int)($_GET['days_ahead'] ?? 365); // default a full year for long packages
+        $daysAhead = (int)($_GET['days_ahead'] ?? 60); // enough for the visible scheduling window without a full-year scan
 
         if ($teacherId < 1) {
             $this->sendJSON(['error' => 'teacher_id is required'], 400);

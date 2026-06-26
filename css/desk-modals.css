@@ -7,8 +7,8 @@
 .desk-modal-panel {
     background: #fff;
     border: 1px solid #e2e8f0;
-    border-radius: 0.25rem;
-    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+    border-radius: 1rem;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
     width: 100%;
     position: relative;
 }
@@ -145,7 +145,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.35rem;
+    flex-wrap: wrap;
 }
 
 .desk-modal-footer {
@@ -156,6 +157,71 @@
     padding-top: 0.75rem;
     margin-top: 0.75rem;
     border-top: 1px solid #f1f5f9;
+}
+
+.assign-request-modal-panel {
+    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+}
+
+.assign-request-header {
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+}
+
+.assign-request-summary-strip {
+    background:
+        radial-gradient(circle at top left, rgba(212, 175, 55, 0.08), transparent 36%),
+        linear-gradient(180deg, rgba(248, 250, 252, 0.85), rgba(255, 255, 255, 0.9));
+}
+
+.assign-request-summary-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.85rem 0.95rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.9rem;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset;
+}
+
+.assign-request-summary-item i {
+    margin-top: 0.1rem;
+    font-size: 1rem;
+    width: 1.25rem;
+    text-align: center;
+}
+
+.assign-request-summary-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #94a3b8;
+}
+
+.assign-request-summary-value {
+    margin-top: 0.2rem;
+    font-size: 0.96rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.assign-request-form-pane {
+    background:
+        linear-gradient(180deg, rgba(248, 250, 252, 0.42), rgba(255, 255, 255, 0.96)),
+        #fff;
+}
+
+.assign-request-form-pane .desk-modal-body {
+    padding: 0.75rem 0.85rem 0.85rem;
+}
+
+.assign-request-availability-pane {
+    background:
+        radial-gradient(circle at top right, rgba(184, 134, 11, 0.07), transparent 28%),
+        rgba(248, 250, 252, 0.9);
 }
 
 .desk-modal-btn {
@@ -196,29 +262,163 @@
 }
 
 .desk-modal-slot {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.25rem;
-    background: #fafafa;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.8rem;
+    border: 1px solid #d9e3ef;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.92) inset, 0 10px 24px rgba(15, 23, 42, 0.03);
 }
 
-@media (min-width: 768px) {
-    .desk-modal-slot {
-        grid-template-columns: 1.1fr 1.2fr 0.9fr 0.9fr 0.9fr auto;
-        align-items: end;
+.desk-modal-slot > div,
+.desk-modal-slot > button,
+.desk-modal-slot > input {
+    min-width: 0;
+}
+
+.assign-request-slot-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.assign-request-slot-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.assign-request-field-caption {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 0.3rem;
+}
+
+.assign-request-fixed-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0.35rem;
+    padding: 0.18rem 0.48rem;
+    border-radius: 999px;
+    border: 1px solid #facc15;
+    background: #fffbeb;
+    color: #a16207;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.assign-request-slot-trash {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+    display: grid;
+    place-items: center;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.assign-request-slot-trash:hover {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca;
+    transform: translateY(-1px);
+}
+
+.assign-request-slot-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+}
+
+@media (min-width: 640px) {
+    .assign-request-slot-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
-.desk-modal-list {
-    max-height: 50vh;
+@media (min-width: 1024px) {
+    .assign-request-slot-fields {
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+        align-items: start;
+    }
+}
+
+.assign-request-slot-field {
+    min-width: 0;
+}
+
+.assign-request-slot .desk-modal-input,
+.assign-request-slot select {
+    border-radius: 0.75rem !important;
+    min-height: 2.6rem;
+    padding: 0.48rem 0.72rem !important;
+    font-size: 0.88rem !important;
+}
+
+.assign-request-slot .desk-modal-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    color: #94a3b8;
+    margin-bottom: 0.25rem;
+}
+
+.assign-request-slot .desk-modal-input {
+    background: #fff;
+}
+
+.assign-request-slot .desk-modal-input,
+.assign-request-slot select {
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.assign-request-availability-list {
+    max-height: 100%;
     overflow-y: auto;
     border: 1px solid #e2e8f0;
-    border-radius: 0.25rem;
-    padding: 0.5rem;
-    background: #fafafa;
+    border-radius: 1rem;
+    padding: 1rem;
+    background: #fff;
+}
+
+.assign-request-availability-list .text-sm.font-semibold.text-slate-900 {
+    font-size: 1.05rem;
+}
+
+.assign-request-availability-list .grid.grid-cols-7.gap-2 > button {
+    border-radius: 0.8rem;
+}
+
+.assign-request-availability-list .border {
+    border-color: #dbe4f0;
+}
+
+.assign-request-availability-list .rounded-sm.border {
+    border-radius: 0.9rem;
+}
+
+.assign-request-availability-list .rounded-lg.border {
+    border-radius: 0.9rem;
+}
+
+.assign-request-availability-list button {
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.assign-request-availability-list button:hover {
+    transform: translateY(-1px);
 }
 
 .desk-modal-list-item {
@@ -234,16 +434,47 @@
 }
 
 .desk-modal-panel .assign-request-slot {
-    border-radius: 0.25rem !important;
-    padding: 0.5rem !important;
-    background: #fafafa !important;
+    border-radius: 1rem !important;
+    padding: 0.8rem !important;
+    background: #fff !important;
+}
+
+.assign-request-slot-schedule {
+    min-height: 2.6rem;
+    padding: 0.48rem 0.72rem;
+    border: 1px solid #dbe4f0;
+    border-radius: 0.75rem;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.assign-request-slot-schedule-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+}
+
+.assign-request-slot-schedule-subtitle {
+    margin-top: 0.15rem;
+    font-size: 0.72rem;
+    color: #64748b;
+    line-height: 1.2;
+}
+
+.desk-modal-panel .assign-request-slot .desk-modal-input.bg-slate-50 {
+    display: flex;
+    align-items: center;
+    min-height: 3rem;
 }
 
 .desk-modal-panel .assign-request-slot select,
 .desk-modal-panel .assign-request-slot input {
-    border-radius: 0.25rem !important;
-    padding: 0.4375rem 0.5rem !important;
-    font-size: 0.8125rem !important;
+    border-radius: 0.75rem !important;
+    padding: 0.7rem 0.85rem !important;
+    font-size: 0.875rem !important;
 }
 
 /* SweetAlert enrollment details — match desk modal compact style */
