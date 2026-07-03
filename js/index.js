@@ -3884,19 +3884,19 @@ function renderStudentRequestInstrumentSelectors(maxInstruments, instruments) {
     for (let i = 1; i <= maxCount; i++) {
         const slotLabel = maxCount === 1 ? 'Instrument' : `Instrument ${i}`;
         html += `
-            <div class="p-3 bg-zinc-900/60 rounded-lg border border-zinc-700 space-y-2">
-                <label class="block text-sm font-medium text-zinc-200">${slotLabel} *</label>
+            <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3 shadow-sm">
+                <label class="block text-sm font-semibold text-slate-700">${slotLabel} *</label>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs text-zinc-400 mb-1">Type</label>
-                        <select class="student-request-instrument-type w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentTypeChange(${i})">
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Type</label>
+                        <select class="student-request-instrument-type w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentTypeChange(${i})">
                             <option value="">Select type...</option>
                             ${typeOptionsHtml}
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-zinc-400 mb-1">Instrument</label>
-                        <select class="student-request-instrument w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentDropdownChange()">
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Instrument</label>
+                        <select class="student-request-instrument w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentDropdownChange(${i})">
                             <option value="">Select instrument...</option>
                         </select>
                     </div>
@@ -3913,6 +3913,26 @@ function onStudentRequestInstrumentTypeChange(slot) {
     if (!typeSelect || !instrumentSelect) return;
 
     const typeId = typeSelect.value;
+
+    // Check for duplicate type selection across other slots
+    if (typeId) {
+        const allTypeSelects = document.querySelectorAll('select.student-request-instrument-type');
+        const duplicateType = Array.from(allTypeSelects).some(sel =>
+            sel !== typeSelect && String(sel.value || '') === String(typeId)
+        );
+        if (duplicateType) {
+            typeSelect.value = '';
+            instrumentSelect.innerHTML = '<option value="">Select instrument...</option>';
+            instrumentSelect.value = '';
+            if (typeof showMessage === 'function') {
+                showMessage('That instrument type has already been selected in another slot. Please choose a different type.', 'error');
+            }
+            // Refresh disabled states without recursing into the type-change handler
+            _syncStudentRequestTypeDisabledStates();
+            return;
+        }
+    }
+
     instrumentSelect.innerHTML = '<option value="">Select instrument...</option>';
     instrumentSelect.value = '';
 
@@ -3925,11 +3945,42 @@ function onStudentRequestInstrumentTypeChange(slot) {
             instrumentSelect.appendChild(opt);
         });
     }
-    onStudentRequestInstrumentDropdownChange();
+    onStudentRequestInstrumentDropdownChange(slot);
 }
 
-function onStudentRequestInstrumentDropdownChange() {
+// Sync disabled state of type dropdowns so already-used types are greyed out
+function _syncStudentRequestTypeDisabledStates() {
+    const allTypeSelects = document.querySelectorAll('select.student-request-instrument-type');
+    const usedTypes = new Set();
+    allTypeSelects.forEach(sel => { if (sel.value) usedTypes.add(String(sel.value)); });
+    allTypeSelects.forEach(sel => {
+        const currentVal = String(sel.value || '');
+        Array.from(sel.options).forEach(opt => {
+            if (opt.value === '') return;
+            opt.disabled = usedTypes.has(String(opt.value)) && String(opt.value) !== currentVal;
+        });
+    });
+}
+
+function onStudentRequestInstrumentDropdownChange(changedSlot = null) {
     const selects = document.querySelectorAll('select.student-request-instrument');
+    const changedSelect = changedSlot != null
+        ? document.querySelector(`select.student-request-instrument[data-slot="${changedSlot}"]`)
+        : null;
+
+    if (changedSelect && changedSelect.value) {
+        const selectedValue = String(changedSelect.value);
+        const duplicateExists = Array.from(selects).some(select =>
+            select !== changedSelect && String(select.value || '') === selectedValue
+        );
+        if (duplicateExists) {
+            changedSelect.value = '';
+            if (typeof showMessage === 'function') {
+                showMessage('That instrument has already been selected in another slot. Please choose a different instrument.', 'error');
+            }
+        }
+    }
+
     const used = new Set();
     selects.forEach(select => {
         const val = select.value;
@@ -3942,6 +3993,9 @@ function onStudentRequestInstrumentDropdownChange() {
             opt.disabled = used.has(opt.value) && opt.value !== currentVal;
         });
     });
+
+    // Also keep type dropdowns in sync
+    _syncStudentRequestTypeDisabledStates();
 }
 
 async function fetchStudentRequestMetaByEmail(email) {

@@ -397,6 +397,16 @@
                 return;
             }
 
+            // Validate that no two instrument slots share the same type
+            const typeSelects = Array.from(document.querySelectorAll('#walkinInstrumentsContainer .student-request-instrument-type'));
+            const selectedTypeIds = typeSelects.map(el => String(el.value || '').trim()).filter(Boolean);
+            
+            // Only check for duplicate types if there are multiple types selected
+            if (selectedTypeIds.length > 1 && selectedTypeIds.length !== new Set(selectedTypeIds).size) {
+                showMessage('Each instrument slot must have a different instrument type. Please change the duplicate type selection.', 'error');
+                return;
+            }
+
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
 

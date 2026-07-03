@@ -488,8 +488,8 @@
         </div>
     </div>
 
-    <div id="walkinEnrollmentModal" class="desk-modal desk-modal-readable fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 overflow-y-auto p-3 sm:p-5">
-        <div class="desk-modal-panel max-w-6xl max-h-[94vh] overflow-y-auto my-4">
+    <div id="walkinEnrollmentModal" class="desk-modal fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 overflow-hidden p-3 sm:p-5">
+        <div class="desk-modal-panel walkin-enrollment-panel max-w-[92rem] max-h-[94vh] overflow-hidden my-4">
             <div class="desk-modal-header">
                 <div>
                     <h3>Walk-In Enrollment</h3>
@@ -500,48 +500,90 @@
 
             <div id="walkinEnrollmentMessage" class="hidden mx-4 mt-3 p-2 rounded text-sm border"></div>
 
-            <form id="walkinEnrollmentForm" class="desk-modal-body">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="space-y-3">
-                        <div>
-                            <label class="desk-modal-label">Walk-in student *</label>
-                            <input type="text" id="walkinStudentSearch" placeholder="Search name or login..." class="desk-modal-input">
-                            <input type="hidden" id="walkinStudentSelect" value="">
-                        </div>
-
-                        <div id="walkinSelectedStudentCard" class="hidden desk-modal-note" style="border-color:#bbf7d0;background:#f0fdf4;color:#166534;">
-                            <div class="flex items-start justify-between gap-2">
-                                <div>
-                                    <div class="text-[11px] font-bold uppercase tracking-wide opacity-70">Selected</div>
-                                    <div id="walkinSelectedStudentName" class="font-semibold text-slate-900 mt-1">—</div>
-                                    <div id="walkinSelectedStudentMeta" class="text-xs mt-0.5">—</div>
-                                </div>
-                                <button type="button" id="walkinClearStudentBtn" class="desk-modal-btn desk-modal-btn-secondary">Change</button>
+            <form id="walkinEnrollmentForm" class="desk-modal-body walkin-enrollment-body">
+                <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,0.64fr)] gap-5 items-start h-full min-h-0">
+                    <div class="space-y-5 walkin-steps-scroll">
+                        <div class="space-y-3 walkin-field-group">
+                            <div>
+                                <h2 class="text-lg font-semibold text-slate-900">1. Walk-in Student <span class="text-red-500">*</span></h2>
+                                <p class="mt-1 text-sm text-slate-500">Search a registered student and choose them for walk-in enrollment.</p>
                             </div>
+                            <div>
+                                <label class="desk-modal-label">Walk-in student *</label>
+                                <input type="text" id="walkinStudentSearch" placeholder="Search name or login..." class="desk-modal-input">
+                                <input type="hidden" id="walkinStudentSelect" value="">
+                            </div>
+
+                            <div id="walkinSelectedStudentCard" class="hidden desk-modal-note walkin-summary-box" style="border-color:#bbf7d0;background:#f0fdf4;color:#166534;">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div class="text-[11px] font-bold uppercase tracking-wide opacity-70">Selected</div>
+                                        <div id="walkinSelectedStudentName" class="font-semibold text-slate-900 mt-1">—</div>
+                                        <div id="walkinSelectedStudentMeta" class="text-xs mt-0.5">—</div>
+                                    </div>
+                                    <button type="button" id="walkinClearStudentBtn" class="desk-modal-btn desk-modal-btn-secondary">Change</button>
+                                </div>
+                            </div>
+
+                            <div id="walkinStudentResults" class="desk-modal-list max-h-72 walkin-results">
+                                <div class="text-sm text-slate-500 text-center py-4">Type to search students.</div>
+                            </div>
+                            <p id="walkinStatusInfo" class="desk-modal-hint"></p>
                         </div>
 
-                        <div id="walkinStudentResults" class="desk-modal-list max-h-72">
-                            <div class="text-sm text-slate-500 text-center py-4">Type to search students.</div>
-                        </div>
-                        <p id="walkinStatusInfo" class="desk-modal-hint"></p>
-                    </div>
-
-                    <div class="space-y-3">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="space-y-3 walkin-field-group">
+                            <div>
+                                <h2 class="text-lg font-semibold text-slate-900">2. Select a Package</h2>
+                                <p class="mt-1 text-sm text-slate-500">Choose the number of sessions and instruments you want to learn.</p>
+                            </div>
                             <div>
                                 <label class="desk-modal-label">Package *</label>
-                                <select id="walkinPackageSelect" class="desk-modal-input"><option value="">Select package...</option></select>
+                                <div id="walkinPackageCards" class="walkin-package-grid"></div>
+                                <select id="walkinPackageSelect" class="hidden"><option value="">Select package...</option></select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 walkin-field-group">
+                            <div>
+                                <h2 class="text-lg font-semibold text-slate-900">3. Instruments</h2>
+                                <p class="mt-1 text-sm text-slate-500">This package includes the selected instruments. Fill in each one below.</p>
                             </div>
                             <div>
-                                <label class="desk-modal-label">Payment type *</label>
-                                <select id="walkinPaymentType" class="desk-modal-input">
+                                <label class="desk-modal-label">Instruments *</label>
+                                <div id="walkinInstrumentsContainer" class="desk-modal-list min-h-[5rem] walkin-results">
+                                    <div class="text-sm text-slate-500">Select a package first.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 walkin-field-group">
+                            <div>
+                                <h2 class="text-lg font-semibold text-slate-900">4. Payment Plan</h2>
+                                <p class="mt-1 text-sm text-slate-500">Choose how you'd like to pay for this enrollment.</p>
+                            </div>
+                            <div>
+                                <label class="desk-modal-label">Payment plan *</label>
+                                <div id="walkinPaymentTypeCards" class="walkin-payment-grid"></div>
+                                <select id="walkinPaymentType" class="hidden">
                                     <option value="Partial Payment">Partial Payment</option>
                                     <option value="Full Payment">Full Payment</option>
-                                    <option value="Installment">Installment</option>
                                 </select>
                             </div>
                         </div>
-                        <div>
+                    </div>
+
+                    <aside class="walkin-sidebar-stack walkin-sidebar-fixed">
+                        <div class="walkin-summary-panel">
+                            <div class="walkin-summary-title">
+                                <i class="fas fa-credit-card text-slate-400"></i>
+                                Payment Summary
+                            </div>
+                            <div id="walkinAmountInfo" class="walkin-summary-content" style="color:#334155;">
+                                Estimated package amount: <span class="font-bold">₱0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1 walkin-field-group">
                             <label class="desk-modal-label">Payment method *</label>
                             <select id="walkinPaymentMethod" class="desk-modal-input">
                                 <option value="">Select method</option>
@@ -551,21 +593,17 @@
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="desk-modal-label">Instruments *</label>
-                            <div id="walkinInstrumentsContainer" class="desk-modal-list min-h-[5rem]">
-                                <div class="text-sm text-slate-500">Select a package first.</div>
-                            </div>
-                        </div>
-                        <div id="walkinAmountInfo" class="desk-modal-note" style="border-color:#f9f1d5;background:#fdfaf1;color:#334155;">
-                            Estimated amount: <span class="font-bold">₱0.00</span>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="desk-modal-footer">
-                    <button type="button" id="cancelWalkinEnrollmentBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
-                    <button type="submit" id="submitWalkinEnrollmentBtn" class="desk-modal-btn desk-modal-btn-gold">Submit enrollment</button>
+                        <div class="desk-modal-note walkin-summary-box" style="border-color:#d7e3f6;background:#f7fbff;color:#475569;">
+                            <i class="fas fa-info-circle mr-1 text-blue-500"></i>
+                            Cash walk-ins can be submitted without uploading proof.
+                        </div>
+
+                        <div class="desk-modal-footer flex-col sm:flex-row sm:justify-end">
+                            <button type="button" id="cancelWalkinEnrollmentBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
+                            <button type="submit" id="submitWalkinEnrollmentBtn" class="desk-modal-btn desk-modal-btn-gold">Submit enrollment</button>
+                        </div>
+                    </aside>
                 </div>
             </form>
         </div>

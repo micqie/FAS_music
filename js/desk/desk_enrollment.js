@@ -27,6 +27,25 @@
             });
         }
 
+        function showToast(message, type = 'success') {
+            Swal.fire({
+                icon: type === 'success' ? 'success' : 'error',
+                title: message,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3500,
+                timerProgressBar: true,
+                customClass: {
+                    popup: 'text-sm',
+                    container: 'swal2-toast-container-high-z'
+                },
+                didOpen: (toast) => {
+                    toast.style.zIndex = '99999';
+                }
+            });
+        }
+
         function showAssignPackageMessage(msg, type) {
             Swal.fire({
                 icon: type === 'success' ? 'success' : 'error',
@@ -325,7 +344,19 @@
                 const students = data.success && Array.isArray(data.students) ? data.students : [];
                 walkinStudents = students.filter(student => {
                     const source = String(student.registration_source || 'online').toLowerCase();
-                    return source === 'walkin' && !student.session_package_id;
+                    const registrationStatus = String(student.registration_status || 'Pending');
+                    
+                    // Registration fee status - check if they've completed their lifetime registration (₱1000)
+                    const isLifetimeRegistered = registrationStatus === 'Approved' || registrationStatus === 'Fee Paid';
+                    
+                    // Check if they have an active/pending enrollment (currently enrolled)
+                    const hasActiveEnrollment = Number(student.has_active_enrollment || 0) === 1;
+                    
+                    // Only show walk-in students who:
+                    // 1. Paid the lifetime registration fee (₱1000)
+                    // 2. Do NOT have an active or pending enrollment (not currently enrolled)
+                    // This includes students who have completed their package and are ready for a new one
+                    return source === 'walkin' && isLifetimeRegistered && !hasActiveEnrollment;
                 });
                 populateWalkinStudentSelect();
             } catch (error) {
@@ -370,11 +401,19 @@
         }
 
         function getWalkinStudentStatusBadge(student) {
+            const hasCompleted = Number(student?.has_completed_enrollment || 0) === 1;
             const registrationStatus = String(student?.registration_status || 'Pending');
+
+            if (hasCompleted) {
+                return `<span class="inline-flex items-center rounded-sm border border-sky-200 bg-sky-50 px-2.5 py-1 text-sm font-bold text-sky-700">Re-enrollment</span>`;
+            }
             const cls = registrationStatus === 'Approved' || registrationStatus === 'Fee Paid'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                 : 'border-amber-200 bg-amber-50 text-amber-700';
-            return `<span class="inline-flex items-center rounded-sm border px-2.5 py-1 text-sm font-bold ${cls}">${escapeHtml(registrationStatus)}</span>`;
+            const label = registrationStatus === 'Approved' || registrationStatus === 'Fee Paid'
+                ? 'Registered'
+                : registrationStatus;
+            return `<span class="inline-flex items-center rounded-sm border px-2.5 py-1 text-sm font-bold ${cls}">${escapeHtml(label)}</span>`;
         }
 
         function updateWalkinSelectedStudentCard(student) {
@@ -458,6 +497,111 @@
             }).join('');
         }
 
+        function renderWalkinPackageCards() {
+            const packageSelect = document.getElementById('walkinPackageSelect');
+            const cardsContainer = document.getElementById('walkinPackageCards');
+            if (!packageSelect || !cardsContainer) return;
+
+            const options = Array.from(packageSelect.options || []).filter(option => String(option.value || '').trim());
+            if (!options.length) {
+                cardsContainer.innerHTML = '';
+                return;
+            }
+
+            const selectedValue = String(packageSelect.value || '');
+            cardsContainer.innerHTML = options.map(option => {
+                const maxInst = Number(option.getAttribute('data-max-instruments') || 0);
+                const sessions = Number(option.getAttribute('data-sessions') || 0);
+                const isSelected = selectedValue && selectedValue === String(option.value || '');
+                return `
+                    <button
+                        type="button"
+                        class="walkin-package-card ${isSelected ? 'is-selected' : ''}"
+                        data-package-id="${escapeHtml(String(option.value || ''))}"
+                    >
+                        <div class="flex items-start gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="walkin-package-card-title">${escapeHtml((option.textContent || 'Package').split(' (')[0])}</div>
+                                <div class="walkin-package-card-subtitle">${sessions} session${sessions === 1 ? '' : 's'} • up to ${maxInst} instrument${maxInst === 1 ? '' : 's'}</div>
+                                <div class="walkin-package-card-price">${escapeHtml(option.getAttribute('data-price') ? formatCurrencyPHP(option.getAttribute('data-price')) : '₱0.00')}</div>
+                            </div>
+                            <span class="walkin-package-card-check ${isSelected ? '' : 'opacity-0'}"><i class="fas fa-check"></i></span>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function syncWalkinPackageCardSelection() {
+            const packageSelect = document.getElementById('walkinPackageSelect');
+            const cardsContainer = document.getElementById('walkinPackageCards');
+            if (!packageSelect || !cardsContainer) return;
+
+            const selectedValue = String(packageSelect.value || '');
+            cardsContainer.querySelectorAll('.walkin-package-card').forEach(card => {
+                const isSelected = selectedValue && String(card.getAttribute('data-package-id') || '') === selectedValue;
+                card.classList.toggle('is-selected', isSelected);
+                const check = card.querySelector('.walkin-package-card-check');
+                if (check) {
+                    check.classList.toggle('opacity-0', !isSelected);
+                }
+            });
+        }
+
+        function selectWalkinPackage(packageId) {
+            const packageSelect = document.getElementById('walkinPackageSelect');
+            if (!packageSelect) return;
+            packageSelect.value = String(packageId || '');
+            packageSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function renderWalkinPaymentTypeCards() {
+            const paymentTypeSelect = document.getElementById('walkinPaymentType');
+            const cardsContainer = document.getElementById('walkinPaymentTypeCards');
+            if (!paymentTypeSelect || !cardsContainer) return;
+
+            const options = Array.from(paymentTypeSelect.options || []).filter(option => String(option.value || '').trim());
+            const selectedValue = String(paymentTypeSelect.value || options[0]?.value || '');
+            cardsContainer.innerHTML = options.map(option => {
+                const value = String(option.value || '');
+                const label = String(option.textContent || value);
+                const subtitle = value === 'Partial Payment'
+                    ? 'Pay a deposit now, rest later'
+                    : 'Pay the total amount now';
+                const isSelected = selectedValue === value;
+                return `
+                    <button type="button" class="walkin-choice-card ${isSelected ? 'is-selected' : ''}" data-payment-type="${escapeHtml(value)}">
+                        <div class="flex items-start gap-3">
+                            <span class="walkin-choice-card-radio"><span class="walkin-choice-card-radio-dot"></span></span>
+                            <div class="min-w-0 flex-1">
+                                <div class="walkin-choice-card-title">${escapeHtml(label)}</div>
+                                <div class="walkin-choice-card-subtitle">${escapeHtml(subtitle)}</div>
+                            </div>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function syncWalkinPaymentTypeCardSelection() {
+            const paymentTypeSelect = document.getElementById('walkinPaymentType');
+            const cardsContainer = document.getElementById('walkinPaymentTypeCards');
+            if (!paymentTypeSelect || !cardsContainer) return;
+
+            const selectedValue = String(paymentTypeSelect.value || '');
+            cardsContainer.querySelectorAll('.walkin-choice-card').forEach(card => {
+                const isSelected = selectedValue && String(card.getAttribute('data-payment-type') || '') === selectedValue;
+                card.classList.toggle('is-selected', isSelected);
+            });
+        }
+
+        function selectWalkinPaymentType(paymentType) {
+            const paymentTypeSelect = document.getElementById('walkinPaymentType');
+            if (!paymentTypeSelect) return;
+            paymentTypeSelect.value = String(paymentType || '');
+            paymentTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
         async function selectWalkinStudent(student) {
             const hidden = document.getElementById('walkinStudentSelect');
             const statusEl = document.getElementById('walkinStatusInfo');
@@ -474,6 +618,9 @@
 
             if (!student || !hidden.value) {
                 packageSelect.innerHTML = '<option value="">Select package...</option>';
+                renderWalkinPackageCards();
+                renderWalkinPaymentTypeCards();
+                syncWalkinPaymentTypeCardSelection();
                 instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
                 if (statusEl) statusEl.textContent = '';
                 if (submitBtn) submitBtn.disabled = false;
@@ -490,12 +637,19 @@
 
             walkinMeta = meta;
             const packages = Array.isArray(meta.packages) ? meta.packages : [];
+            const previousValue = String(packageSelect.value || '');
             packageSelect.innerHTML = '<option value="">Select package...</option>' + packages.map(pkg => {
                 const sessions = Number(pkg.sessions || 0);
                 const maxInst = Number(pkg.max_instruments || 1);
                 const price = formatCurrencyPHP(pkg.price || 0);
                 return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''}) - ${price}</option>`;
             }).join('');
+            if (previousValue && packages.some(pkg => String(pkg.package_id) === previousValue)) {
+                packageSelect.value = previousValue;
+            }
+            renderWalkinPackageCards();
+            renderWalkinPaymentTypeCards();
+            syncWalkinPaymentTypeCardSelection();
 
             const latest = meta.latest_request || null;
             const hasPending = latest && String(latest.status || '') === 'Pending';
@@ -512,6 +666,7 @@
             const modal = document.getElementById('walkinEnrollmentModal');
             if (!modal) return;
             loadWalkinStudents();
+            document.body.style.overflow = 'hidden';
             modal.classList.remove('hidden');
             modal.classList.add('flex');
         }
@@ -524,6 +679,7 @@
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
             }
+            document.body.style.overflow = '';
             if (form) form.reset();
             walkinMeta = null;
             if (submitBtn) submitBtn.disabled = false;
@@ -536,6 +692,9 @@
             if (searchInput) searchInput.value = '';
             if (hiddenSelect) hiddenSelect.value = '';
             if (packageSelect) packageSelect.innerHTML = '<option value="">Select package...</option>';
+            renderWalkinPackageCards();
+            renderWalkinPaymentTypeCards();
+            syncWalkinPaymentTypeCardSelection();
             if (instrumentsContainer) instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
             updateWalkinSelectedStudentCard(null);
             renderWalkinStudentResults('');
@@ -553,18 +712,42 @@
             const price = Number(selected?.getAttribute('data-price') || 0);
             const sessions = Number(selected?.getAttribute('data-sessions') || 0);
             const paymentType = String(paymentTypeEl.value || 'Partial Payment');
+            syncWalkinPackageCardSelection();
+            syncWalkinPaymentTypeCardSelection();
             const registrationFeeDue = typeof getRegistrationFeeDueAmount === 'function'
                 ? getRegistrationFeeDueAmount(walkinMeta?.student || null)
                 : 1000;
+            const partialDeposit = 5000;
             const partialAmount = computeStudentRequestPayableNow(price, sessions, 'Partial Payment');
             const fullAmount = computeStudentRequestPayableNow(price, sessions, 'Full Payment');
-            const installmentAmount = computeStudentRequestPayableNow(price, sessions, 'Installment');
             const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType, registrationFeeDue);
             const enrollmentNow = computeStudentRequestPayableNow(price, sessions, paymentType);
-            const selectedLabel = paymentType === 'Full Payment'
-                ? 'Full Payment'
-                : (paymentType === 'Installment' ? 'Installment (est. per session)' : 'Partial Payment');
-            amountEl.innerHTML = `Estimated package amount: <span class="font-bold">${formatCurrencyPHP(price)}</span><br>Registration fee due: <span class="font-bold">${formatCurrencyPHP(registrationFeeDue)}</span><br>Enrollment fee (${escapeHtml(selectedLabel)}): <span class="font-bold">${formatCurrencyPHP(enrollmentNow)}</span><br>Full Payment: <span class="font-bold">${formatCurrencyPHP(fullAmount)}</span> | Partial Payment: <span class="font-bold">${formatCurrencyPHP(partialAmount)}</span><br>Installment (est./session): <span class="font-bold">${formatCurrencyPHP(installmentAmount)}</span><br>Total due now (${escapeHtml(selectedLabel)}): <span class="font-bold">${formatCurrencyPHP(payableNow)}</span>`;
+            const summaryLabel = paymentType === 'Full Payment' ? 'Full Payment' : 'Partial Deposit';
+            amountEl.innerHTML = `
+                <div class="space-y-0">
+                    <div class="walkin-summary-row">
+                        <div>
+                            <div class="walkin-summary-label">Package Amount</div>
+                            <div class="walkin-summary-subtext">(${escapeHtml(selected?.textContent?.split(' (')[0] || 'Selected package')})</div>
+                        </div>
+                        <div class="walkin-summary-value">${formatCurrencyPHP(price)}</div>
+                    </div>
+                    <div class="walkin-summary-row">
+                        <div class="walkin-summary-label">Registration Fee</div>
+                        <div class="walkin-summary-value">${formatCurrencyPHP(registrationFeeDue)}</div>
+                    </div>
+                    <div class="walkin-summary-row">
+                        <div class="walkin-summary-label">${escapeHtml(summaryLabel)}</div>
+                        <div class="walkin-summary-value">${formatCurrencyPHP(enrollmentNow)}</div>
+                    </div>
+                    <div class="walkin-summary-total">
+                        <div class="walkin-summary-label">Total Due Now</div>
+                        <div class="walkin-summary-value">${formatCurrencyPHP(payableNow)}</div>
+                    </div>
+                    ${paymentType === 'Partial Payment'
+                        ? `<div class="walkin-summary-balance">Remaining balance: ${formatCurrencyPHP(Math.max(price - partialDeposit, 0))}</div>`
+                        : ''}
+                </div>`;
             instrumentsContainer.innerHTML = maxInst > 0
                 ? renderStudentRequestInstrumentSelectors(maxInst, walkinMeta?.instruments || [])
                 : '<div class="text-sm text-slate-500">Select a package first.</div>';
@@ -597,7 +780,10 @@
             const packageSelect = document.getElementById('walkinPackageSelect');
             const paymentTypeEl = document.getElementById('walkinPaymentType');
             const paymentMethodEl = document.getElementById('walkinPaymentMethod');
-            if (!studentSelect || !packageSelect || !paymentTypeEl || !paymentMethodEl) return;
+            if (!studentSelect || !packageSelect || !paymentTypeEl || !paymentMethodEl) {
+                console.error('[Walk-in Enrollment] Missing required form elements');
+                return;
+            }
 
             const selectedStudent = resolveWalkinSelectedStudent();
             const email = studentSelect.value || '';
@@ -610,18 +796,49 @@
                 .filter(value => !Number.isNaN(value) && value > 0);
             const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
 
+            console.log('[Walk-in Enrollment Debug]', {
+                email,
+                studentId,
+                packageId,
+                paymentType,
+                paymentMethod,
+                instrumentIds,
+                uniqueInstrumentIds
+            });
+
             if (!email || !studentId || !packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
-                showMessage('Please complete student, package, instruments, payment type, and payment method.', 'error');
+                showToast('Please complete student, package, instruments, payment type, and payment method.', 'error');
+                console.error('[Walk-in Enrollment] Validation failed: missing required fields');
+                return;
+            }
+            if (instrumentIds.length !== uniqueInstrumentIds.length) {
+                showToast('Each selected instrument must be unique. Please change the duplicate selection.', 'error');
+                console.error('[Walk-in Enrollment] Validation failed: duplicate instruments');
+                return;
+            }
+
+            // Validate that no two instrument slots share the same type
+            const typeSelects = Array.from(document.querySelectorAll('#walkinInstrumentsContainer .student-request-instrument-type'));
+            const selectedTypeIds = typeSelects.map(el => String(el.value || '').trim()).filter(Boolean);
+            
+            console.log('[Walk-in Enrollment Type Check]', { typeSelects: typeSelects.length, selectedTypeIds });
+            
+            // Only check for duplicate types if there are multiple types selected
+            if (selectedTypeIds.length > 1 && selectedTypeIds.length !== new Set(selectedTypeIds).size) {
+                showToast('Each instrument slot must have a different instrument type. Please change the duplicate type selection.', 'error');
+                console.error('[Walk-in Enrollment] Validation failed: duplicate types');
                 return;
             }
 
             const selectedOption = packageSelect.options[packageSelect.selectedIndex];
             const maxInst = Number(selectedOption?.getAttribute('data-max-instruments') || 1);
             if (uniqueInstrumentIds.length > maxInst) {
-                showMessage(`You can select up to ${maxInst} instrument(s) for this package.`, 'error');
+                showToast(`You can select up to ${maxInst} instrument(s) for this package.`, 'error');
+                console.error('[Walk-in Enrollment] Validation failed: too many instruments');
                 return;
             }
 
+            console.log('[Walk-in Enrollment] Validation passed, submitting...');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
 
@@ -639,15 +856,18 @@
                 if (response.success) {
                     closeWalkinEnrollmentModal();
                     await Promise.all([loadPendingRequests(), loadActiveStudents(), loadWalkinStudents()]);
-                    showMessage(response.message || 'Walk-in enrollment submitted.', 'success');
-                    if (response.request_id) {
-                        window.location.href = `desk_sessions.html?page=sessions&view=pending&assign_request_id=${response.request_id}`;
-                    }
+                    showToast(response.message || 'Walk-in enrollment submitted successfully.', 'success');
+                    // Stay on the current page and show pending enrollments
+                    const viewUrl = new URL(window.location.href);
+                    viewUrl.searchParams.set('view', 'pending');
+                    window.history.replaceState({}, '', viewUrl.toString());
+                    applySessionView();
                 } else {
-                    showMessage(response.error || 'Failed to submit walk-in enrollment.', 'error');
+                    showToast(response.error || 'Failed to submit walk-in enrollment.', 'error');
                 }
             } catch (error) {
-                showMessage('Network error. Please try again.', 'error');
+                console.error('[Walk-in Enrollment] Network error:', error);
+                showToast('Network error. Please try again.', 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit Walk-In Enrollment';
@@ -2160,6 +2380,16 @@
             document.getElementById('walkinEnrollmentForm')?.addEventListener('submit', submitWalkinEnrollment);
             document.getElementById('walkinStudentSearch')?.addEventListener('input', handleWalkinStudentChange);
             document.getElementById('walkinStudentSearch')?.addEventListener('change', handleWalkinStudentChange);
+            document.getElementById('walkinPackageCards')?.addEventListener('click', (event) => {
+                const button = event.target.closest('.walkin-package-card');
+                if (!button) return;
+                selectWalkinPackage(button.getAttribute('data-package-id'));
+            });
+            document.getElementById('walkinPaymentTypeCards')?.addEventListener('click', (event) => {
+                const button = event.target.closest('.walkin-choice-card');
+                if (!button) return;
+                selectWalkinPaymentType(button.getAttribute('data-payment-type'));
+            });
             document.getElementById('walkinStudentResults')?.addEventListener('click', async (event) => {
                 const button = event.target.closest('.walkin-student-result');
                 if (!button) return;
@@ -2168,6 +2398,8 @@
                 if (!student) return;
                 await selectWalkinStudent(student);
             });
+            renderWalkinPaymentTypeCards();
+            syncWalkinPaymentTypeCardSelection();
             document.getElementById('walkinClearStudentBtn')?.addEventListener('click', async () => {
                 const input = document.getElementById('walkinStudentSearch');
                 const hidden = document.getElementById('walkinStudentSelect');
@@ -2184,6 +2416,9 @@
                 walkinMeta = null;
                 updateWalkinSelectedStudentCard(null);
                 renderWalkinStudentResults('');
+                renderWalkinPackageCards();
+                renderWalkinPaymentTypeCards();
+                syncWalkinPaymentTypeCardSelection();
                 updateWalkinPackageUI();
             });
             document.getElementById('walkinPackageSelect')?.addEventListener('change', updateWalkinPackageUI);

@@ -2440,7 +2440,10 @@ class StudentsApi
                     sp.package_name,
                     sp.sessions,
                     sp.max_instruments,
-                    s.created_at
+                    s.created_at,
+                    COALESCE(enr.latest_enrollment_status, '') AS enrollment_status,
+                    COALESCE(enr.has_active_enrollment, 0) AS has_active_enrollment,
+                    COALESCE(enr.has_completed_enrollment, 0) AS has_completed_enrollment
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
                 LEFT JOIN tbl_session_packages sp ON s.session_package_id = sp.package_id
@@ -2456,6 +2459,18 @@ class StudentsApi
                     FROM tbl_registration_payments rp
                     GROUP BY rp.student_id
                 ) rf ON rf.student_id = s.student_id
+                LEFT JOIN (
+                    SELECT
+                        e.student_id,
+                        MAX(CASE WHEN e.status IN ('Active','Pending') THEN 1 ELSE 0 END) AS has_active_enrollment,
+                        MAX(CASE WHEN e.status = 'Completed' THEN 1 ELSE 0 END) AS has_completed_enrollment,
+                        (SELECT e2.status FROM tbl_enrollments e2
+                         WHERE e2.student_id = e.student_id
+                         ORDER BY e2.enrollment_id DESC LIMIT 1) AS latest_enrollment_status
+                    FROM tbl_enrollments e
+                    GROUP BY e.student_id
+                ) enr ON enr.student_id = s.student_id
+                WHERE 1=1
             ";
         } else {
             $sql = "
@@ -2472,7 +2487,10 @@ class StudentsApi
                     s.branch_id,
                     " . ($hasRegistrationSourceCol ? "s.registration_source" : "'online'") . " AS registration_source,
                     b.branch_name,
-                    s.created_at
+                    s.created_at,
+                    COALESCE(enr.latest_enrollment_status, '') AS enrollment_status,
+                    COALESCE(enr.has_active_enrollment, 0) AS has_active_enrollment,
+                    COALESCE(enr.has_completed_enrollment, 0) AS has_completed_enrollment
                 FROM tbl_students s
                 LEFT JOIN tbl_branches b ON s.branch_id = b.branch_id
                 LEFT JOIN (
@@ -2487,6 +2505,18 @@ class StudentsApi
                     FROM tbl_registration_payments rp
                     GROUP BY rp.student_id
                 ) rf ON rf.student_id = s.student_id
+                LEFT JOIN (
+                    SELECT
+                        e.student_id,
+                        MAX(CASE WHEN e.status IN ('Active','Pending') THEN 1 ELSE 0 END) AS has_active_enrollment,
+                        MAX(CASE WHEN e.status = 'Completed' THEN 1 ELSE 0 END) AS has_completed_enrollment,
+                        (SELECT e2.status FROM tbl_enrollments e2
+                         WHERE e2.student_id = e.student_id
+                         ORDER BY e2.enrollment_id DESC LIMIT 1) AS latest_enrollment_status
+                    FROM tbl_enrollments e
+                    GROUP BY e.student_id
+                ) enr ON enr.student_id = s.student_id
+                WHERE 1=1
             ";
         }
 
