@@ -228,6 +228,11 @@
             setSelectedSpecializationIds([]);
             if (title) title.textContent = 'Add Teacher';
             if (subtitle) subtitle.textContent = 'Set profile details, specializations, and portal login.';
+            // Hide status field — new teachers are always Active
+            const statusWrapper = document.getElementById('statusFieldWrapper');
+            const statusHidden  = document.getElementById('statusHidden');
+            if (statusWrapper) statusWrapper.classList.add('hidden');
+            if (statusHidden)  statusHidden.value = 'Active';
             if (window.TeacherFormUI) {
                 TeacherFormUI.setAccountMode('real_email', false);
                 TeacherFormUI.previewSystemLogin();
@@ -258,6 +263,9 @@
             document.getElementById('status').value = t.status || 'Active';
             document.getElementById('teacherModalTitle').textContent = 'Edit Teacher';
             document.getElementById('teacherModalSubtitle').textContent = 'Update teacher profile and specializations.';
+            // Show status field in edit mode
+            const statusWrapper = document.getElementById('statusFieldWrapper');
+            if (statusWrapper) statusWrapper.classList.remove('hidden');
             if (window.TeacherFormUI) {
                 TeacherFormUI.setAccountMode('real_email', true);
             }
@@ -333,7 +341,9 @@
                 specialization_ids: getSelectedSpecializationIds(),
                 email: document.getElementById('email').value.trim(),
                 phone: document.getElementById('phone').value.trim(),
-                status: document.getElementById('status').value,
+                status: isEdit
+                    ? document.getElementById('status').value
+                    : (document.getElementById('statusHidden')?.value || 'Active'),
                 ...(window.TeacherFormUI ? TeacherFormUI.getAccountModePayload(isEdit) : {})
             };
             const endpoint = isEdit ? 'update-teacher' : 'add-teacher';

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Grading | Father & Sons</title>
+    <title>Session Grades | Father & Sons</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -12,7 +12,7 @@
             theme: {
                 extend: {
                     colors: {
-                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        gold: { 50:'#fdfaf1', 100:'#f9f1d5', 400:'#d4af37', 500:'#b8860b', 600:'#996515' },
                         obsidian: '#0f1115',
                         darkSlate: '#1a1d23'
                     },
@@ -22,38 +22,43 @@
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background: #f0f4f8; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #f7f8fa; color: #111827; }
         .dark-glass { background: rgba(15,17,21,0.95); backdrop-filter: blur(12px); }
 
-        /* Score button group */
-        .score-btn { transition: all .15s ease; }
-        .score-btn.active { transform: scale(1.06); }
-        .score-btn-1.active  { background:#fee2e2; border-color:#f87171; color:#b91c1c; }
-        .score-btn-2.active  { background:#ffedd5; border-color:#fb923c; color:#c2410c; }
-        .score-btn-3.active  { background:#fef9c3; border-color:#facc15; color:#92400e; }
-        .score-btn-4.active  { background:#dcfce7; border-color:#4ade80; color:#15803d; }
-        .score-btn-5.active  { background:#d1fae5; border-color:#34d399; color:#065f46; }
+        /* Score buttons */
+        .score-btn { transition: all .12s ease; cursor: pointer; }
+        .score-btn.active { transform: scale(1.03); }
+        .score-btn-1.active { background:#fee2e2; border-color:#f87171; color:#b91c1c; }
+        .score-btn-2.active { background:#ffedd5; border-color:#fb923c; color:#c2410c; }
+        .score-btn-3.active { background:#fef9c3; border-color:#facc15; color:#92400e; }
+        .score-btn-4.active { background:#dcfce7; border-color:#4ade80; color:#15803d; }
+        .score-btn-5.active { background:#d1fae5; border-color:#34d399; color:#065f46; }
 
-        /* Session card selected state */
-        .session-card-selected { border-color: #d4af37 !important; background: #fdfaf1 !important; }
+        /* Session list */
+        .session-card { transition: background .12s, border-color .12s; }
+        .session-card:hover { background: #f9fafb; }
+        .session-card.is-selected { background: #f0fdf4; border-color: #0d9488 !important; }
 
-        /* Custom scrollbar */
-        .nice-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
-        .nice-scroll::-webkit-scrollbar { width: 5px; }
-        .nice-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        /* Scrollbar */
+        .scroll-thin { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
+        .scroll-thin::-webkit-scrollbar { width: 4px; }
+        .scroll-thin::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
 
-        /* Smooth fade for panels */
-        .panel-fade { animation: fadeIn .2s ease; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+        /* Sticky panel on desktop */
+        @media (min-width: 1024px) { .sticky-panel { position: sticky; top: 82px; } }
 
-        /* Sticky session list on desktop */
-        @media (min-width: 1024px) {
-            .sticky-list { position: sticky; top: 80px; }
-        }
+        /* Criteria input */
+        .criteria-name-input:focus { outline: none; border-color: #6366f1; }
+
+        /* Fade in */
+        .fade-in { animation: fadeIn .18s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+        /* Sidebar active */
     </style>
 </head>
-<body class="text-slate-900 antialiased">
+<body class="antialiased">
 
 <!-- ── Navbar ── -->
 <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-6 py-3 flex justify-between items-center shadow-2xl">
@@ -138,339 +143,243 @@
     </div>
 </aside>
 
-<!-- ══════════════════════════════════════════════════════ MAIN ══ -->
+<!-- ══════════════════════════════════════════ MAIN ══ -->
 <main class="lg:ml-72 pt-28 p-6 md:p-8">
 <div class="max-w-7xl mx-auto space-y-6">
 
-    <!-- ── Page header ── -->
-    <div class="rounded-3xl bg-gradient-to-br from-obsidian via-darkSlate to-slate-800 px-6 py-6 text-white shadow-xl">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <p class="text-xs uppercase tracking-widest text-gold-400 font-bold mb-1">Instructor Tools</p>
-                <h1 class="text-2xl sm:text-3xl font-black tracking-tight">Student Grading</h1>
-                <p class="mt-1.5 text-sm text-slate-300 max-w-lg">
-                    A session must be attended (<span class="text-emerald-400 font-semibold">Present</span>) before you can grade it.
-                    Once graded, the card shows a <span class="text-gold-400 font-semibold">⭐ Graded</span> badge.
-                </p>
-            </div>
-            <!-- Quick-status legend -->
-            <div class="flex flex-wrap gap-2 text-[11px] font-semibold shrink-0">
-                <span class="flex items-center gap-1.5 bg-white/10 rounded-full px-3 py-1"><span class="w-2 h-2 rounded-full bg-sky-400 inline-block"></span>Scheduled</span>
-                <span class="flex items-center gap-1.5 bg-white/10 rounded-full px-3 py-1"><span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>Present</span>
-                <span class="flex items-center gap-1.5 bg-white/10 rounded-full px-3 py-1"><span class="w-2 h-2 rounded-full bg-[#d4af37] inline-block"></span>Graded</span>
-                <span class="flex items-center gap-1.5 bg-white/10 rounded-full px-3 py-1"><span class="w-2 h-2 rounded-full bg-rose-400 inline-block"></span>Absent</span>
-            </div>
+    <!-- Page title row -->
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-6">
+        <div>
+            <p class="text-xs font-bold uppercase tracking-widest text-teal-600 mb-1">Teacher Workspace</p>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Session grades</h1>
+        </div>
+        <p class="text-sm text-gray-400">A simple step-by-step record for each student.</p>
+    </div>
+
+    <!-- Quick stats -->
+    <div class="grid grid-cols-3 gap-3 mb-6">
+        <div class="bg-white rounded-2xl border border-gray-100 px-4 py-3 shadow-sm">
+            <p class="text-xs text-gray-400 font-medium">Sessions</p>
+            <p id="statSessionsInView" class="text-xl font-black text-gray-900 mt-0.5">—</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 px-4 py-3 shadow-sm">
+            <p class="text-xs text-gray-400 font-medium">Graded</p>
+            <p id="statGradedSessions" class="text-xl font-black text-teal-600 mt-0.5">—</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 px-4 py-3 shadow-sm">
+            <p class="text-xs text-gray-400 font-medium">Avg Score</p>
+            <p id="statAverageScore" class="text-xl font-black text-gray-900 mt-0.5">—</p>
         </div>
     </div>
 
-    <!-- ── Stats ── -->
-    <div class="grid grid-cols-3 gap-3 sm:gap-4">
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col items-center text-center shadow-sm">
-            <div class="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center mb-2">
-                <i class="fas fa-clipboard-list text-slate-500"></i>
-            </div>
-            <p id="statSessionsInView" class="text-2xl font-black text-slate-900">—</p>
-            <p class="text-xs text-slate-400 mt-0.5 leading-tight">Sessions</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col items-center text-center shadow-sm">
-            <div class="w-10 h-10 rounded-2xl bg-gold-100 flex items-center justify-center mb-2">
-                <i class="fas fa-star text-gold-500"></i>
-            </div>
-            <p id="statGradedSessions" class="text-2xl font-black text-slate-900">—</p>
-            <p class="text-xs text-slate-400 mt-0.5 leading-tight">Graded</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col items-center text-center shadow-sm">
-            <div class="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center mb-2">
-                <i class="fas fa-chart-line text-emerald-500"></i>
-            </div>
-            <p id="statAverageScore" class="text-2xl font-black text-slate-900">—</p>
-            <p class="text-xs text-slate-400 mt-0.5 leading-tight">Avg Score</p>
-        </div>
-    </div>
-
-    <!-- ── Filters ── -->
-    <div class="flex flex-col sm:flex-row gap-3">
-        <select id="gradeFilter" class="flex-1 sm:flex-none sm:w-52 rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 focus:outline-none focus:border-gold-400 transition-colors">
-            <option value="all">📋 All Sessions</option>
-            <option value="completed">✅ Ready to Grade (Present)</option>
-            <option value="graded">⭐ Already Graded</option>
-            <option value="ungraded">📝 Needs Grade</option>
+    <!-- Filters -->
+    <div class="flex flex-col sm:flex-row gap-2 mb-5">
+        <select id="gradeFilter" class="sm:w-52 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:border-teal-500 transition-colors">
+            <option value="all">All Sessions</option>
+            <option value="completed">Ready to Grade</option>
+            <option value="graded">Already Graded</option>
+            <option value="ungraded">Needs Grade</option>
         </select>
         <div class="relative flex-1">
-            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-            <input id="gradeSearch" type="text" placeholder="Search by student name or instrument…"
-                class="w-full pl-11 pr-4 py-3 rounded-2xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:border-gold-400 transition-colors">
+            <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 text-sm"></i>
+            <input id="gradeSearch" type="text" placeholder="Search student or instrument…"
+                class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-teal-500 transition-colors">
         </div>
     </div>
 
-    <!-- ── Two-column layout on desktop ── -->
-    <div class="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 items-start">
+    <!-- Two-column layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5 items-start">
 
-        <!-- ════ SESSION LIST ════ -->
-        <div class="sticky-list">
-            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
-                    <div class="flex items-center gap-2">
-                        <i class="fas fa-list-ul text-gold-500 text-sm"></i>
-                        <h2 class="text-sm font-bold text-slate-800">Session Queue</h2>
+        <!-- ══ LEFT: Session list ══ -->
+        <div class="sticky-panel">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-700">Today's sessions</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Choose a student to grade</p>
                     </div>
-                    <span id="sessionGradeCount" class="text-xs font-semibold text-slate-400 bg-slate-100 rounded-full px-2.5 py-0.5">—</span>
+                    <span id="sessionGradeCount" class="text-xs font-bold text-teal-600 bg-teal-50 rounded-full px-2 py-0.5">—</span>
                 </div>
-                <div id="sessionGradeList" class="nice-scroll overflow-y-auto p-3 space-y-2" style="max-height: 70vh;"></div>
+                <div id="sessionGradeList" class="scroll-thin overflow-y-auto divide-y divide-gray-50" style="max-height:72vh;"></div>
             </div>
         </div>
 
-        <!-- ════ RIGHT COLUMN ════ -->
-        <div class="space-y-5">
-
-            <!-- ── Grade Form ── -->
-            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <!-- ══ RIGHT: Grade form ══ -->
+        <div>
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden fade-in">
 
                 <!-- Form header -->
-                <div class="px-5 sm:px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <h2 class="text-lg font-bold text-slate-900">Grade This Session</h2>
-                            <p id="gradeFormSubtitle" class="text-sm text-slate-500 mt-0.5">Select a session from the left to get started.</p>
-                        </div>
-                        <div id="gradeAverageBadge" class="hidden items-center gap-1 bg-gold-100 text-gold-700 text-xs font-black px-3 py-1.5 rounded-full border border-gold-300 shrink-0">
-                            <i class="fas fa-star text-[10px]"></i>
-                            <span></span>
-                        </div>
-                    </div>
+                <div class="px-6 py-5 border-b border-gray-100">
+                    <p class="text-xs font-bold text-teal-600 uppercase tracking-widest mb-1">Session grading</p>
+                    <h2 id="gradeStudentHeading" class="text-xl font-bold text-gray-900">Select a session</h2>
+                    <p id="gradeSessionMeta" class="text-sm text-gray-400 mt-0.5">—</p>
                 </div>
 
-                <div class="px-5 sm:px-6 py-5 space-y-5">
-                    <!-- Lock banner -->
-                    <div id="gradeLockBanner" class="hidden rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
-                        <div class="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-                            <i class="fas fa-lock text-amber-500 text-sm"></i>
-                        </div>
-                        <div>
-                            <p class="text-sm font-bold text-amber-800">Grading Locked</p>
-                            <p id="gradeLockMsg" class="text-xs text-amber-700 mt-0.5 leading-relaxed"></p>
-                        </div>
-                    </div>
+                <div class="px-6 py-6 space-y-7">
 
-                    <div id="gradeMessage" class="hidden rounded-2xl border px-4 py-3 text-sm font-medium"></div>
+                    <!-- Status message -->
+                    <div id="gradeMessage" class="hidden rounded-xl border px-4 py-3 text-sm font-medium"></div>
 
-                    <form id="gradingForm" class="space-y-5">
+                    <form id="gradingForm" class="space-y-7">
                         <input type="hidden" id="sessionIdInput">
+                        <input type="hidden" id="gradeStudentName">
+                        <input type="hidden" id="gradeFormSubtitle">
 
-                        <!-- Student info cards -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div class="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">👤 Student</p>
-                                <p id="gradeStudentName" class="text-sm font-semibold text-slate-800">—</p>
-                            </div>
-                            <div class="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">📅 Session Date</p>
-                                <p id="gradeSessionMeta" class="text-sm font-semibold text-slate-800">—</p>
+                        <!-- ── Step 1: Attendance ── -->
+                        <section>
+                            <p class="text-base font-semibold text-gray-800 mb-1">Attendance</p>
+                            <p class="text-sm text-gray-400 mb-3" id="attendanceSectionDesc">Session attendance status.</p>
+                            <!-- Dynamic attendance UI rendered by JS here -->
+                            <div id="attendanceControl"></div>
+                        </section>
+
+                        <!-- Lock banner (shown when not present) -->
+                        <div id="gradeLockBanner" class="hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
+                            <i class="fas fa-lock text-amber-400 text-sm shrink-0"></i>
+                            <div>
+                                <p class="text-sm font-semibold text-amber-800">Grading is not ready yet</p>
+                                <p id="gradeLockMsg" class="text-xs text-amber-600 mt-0.5">Select Present to continue.</p>
                             </div>
                         </div>
 
-                        <!-- Skill level -->
-                        <div>
-                            <label for="skillLevelInput" class="block text-sm font-bold text-slate-700 mb-2">
-                                🎯 Overall Skill Level
-                            </label>
-                            <select id="skillLevelInput" required
-                                class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:border-gold-400 transition-colors">
+                        <!-- ── Step 2: Overall level ── -->
+                        <section>
+                            <p class="text-base font-semibold text-gray-800 mb-1">Overall level</p>
+                            <p class="text-sm text-gray-400 mb-3">Choose the best overall description.</p>
+                            <select id="skillLevelInput"
+                                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:border-teal-500 transition-colors appearance-none">
                                 <option value="">Choose a level…</option>
-                                <option value="Needs Improvement">🔴 Needs Improvement</option>
-                                <option value="Developing">🟠 Developing</option>
-                                <option value="Good">🟡 Good</option>
-                                <option value="Very Good">🟢 Very Good</option>
-                                <option value="Excellent">⭐ Excellent</option>
+                                <option value="Needs Improvement">Needs Improvement</option>
+                                <option value="Developing">Developing</option>
+                                <option value="Good">Good</option>
+                                <option value="Very Good">Very Good</option>
+                                <option value="Excellent">Excellent</option>
                             </select>
-                        </div>
+                        </section>
 
-                        <!-- Score fields — mobile: stacked, desktop: 2-col -->
-                        <div>
-                            <p class="text-sm font-bold text-slate-700 mb-3">📊 Performance Scores <span class="text-xs font-normal text-slate-400">(tap a number)</span></p>
-                            <div class="space-y-4">
-
-                                <!-- Performance -->
+                        <!-- ── Step 3: Performance scores ── -->
+                        <section>
+                            <div class="flex items-center justify-between mb-3">
                                 <div>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <label class="text-sm font-semibold text-slate-700">🎵 Performance</label>
-                                        <span id="perfLabel" class="text-xs font-bold text-slate-400">—</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button type="button" data-field="performanceScoreInput" data-val="1" class="score-btn score-btn-1 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white hover:bg-red-50 hover:border-red-300">1</button>
-                                        <button type="button" data-field="performanceScoreInput" data-val="2" class="score-btn score-btn-2 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white hover:bg-orange-50 hover:border-orange-300">2</button>
-                                        <button type="button" data-field="performanceScoreInput" data-val="3" class="score-btn score-btn-3 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white hover:bg-yellow-50 hover:border-yellow-300">3</button>
-                                        <button type="button" data-field="performanceScoreInput" data-val="4" class="score-btn score-btn-4 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white hover:bg-green-50 hover:border-green-300">4</button>
-                                        <button type="button" data-field="performanceScoreInput" data-val="5" class="score-btn score-btn-5 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white hover:bg-emerald-50 hover:border-emerald-300">5</button>
-                                    </div>
-                                    <input type="hidden" id="performanceScoreInput">
+                                    <p class="text-base font-semibold text-gray-800">Performance Scores</p>
+                                    <p class="text-sm text-gray-400 mt-0.5">Rate the student on each criterion.</p>
                                 </div>
-
-                                <!-- Technique -->
-                                <div>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <label class="text-sm font-semibold text-slate-700">🤲 Technique</label>
-                                        <span id="techLabel" class="text-xs font-bold text-slate-400">—</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button type="button" data-field="techniqueScoreInput" data-val="1" class="score-btn score-btn-1 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">1</button>
-                                        <button type="button" data-field="techniqueScoreInput" data-val="2" class="score-btn score-btn-2 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">2</button>
-                                        <button type="button" data-field="techniqueScoreInput" data-val="3" class="score-btn score-btn-3 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">3</button>
-                                        <button type="button" data-field="techniqueScoreInput" data-val="4" class="score-btn score-btn-4 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">4</button>
-                                        <button type="button" data-field="techniqueScoreInput" data-val="5" class="score-btn score-btn-5 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">5</button>
-                                    </div>
-                                    <input type="hidden" id="techniqueScoreInput">
-                                </div>
-
-                                <!-- Rhythm -->
-                                <div>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <label class="text-sm font-semibold text-slate-700">🥁 Rhythm & Timing</label>
-                                        <span id="rhythmLabel" class="text-xs font-bold text-slate-400">—</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button type="button" data-field="rhythmScoreInput" data-val="1" class="score-btn score-btn-1 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">1</button>
-                                        <button type="button" data-field="rhythmScoreInput" data-val="2" class="score-btn score-btn-2 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">2</button>
-                                        <button type="button" data-field="rhythmScoreInput" data-val="3" class="score-btn score-btn-3 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">3</button>
-                                        <button type="button" data-field="rhythmScoreInput" data-val="4" class="score-btn score-btn-4 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">4</button>
-                                        <button type="button" data-field="rhythmScoreInput" data-val="5" class="score-btn score-btn-5 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">5</button>
-                                    </div>
-                                    <input type="hidden" id="rhythmScoreInput">
-                                </div>
-
-                                <!-- Focus -->
-                                <div>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <label class="text-sm font-semibold text-slate-700">🧠 Focus & Discipline</label>
-                                        <span id="focusLabel" class="text-xs font-bold text-slate-400">—</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button type="button" data-field="focusScoreInput" data-val="1" class="score-btn score-btn-1 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">1</button>
-                                        <button type="button" data-field="focusScoreInput" data-val="2" class="score-btn score-btn-2 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">2</button>
-                                        <button type="button" data-field="focusScoreInput" data-val="3" class="score-btn score-btn-3 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">3</button>
-                                        <button type="button" data-field="focusScoreInput" data-val="4" class="score-btn score-btn-4 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">4</button>
-                                        <button type="button" data-field="focusScoreInput" data-val="5" class="score-btn score-btn-5 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">5</button>
-                                    </div>
-                                    <input type="hidden" id="focusScoreInput">
-                                </div>
-
-                                <!-- Assignment -->
-                                <div>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <label class="text-sm font-semibold text-slate-700">📚 Assignment & Practice</label>
-                                        <span id="assignLabel" class="text-xs font-bold text-slate-400">—</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button type="button" data-field="assignmentScoreInput" data-val="1" class="score-btn score-btn-1 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">1</button>
-                                        <button type="button" data-field="assignmentScoreInput" data-val="2" class="score-btn score-btn-2 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">2</button>
-                                        <button type="button" data-field="assignmentScoreInput" data-val="3" class="score-btn score-btn-3 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">3</button>
-                                        <button type="button" data-field="assignmentScoreInput" data-val="4" class="score-btn score-btn-4 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">4</button>
-                                        <button type="button" data-field="assignmentScoreInput" data-val="5" class="score-btn score-btn-5 flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 bg-white">5</button>
-                                    </div>
-                                    <input type="hidden" id="assignmentScoreInput">
-                                </div>
-
+                                <button type="button" id="editCriteriaBtn"
+                                    onclick="toggleEditCriteria()"
+                                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-indigo-600 text-xs font-semibold hover:bg-indigo-50 transition">
+                                    <i class="fas fa-pencil text-[10px]"></i>Edit Criteria
+                                </button>
                             </div>
-                        </div>
+                            <div id="scoreCriteriaContainer" class="space-y-4"></div>
+                        </section>
 
-                        <!-- Score legend -->
-                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-                            <span><b class="text-rose-400">1</b> Poor</span>
-                            <span><b class="text-orange-400">2</b> Fair</span>
-                            <span><b class="text-yellow-500">3</b> Good</span>
-                            <span><b class="text-green-500">4</b> Very Good</span>
-                            <span><b class="text-emerald-500">5</b> Excellent</span>
-                        </div>
+                        <!-- Hidden score inputs -->
+                        <input type="hidden" id="performanceScoreInput">
+                        <input type="hidden" id="techniqueScoreInput">
+                        <input type="hidden" id="rhythmScoreInput">
+                        <input type="hidden" id="focusScoreInput">
+                        <input type="hidden" id="assignmentScoreInput">
 
                         <!-- Average preview -->
-                        <div id="avgPreviewBox" class="hidden rounded-2xl bg-gold-50 border border-gold-200 px-4 py-3 flex items-center justify-between">
-                            <span class="text-sm font-semibold text-gold-800">Average Session Score</span>
-                            <span id="scorePreview" class="text-xl font-black text-gold-700">—</span>
+                        <div id="avgPreviewBox" class="hidden rounded-xl bg-teal-50 border border-teal-100 px-4 py-3 flex items-center justify-between">
+                            <span class="text-sm font-medium text-teal-700">Average score</span>
+                            <span id="scorePreview" class="text-lg font-black text-teal-700">—</span>
                         </div>
 
-                        <!-- Remarks -->
-                        <div>
-                            <label for="remarksInput" class="block text-sm font-bold text-slate-700 mb-2">
-                                💬 Teacher Remarks
-                                <span class="font-normal text-slate-400 text-xs ml-1">(visible to student)</span>
-                            </label>
-                            <textarea id="remarksInput" rows="4"
-                                class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-gold-400 transition-colors resize-none leading-relaxed"
-                                placeholder="Write what went well, what to improve, and what to focus on next session…"></textarea>
+                        <!-- ── Step 4: Remarks ── -->
+                        <section>
+                            <p class="text-base font-semibold text-gray-800 mb-1">Teacher Remarks</p>
+                            <p class="text-sm text-gray-400 mb-3">Optional notes — visible to the student.</p>
+                            <textarea id="remarksInput" rows="3"
+                                placeholder="Write your observations here…"
+                                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-teal-500 transition-colors resize-none leading-relaxed"></textarea>
+                        </section>
+
+                        <!-- Actions row -->
+                        <div class="flex items-center gap-3 pt-1">
+                            <button type="submit" id="saveGradeBtn"
+                                class="flex-1 py-3.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 active:scale-[.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                <i class="fas fa-check text-xs"></i> Save Grade
+                            </button>
+                            <button type="button" id="viewProgressBtn"
+                                onclick="openProgressModal()"
+                                class="px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50 transition hidden">
+                                View Progress
+                            </button>
                         </div>
 
-                        <!-- Save button -->
-                        <button type="submit" id="saveGradeBtn"
-                            class="w-full py-4 rounded-2xl bg-obsidian text-white text-base font-bold hover:bg-slate-800 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg">
-                            <i class="fas fa-save"></i>
-                            Save Session Grade
-                        </button>
+                        <!-- Grade average badge (compact) -->
+                        <div id="gradeAverageBadge" class="hidden justify-end">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">
+                                <i class="fas fa-star text-[9px]"></i><span></span>
+                            </span>
+                        </div>
 
                     </form>
                 </div>
             </div>
+        </div>
 
-            <!-- ── Analytics Panel ── -->
-            <div id="analyticsPanel" class="hidden bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden panel-fade">
-                <div class="px-5 sm:px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-xl bg-gold-100 flex items-center justify-center">
-                            <i class="fas fa-chart-pie text-gold-500 text-sm"></i>
-                        </div>
-                        <div>
-                            <h2 class="text-base font-bold text-slate-900">Student Analytics</h2>
-                            <p id="analyticsStudentLabel" class="text-xs text-slate-400">—</p>
+    </div>
+</div>
+</main>
+
+<!-- ══ Progress modal ══ -->
+<div id="progressModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest text-teal-600 mb-0.5">Student Progress</p>
+                <h3 id="progressModalTitle" class="text-lg font-bold text-gray-900">—</h3>
+                <p id="progressModalSubtitle" class="text-xs text-gray-400 mt-0.5">—</p>
+            </div>
+            <button onclick="closeProgressModal()" class="h-9 w-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition shrink-0">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-6 scroll-thin">
+            <!-- Category bars -->
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">This Session at a Glance</p>
+                <div id="categoryBars" class="space-y-3"></div>
+            </div>
+            <!-- Charts -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Score Over Time</p>
+                    <div class="relative rounded-xl bg-gray-50 border border-gray-100" style="height:180px">
+                        <canvas id="trendChart"></canvas>
+                        <div id="trendEmpty" class="hidden absolute inset-0 flex items-center justify-center text-sm text-gray-400 text-center px-6">
+                            Grade at least 2 sessions to see progress.
                         </div>
                     </div>
-                    <span id="analyticsSessionCount" class="text-xs font-semibold text-slate-400 bg-slate-100 rounded-full px-2.5 py-1 shrink-0"></span>
                 </div>
-
-                <div class="px-5 sm:px-6 py-5 space-y-6">
-
-                    <!-- Charts row -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">This Session's Skills</p>
-                            <div class="relative flex items-center justify-center rounded-2xl bg-slate-50 border border-slate-100" style="height:200px">
-                                <canvas id="radarChart" role="img" aria-label="Skill radar chart"></canvas>
-                                <p id="radarEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-slate-400 text-center px-6">
-                                    <i class="fas fa-chart-radar text-2xl text-slate-200"></i>
-                                    Grade this session to see the skills chart.
-                                </p>
-                            </div>
-                        </div>
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Score Trend Over Time</p>
-                            <div class="relative flex items-center justify-center rounded-2xl bg-slate-50 border border-slate-100" style="height:200px">
-                                <canvas id="trendChart" role="img" aria-label="Score trend chart"></canvas>
-                                <p id="trendEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-slate-400 text-center px-6">
-                                    <i class="fas fa-chart-line text-2xl text-slate-200"></i>
-                                    At least 2 graded sessions needed.
-                                </p>
-                            </div>
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Skills Snapshot</p>
+                    <div class="relative rounded-xl bg-gray-50 border border-gray-100" style="height:180px">
+                        <canvas id="radarChart"></canvas>
+                        <div id="radarEmpty" class="hidden absolute inset-0 flex items-center justify-center text-sm text-gray-400 text-center px-6">
+                            Grade this session to see the snapshot.
                         </div>
                     </div>
-
-                    <!-- Category averages -->
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">All-Time Category Averages</p>
-                        <div id="categoryBars" class="space-y-3"></div>
-                    </div>
-
-                    <!-- Improvement tips -->
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">💡 Focus Areas for Next Session</p>
-                        <div id="improvementTips" class="space-y-3"></div>
-                    </div>
-
                 </div>
             </div>
+            <!-- Tips -->
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Improvement Tips</p>
+                <div id="improvementTips" class="space-y-3"></div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex justify-end">
+            <button onclick="closeProgressModal()" class="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition">Close</button>
+        </div>
+    </div>
+</div>
 
-        </div><!-- /right column -->
-    </div><!-- /grid -->
-
-</div><!-- /container -->
-</main>
+<!-- analyticsStudentLabel / analyticsSessionCount — used by JS -->
+<span id="analyticsStudentLabel" class="hidden"></span>
+<span id="analyticsSessionCount" class="hidden"></span>
+<div id="analyticsPanel" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
@@ -478,7 +387,6 @@
 <script src="../../js/index.js"></script>
 <script src="../../js/instructor/instructor_nav.js"></script>
 <script src="../../js/instructor/grading.js"></script>
-    <script src="../../js/session_timeout.js"></script>
+<script src="../../js/session_timeout.js"></script>
 </body>
 </html>
-

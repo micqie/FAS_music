@@ -516,10 +516,10 @@ class AttendanceApi
         }
 
         $totalSessions = max(0, (int)($enrollment['total_sessions'] ?? 0));
-        if ($totalSessions === 12) return 2;
-        if ($totalSessions === 20) return 3;
-        if ($totalSessions > 20) return 3;
-        return 0;
+        if ($totalSessions <= 12) return 2;
+        if ($totalSessions <= 20) return 3;
+        if ($totalSessions <= 50) return 5;
+        return 5;
     }
 
     private function getScheduleOperationIdByCode($operationCode)
@@ -623,8 +623,8 @@ class AttendanceApi
             return;
         }
 
-        $allowedAbsences = $this->getAllowedAbsencesForEnrollment($enrollment);
-        $freezeThreshold = 3;
+        $allowedAbsences  = $this->getAllowedAbsencesForEnrollment($enrollment);
+        $freezeThreshold  = $allowedAbsences > 0 ? $allowedAbsences : 3; // use policy-based limit; fallback to 3
         $freezeTriggered = false;
         $currentStreak = 0;
         $usedAbsences = 0;
@@ -700,7 +700,8 @@ class AttendanceApi
         }
 
         $stmt = $this->conn->prepare("
-            SELECT enrollment_id, used_absences, consecutive_absences, schedule_status
+            SELECT enrollment_id, used_absences, consecutive_absences, schedule_status,
+                   total_sessions, allowed_absences
             FROM tbl_enrollments
             WHERE student_id = ?
               AND status = 'Active'
@@ -720,11 +721,13 @@ class AttendanceApi
             $enrollment = $stmt->fetch(PDO::FETCH_ASSOC) ?: $enrollment;
         }
 
-        $usedAbsences = (int)($enrollment['used_absences'] ?? 0);
+        $usedAbsences        = (int)($enrollment['used_absences'] ?? 0);
         $consecutiveAbsences = (int)($enrollment['consecutive_absences'] ?? 0);
-        $scheduleStatus = (string)($enrollment['schedule_status'] ?? 'Active');
-        $frozen = strcasecmp($scheduleStatus, 'Frozen') === 0 || $usedAbsences >= 3;
-        $amount = 50;
+        $scheduleStatus      = (string)($enrollment['schedule_status'] ?? 'Active');
+        $freezeThreshold     = $this->getAllowedAbsencesForEnrollment($enrollment);
+        if ($freezeThreshold <= 0) $freezeThreshold = 3; // safe fallback
+        $frozen = strcasecmp($scheduleStatus, 'Frozen') === 0 || $usedAbsences >= $freezeThreshold;
+        $amount = 100;
 
         return [
             'frozen' => $frozen,

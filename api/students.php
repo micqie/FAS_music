@@ -1012,10 +1012,10 @@ class StudentsApi
             }
         }
 
-        if ($sessionCount === 12) return 2;
-        if ($sessionCount === 20) return 3;
-        if ($sessionCount > 20) return 3;
-        return 0;
+        if ($sessionCount <= 12) return 2;
+        if ($sessionCount <= 20) return 3;
+        if ($sessionCount <= 50) return 5;
+        return 5;
     }
 
     private function getScheduleOperationIdByCode($operationCode)
@@ -2837,8 +2837,22 @@ class StudentsApi
                     e.allowed_absences,
                     e.used_absences,
                     e.consecutive_absences,
-                    CASE WHEN COALESCE(e.used_absences, 0) >= 3 THEN 1 ELSE 0 END AS schedule_freeze_required,
-                    CASE WHEN COALESCE(e.used_absences, 0) >= 3 THEN 50 ELSE 0 END AS reservation_fee_amount,
+                    CASE WHEN COALESCE(e.used_absences, 0) >= GREATEST(
+                        CASE
+                            WHEN COALESCE(e.allowed_absences, 0) > 0 THEN e.allowed_absences
+                            WHEN COALESCE(e.total_sessions, 0) <= 12 THEN 2
+                            WHEN COALESCE(e.total_sessions, 0) <= 20 THEN 3
+                            ELSE 5
+                        END, 1)
+                    THEN 1 ELSE 0 END AS schedule_freeze_required,
+                    CASE WHEN COALESCE(e.used_absences, 0) >= GREATEST(
+                        CASE
+                            WHEN COALESCE(e.allowed_absences, 0) > 0 THEN e.allowed_absences
+                            WHEN COALESCE(e.total_sessions, 0) <= 12 THEN 2
+                            WHEN COALESCE(e.total_sessions, 0) <= 20 THEN 3
+                            ELSE 5
+                        END, 1)
+                    THEN 100 ELSE 0 END AS reservation_fee_amount,
                     {$packageSessionsExpr} AS package_sessions,
                     1 AS package_max_instruments,
                     t.first_name AS teacher_first_name,

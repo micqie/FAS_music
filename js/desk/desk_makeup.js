@@ -66,20 +66,39 @@
             const now = new Date();
             return sessionsList.filter(slot => {
                 if (!slot || !slot.session_date) return false;
-                const status = String(slot.status || '').toLowerCase();
-                if (['completed', 'present', 'late', 'cancelled_by_teacher', 'rescheduled'].includes(status)) return false;
+                const status     = String(slot.status || '').toLowerCase();
+                const attStatus  = String(slot.attendance_status || '').toLowerCase();
+
+                // Skip sessions that were completed/attended
+                if (['completed', 'present', 'late'].includes(status)) return false;
+                if (['present', 'late'].includes(attStatus)) return false;
+                if (status === 'cancelled_by_teacher' || status === 'rescheduled') return false;
+
+                // Only count past sessions
                 const sessionDateTime = new Date(`${slot.session_date}T${slot.end_time || slot.start_time || '23:59:59'}`);
                 if (Number.isNaN(sessionDateTime.getTime()) || sessionDateTime > now) return false;
+
                 const sessionKey = normalizeDateKey(slot.session_date);
                 if (sessionKey && attendanceContext.attendedKeys.has(sessionKey)) return false;
                 if (sessionKey && attendanceContext.excusedKeys.has(sessionKey)) return false;
-                return ['absent', 'no show', 'scheduled', 'cancelled'].includes(status) || !status;
+                if (attStatus === 'excused') return false;
+
+                // Count if explicitly absent, or past + no show
+                if (['absent', 'no show', 'ci'].includes(attStatus)) return true;
+                if (['absent', 'no show'].includes(status)) return true;
+
+                // Past session with no attendance recorded = count as absence
+                if (sessionDateTime <= now && (!attStatus || attStatus === 'pending')) return true;
+
+                return false;
             }).length;
         }
 
         function getMakeupThreshold(student) {
             const totalSessions = Number(student?.sessions || 0);
-            return totalSessions >= 20 ? 3 : 2;
+            if (totalSessions <= 12) return 2;
+            if (totalSessions <= 20) return 3;
+            return 5; // 50-session package
         }
 
         function getPendingMakeupSessions(student) {
@@ -92,8 +111,15 @@
             });
         }
 
+        // Show student if:
+        // 1. Any session has makeup_required=1 (DB-confirmed), OR
+        // 2. Absence count meets or exceeds their package threshold
+        //    (catches students whose DB flag hasn't been synced yet)
         function isMakeupRequired(student) {
-            return getPendingMakeupSessions(student).length > 0;
+            if (getPendingMakeupSessions(student).length > 0) return true;
+            const absences = getAbsenceCount(student);
+            const threshold = getMakeupThreshold(student);
+            return absences >= threshold;
         }
 
         function getRemainingCount(student) {
@@ -276,6 +302,125 @@
             });
         }
 
+        function openMakeupReschedulePicker(sessionId, enrollmentId) {
+            const student = makeupRows.find(row => Number(row.enrollment_id) === Number(enrollmentId));
+            const studentName = student
+                ? `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student'
+                : 'Student';
+
+            Swal.fire({
+                title: `Reschedule Make-Up`,
+                text: `Loading available slots for ${studentName}…`,
+                didOpen: async () => {
+                    Swal.showLoading();
+                    try {
+                        const response = await axios.get(`${baseApiUrl}/students.php?action=get-reschedule-slots&session_id=${encodeURIComponent(sessionId)}`);
+                        const data = response.data || {};
+                        const slots = Array.isArray(data.slots) ? data.slots : [];
+
+                        if (!data.success) {
+                            Swal.fire({ icon: 'error', title: 'Cannot Reschedule', text: data.error || 'Unable to load available slots.', confirmButtonColor: '#b8860b' });
+                            return;
+                        }
+                        if (!slots.length) {
+                            Swal.fire({ icon: 'info', title: 'No Slots Available', text: 'No available slots found for this teacher right now. Check teacher availability.', confirmButtonColor: '#b8860b' });
+                            return;
+                        }
+
+                        const inputOptions = {};
+                        slots.forEach((slot, index) => {
+                            const date = formatDateShort(slot.session_date);
+                            const time = slot.start_time ? `${formatTime12Hour(slot.start_time)} – ${formatTime12Hour(slot.end_time)}` : '—';
+                            inputOptions[String(index)] = `${date} · ${slot.day_of_week || ''} · ${time}`;
+                        });
+
+                        Swal.fire({
+                            icon: 'info',
+                            title: `Reschedule Make-Up — ${escapeHtml(studentName)}`,
+                            text: 'Choose a new slot for this make-up session.',
+                            input: 'select',
+                            inputOptions,
+                            inputPlaceholder: 'Select an available slot',
+                            inputValue: '',
+                            showCancelButton: true,
+                            confirmButtonText: 'Confirm Reschedule',
+                            cancelButtonText: 'Cancel',
+                            confirmButtonColor: '#b8860b',
+                            inputValidator: value => (!value && value !== 0) ? 'Please select a slot.' : null
+                        }).then(async result => {
+                            if (!result.isConfirmed) return;
+                            const chosen = slots[Number(result.value)];
+                            if (!chosen) { showMessage('Selected slot is invalid.', 'error'); return; }
+
+                            try {
+                                const saveRes = await axios.post(`${baseApiUrl}/students.php?action=reschedule-session`, {
+                                    session_id: sessionId,
+                                    session_date: chosen.session_date,
+                                    start_time: chosen.start_time,
+                                    end_time: chosen.end_time,
+                                    reason: 'Make-up session rescheduled by desk'
+                                });
+                                const saveData = saveRes.data || {};
+                                if (saveData.success) {
+                                    Swal.fire({ icon: 'success', title: 'Rescheduled', text: saveData.message || 'Make-up session rescheduled successfully.', confirmButtonColor: '#b8860b' });
+                                    await loadMakeupRows();
+                                } else {
+                                    showMessage(saveData.error || 'Failed to reschedule. Please try again.', 'error');
+                                }
+                            } catch (e) {
+                                showMessage('Network error while rescheduling. Please try again.', 'error');
+                            }
+                        });
+                    } catch (e) {
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load reschedule options.', confirmButtonColor: '#b8860b' });
+                    }
+                }
+            });
+        }
+
+        async function openMakeupRescheduleFlow(enrollmentId) {
+            const student = makeupRows.find(row => Number(row.enrollment_id) === Number(enrollmentId));
+            if (!student) { showMessage('Student not found.', 'error'); return; }
+
+            const pending = getPendingMakeupSessions(student);
+            if (!pending.length) { showMessage('No pending make-up sessions found for this student.', 'info'); return; }
+
+            const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
+
+            // If only one pending makeup, go straight to slot picker
+            if (pending.length === 1) {
+                openMakeupReschedulePicker(Number(pending[0].session_id), enrollmentId);
+                return;
+            }
+
+            // Multiple pending — let desk pick which session to reschedule first
+            const sessionOptions = {};
+            pending.forEach((slot, i) => {
+                const date = slot.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
+                const time = slot.start_time ? `${formatTime12Hour(slot.start_time)} – ${formatTime12Hour(slot.end_time)}` : '—';
+                sessionOptions[String(i)] = `Session ${slot.session_number || '—'} · ${date} · ${time}`;
+            });
+
+            const result = await Swal.fire({
+                icon: 'question',
+                title: `Make-Up Sessions — ${escapeHtml(studentName)}`,
+                text: `This student has ${pending.length} pending make-up sessions. Which one would you like to reschedule?`,
+                input: 'select',
+                inputOptions: sessionOptions,
+                inputPlaceholder: 'Select a session',
+                showCancelButton: true,
+                confirmButtonText: 'Pick a Slot',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#b8860b',
+                inputValidator: value => (!value && value !== 0) ? 'Please select a session.' : null
+            });
+
+            if (!result.isConfirmed) return;
+            const chosenSlot = pending[Number(result.value)];
+            if (!chosenSlot) return;
+            openMakeupReschedulePicker(Number(chosenSlot.session_id), enrollmentId);
+        }
+
         async function loadAttendanceHistory(studentId) {
             const response = await axios.get(`${baseApiUrl}/attendance.php?action=get-student-attendance&student_id=${encodeURIComponent(studentId)}&limit=200`);
             const rows = response?.data?.success && Array.isArray(response.data.attendance) ? response.data.attendance : [];
@@ -313,11 +458,17 @@
             tbody.innerHTML = makeupRows.map(student => {
                 const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
                 const sessionSummary = getNextSessionSummary(student);
+                const pendingCount = getPendingMakeupSessions(student).length;
                 return `
                     <tr class="hover:bg-rose-50/40 transition">
                         <td class="px-6 py-4">
-                            <div class="font-medium text-slate-900">${studentName}</div>
-                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                            <button type="button"
+                                onclick="openMakeupRescheduleFlow(${Number(student.enrollment_id)})"
+                                class="text-left group">
+                                <div class="font-semibold text-blue-700 group-hover:text-blue-900 group-hover:underline transition">${studentName}</div>
+                                <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                                ${pendingCount > 0 ? `<div class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700"><i class="fas fa-calendar-plus text-[9px]"></i> ${pendingCount} make-up${pendingCount === 1 ? '' : 's'} pending</div>` : ''}
+                            </button>
                         </td>
                         <td class="px-6 py-4 text-slate-700">${escapeHtml(student.package_name || '—')}</td>
                         <td class="px-6 py-4 text-slate-700 font-medium">${getCompletedCount(student)} / ${Number(student.sessions || 0)}</td>
@@ -387,6 +538,11 @@
             }
         }
 
+        window.openMakeupDetails = openMakeupDetails;
+        window.openUpcomingSessionsModal = openUpcomingSessionsModal;
+        window.openMakeupRescheduleFlow = openMakeupRescheduleFlow;
+        window.openMakeupReschedulePicker = openMakeupReschedulePicker;
+
         document.addEventListener('DOMContentLoaded', async () => {
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
             const role = String(user?.role_name || '').toLowerCase();
@@ -410,6 +566,3 @@
 
             await loadMakeupRows();
         });
-
-        window.openMakeupDetails = openMakeupDetails;
-        window.openUpcomingSessionsModal = openUpcomingSessionsModal;

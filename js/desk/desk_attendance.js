@@ -227,7 +227,10 @@
                             completedCount,
                             remainingCount,
                             absences,
-                            totalSessions: Number(student.sessions || 0)
+                            totalSessions: Number(student.sessions || 0),
+                            scheduleStatus: String(student.schedule_status || 'Active'),
+                            usedAbsences: Number(student.used_absences || 0),
+                            scheduleFreezeRequired: Number(student.schedule_freeze_required || 0)
                         };
                     });
             }).sort((a, b) => {
@@ -575,18 +578,21 @@
                 return;
             }
 
-            listEl.innerHTML = upcoming.map(event => `
-                <button type="button" class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-left hover:bg-white/10 transition" onclick="selectAttendanceCalendarDate('${escapeHtml(event.dateKey)}')">
+            listEl.innerHTML = upcoming.map(event => {
+                const frozen = isEnrollmentFrozen(event);
+                return `
+                <button type="button" class="w-full rounded-2xl border ${frozen ? 'border-rose-400/40 bg-rose-900/20' : 'border-white/10 bg-white/5'} px-4 py-4 text-left hover:bg-white/10 transition" onclick="selectAttendanceCalendarDate('${escapeHtml(event.dateKey)}')">
                     <div class="flex items-center justify-between gap-3">
-                        <div>
+                        <div class="min-w-0">
                             <div class="text-sm font-semibold text-white">${escapeHtml(event.studentName)}</div>
                             <div class="mt-1 text-xs text-slate-400">${escapeHtml(event.packageName)} • ${escapeHtml(event.teacherName)}</div>
+                            ${frozen ? `<div class="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-rose-300"><i class="fas fa-snowflake"></i> Frozen</div>` : ''}
                         </div>
                         <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${getStateClasses(event.state)}">${escapeHtml(event.state)}</span>
                     </div>
                     <div class="mt-3 text-sm text-slate-200">${escapeHtml(formatDateShort(event.dateKey))} • ${escapeHtml(event.startTime ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}` : 'Time pending')}</div>
                 </button>
-            `).join('');
+            `}).join('');
         }
 
         function openUpcomingSessionsModal() {
@@ -596,22 +602,25 @@
                 .slice(0, 12);
 
             const content = upcoming.length
-                ? upcoming.map(event => `
+                ? upcoming.map(event => {
+                    const frozen = isEnrollmentFrozen(event);
+                    return `
                     <button
                         type="button"
-                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-left hover:bg-slate-100 transition"
+                        class="w-full rounded-2xl border ${frozen ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-slate-50'} px-4 py-4 text-left hover:bg-slate-100 transition"
                         onclick="window.selectAttendanceCalendarDate('${escapeHtml(event.dateKey)}'); Swal.close();"
                     >
                         <div class="flex items-start justify-between gap-3">
-                            <div>
+                            <div class="min-w-0">
                                 <div class="text-sm font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
                                 <div class="mt-1 text-xs text-slate-500">${escapeHtml(event.packageName)} • ${escapeHtml(event.teacherName)}</div>
+                                ${frozen ? `<div class="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-rose-600"><i class="fas fa-snowflake"></i> Frozen — ₱100 fee required</div>` : ''}
                             </div>
                             <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${getStateClasses(event.state)}">${escapeHtml(event.state)}</span>
                         </div>
                         <div class="mt-3 text-sm text-slate-700">${escapeHtml(formatDateShort(event.dateKey))} • ${escapeHtml(event.startTime ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}` : 'Time pending')}</div>
                     </button>
-                `).join('')
+                `}).join('')
                 : '<div class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No upcoming sessions are scheduled for this branch yet.</div>';
 
             Swal.fire({
@@ -644,12 +653,21 @@
                 return;
             }
 
-            listEl.innerHTML = selectedEvents.map(event => `
-                <article class="rounded-3xl border border-slate-200 bg-slate-50/70 p-3.5 shadow-sm">
+            listEl.innerHTML = selectedEvents.map(event => {
+                const frozen = isEnrollmentFrozen(event);
+                const frozenBanner = frozen
+                    ? `<div class="mt-2 flex items-center gap-1.5 rounded-xl bg-rose-50 border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700">
+                            <i class="fas fa-snowflake text-rose-400"></i>
+                            Account Frozen — ₱100 reservation fee required to check in
+                       </div>`
+                    : '';
+                return `
+                <article class="rounded-3xl border ${frozen ? 'border-rose-200 bg-rose-50/40' : 'border-slate-200 bg-slate-50/70'} p-3.5 shadow-sm">
                     <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
+                        <div class="min-w-0">
                             <div class="text-lg font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
                             <div class="mt-1 text-sm text-slate-500">${escapeHtml(event.email || 'No email on file')}</div>
+                            ${frozenBanner}
                         </div>
                         <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${getStateClasses(event.state)}">${escapeHtml(event.state)}</span>
                     </div>
@@ -672,15 +690,21 @@
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-amber-600 border border-amber-100">Remaining ${event.remainingCount}</span>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-200 transition" onclick="openAttendanceDetails(${Number(event.enrollmentId)})">
-                                <i class="fas fa-up-right-from-square"></i>
-                                View Attendance
-                            </button>
+                            ${frozen
+                                ? `<button type="button" class="inline-flex items-center gap-2 rounded-xl bg-rose-100 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-200 transition" onclick="showFrozenAttendanceAlert(${JSON.stringify({ usedAbsences: event.usedAbsences })})">
+                                        <i class="fas fa-snowflake"></i>
+                                        Account Frozen
+                                   </button>`
+                                : `<button type="button" class="inline-flex items-center gap-2 rounded-xl bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-200 transition" onclick="openAttendanceDetails(${Number(event.enrollmentId)})">
+                                        <i class="fas fa-up-right-from-square"></i>
+                                        View Attendance
+                                   </button>`
+                            }
                             ${renderSessionRoomControl(event)}
                         </div>
                     </div>
                 </article>
-            `).join('') + '<div aria-hidden="true" class="h-2"></div>';
+            `}).join('') + '<div aria-hidden="true" class="h-2"></div>';
         }
 
         function getDayScheduleModalMarkup(dateKey) {
@@ -694,12 +718,21 @@
                 `;
             }
 
-            return selectedEvents.map(event => `
-                <article class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm">
+            return selectedEvents.map(event => {
+                const frozen = isEnrollmentFrozen(event);
+                const frozenBanner = frozen
+                    ? `<div class="mt-2 flex items-center gap-1.5 rounded-xl bg-rose-50 border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700">
+                            <i class="fas fa-snowflake text-rose-400"></i>
+                            Account Frozen — ₱100 reservation fee required to check in
+                       </div>`
+                    : '';
+                return `
+                <article class="rounded-3xl border ${frozen ? 'border-rose-200 bg-rose-50/40' : 'border-slate-200 bg-slate-50/80'} p-4 shadow-sm">
                     <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
+                        <div class="min-w-0">
                             <div class="text-base font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
                             <div class="mt-1 text-xs text-slate-500">${escapeHtml(event.email || 'No email on file')}</div>
+                            ${frozenBanner}
                         </div>
                         <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${getStateClasses(event.state)}">${escapeHtml(event.state)}</span>
                     </div>
@@ -722,15 +755,21 @@
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-amber-600 border border-amber-100">Remaining ${event.remainingCount}</span>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-200 transition" onclick="openAttendanceDetails(${Number(event.enrollmentId)})">
-                                <i class="fas fa-up-right-from-square"></i>
-                                View Attendance
-                            </button>
+                            ${frozen
+                                ? `<button type="button" class="inline-flex items-center gap-2 rounded-xl bg-rose-100 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-200 transition" onclick="showFrozenAttendanceAlert(${JSON.stringify({ usedAbsences: event.usedAbsences })})">
+                                        <i class="fas fa-snowflake"></i>
+                                        Account Frozen
+                                   </button>`
+                                : `<button type="button" class="inline-flex items-center gap-2 rounded-xl bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-200 transition" onclick="openAttendanceDetails(${Number(event.enrollmentId)})">
+                                        <i class="fas fa-up-right-from-square"></i>
+                                        View Attendance
+                                   </button>`
+                            }
                             ${renderSessionRoomControl(event)}
                         </div>
                     </div>
                 </article>
-            `).join('');
+            `}).join('');
         }
 
         function openAttendanceDayModal(dateKey) {
@@ -814,6 +853,7 @@
             attendanceCalendarMonth = getMonthKeyFromDate(attendanceSelectedDate);
             renderAttendanceCalendar();
             renderSelectedDateSchedule();
+            renderFrozenAccountsPanel();
             renderUpcomingSessions();
         }
 
@@ -824,6 +864,144 @@
             }
             renderAttendanceCalendar();
             renderSelectedDateSchedule();
+            renderFrozenAccountsPanel();
+        }
+
+        function isEnrollmentFrozen(event) {
+            const status = String(event.scheduleStatus || '').toLowerCase();
+            // Use server-computed field if present; fall back to used_absences >= 3 only as a last resort
+            if (status === 'frozen') return true;
+            if (typeof event.scheduleFreezeRequired !== 'undefined') return Number(event.scheduleFreezeRequired) === 1;
+            return Number(event.usedAbsences || 0) >= 3;
+        }
+
+        function showFrozenAttendanceAlert(event) {
+            Swal.fire({
+                title: 'Attendance Not Allowed Today',
+                text: `Attendance is locked because this schedule is frozen after ${event.usedAbsences} recorded absence${event.usedAbsences === 1 ? '' : 's'}. Please pay ₱100 to reserve the slot before checking in.`,
+                icon: 'warning',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#b8860b'
+            });
+        }
+
+        let activeDayScheduleTab = 'scheduled';
+
+        function switchDayScheduleTab(tab) {
+            activeDayScheduleTab = tab;
+            const scheduledList = document.getElementById('attendanceSelectedDateList');
+            const frozenList    = document.getElementById('frozenAccountsDayList');
+            const tabScheduled  = document.getElementById('dayScheduleTabScheduled');
+            const tabFrozen     = document.getElementById('dayScheduleTabFrozen');
+
+            const activeScheduledCls = 'day-schedule-tab inline-flex items-center gap-1.5 rounded-full border border-slate-900 bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white transition';
+            const inactiveScheduledCls = 'day-schedule-tab inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition';
+            const activeFrozenCls    = 'day-schedule-tab inline-flex items-center gap-1.5 rounded-full border border-rose-500 bg-rose-500 px-3.5 py-1.5 text-xs font-bold text-white transition';
+            const inactiveFrozenCls  = 'day-schedule-tab inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition';
+
+            if (tab === 'scheduled') {
+                if (scheduledList) scheduledList.classList.remove('hidden');
+                if (frozenList)    frozenList.classList.add('hidden');
+                if (tabScheduled)  tabScheduled.className = activeScheduledCls;
+                if (tabFrozen)     tabFrozen.className    = inactiveFrozenCls;
+            } else {
+                if (scheduledList) scheduledList.classList.add('hidden');
+                if (frozenList)    frozenList.classList.remove('hidden');
+                if (tabScheduled)  tabScheduled.className = inactiveScheduledCls;
+                if (tabFrozen)     tabFrozen.className    = activeFrozenCls;
+                renderFrozenAccountsDayList();
+            }
+        }
+
+        function renderFrozenAccountsDayList() {
+            const listEl      = document.getElementById('frozenAccountsDayList');
+            const countBadge  = document.getElementById('dayScheduleFrozenCount');
+            if (!listEl) return;
+
+            const todayKey = getTodayDateKey();
+            // Get events scheduled for the currently selected date that belong to frozen students
+            const frozenTodayEvents = getEventsForDate(attendanceSelectedDate).filter(event => isEnrollmentFrozen(event));
+
+            // Update count badge on tab
+            if (countBadge) {
+                if (frozenTodayEvents.length) {
+                    countBadge.textContent = String(frozenTodayEvents.length);
+                    countBadge.classList.remove('hidden');
+                } else {
+                    countBadge.classList.add('hidden');
+                }
+            }
+
+            if (!frozenTodayEvents.length) {
+                listEl.innerHTML = `
+                    <div class="rounded-2xl border border-dashed border-rose-200 px-4 py-10 text-center text-sm text-rose-400">
+                        <i class="fas fa-snowflake text-2xl text-rose-200 block mb-3"></i>
+                        No frozen accounts are scheduled for ${escapeHtml(formatDateLong(attendanceSelectedDate))}.
+                    </div>`;
+                return;
+            }
+
+            // Render using the same card style as the scheduled list — frozen card variant
+            listEl.innerHTML = frozenTodayEvents.map(event => `
+                <article class="rounded-3xl border border-rose-200 bg-rose-50/40 p-3.5 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-lg font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
+                            <div class="mt-1 text-sm text-slate-500">${escapeHtml(event.email || 'No email on file')}</div>
+                            <div class="mt-2 flex items-center gap-1.5 rounded-xl bg-rose-100 border border-rose-200 px-3 py-1.5 w-fit text-xs font-semibold text-rose-700">
+                                <i class="fas fa-snowflake text-rose-400"></i>
+                                Account Frozen — ₱100 reservation fee required
+                            </div>
+                        </div>
+                        <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${getStateClasses(event.state)}">${escapeHtml(event.state)}</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
+                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Session</div>
+                            <div class="mt-2 text-sm font-semibold text-slate-900">${event.startTime ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}` : 'Time pending'}</div>
+                            <div class="mt-1 text-xs text-slate-500">Session ${event.sessionNumber || '—'} • ${escapeHtml(getSessionRoomDisplayLabel(event) || 'Room pending')}</div>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
+                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Teacher & Package</div>
+                            <div class="mt-2 text-sm font-semibold text-slate-900">${escapeHtml(event.teacherName)}</div>
+                            <div class="mt-1 text-xs text-slate-500">${escapeHtml(event.packageName)}</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap gap-2 text-xs">
+                            <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 border border-slate-200">Completed ${event.completedCount}/${event.totalSessions || '—'}</span>
+                            <span class="rounded-full bg-white px-3 py-1 font-semibold text-rose-600 border border-rose-100">Absences ${event.absences}</span>
+                            <span class="rounded-full bg-white px-3 py-1 font-semibold text-amber-600 border border-amber-100">Remaining ${event.remainingCount}</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button"
+                                class="inline-flex items-center gap-2 rounded-xl bg-rose-100 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-200 transition"
+                                onclick="showFrozenAttendanceAlert(${JSON.stringify({ usedAbsences: event.usedAbsences })})">
+                                <i class="fas fa-snowflake"></i> Account Frozen
+                            </button>
+                            ${renderSessionRoomControl(event)}
+                        </div>
+                    </div>
+                </article>
+            `).join('') + '<div aria-hidden="true" class="h-2"></div>';
+        }
+
+        function renderFrozenAccountsPanel() {
+            // Update the frozen tab count badge whenever data reloads
+            const todayFrozen = getEventsForDate(attendanceSelectedDate).filter(event => isEnrollmentFrozen(event));
+            const countBadge  = document.getElementById('dayScheduleFrozenCount');
+            if (countBadge) {
+                if (todayFrozen.length) {
+                    countBadge.textContent = String(todayFrozen.length);
+                    countBadge.classList.remove('hidden');
+                } else {
+                    countBadge.classList.add('hidden');
+                }
+            }
+            // If currently on the frozen tab, re-render it
+            if (activeDayScheduleTab === 'frozen') {
+                renderFrozenAccountsDayList();
+            }
         }
 
         function getCompletedCount(student) {
@@ -1065,6 +1243,17 @@
                 return;
             }
 
+            const isFrozen = String(student.schedule_status || '').toLowerCase() === 'frozen'
+                || Number(student.schedule_freeze_required || 0) === 1
+                || (student.schedule_freeze_required === undefined && Number(student.used_absences || 0) >= 3);
+            const usedAbsences = Number(student.used_absences || 0);
+
+            // If frozen, show the blocked alert instead of the details modal
+            if (isFrozen) {
+                showFrozenAttendanceAlert({ usedAbsences });
+                return;
+            }
+
             const sessionsList = Array.isArray(student.sessions_list) ? student.sessions_list : [];
             const totalSessions = Number(student.sessions || 0);
             const absenceCount = getAbsenceCount(student);
@@ -1187,6 +1376,7 @@
                     attendanceCalendarMonth = getMonthKeyFromDate(attendanceSelectedDate);
                 }
                 updateAttendanceSummary(attendanceRows);
+                renderFrozenAccountsPanel();
                 syncAttendanceCalendarView();
             } catch (error) {
                 const gridEl = document.getElementById('attendanceCalendarGrid');
@@ -1262,6 +1452,9 @@
 
         window.openAttendanceDetails = openAttendanceDetails;
         window.openAttendanceDayModal = openAttendanceDayModal;
+        window.showFrozenAttendanceAlert = showFrozenAttendanceAlert;
+        window.openFrozenAccountsModal = openFrozenAccountsModal;
+        window.switchDayScheduleTab = switchDayScheduleTab;
         window.openUpcomingSessionsModal = openUpcomingSessionsModal;
         window.openMakeupSummaryModal = openMakeupSummaryModal;
         window.openSessionDatesModal = openSessionDatesModal;

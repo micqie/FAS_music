@@ -2676,10 +2676,11 @@ function renderCurrentEnrollmentSummary(enrollment, student, instruments) {
 
 function getScheduleFreezeReservationNotice(enrollment) {
     if (!enrollment) return null;
-    const usedAbsences = Number(enrollment.used_absences || 0);
-    const freezeRequired = Number(enrollment.schedule_freeze_required || 0) === 1 || usedAbsences >= 3;
+    const usedAbsences  = Number(enrollment.used_absences || 0);
+    const freezeRequired = Number(enrollment.schedule_freeze_required || 0) === 1
+        || (enrollment.schedule_freeze_required === undefined && usedAbsences >= 3);
     if (!freezeRequired) return null;
-    const amount = Number(enrollment.reservation_fee_amount || 50) || 50;
+    const amount = Number(enrollment.reservation_fee_amount || 100) || 100;
     const amountLabel = formatCurrencyPHP(amount).replace(/\.00$/, '');
     return {
         amount,
