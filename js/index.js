@@ -856,7 +856,7 @@ function initLoginForm() {
                     } else if (roleCategory === 'manager') {
                         window.location.href = 'pages/manager/manager_dashboard.html';
                     } else if (roleCategory === 'staff') {
-                        window.location.href = 'pages/desk/desk_scanner.html';
+                        window.location.href = 'pages/desk/desk_attendance.html';
                     } else if (roleCategory === 'instructor') {
                         window.location.href = 'pages/instructor/instructor_dashboard.html';
                     } else if (roleCategory === 'student') {
@@ -3083,6 +3083,38 @@ function renderGuardianDashboardAlerts(students) {
     const dueStudents = rows.filter((item) => getGuardianPaymentMetrics(item).totalBalance > 0);
     const alerts = [];
 
+    // ── Frozen account notices ──
+    const frozenStudents = rows.filter(item => {
+        const enrollment = item?.current_enrollment || null;
+        if (!enrollment) return false;
+        const notice = getScheduleFreezeReservationNotice(enrollment);
+        return !!notice;
+    });
+    if (frozenStudents.length > 0) {
+        frozenStudents.forEach(item => {
+            const s    = item?.student || {};
+            const name = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Student';
+            const enrollment = item?.current_enrollment || {};
+            const notice = getScheduleFreezeReservationNotice(enrollment);
+            alerts.push(`
+                <div class="rounded-2xl border border-rose-300 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-2 text-sm font-bold text-rose-800 dark:text-rose-200">
+                            <i class="fas fa-snowflake"></i>
+                            ${escapeHtml(name)}'s account is frozen
+                        </div>
+                        <div class="mt-1 text-xs text-rose-600 dark:text-rose-300">
+                            ${escapeHtml(notice?.text || `${enrollment.used_absences || 0} absences recorded. ₱${notice?.amount || 100} slot reservation fee required.`)}
+                        </div>
+                    </div>
+                    <span class="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-100 dark:bg-rose-500/20 px-3 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-200">
+                        <i class="fas fa-info-circle"></i> Payment required at branch
+                    </span>
+                </div>
+            `);
+        });
+    }
+
     if (dueStudents.length > 0) {
         alerts.push(`
             <div class="rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -3216,7 +3248,7 @@ function renderGuardianStudentCard(item, index) {
     const statusMetrics = getGuardianSessionStatusMetrics(item);
 
     return `
-        <button type="button" onclick="openGuardianStudentModal(${index})" class="w-full rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 text-left shadow-lg transition hover:border-gold-300">
+        <button type="button" onclick="openGuardianStudentModal(${index})" class="w-full rounded-3xl border ${getScheduleFreezeReservationNotice(enrollment) ? 'border-rose-300 dark:border-rose-500/30' : 'border-zinc-200 dark:border-white/10'} bg-white dark:bg-white/5 p-5 text-left shadow-lg transition hover:border-gold-300">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <div class="text-xl font-extrabold text-zinc-900 dark:text-white">${escapeHtml(studentName)}</div>
@@ -3224,6 +3256,7 @@ function renderGuardianStudentCard(item, index) {
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(regStatus)}">${escapeHtml(regStatus)}</span>
+                    ${getScheduleFreezeReservationNotice(enrollment) ? `<span class="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300"><i class="fas fa-snowflake text-[9px]"></i> Frozen</span>` : ''}
                     ${paymentMetrics.totalBalance > 0 ? `<span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-3 py-1 text-xs font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-400">${formatCurrencyPHP(paymentMetrics.totalBalance)} due</span>` : ''}
                 </div>
             </div>
@@ -3268,6 +3301,18 @@ function renderGuardianStudentModal(item, index) {
 
     return `
         <div class="space-y-6">
+            ${getScheduleFreezeReservationNotice(enrollment) ? `
+            <div class="rounded-2xl border border-rose-300 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10 px-4 py-3 flex items-start gap-3">
+                <i class="fas fa-snowflake text-rose-500 mt-0.5 shrink-0"></i>
+                <div>
+                    <p class="text-sm font-bold text-rose-800 dark:text-rose-200">Account Frozen</p>
+                    <p class="text-xs text-rose-600 dark:text-rose-300 mt-0.5">
+                        ${enrollment.used_absences || 0} absence${Number(enrollment.used_absences || 0) === 1 ? '' : 's'} recorded.
+                        A ₱${getScheduleFreezeReservationNotice(enrollment)?.amount || 100} slot reservation fee must be paid at the branch to restore access.
+                    </p>
+                </div>
+            </div>
+            ` : ''}
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <div class="text-sm text-zinc-500 dark:text-zinc-400">Branch: <span class="font-semibold text-zinc-700 dark:text-zinc-200">${escapeHtml(branch)}</span></div>
@@ -4319,6 +4364,142 @@ function closeStudentRequestModal() {
     setStudentModalState('studentRequestModal', false);
 }
 
+// ── Freeze Payment Modal (Student Side) ───────────────────────────
+function openFreezePaymentModal() {
+    const enrollmentId = Number(window.__freezeEnrollmentId || 0);
+    const studentId    = Number(window.__freezeStudentId    || 0);
+    const amount       = Number(window.__freezeAmount       || 100);
+    if (!enrollmentId || !studentId) {
+        Swal.fire({ icon:'error', title:'Error', text:'Account information not loaded. Please refresh the page.', confirmButtonColor:'#b8860b' });
+        return;
+    }
+
+    Swal.fire({
+        title: '<i class="fas fa-snowflake text-rose-500 mr-2"></i>Pay Slot Reservation Fee',
+        width: 480,
+        showCancelButton: true,
+        confirmButtonText: 'Submit Payment',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#b8860b',
+        allowOutsideClick: false,
+        html: `
+            <div class="text-left space-y-4 py-2">
+                <div class="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 flex items-center justify-between">
+                    <span class="text-sm font-semibold text-rose-800">Amount Due</span>
+                    <span class="text-xl font-black text-rose-700">₱${Number(amount).toFixed(2)}</span>
+                </div>
+                <p class="text-sm text-zinc-500">Choose how you'd like to pay. Online payments require desk approval. Cash walk-ins are processed at the branch.</p>
+
+                <!-- Payment type toggle -->
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" id="fpTypeOnline"
+                        onclick="selectFreezePayType('online')"
+                        class="py-2.5 rounded-xl border-2 border-blue-500 bg-blue-50 text-sm font-bold text-blue-700">
+                        Online Payment
+                    </button>
+                    <button type="button" id="fpTypeCash"
+                        onclick="selectFreezePayType('cash')"
+                        class="py-2.5 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:border-slate-400">
+                        Cash (Walk-in)
+                    </button>
+                </div>
+
+                <!-- Online fields -->
+                <div id="fpOnlineFields" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Payment Method</label>
+                        <select id="fpMethod" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-blue-400">
+                            <option value="GCash">GCash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Reference Number *</label>
+                        <input type="text" id="fpReference" placeholder="e.g. GCash ref #..."
+                            class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-blue-400"
+                            maxlength="100">
+                    </div>
+                </div>
+
+                <!-- Cash fields -->
+                <div id="fpCashFields" class="hidden">
+                    <div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                        <i class="fas fa-info-circle mr-1.5"></i>
+                        Bring ₱${Number(amount).toFixed(2)} cash to the branch. The desk will process your payment immediately.
+                    </div>
+                </div>
+
+                <p id="fpMsg" class="hidden text-xs font-medium text-red-600"></p>
+            </div>
+        `,
+        didOpen: () => {
+            window.__fpCurrentType = 'online';
+        },
+        preConfirm: async () => {
+            const type   = window.__fpCurrentType || 'online';
+            const method = type === 'online' ? (document.getElementById('fpMethod')?.value || 'GCash') : 'Cash';
+            const ref    = type === 'online' ? (document.getElementById('fpReference')?.value || '').trim() : '';
+            const msgEl  = document.getElementById('fpMsg');
+
+            if (type === 'online' && !ref) {
+                if (msgEl) { msgEl.textContent = 'Reference number is required for online payments.'; msgEl.classList.remove('hidden'); }
+                return false;
+            }
+            if (msgEl) msgEl.classList.add('hidden');
+
+            try {
+                const payload = new FormData();
+                payload.append('action',           'submit-freeze-payment');
+                payload.append('enrollment_id',    String(enrollmentId));
+                payload.append('student_id',       String(studentId));
+                payload.append('payment_method',   method);
+                payload.append('reference_number', ref);
+                payload.append('source',           'online'); // student always submits as online
+                const res  = await axios.post(`${baseApiUrl}/students.php?action=submit-freeze-payment`, payload);
+                const data = res.data || {};
+                if (!data.success) { Swal.showValidationMessage(data.error || 'Submission failed.'); return false; }
+                return data;
+            } catch (e) {
+                Swal.showValidationMessage('Network error. Please try again.');
+                return false;
+            }
+        }
+    }).then(result => {
+        if (!result.isConfirmed || !result.value) return;
+        Swal.fire({
+            icon: 'success',
+            title: 'Payment Submitted',
+            text: result.value.message || 'Your payment is pending desk approval.',
+            confirmButtonColor: '#b8860b'
+        }).then(() => window.location.reload());
+    });
+}
+
+function selectFreezePayType(type) {
+    window.__fpCurrentType = type;
+    const onlineBtn    = document.getElementById('fpTypeOnline');
+    const cashBtn      = document.getElementById('fpTypeCash');
+    const onlineFields = document.getElementById('fpOnlineFields');
+    const cashFields   = document.getElementById('fpCashFields');
+    const activeCls    = 'py-2.5 rounded-xl border-2 border-blue-500 bg-blue-50 text-sm font-bold text-blue-700';
+    const inactiveCls  = 'py-2.5 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:border-slate-400';
+    if (type === 'online') {
+        if (onlineBtn)    onlineBtn.className    = activeCls;
+        if (cashBtn)      cashBtn.className      = inactiveCls;
+        if (onlineFields) onlineFields.classList.remove('hidden');
+        if (cashFields)   cashFields.classList.add('hidden');
+    } else {
+        if (cashBtn)      cashBtn.className      = activeCls;
+        if (onlineBtn)    onlineBtn.className    = inactiveCls;
+        if (cashFields)   cashFields.classList.remove('hidden');
+        if (onlineFields) onlineFields.classList.add('hidden');
+    }
+}
+
+window.openFreezePaymentModal = openFreezePaymentModal;
+window.selectFreezePayType    = selectFreezePayType;
+
 window.openStudentRegistrationModal = openStudentRegistrationModal;
 window.closeStudentRegistrationModal = closeStudentRegistrationModal;
 window.openStudentRequestModal = openStudentRequestModal;
@@ -4647,12 +4828,40 @@ function renderStudentActionBanner(student, meta, portal) {
     `;
 
     if (reservationNotice) {
-        title = reservationNotice.title;
-        text = reservationNotice.text;
-        actions = `
-            <a href="student_attendance.html" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Attendance</a>
-            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Sessions</a>
-        `;
+        title = 'Your account is frozen';
+        text = `You have ${reservationNotice.usedAbsences} recorded absence${reservationNotice.usedAbsences === 1 ? '' : 's'}. Pay the ₱${reservationNotice.amount} slot reservation fee to restore access.`;
+
+        // Store enrollment info on window for the pay modal
+        window.__freezeEnrollmentId = Number(portal?.current_enrollment?.enrollment_id || 0);
+        window.__freezeStudentId    = Number(student?.student_id || 0);
+        window.__freezeAmount       = reservationNotice.amount;
+
+        // Check if there's already a pending payment submission
+        const pendingPayment = portal?.current_enrollment?.__freeze_payment_status;
+        if (pendingPayment === 'Pending') {
+            actions = `
+                <span class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-100 border border-amber-300 text-amber-800 text-sm font-bold">
+                    <i class="fas fa-clock"></i> Payment Pending Approval
+                </span>
+                <a href="student_attendance.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Attendance</a>
+            `;
+        } else if (pendingPayment === 'Rejected') {
+            actions = `
+                <button type="button" onclick="openFreezePaymentModal()" class="px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-extrabold transition flex items-center gap-2">
+                    <i class="fas fa-snowflake"></i> Pay Again — ₱${reservationNotice.amount}
+                </button>
+                <span class="text-xs text-rose-500 font-semibold self-center">Previous payment was rejected.</span>
+            `;
+        } else {
+            actions = `
+                <button type="button" onclick="openFreezePaymentModal()" class="px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-extrabold transition flex items-center gap-2">
+                    <i class="fas fa-snowflake"></i> Pay Now — ₱${reservationNotice.amount}
+                </button>
+                <a href="student_attendance.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">View Attendance</a>
+            `;
+        }
+        // Make the banner visually distinct for frozen state
+        banner.className = banner.className.replace('bg-amber-50', 'bg-rose-50').replace('dark:bg-gold-500/10', 'dark:bg-rose-500/10').replace('border-gold-500/25', 'border-rose-400/40');
     } else if (isRejected) {
         title = 'Registration was rejected';
         text = 'Open the form to try again.';
@@ -5151,6 +5360,18 @@ async function initStudentDashboardPage() {
         }
     } catch (e) {
         setHtml('studentAvailabilityCalendar', '<div class="text-zinc-500">Unable to load teacher availability right now.</div>');
+    }
+
+    // Fetch current freeze payment status so the banner shows the right state
+    const freezeNotice = getScheduleFreezeReservationNotice(portal?.current_enrollment || null);
+    if (freezeNotice && portal?.current_enrollment?.enrollment_id) {
+        try {
+            const fpRes  = await axios.get(`${baseApiUrl}/students.php?action=get-student-freeze-payment-status&enrollment_id=${encodeURIComponent(portal.current_enrollment.enrollment_id)}`);
+            const fpData = fpRes.data || {};
+            if (fpData.success && fpData.payment) {
+                portal.current_enrollment.__freeze_payment_status = fpData.payment.status;
+            }
+        } catch (_) { /* non-critical */ }
     }
 
     if (!isEnrolledStudent) {

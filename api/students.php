@@ -5464,6 +5464,315 @@ class StudentsApi
             // Keep API working even if alter fails
         }
     }
+
+    // ── Freeze Payment: ensure table exists ───────────────────────
+    private function ensureFreezePaymentsTable() {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS `tbl_freeze_payments` (
+                    `freeze_payment_id` INT NOT NULL AUTO_INCREMENT,
+                    `enrollment_id`     INT NOT NULL,
+                    `student_id`        INT NOT NULL,
+                    `amount`            DECIMAL(10,2) NOT NULL DEFAULT 100.00,
+                    `payment_method`    ENUM('Cash','GCash','Bank Transfer','Other') NOT NULL DEFAULT 'Cash',
+                    `reference_number`  VARCHAR(100) NULL,
+                    `proof_path`        VARCHAR(255) NULL,
+                    `status`            ENUM('Pending','Paid','Rejected') NOT NULL DEFAULT 'Pending',
+                    `receipt_number`    VARCHAR(50) NULL,
+                    `notes`             TEXT NULL,
+                    `reviewed_by`       INT NULL,
+                    `reviewed_at`       DATETIME NULL,
+                    `payment_date`      DATE NULL,
+                    `source`            ENUM('online','walkin') NOT NULL DEFAULT 'online',
+                    `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`freeze_payment_id`),
+                    KEY `idx_fp_enrollment` (`enrollment_id`),
+                    KEY `idx_fp_student`    (`student_id`),
+                    KEY `idx_fp_status`     (`status`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            ");
+        } catch (PDOException $e) { /* table may already exist */ }
+    }
+
+    // ── Student submits freeze payment (online or walkin intent) ──
+    public function submitFreezePayment() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { $this->sendJSON(['error' => 'Method not allowed'], 405); }
+        $this->ensureFreezePaymentsTable();
+
+        $isMultipart = $this->isMultipartRequest();
+        $data        = $isMultipart ? ($_POST ?: []) : (json_decode(file_get_contents('php://input'), true) ?: []);
+
+        $enrollmentId    = (int)($data['enrollment_id'] ?? 0);
+        $studentId       = (int)($data['student_id']    ?? 0);
+        $paymentMethod   = trim((string)($data['payment_method']   ?? 'Cash'));
+        $referenceNumber = trim((string)($data['reference_number'] ?? ''));
+        $notes           = trim((string)($data['notes']            ?? ''));
+        $source          = in_array($data['source'] ?? '', ['online','walkin']) ? $data['source'] : 'online';
+
+        if ($enrollmentId < 1 || $studentId < 1) {
+            $this->sendJSON(['error' => 'enrollment_id and student_id are required'], 400);
+        }
+
+        // Cancel any previous Pending entries so there is only one active request
+        try {
+            $this->conn->prepare("
+                UPDATE tbl_freeze_payments SET status = 'Rejected', notes = 'Superseded by new submission'
+                WHERE enrollment_id = ? AND status = 'Pending'
+            ")->execute([$enrollmentId]);
+        } catch (PDOException $e) {}
+
+        // Handle proof upload
+        $proofPath = null;
+        if ($isMultipart && !empty($_FILES['proof_file']['name']) && ($_FILES['proof_file']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            try { $proofPath = $this->storePaymentProofUpload($_FILES['proof_file'], 'freeze_payments'); }
+            catch (Exception $e) { $this->sendJSON(['error' => $e->getMessage()], 400); }
+        }
+
+        $status      = ($source === 'walkin') ? 'Paid' : 'Pending';
+        $receiptNum  = ($source === 'walkin') ? 'FREEZE-WALKIN-' . time() : null;
+        $reviewedAt  = ($source === 'walkin') ? date('Y-m-d H:i:s') : null;
+        $payDate     = ($source === 'walkin') ? date('Y-m-d') : null;
+
+        try {
+            $this->conn->beginTransaction();
+
+            $stmt = $this->conn->prepare("
+                INSERT INTO tbl_freeze_payments
+                    (enrollment_id, student_id, amount, payment_method, reference_number, proof_path,
+                     status, receipt_number, notes, source, payment_date, reviewed_at)
+                VALUES (?, ?, 100.00, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $enrollmentId, $studentId, $paymentMethod, $referenceNumber ?: null,
+                $proofPath, $status, $receiptNum, $notes ?: null, $source, $payDate, $reviewedAt
+            ]);
+            $newId = (int)$this->conn->lastInsertId();
+
+            // Walk-in: immediately unfreeze
+            if ($source === 'walkin') {
+                $this->unfreezeEnrollment($enrollmentId);
+            }
+
+            $this->conn->commit();
+            $this->sendJSON([
+                'success'          => true,
+                'freeze_payment_id' => $newId,
+                'status'           => $status,
+                'message'          => $source === 'walkin'
+                    ? 'Payment confirmed. Account has been unfrozen.'
+                    : 'Payment submitted. Waiting for desk approval.'
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ── Desk: get list of freeze payment requests (by branch) ─────
+    public function getFreezePayments() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') { $this->sendJSON(['error' => 'Method not allowed'], 405); }
+        $this->ensureFreezePaymentsTable();
+
+        $branchId  = (int)($_GET['branch_id'] ?? 0);
+        $statusFilter = trim($_GET['status'] ?? '');
+        $params    = [];
+        $where     = 'WHERE 1=1';
+
+        if ($branchId > 0) { $where .= ' AND s.branch_id = ?'; $params[] = $branchId; }
+        if (in_array($statusFilter, ['Pending','Paid','Rejected'])) { $where .= ' AND fp.status = ?'; $params[] = $statusFilter; }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT fp.*,
+                       s.first_name, s.last_name, s.email, s.branch_id,
+                       b.branch_name,
+                       COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
+                       e.used_absences, e.schedule_status
+                FROM tbl_freeze_payments fp
+                INNER JOIN tbl_students s  ON s.student_id  = fp.student_id
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = fp.enrollment_id
+                LEFT JOIN tbl_branches b   ON b.branch_id   = s.branch_id
+                LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
+                $where
+                ORDER BY fp.status = 'Pending' DESC, fp.created_at DESC
+            ");
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $this->sendJSON(['success' => true, 'payments' => $rows]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ── Desk: get frozen student accounts ─────────────────────────
+    public function getFrozenStudents() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') { $this->sendJSON(['error' => 'Method not allowed'], 405); }
+        $this->ensureFreezePaymentsTable();
+
+        $branchId = (int)($_GET['branch_id'] ?? 0);
+        $params = [];
+        $where = "WHERE e.schedule_status = 'Frozen'";
+        if ($branchId > 0) {
+            $where .= ' AND s.branch_id = ?';
+            $params[] = $branchId;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT e.enrollment_id,
+                       e.student_id,
+                       e.package_id,
+                       e.used_absences,
+                       e.consecutive_absences,
+                       e.total_sessions,
+                       e.completed_sessions,
+                       e.allowed_absences,
+                       e.schedule_status,
+                       e.status AS enrollment_status,
+                       e.created_at AS enrollment_created_at,
+                       s.first_name,
+                       s.last_name,
+                       s.email,
+                       s.phone,
+                       s.branch_id,
+                       b.branch_name,
+                       COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
+                       COALESCE((
+                           SELECT fp.freeze_payment_id
+                           FROM tbl_freeze_payments fp
+                           WHERE fp.enrollment_id = e.enrollment_id
+                           ORDER BY fp.created_at DESC
+                           LIMIT 1
+                       ), 0) AS freeze_payment_id,
+                       COALESCE((
+                           SELECT fp.status
+                           FROM tbl_freeze_payments fp
+                           WHERE fp.enrollment_id = e.enrollment_id
+                           ORDER BY fp.created_at DESC
+                           LIMIT 1
+                       ), 'None') AS freeze_payment_status,
+                       (
+                           SELECT fp.payment_method
+                           FROM tbl_freeze_payments fp
+                           WHERE fp.enrollment_id = e.enrollment_id
+                           ORDER BY fp.created_at DESC
+                           LIMIT 1
+                       ) AS freeze_payment_method,
+                       (
+                           SELECT fp.created_at
+                           FROM tbl_freeze_payments fp
+                           WHERE fp.enrollment_id = e.enrollment_id
+                           ORDER BY fp.created_at DESC
+                           LIMIT 1
+                       ) AS freeze_payment_created_at
+                FROM tbl_enrollments e
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
+                LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
+                $where
+                ORDER BY e.used_absences DESC, e.created_at DESC, s.last_name ASC, s.first_name ASC
+            ");
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $this->sendJSON(['success' => true, 'students' => $rows]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ── Desk: approve a freeze payment ────────────────────────────
+    public function approveFreezePayment() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { $this->sendJSON(['error' => 'Method not allowed'], 405); }
+        $this->ensureFreezePaymentsTable();
+        $data    = json_decode(file_get_contents('php://input'), true) ?: [];
+        $fpId    = (int)($data['freeze_payment_id'] ?? 0);
+        $userId  = (int)($data['user_id'] ?? 0);
+        if ($fpId < 1) { $this->sendJSON(['error' => 'freeze_payment_id required'], 400); }
+
+        try {
+            $this->conn->beginTransaction();
+            $stmt = $this->conn->prepare("SELECT * FROM tbl_freeze_payments WHERE freeze_payment_id = ? LIMIT 1");
+            $stmt->execute([$fpId]);
+            $fp = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$fp) { $this->conn->rollBack(); $this->sendJSON(['error' => 'Payment not found'], 404); }
+            if ($fp['status'] !== 'Pending') { $this->conn->rollBack(); $this->sendJSON(['error' => 'Only Pending payments can be approved'], 400); }
+
+            $receipt = 'FREEZE-' . time();
+            $this->conn->prepare("
+                UPDATE tbl_freeze_payments
+                SET status = 'Paid', receipt_number = ?, reviewed_by = ?, reviewed_at = NOW(), payment_date = CURDATE()
+                WHERE freeze_payment_id = ?
+            ")->execute([$receipt, $userId ?: null, $fpId]);
+
+            $this->unfreezeEnrollment((int)$fp['enrollment_id']);
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'message' => 'Payment approved. Account unfrozen.', 'receipt_number' => $receipt]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ── Desk: reject a freeze payment ─────────────────────────────
+    public function rejectFreezePayment() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { $this->sendJSON(['error' => 'Method not allowed'], 405); }
+        $this->ensureFreezePaymentsTable();
+        $data   = json_decode(file_get_contents('php://input'), true) ?: [];
+        $fpId   = (int)($data['freeze_payment_id'] ?? 0);
+        $userId = (int)($data['user_id'] ?? 0);
+        $reason = trim((string)($data['reason'] ?? ''));
+        if ($fpId < 1) { $this->sendJSON(['error' => 'freeze_payment_id required'], 400); }
+
+        try {
+            $this->conn->prepare("
+                UPDATE tbl_freeze_payments
+                SET status = 'Rejected', notes = ?, reviewed_by = ?, reviewed_at = NOW()
+                WHERE freeze_payment_id = ? AND status = 'Pending'
+            ")->execute([$reason ?: null, $userId ?: null, $fpId]);
+            $this->sendJSON(['success' => true, 'message' => 'Payment rejected.']);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ── Desk walk-in: instantly pay and unfreeze ──────────────────
+    // (reuses submitFreezePayment with source=walkin above)
+
+    // ── Student: get current freeze payment status ────────────────
+    public function getStudentFreezePaymentStatus() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') { $this->sendJSON(['error' => 'Method not allowed'], 405); }
+        $this->ensureFreezePaymentsTable();
+        $enrollmentId = (int)($_GET['enrollment_id'] ?? 0);
+        if ($enrollmentId < 1) { $this->sendJSON(['error' => 'enrollment_id required'], 400); }
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT freeze_payment_id, status, payment_method, source, reference_number,
+                       receipt_number, payment_date, created_at
+                FROM tbl_freeze_payments
+                WHERE enrollment_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+            ");
+            $stmt->execute([$enrollmentId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            $this->sendJSON(['success' => true, 'payment' => $row]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ── Helper: unfreeze an enrollment ────────────────────────────
+    private function unfreezeEnrollment(int $enrollmentId) {
+        if ($enrollmentId < 1) return;
+        try {
+            $this->conn->prepare("
+                UPDATE tbl_enrollments
+                SET schedule_status      = 'Active',
+                    consecutive_absences = 0
+                WHERE enrollment_id = ?
+            ")->execute([$enrollmentId]);
+        } catch (PDOException $e) { /* non-fatal */ }
+    }
 }
 
 $studentsApi = new StudentsApi($conn);
@@ -5549,6 +5858,24 @@ switch ($action) {
         break;
     case 'reschedule-cancelled-session':
         $studentsApi->rescheduleCancelledSession();
+        break;
+    case 'submit-freeze-payment':
+        $studentsApi->submitFreezePayment();
+        break;
+    case 'get-freeze-payments':
+        $studentsApi->getFreezePayments();
+        break;
+    case 'get-frozen-students':
+        $studentsApi->getFrozenStudents();
+        break;
+    case 'approve-freeze-payment':
+        $studentsApi->approveFreezePayment();
+        break;
+    case 'reject-freeze-payment':
+        $studentsApi->rejectFreezePayment();
+        break;
+    case 'get-student-freeze-payment-status':
+        $studentsApi->getStudentFreezePaymentStatus();
         break;
     default:
         $studentsApi->sendJSON(['error' => 'Invalid action'], 400);

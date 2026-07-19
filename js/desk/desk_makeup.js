@@ -383,42 +383,86 @@
             if (!student) { showMessage('Student not found.', 'error'); return; }
 
             const pending = getPendingMakeupSessions(student);
-            if (!pending.length) { showMessage('No pending make-up sessions found for this student.', 'info'); return; }
-
             const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
 
-            // If only one pending makeup, go straight to slot picker
+            // ── Case 1: DB-flagged makeup_required sessions exist ──
             if (pending.length === 1) {
                 openMakeupReschedulePicker(Number(pending[0].session_id), enrollmentId);
                 return;
             }
+            if (pending.length > 1) {
+                const opts = {};
+                pending.forEach((slot, i) => {
+                    const date = slot.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
+                    const time = slot.start_time ? `${formatTime12Hour(slot.start_time)} – ${formatTime12Hour(slot.end_time)}` : '—';
+                    opts[String(i)] = `Session ${slot.session_number || '—'} · ${date} · ${time}`;
+                });
+                const r = await Swal.fire({
+                    icon: 'question',
+                    title: `Schedule Make-Up — ${escapeHtml(studentName)}`,
+                    text: `${pending.length} sessions need a make-up. Which one would you like to schedule?`,
+                    input: 'select', inputOptions: opts,
+                    inputPlaceholder: 'Select a session',
+                    showCancelButton: true,
+                    confirmButtonText: 'Pick a Slot', cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#b8860b',
+                    inputValidator: v => (!v && v !== 0) ? 'Please select a session.' : null
+                });
+                if (!r.isConfirmed) return;
+                const s = pending[Number(r.value)];
+                if (s) openMakeupReschedulePicker(Number(s.session_id), enrollmentId);
+                return;
+            }
 
-            // Multiple pending — let desk pick which session to reschedule first
-            const sessionOptions = {};
-            pending.forEach((slot, i) => {
+            // ── Case 2: No makeup_required flag — find absent/missed sessions ──
+            const sessionsList = Array.isArray(student.sessions_list) ? student.sessions_list : [];
+            const now = new Date();
+            const absentSessions = sessionsList.filter(slot => {
+                if (!slot || !slot.session_date) return false;
+                const att    = String(slot.attendance_status || '').toLowerCase();
+                const status = String(slot.status || '').toLowerCase();
+                const dt     = new Date(`${slot.session_date}T${slot.end_time || '23:59:59'}`);
+                if (isNaN(dt.getTime()) || dt > now) return false;
+                if (['present','late','excused'].includes(att)) return false;
+                if (['cancelled_by_teacher','rescheduled','completed','present','late'].includes(status)) return false;
+                if (Number(slot.rescheduled_to_session_id || 0) > 0) return false;
+                return true;
+            });
+
+            if (!absentSessions.length) {
+                showMessage('No missed sessions found to schedule a make-up for this student.', 'error');
+                return;
+            }
+
+            if (absentSessions.length === 1) {
+                openMakeupReschedulePicker(Number(absentSessions[0].session_id), enrollmentId);
+                return;
+            }
+
+            // Multiple absent sessions — let desk pick which one
+            const absentOpts = {};
+            absentSessions.forEach((slot, i) => {
                 const date = slot.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
                 const time = slot.start_time ? `${formatTime12Hour(slot.start_time)} – ${formatTime12Hour(slot.end_time)}` : '—';
-                sessionOptions[String(i)] = `Session ${slot.session_number || '—'} · ${date} · ${time}`;
+                const att  = slot.attendance_status ? ` · ${slot.attendance_status}` : '';
+                absentOpts[String(i)] = `Session ${slot.session_number || '—'} · ${date} · ${time}${att}`;
             });
 
             const result = await Swal.fire({
-                icon: 'question',
-                title: `Make-Up Sessions — ${escapeHtml(studentName)}`,
-                text: `This student has ${pending.length} pending make-up sessions. Which one would you like to reschedule?`,
-                input: 'select',
-                inputOptions: sessionOptions,
-                inputPlaceholder: 'Select a session',
+                icon: 'info',
+                title: `Schedule Make-Up — ${escapeHtml(studentName)}`,
+                text: `${absentSessions.length} missed session${absentSessions.length > 1 ? 's' : ''} found. Choose one to schedule a make-up for.`,
+                input: 'select', inputOptions: absentOpts,
+                inputPlaceholder: 'Select a missed session',
                 showCancelButton: true,
-                confirmButtonText: 'Pick a Slot',
-                cancelButtonText: 'Cancel',
+                confirmButtonText: 'Pick a Slot', cancelButtonText: 'Cancel',
                 confirmButtonColor: '#b8860b',
-                inputValidator: value => (!value && value !== 0) ? 'Please select a session.' : null
+                inputValidator: v => (!v && v !== 0) ? 'Please select a session.' : null
             });
 
             if (!result.isConfirmed) return;
-            const chosenSlot = pending[Number(result.value)];
-            if (!chosenSlot) return;
-            openMakeupReschedulePicker(Number(chosenSlot.session_id), enrollmentId);
+            const chosenSlot = absentSessions[Number(result.value)];
+            if (chosenSlot) openMakeupReschedulePicker(Number(chosenSlot.session_id), enrollmentId);
         }
 
         async function loadAttendanceHistory(studentId) {
@@ -465,7 +509,7 @@
                             <button type="button"
                                 onclick="openMakeupRescheduleFlow(${Number(student.enrollment_id)})"
                                 class="text-left group">
-                                <div class="font-semibold text-blue-700 group-hover:text-blue-900 group-hover:underline transition">${studentName}</div>
+                                <div class="font-semibold text-slate-900 group-hover:text-blue-700 transition">${studentName}</div>
                                 <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
                                 ${pendingCount > 0 ? `<div class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700"><i class="fas fa-calendar-plus text-[9px]"></i> ${pendingCount} make-up${pendingCount === 1 ? '' : 's'} pending</div>` : ''}
                             </button>
@@ -487,7 +531,15 @@
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-2 flex-wrap">
                                 ${getStatusBadge(student)}
-                                <button type="button" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold" onclick="openMakeupDetails(${Number(student.enrollment_id)})">
+                                <button type="button"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 text-xs font-bold transition"
+                                    onclick="openMakeupRescheduleFlow(${Number(student.enrollment_id)})">
+                                    <i class="fas fa-calendar-plus text-[11px]"></i>
+                                    Schedule Make-Up
+                                </button>
+                                <button type="button"
+                                    class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold transition"
+                                    onclick="openMakeupDetails(${Number(student.enrollment_id)})">
                                     View Details
                                 </button>
                             </div>

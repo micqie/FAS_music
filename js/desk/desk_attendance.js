@@ -979,6 +979,11 @@
                                 onclick="showFrozenAttendanceAlert(${JSON.stringify({ usedAbsences: event.usedAbsences })})">
                                 <i class="fas fa-snowflake"></i> Account Frozen
                             </button>
+                            <button type="button"
+                                class="inline-flex items-center gap-2 rounded-xl bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-200 transition"
+                                onclick="deskWalkinFreezePayment(${event.enrollmentId}, ${event.studentId})">
+                                <i class="fas fa-money-bill text-sm"></i> Walk-In Pay ₱100
+                            </button>
                             ${renderSessionRoomControl(event)}
                         </div>
                     </div>

@@ -141,6 +141,9 @@
                     <a href="desk_registration.html"  data-page="registration" class="desk-drawer-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/8 hover:text-white transition">
                         <i class="fas fa-id-card w-5 text-center text-slate-400"></i> Registrations
                     </a>
+                    <a href="desk_freezeaccounts.html" data-page="freezeaccounts" class="desk-drawer-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/8 hover:text-white transition">
+                        <i class="fas fa-snowflake w-5 text-center text-slate-400"></i> Frozen Accounts
+                    </a>
                     <a href="desk_featured_posts.html" data-page="featured"    class="desk-drawer-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/8 hover:text-white transition">
                         <i class="fas fa-photo-film w-5 text-center text-slate-400"></i> Featured Posts
                     </a>

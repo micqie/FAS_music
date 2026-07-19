@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desk - Frozen Accounts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/desk-premium.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50:'#fdfaf1', 100:'#f9f1d5', 400:'#d4af37', 500:'#b8860b', 600:'#996515' },
+                        obsidian: '#0f1115', darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+        :root { --nav-bg: #0b0f18; }
+        body { font-family: 'Space Grotesk', sans-serif; }
+        .sidebar-scroll { scrollbar-width: none; }
+        .sidebar-scroll::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="desk-app bg-[#f1f5f9] text-slate-900 antialiased">
+<div class="min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside class="desk-sidebar fixed w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden flex-col">
+            <div class="desk-sidebar-brand px-2 pb-4 mb-3 border-b border-white/10">
+                <a href="desk_scanner.html" class="inline-flex h-10 items-center" aria-label="Father & Sons Music home">
+              <div class="flex flex-col items-center  justify-center py-8 ml-6">
+    <img src="../../assets/fas-logo.png"
+         alt="Father & Sons Music"
+         class="h-14 w-auto object-contain">
+</div>
+                </a>
+                      <div data-old-branch-wrap="1" class="desk-topnav-branch inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200 w-fit">Branch:
+                                <i class="fas fa-location-dot text-gold-400"></i>
+                                <span>—</span>
+                            </div>
+            </div>
+            <nav class="desk-sidebar-nav overflow-x-hidden space-y-1.5">
+                <a href="desk_attendance.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition"></i> Attendance
+                </a>
+                <a href="desk_makeup.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-triangle-exclamation text-slate-400"></i> Make-Up List
+                </a>
+
+                <a href="desk_scanner.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-qrcode text-slate-400"></i> Scanner
+                </a>
+                <a href="desk_enrollment.html?view=active" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-user-graduate text-slate-400"></i> Enrollments
+                </a>
+                <a href="desk_sessions.html?page=sessions" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-calendar-check text-slate-400"></i> Sessions
+                </a>
+                <a href="desk_registration.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-id-card text-slate-400"></i> Registrations
+                </a>
+                <a href="desk_freezeaccounts.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600/30 text-white border border-blue-500/40">
+                    <i class="fas fa-snowflake text-white"></i> Frozen Accounts
+                </a>
+                    <a href="desk_featured_posts.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-300 hover:bg-white/10 transition">
+                    <i class="fas fa-photo-film text-slate-400"></i> Featured Posts
+                </a>
+            </nav>
+
+        </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+        <div id="deskTopNavMount"></div>
+        <main class="desk-main flex-1 px-4 sm:px-6 py-6">
+            <div class="max-w-7xl mx-auto">
+
+                <!-- Header -->
+                <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                            <i class="fas fa-snowflake text-rose-500"></i> Frozen Accounts
+                        </h1>
+                        <p class="text-slate-500 mt-1 text-sm">Review and process slot reservation fee payments (₱100 each).</p>
+                    </div>
+                    <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+                        <button type="button" onclick="setFreezeView('students')" data-view="students" class="freeze-view-btn px-4 py-2 text-sm font-semibold rounded-lg bg-slate-900 text-white transition">
+                            Frozen Accounts
+                        </button>
+                        <button type="button" onclick="setFreezeView('payments')" data-view="payments" class="freeze-view-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition">
+                            Payment Requests
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Frozen students list -->
+                <div id="frozenStudentsSection" class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-6">
+                    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                            <h2 class="text-lg font-black text-slate-900">Frozen Students</h2>
+                            <p class="text-sm text-slate-500 mt-1">Students whose schedules are currently frozen and need the ₱100 reservation fee.</p>
+                        </div>
+                        <div class="flex flex-wrap gap-3 text-sm font-semibold">
+                            <span class="rounded-full bg-rose-50 border border-rose-200 px-4 py-1.5 text-rose-700">
+                                Frozen: <span id="frozenCount" class="font-black">0</span>
+                            </span>
+                            <span class="rounded-full bg-slate-50 border border-slate-200 px-4 py-1.5 text-slate-600">
+                                Needs payment: <span id="frozenPendingCount" class="font-black text-amber-600">0</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-rose-50/60">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Branch</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Package</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Absences</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Payment State</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Frozen Since</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="frozenStudentsBody" class="divide-y divide-rose-50">
+                                <tr><td colspan="7" class="px-6 py-10 text-center text-slate-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2 block"></i>Loading frozen students...
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Payment requests -->
+            <div id="freezePaymentsSection" class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+                    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                        <h2 class="text-lg font-black text-slate-900">Freeze Payment Requests</h2>
+                        <p class="text-sm text-slate-500 mt-1">Review and process slot reservation fee submissions.</p>
+                        <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1">
+                            <button onclick="setFreezeFilter('Pending')"  data-filter="Pending"  class="freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg bg-slate-900 text-white transition">Pending</button>
+                            <button onclick="setFreezeFilter('Paid')"     data-filter="Paid"     class="freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition">Paid</button>
+                            <button onclick="setFreezeFilter('all')"      data-filter="all"      class="freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition">All</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-rose-50/60">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Package</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Absences</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Payment</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Submitted</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="freezeTableBody" class="divide-y divide-rose-50">
+                                <tr><td colspan="8" class="px-6 py-10 text-center text-slate-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2 block"></i>Loading...
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="../../js/index.js"></script>
+<script src="../../js/session_timeout.js"></script>
+<script src="../../js/desk/desk_nav.js"></script>
+<script>
+    let deskBranchId   = 0;
+    let frozenStudents  = [];
+    let freezePayments = [];
+    let currentFilter  = 'Pending';
+    let activeFreezeView = 'students';
+
+    function escHtml(t) {
+        if (t == null) return '';
+        const d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
+    function fmtDate(d) {
+        if (!d) return '—';
+        return new Date(d).toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'numeric' });
+    }
+    function statusBadge(status) {
+        const map = {
+            Pending:  'bg-amber-100 text-amber-700 border-amber-200',
+            Paid:     'bg-emerald-100 text-emerald-700 border-emerald-200',
+            Rejected: 'bg-rose-100 text-rose-700 border-rose-200'
+        };
+        return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${map[status] || 'bg-slate-100 text-slate-600'}">${escHtml(status)}</span>`;
+    }
+
+    function paymentBadge(status) {
+        const key = String(status || 'None');
+        const map = {
+            Paid: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            Pending: 'bg-amber-100 text-amber-700 border-amber-200',
+            Rejected: 'bg-rose-100 text-rose-700 border-rose-200',
+            None: 'bg-slate-100 text-slate-600 border-slate-200'
+        };
+        return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${map[key] || map.None}">${escHtml(key)}</span>`;
+    }
+
+    function setFreezeFilter(f) {
+        currentFilter = f;
+        document.querySelectorAll('.freeze-filter-btn').forEach(btn => {
+            const active = btn.dataset.filter === f;
+            btn.className = active
+                ? 'freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg bg-slate-900 text-white transition'
+                : 'freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition';
+        });
+        renderTable();
+    }
+
+    function setFreezeView(view) {
+        activeFreezeView = view === 'payments' ? 'payments' : 'students';
+
+        const studentsSection = document.getElementById('frozenStudentsSection');
+        const paymentsSection = document.getElementById('freezePaymentsSection');
+        const viewButtons = document.querySelectorAll('.freeze-view-btn');
+
+        if (studentsSection) studentsSection.classList.toggle('hidden', activeFreezeView !== 'students');
+        if (paymentsSection) paymentsSection.classList.toggle('hidden', activeFreezeView !== 'payments');
+
+        viewButtons.forEach(btn => {
+            const active = btn.dataset.view === activeFreezeView;
+            btn.className = active
+                ? 'freeze-view-btn px-4 py-2 text-sm font-semibold rounded-lg bg-slate-900 text-white transition'
+                : 'freeze-view-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition';
+        });
+    }
+
+    function renderFrozenStudents() {
+        const tbody = document.getElementById('frozenStudentsBody');
+        if (!tbody) return;
+
+        const pendingPayments = frozenStudents.filter(row => String(row.freeze_payment_status || 'None') !== 'Paid').length;
+        const countEl = document.getElementById('frozenCount');
+        const pendingCountEl = document.getElementById('frozenPendingCount');
+        if (countEl) countEl.textContent = String(frozenStudents.length);
+        if (pendingCountEl) pendingCountEl.textContent = String(pendingPayments);
+
+        if (!frozenStudents.length) {
+            tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-10 text-center text-slate-400">
+                <i class="fas fa-snowflake text-3xl text-slate-200 block mb-3"></i>
+                No frozen student accounts found.
+            </td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = frozenStudents.map(row => {
+            const name = `${escHtml(row.first_name || '')} ${escHtml(row.last_name || '')}`.trim() || 'Student';
+            const paymentStatus = row.freeze_payment_status || 'None';
+            const freezePaymentId = Number(row.freeze_payment_id || 0);
+            const frozenSince = row.enrollment_created_at ? fmtDate(row.enrollment_created_at) : '—';
+            const actionHtml = paymentStatus === 'Paid'
+                ? '<span class="text-xs font-semibold text-emerald-600">Already cleared</span>'
+                : `<div class="flex flex-wrap gap-2">
+                        <button onclick="showFrozenStudent(${row.enrollment_id})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">
+                            <i class="fas fa-eye text-[10px]"></i> Details
+                        </button>
+                        <button onclick="payNowFrozenStudent(${row.enrollment_id}, ${row.student_id}, ${freezePaymentId})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-bold transition">
+                            <i class="fas fa-money-bill text-[10px]"></i> Pay Now
+                        </button>
+                   </div>`;
+
+            return `<tr class="hover:bg-rose-50/30 transition">
+                <td class="px-6 py-4">
+                    <div class="font-semibold text-slate-900">${name}</div>
+                    <div class="text-xs text-slate-500">${escHtml(row.email || '')}</div>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-700">${escHtml(row.branch_name || '—')}</td>
+                <td class="px-6 py-4 text-sm text-slate-700">${escHtml(row.package_name || '—')}</td>
+                <td class="px-6 py-4">
+                    <div class="font-bold text-rose-600">${Number(row.used_absences || 0)}</div>
+                    <div class="text-xs text-slate-400">Consecutive: ${Number(row.consecutive_absences || 0)}</div>
+                </td>
+                <td class="px-6 py-4">${paymentBadge(paymentStatus)}</td>
+                <td class="px-6 py-4 text-sm text-slate-700">${frozenSince}</td>
+                <td class="px-6 py-4">${actionHtml}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('freezeTableBody');
+        if (!tbody) return;
+
+        const rows = currentFilter === 'all'
+            ? freezePayments
+            : freezePayments.filter(r => r.status === currentFilter);
+
+        // Update chips
+        const pending = freezePayments.filter(r => r.status === 'Pending').length;
+        const paid    = freezePayments.filter(r => r.status === 'Paid').length;
+        const chipP = document.getElementById('chipPending');
+        const chipPd = document.getElementById('chipPaid');
+        if (chipP)  chipP.textContent  = String(pending);
+        if (chipPd) chipPd.textContent = String(paid);
+
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-10 text-center text-slate-400">
+                <i class="fas fa-snowflake text-3xl text-slate-200 block mb-3"></i>
+                No ${currentFilter === 'all' ? '' : currentFilter.toLowerCase() + ' '}freeze payment records found.
+            </td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = rows.map(r => {
+            const name  = `${escHtml(r.first_name || '')} ${escHtml(r.last_name || '')}`.trim() || 'Student';
+            const isPending  = r.status === 'Pending';
+            const isOnline   = (r.source || 'online') === 'online';
+
+            const actionBtns = isPending ? `
+                <div class="flex flex-wrap gap-2">
+                    ${isOnline ? `
+                        <button onclick="approveFreeze(${r.freeze_payment_id})"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-bold transition">
+                            <i class="fas fa-check text-[10px]"></i> Approve
+                        </button>
+                        <button onclick="rejectFreeze(${r.freeze_payment_id})"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-bold transition">
+                            <i class="fas fa-times text-[10px]"></i> Reject
+                        </button>
+                    ` : `
+                        <button onclick="walkinPayFreeze(${r.enrollment_id}, ${r.student_id}, ${r.freeze_payment_id})"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold transition">
+                            <i class="fas fa-money-bill text-[10px]"></i> Walk-In Pay
+                        </button>
+                    `}
+                </div>
+            ` : (r.status === 'Paid' ? '<span class="text-xs text-emerald-600 font-semibold">Cleared</span>' : '<span class="text-xs text-rose-500 font-semibold">Rejected</span>');
+
+            const refHtml = r.reference_number
+                ? `<div class="text-xs text-slate-500 mt-0.5">Ref: ${escHtml(r.reference_number)}</div>`
+                : '';
+
+            return `<tr class="hover:bg-rose-50/30 transition">
+                <td class="px-6 py-4">
+                    <div class="font-semibold text-slate-900">${name}</div>
+                    <div class="text-xs text-slate-500">${escHtml(r.email || '')}</div>
+                    <div class="text-xs text-slate-400">${escHtml(r.branch_name || '')}</div>
+                </td>
+                <td class="px-6 py-4 text-slate-700 text-sm">${escHtml(r.package_name || '—')}</td>
+                <td class="px-6 py-4 font-bold text-rose-600">${r.used_absences ?? '—'}</td>
+                <td class="px-6 py-4 font-bold text-slate-800">₱${Number(r.amount || 100).toFixed(2)}</td>
+                <td class="px-6 py-4">
+                    <span class="inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-xs font-semibold ${isOnline ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-600'}">
+                        ${isOnline ? '<i class="fas fa-wifi text-[9px]"></i> Online' : '<i class="fas fa-store text-[9px]"></i> Walk-In'}
+                    </span>
+                    <div class="text-xs text-slate-500 mt-0.5">${escHtml(r.payment_method || '—')}</div>
+                    ${refHtml}
+                </td>
+                <td class="px-6 py-4">${statusBadge(r.status)}</td>
+                <td class="px-6 py-4 text-xs text-slate-500">${fmtDate(r.created_at)}</td>
+                <td class="px-6 py-4">${actionBtns}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function showFrozenStudent(enrollmentId) {
+        const row = frozenStudents.find(item => Number(item.enrollment_id) === Number(enrollmentId));
+        if (!row) return;
+
+        const name = `${escHtml(row.first_name || '')} ${escHtml(row.last_name || '')}`.trim() || 'Student';
+        const paymentStatus = row.freeze_payment_status || 'None';
+        const paymentMethod = row.freeze_payment_method || '—';
+        const paymentDate = row.freeze_payment_created_at ? fmtDate(row.freeze_payment_created_at) : '—';
+        const freezePaymentId = Number(row.freeze_payment_id || 0);
+
+        Swal.fire({
+            title: `Frozen Account - ${name}`,
+            width: 640,
+            confirmButtonText: 'Close',
+            didOpen: () => {
+                const btn = document.getElementById('freezeModalPayNowBtn');
+                if (btn && paymentStatus !== 'Paid') {
+                    btn.addEventListener('click', () => payNowFrozenStudent(row.enrollment_id, row.student_id, freezePaymentId));
+                }
+            },
+            html: `
+                <div class="text-left space-y-3 text-sm text-slate-700">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><span class="font-semibold text-slate-900">Branch:</span> ${escHtml(row.branch_name || '—')}</div>
+                        <div><span class="font-semibold text-slate-900">Package:</span> ${escHtml(row.package_name || '—')}</div>
+                        <div><span class="font-semibold text-slate-900">Absences:</span> ${Number(row.used_absences || 0)}</div>
+                        <div><span class="font-semibold text-slate-900">Consecutive:</span> ${Number(row.consecutive_absences || 0)}</div>
+                        <div><span class="font-semibold text-slate-900">Payment State:</span> ${escHtml(paymentStatus)}</div>
+                        <div><span class="font-semibold text-slate-900">Payment Method:</span> ${escHtml(paymentMethod)}</div>
+                        <div><span class="font-semibold text-slate-900">Frozen Since:</span> ${escHtml(paymentDate)}</div>
+                        <div><span class="font-semibold text-slate-900">Phone:</span> ${escHtml(row.phone || '—')}</div>
+                    </div>
+                    ${paymentStatus === 'Paid' ? '<div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700 font-semibold">Account has already been cleared.</div>' : `<button type="button" id="freezeModalPayNowBtn" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-white font-bold hover:bg-emerald-700 transition"><i class="fas fa-money-bill"></i> Pay Now</button>`}
+                </div>
+            `
+        });
+    }
+
+    async function payNowFrozenStudent(enrollmentId, studentId, existingFpId) {
+        const confirm = await Swal.fire({
+            title: 'Pay Now?',
+            text: 'Confirm ₱100 payment for this frozen account. The account will be unfrozen right away if the payment is approved.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Continue',
+            confirmButtonColor: '#b8860b',
+            cancelButtonText: 'Cancel'
+        });
+        if (!confirm.isConfirmed) return;
+        return walkinPayFreeze(enrollmentId, studentId, existingFpId || null);
+    }
+
+    async function loadFrozenStudents() {
+        try {
+            let url = `${baseApiUrl}/students.php?action=get-frozen-students`;
+            if (deskBranchId > 0) url += `&branch_id=${encodeURIComponent(deskBranchId)}`;
+            const res  = await axios.get(url);
+            const data = res.data || {};
+            frozenStudents = data.success && Array.isArray(data.students) ? data.students : [];
+            renderFrozenStudents();
+        } catch (e) {
+            const tbody = document.getElementById('frozenStudentsBody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-500">Failed to load frozen students. Please try again.</td></tr>`;
+        }
+    }
+
+    async function loadFreezePayments() {
+        const tbody = document.getElementById('freezeTableBody');
+        try {
+            let url = `${baseApiUrl}/students.php?action=get-freeze-payments`;
+            if (deskBranchId > 0) url += `&branch_id=${encodeURIComponent(deskBranchId)}`;
+            const res  = await axios.get(url);
+            const data = res.data || {};
+            freezePayments = data.success && Array.isArray(data.payments) ? data.payments : [];
+            renderTable();
+        } catch (e) {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-8 text-center text-red-500">Failed to load data. Please try again.</td></tr>`;
+        }
+    }
+
+    async function approveFreeze(fpId) {
+        const confirm = await Swal.fire({
+            title: 'Approve Payment?',
+            text: 'This will mark the payment as Paid and unfreeze the student account.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Approve',
+            confirmButtonColor: '#16a34a',
+            cancelButtonText: 'Cancel'
+        });
+        if (!confirm.isConfirmed) return;
+        try {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const res  = await axios.post(`${baseApiUrl}/students.php?action=approve-freeze-payment`, {
+                freeze_payment_id: fpId,
+                user_id: Number(user?.user_id || 0)
+            });
+            const data = res.data || {};
+            if (data.success) {
+                Swal.fire({ icon:'success', title:'Approved', text: data.message || 'Account unfrozen.', confirmButtonColor:'#b8860b', timer: 2500, showConfirmButton: false });
+                await loadFreezePayments();
+            } else {
+                Swal.fire({ icon:'error', title:'Error', text: data.error || 'Could not approve.', confirmButtonColor:'#b8860b' });
+            }
+        } catch (e) {
+            Swal.fire({ icon:'error', title:'Error', text:'Network error.', confirmButtonColor:'#b8860b' });
+        }
+    }
+
+    async function rejectFreeze(fpId) {
+        const { value: reason, isConfirmed } = await Swal.fire({
+            title: 'Reject Payment?',
+            input: 'text',
+            inputLabel: 'Reason (optional)',
+            inputPlaceholder: 'e.g. Invalid reference number',
+            showCancelButton: true,
+            confirmButtonText: 'Reject',
+            confirmButtonColor: '#dc2626',
+            cancelButtonText: 'Cancel'
+        });
+        if (!isConfirmed) return;
+        try {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const res  = await axios.post(`${baseApiUrl}/students.php?action=reject-freeze-payment`, {
+                freeze_payment_id: fpId,
+                reason: reason || '',
+                user_id: Number(user?.user_id || 0)
+            });
+            const data = res.data || {};
+            if (data.success) {
+                Swal.fire({ icon:'success', title:'Rejected', text: data.message || 'Payment rejected.', confirmButtonColor:'#b8860b', timer: 2000, showConfirmButton: false });
+                await loadFreezePayments();
+            } else {
+                Swal.fire({ icon:'error', title:'Error', text: data.error || 'Could not reject.', confirmButtonColor:'#b8860b' });
+            }
+        } catch (e) {
+            Swal.fire({ icon:'error', title:'Error', text:'Network error.', confirmButtonColor:'#b8860b' });
+        }
+    }
+
+    async function walkinPayFreeze(enrollmentId, studentId, existingFpId) {
+        const confirm = await Swal.fire({
+            title: 'Walk-In Payment',
+            text: 'Confirm ₱100 cash payment received. Account will be unfrozen immediately.',
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Confirm Cash Payment',
+            confirmButtonColor: '#b8860b',
+            cancelButtonText: 'Cancel'
+        });
+        if (!confirm.isConfirmed) return;
+
+        try {
+            // If there's already a pending row, approve it directly; otherwise submit as walkin
+            let res;
+            if (existingFpId) {
+                const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+                res = await axios.post(`${baseApiUrl}/students.php?action=approve-freeze-payment`, {
+                    freeze_payment_id: existingFpId,
+                    user_id: Number(user?.user_id || 0)
+                });
+            } else {
+                const payload = new FormData();
+                payload.append('action',        'submit-freeze-payment');
+                payload.append('enrollment_id', String(enrollmentId));
+                payload.append('student_id',    String(studentId));
+                payload.append('payment_method','Cash');
+                payload.append('source',        'walkin');
+                res = await axios.post(`${baseApiUrl}/students.php?action=submit-freeze-payment`, payload);
+            }
+            const data = res.data || {};
+            if (data.success) {
+                Swal.fire({ icon:'success', title:'Payment Confirmed', text: data.message || 'Account unfrozen.', confirmButtonColor:'#b8860b', timer: 2500, showConfirmButton: false });
+                await loadFreezePayments();
+            } else {
+                Swal.fire({ icon:'error', title:'Error', text: data.error || 'Could not process.', confirmButtonColor:'#b8860b' });
+            }
+        } catch (e) {
+            Swal.fire({ icon:'error', title:'Error', text:'Network error.', confirmButtonColor:'#b8860b' });
+        }
+    }
+
+    // Also allow desk to start a walk-in payment for any frozen student not yet in list
+    async function deskWalkinFreezeForStudent(enrollmentId, studentId) {
+        return walkinPayFreeze(enrollmentId, studentId, null);
+    }
+
+    window.approveFreeze        = approveFreeze;
+    window.rejectFreeze         = rejectFreeze;
+    window.walkinPayFreeze      = walkinPayFreeze;
+    window.setFreezeFilter      = setFreezeFilter;
+    window.setFreezeView        = setFreezeView;
+    window.showFrozenStudent    = showFrozenStudent;
+    window.payNowFrozenStudent  = payNowFrozenStudent;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        const role = String(user?.role_name || '').toLowerCase();
+        if (!user || !['staff','desk','front desk','manager','branch manager'].includes(role)) {
+            Swal.fire({ icon:'error', title:'Access Denied', text:'Desk access only.', confirmButtonColor:'#b8860b' })
+                .then(() => { window.location.href = '../../index.html'; });
+            return;
+        }
+        deskBranchId = Number(user.branch_id || 0);
+        const branchName = user.branch_name || '—';
+        document.querySelectorAll('.desk-topnav-branch span').forEach(el => el.textContent = branchName);
+        if (typeof syncDeskNavUser === 'function') syncDeskNavUser();
+        await loadFrozenStudents();
+        await loadFreezePayments();
+        setFreezeView('students');
+    });
+</script>
+</body>
+</html>
