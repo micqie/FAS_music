@@ -26,6 +26,13 @@
         body { font-family: 'Inter', sans-serif; }
         .dark-glass { background: rgba(15, 17, 21, 0.92); backdrop-filter: blur(10px); }
         .soft-shadow { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12); }
+        .instructor-sidebar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .instructor-sidebar::-webkit-scrollbar {
+            display: none;
+        }
     </style>
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
@@ -82,7 +89,7 @@
     </div>
 
     <!-- Sidebar -->
-    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto">
+    <aside class="instructor-sidebar fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto">
         <div class="px-6 space-y-8 flex-1 mt-4">
             <div class="px-4 mb-4">
                 <h2 class="text-[1.5rem] leading-none font-extrabold text-white tracking-tight">Instructor Panel</h2>

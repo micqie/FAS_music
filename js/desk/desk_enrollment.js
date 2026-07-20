@@ -9,6 +9,7 @@
         let activeAssignRequestSlotRow = null;
         let activeAssignRequest = null;
         let assignRequestAvailabilitySlots = [];
+        let assignRequestBookedSessions = [];
         let assignRequestAvailabilityMonth = '';
         let assignRequestAvailabilitySelectedDate = '';
         let assignRequestAvailabilityLoadTimer = null;
@@ -1110,7 +1111,34 @@
             ).trim();
         }
 
-        function renderTeacherControlForInstrument(instrument, selectedTeacherId = '', lockTeacher = false) {
+        function getAssignableAssignRequestSlotRow() {
+            const container = document.getElementById('assignRequestSlotsContainer');
+            const rows = Array.from(container?.querySelectorAll('.assign-request-slot') || []);
+            if (!rows.length) return null;
+
+            const activeRow = activeAssignRequestSlotRow && container?.contains(activeAssignRequestSlotRow)
+                ? activeAssignRequestSlotRow
+                : null;
+            if (activeRow && getAssignRequestRowTeacherId(activeRow)) {
+                return activeRow;
+            }
+
+            const teacherReadyRow = rows.find(row => getAssignRequestRowTeacherId(row));
+            return teacherReadyRow || rows[0] || null;
+        }
+
+        function getAssignRequestRowData(row) {
+            if (!row) return null;
+            return {
+                instrument_id: Number(row.querySelector('.assign-request-slot-instrument')?.value || row.dataset.instrumentId || 0) || null,
+                teacher_id: getAssignRequestRowTeacherId(row),
+                day_of_week: row.querySelector('.assign-request-slot-day')?.value || '',
+                start_time: row.querySelector('.assign-request-slot-start')?.value || '',
+                end_time: row.querySelector('.assign-request-slot-end')?.value || ''
+            };
+        }
+
+        function renderTeacherControlForInstrument(instrument, selectedTeacherId = '', lockTeacher = false, rowIndex = null) {
             const teachers = getTeachersForInstrument(instrument);
             const resolvedTeacherId = Number(selectedTeacherId || 0) || null;
             const resolvedTeacher = resolvedTeacherId ? getTeacherCandidateById(resolvedTeacherId) : null;
@@ -1122,7 +1150,11 @@
 
             if (lockedTeacher) {
                 return `
-                    <div class="rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-2">
+                    <button
+                        type="button"
+                        onclick="event.stopPropagation(); selectAssignRequestTeacherForRow(${Number(rowIndex || 0)}, ${Number(teacherIdToUse || 0)})"
+                        class="w-full rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-100"
+                    >
                         <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Fixed teacher</div>
                         <div class="mt-1 font-semibold text-slate-900">${escapeHtml(teacherNameToUse || 'Teacher')}</div>
                         <input
@@ -1131,7 +1163,7 @@
                             value="${escapeHtml(String(teacherIdToUse || ''))}"
                             data-teacher-name="${escapeHtml(teacherNameToUse || '')}"
                         >
-                    </div>
+                    </button>
                 `;
             }
 
@@ -1231,7 +1263,7 @@
                     <div class="assign-request-slot-fields">
                         <div class="assign-request-slot-field">
                             <label class="desk-modal-label">Teacher</label>
-                            ${renderTeacherControlForInstrument(instrument, teacherId, teacherLocked)}
+                            ${renderTeacherControlForInstrument(instrument, teacherId, teacherLocked, index)}
                         </div>
                         <div class="assign-request-slot-field">
                             <label class="desk-modal-label">Schedule</label>
@@ -1361,7 +1393,12 @@
             }));
             bindAssignRequestSlotFocusHandlers();
             bindAssignRequestSlotRemoveHandlers();
-            setActiveAssignRequestSlot(container.lastElementChild);
+            const insertedRow = container.lastElementChild;
+            if (!activeAssignRequestSlotRow || !container.contains(activeAssignRequestSlotRow)) {
+                setActiveAssignRequestSlot(insertedRow);
+            } else {
+                setActiveAssignRequestSlot(activeAssignRequestSlotRow);
+            }
             updateAssignRequestRowScheduleDisplay(container.lastElementChild);
             updateAssignRequestRecurringSummary();
         }
@@ -1378,15 +1415,7 @@
         }
 
         function getActiveAssignRequestSlotData() {
-            const row = activeAssignRequestSlotRow;
-            if (!row) return null;
-            return {
-                instrument_id: Number(row.querySelector('.assign-request-slot-instrument')?.value || row.dataset.instrumentId || 0) || null,
-                teacher_id: getAssignRequestRowTeacherId(row),
-                day_of_week: row.querySelector('.assign-request-slot-day')?.value || '',
-                start_time: row.querySelector('.assign-request-slot-start')?.value || '',
-                end_time: row.querySelector('.assign-request-slot-end')?.value || ''
-            };
+            return getAssignRequestRowData(activeAssignRequestSlotRow);
         }
 
         function getLockedAssignRequestDays() {
@@ -1419,6 +1448,27 @@
                 updateAssignRequestRecurringSummary();
             }
             void loadAssignRequestAvailability();
+        }
+
+        function selectAssignRequestTeacherForRow(rowIndex, teacherId) {
+            const container = document.getElementById('assignRequestSlotsContainer');
+            const rows = Array.from(container?.querySelectorAll('.assign-request-slot') || []);
+            const row = rows[Number(rowIndex || 0)] || null;
+            if (row) {
+                setActiveAssignRequestSlot(row);
+                const selectInput = row.querySelector('.assign-request-slot-teacher-select');
+                const hiddenInput = row.querySelector('.assign-request-slot-teacher-id');
+                if (selectInput) selectInput.value = String(teacherId || '');
+                if (hiddenInput) {
+                    const candidate = getTeacherCandidateById(teacherId);
+                    hiddenInput.value = String(teacherId || '');
+                    hiddenInput.dataset.teacherName = candidate?.teacher_name || hiddenInput.dataset.teacherName || '';
+                }
+                row.dataset.teacherId = String(teacherId || '');
+                updateAssignRequestRowScheduleDisplay(row);
+                updateAssignRequestRecurringSummary();
+            }
+            setAssignRequestTeacherSelection(teacherId);
         }
 
         function renderAssignRequestTeacherSuggestions(query = '') {
@@ -1489,6 +1539,13 @@
             renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate);
         }
 
+        function formatAssignRequestSessionLabel(session) {
+            const sessionNumber = Number(session?.session_number || 0);
+            const numberLabel = sessionNumber > 0 ? `Session ${sessionNumber}` : 'Session';
+            const timeLabel = `${formatTime12Hour(session?.start_time)} - ${formatTime12Hour(session?.end_time)}`;
+            return `${numberLabel} • ${timeLabel}`;
+        }
+
         function renderAssignRequestAvailability(slots, selectedDate = '') {
             const listEl = document.getElementById('assignRequestAvailabilityList');
             const hintEl = document.getElementById('assignRequestAvailabilityHint');
@@ -1501,7 +1558,16 @@
                 assignRequestAvailabilitySelectedDate = selectedDate;
             }
 
-            if (!Array.isArray(slots) || !slots.length) {
+            const bookedGrouped = {};
+            (Array.isArray(assignRequestBookedSessions) ? assignRequestBookedSessions : []).forEach((session) => {
+                const dateKey = String(session.session_date || '').trim();
+                if (!dateKey) return;
+                if (!bookedGrouped[dateKey]) bookedGrouped[dateKey] = [];
+                bookedGrouped[dateKey].push(session);
+            });
+
+            const hasAnyBookedSessions = Object.keys(bookedGrouped).length > 0;
+            if ((!Array.isArray(slots) || !slots.length) && !hasAnyBookedSessions) {
                 assignRequestAvailabilityMonth = '';
                 assignRequestAvailabilitySelectedDate = '';
                 hintEl.textContent = 'No conflict-free recurring one-hour slots were found for the selected instructor and date range.';
@@ -1525,16 +1591,17 @@
             });
 
             const availableDates = Object.keys(grouped).sort();
+            const bookedDates = Object.keys(bookedGrouped).sort();
             const resolvedSelectedDate = grouped[assignRequestAvailabilitySelectedDate]
                 ? assignRequestAvailabilitySelectedDate
-                : (availableDates.includes(selectedDate) ? selectedDate : availableDates[0]);
+                : (availableDates.includes(selectedDate) ? selectedDate : availableDates[0] || bookedDates[0] || selectedDate);
             assignRequestAvailabilitySelectedDate = resolvedSelectedDate;
 
-            const monthSource = assignRequestAvailabilityMonth || resolvedSelectedDate || availableDates[0];
+            const monthSource = assignRequestAvailabilityMonth || resolvedSelectedDate || availableDates[0] || bookedDates[0];
             const monthParts = String(monthSource).slice(0, 7).split('-');
             const monthDate = new Date(Number(monthParts[0]), Number(monthParts[1]) - 1, 1);
             if (Number.isNaN(monthDate.getTime())) {
-                listEl.innerHTML = '<div class="text-sm text-slate-500">No available slots found.</div>';
+                listEl.innerHTML = '<div class="text-sm text-slate-500">No sessions found.</div>';
                 return;
             }
             const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
@@ -1551,27 +1618,35 @@
             for (let day = 1; day <= daysInMonth; day += 1) {
                 const dateKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const daySlots = grouped[dateKey] || [];
+                const dayBooked = bookedGrouped[dateKey] || [];
                 const isSelected = dateKey === resolvedSelectedDate;
                 const hasSlots = daySlots.length > 0;
+                const hasBooked = dayBooked.length > 0;
                 const baseClass = hasSlots
                     ? (isSelected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-200 bg-white hover:border-emerald-300 hover:bg-emerald-50')
-                    : 'border-slate-200 bg-slate-50 text-slate-300';
+                    : (hasBooked
+                        ? (isSelected ? 'border-amber-400 bg-amber-50 shadow-sm' : 'border-amber-200 bg-white hover:border-amber-300 hover:bg-amber-50')
+                        : 'border-slate-200 bg-slate-50 text-slate-300');
                 cells.push(`
                     <button
                         type="button"
-                        ${hasSlots ? `onclick="selectAssignRequestAvailabilityDate('${dateKey}')"` : 'disabled'}
-                        class="h-16 rounded-sm border p-1.5 text-left text-xs transition ${baseClass} ${hasSlots ? '' : 'cursor-not-allowed'}"
+                        ${hasSlots || hasBooked ? `onclick="selectAssignRequestAvailabilityDate('${dateKey}')"` : 'disabled'}
+                        class="h-16 rounded-sm border p-1.5 text-left text-xs transition ${baseClass} ${(hasSlots || hasBooked) ? '' : 'cursor-not-allowed'}"
                     >
                         <div class="flex items-start justify-between gap-2">
-                            <span class="text-sm font-semibold ${hasSlots ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
-                            ${hasSlots ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${daySlots.length} slot${daySlots.length > 1 ? 's' : ''}</span>` : ''}
+                            <span class="text-sm font-semibold ${hasSlots || hasBooked ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
+                            <div class="flex flex-col items-end gap-1">
+                                ${hasSlots ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${daySlots.length} slot${daySlots.length > 1 ? 's' : ''}</span>` : ''}
+                                ${hasBooked ? `<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">${dayBooked.length} booked</span>` : ''}
+                            </div>
                         </div>
-                        <div class="mt-2 text-[11px] ${hasSlots ? 'text-slate-500' : 'text-slate-400'}">${hasSlots ? `${escapeHtml(daySlots[0].day_of_week || '')} recurring` : 'Unavailable'}</div>
+                        <div class="mt-2 text-[11px] ${hasSlots || hasBooked ? 'text-slate-500' : 'text-slate-400'}">${hasSlots ? `${escapeHtml(daySlots[0].day_of_week || '')} recurring` : (hasBooked ? 'Already enrolled' : 'Unavailable')}</div>
                     </button>
                 `);
             }
 
             const selectedSlots = grouped[resolvedSelectedDate] || [];
+            const selectedBookedSessions = bookedGrouped[resolvedSelectedDate] || [];
             const lockedDays = getLockedAssignRequestDays();
             const activeSlot = getActiveAssignRequestSlotData();
             listEl.innerHTML = `
@@ -1598,6 +1673,21 @@
                                 <div class="text-xs text-slate-500 mt-1">${selectedSlots.length ? `${selectedSlots.length} recurring slot${selectedSlots.length > 1 ? 's' : ''}` : 'No available slots on this date.'}</div>
                             </div>
                         </div>
+                        ${selectedBookedSessions.length ? `
+                            <div class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2">
+                                <div class="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-700">Already Enrolled</div>
+                                <div class="mt-2 space-y-2">
+                                    ${selectedBookedSessions.map(session => `
+                                        <div class="rounded-xl border border-amber-100 bg-white px-3 py-2">
+                                            <div class="text-sm font-semibold text-slate-900">${escapeHtml(formatAssignRequestSessionLabel(session))}</div>
+                                            <div class="mt-1 text-xs text-slate-500">
+                                                ${escapeHtml(session.package_name || '')}${session.teacher_name ? ` • ${escapeHtml(session.teacher_name)}` : ''}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                         <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                             ${selectedSlots.map(slot => {
                                 const slotDay = String(slot.day_of_week || '');
@@ -1658,9 +1748,7 @@
             const slotSelect = document.getElementById('assignRequestAvailableSlotSelect');
             if (dateEl) dateEl.value = sessionDate || '';
             const container = document.getElementById('assignRequestSlotsContainer');
-            const targetRow = activeAssignRequestSlotRow && container && container.contains(activeAssignRequestSlotRow)
-                ? activeAssignRequestSlotRow
-                : container?.querySelector('.assign-request-slot');
+            const targetRow = getAssignableAssignRequestSlotRow();
             if (targetRow) {
                 const dayEl = targetRow.querySelector('.assign-request-slot-day');
                 const startEl = targetRow.querySelector('.assign-request-slot-start');
@@ -1708,15 +1796,15 @@
             const hintEl = document.getElementById('assignRequestAvailabilityHint');
             const slotSelect = document.getElementById('assignRequestAvailableSlotSelect');
             const startDate = document.getElementById('assignRequestDate')?.value || '';
-            const activeSlotData = getActiveAssignRequestSlotData();
+            const activeRow = getAssignableAssignRequestSlotRow();
+            const activeSlotData = getAssignRequestRowData(activeRow);
             const teacherId = Number(activeSlotData?.teacher_id || 0);
-            const activeRowTeacherLabel = activeAssignRequestSlotRow
-                ? getAssignRequestRowTeacherName(activeAssignRequestSlotRow)
-                : '';
+            const activeRowTeacherLabel = activeRow ? getAssignRequestRowTeacherName(activeRow) : '';
             if (!listEl || !hintEl) return;
 
             if (!activeAssignRequest || !teacherId) {
                 assignRequestAvailabilitySlots = [];
+                assignRequestBookedSessions = [];
                 assignRequestAvailabilityMonth = '';
                 assignRequestAvailabilitySelectedDate = '';
                 hintEl.textContent = activeAssignRequest
@@ -1733,10 +1821,12 @@
             const cacheKey = getAssignRequestAvailabilityCacheKey(teacherId, startDate);
             const cachedSlots = assignRequestAvailabilityCache.get(cacheKey);
             if (cachedSlots) {
+                assignRequestAvailabilitySlots = Array.isArray(cachedSlots.slots) ? cachedSlots.slots : [];
+                assignRequestBookedSessions = Array.isArray(cachedSlots.booked_sessions) ? cachedSlots.booked_sessions : [];
                 hintEl.textContent = activeRowTeacherLabel
                     ? `Showing available one-hour slots for ${activeRowTeacherLabel}.`
                     : 'Showing available one-hour slots for the selected teacher.';
-                renderAssignRequestAvailability(cachedSlots, startDate);
+                renderAssignRequestAvailability(assignRequestAvailabilitySlots, startDate);
                 return;
             }
 
@@ -1756,7 +1846,10 @@
                     hintEl.textContent = `Showing available one-hour slots for ${activeRowTeacherLabel}.`;
                 }
                 const slots = Array.isArray(data.slots) ? data.slots : [];
-                assignRequestAvailabilityCache.set(cacheKey, slots);
+                const bookedSessions = Array.isArray(data.booked_sessions) ? data.booked_sessions : [];
+                assignRequestAvailabilitySlots = slots;
+                assignRequestBookedSessions = bookedSessions;
+                assignRequestAvailabilityCache.set(cacheKey, { slots, booked_sessions: bookedSessions });
                 renderAssignRequestAvailability(slots, startDate);
             } catch (error) {
                 if (requestToken !== assignRequestAvailabilityRequestToken) return;
@@ -1856,6 +1949,7 @@
             activeAssignRequest = null;
             assignRequestInstruments = [];
             assignRequestAvailabilitySlots = [];
+            assignRequestBookedSessions = [];
             assignRequestAvailabilityMonth = '';
             assignRequestAvailabilitySelectedDate = '';
             assignRequestAvailabilityCache.clear();

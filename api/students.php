@@ -2110,6 +2110,58 @@ class StudentsApi
         }
     }
 
+    private function getStudentBookedSessionsForTeacher($teacherId, $studentId, $branchId = 0)
+    {
+        $teacherId = (int)$teacherId;
+        $studentId = (int)$studentId;
+        $branchId = (int)$branchId;
+        if ($teacherId < 1 || $studentId < 1 || !$this->tableExists('tbl_sessions')) {
+            return [];
+        }
+
+        try {
+            $packageJoin = $this->tableExists('tbl_session_packages')
+                ? "LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id"
+                : "";
+            $packageNameExpr = $this->tableExists('tbl_session_packages')
+                ? "COALESCE(sp.package_name, CONCAT('Package #', e.package_id))"
+                : "CONCAT('Package #', e.package_id)";
+
+            $sql = "
+                SELECT
+                    ts.session_id,
+                    ts.enrollment_id,
+                    ts.session_number,
+                    ts.session_date,
+                    ts.start_time,
+                    ts.end_time,
+                    ts.status,
+                    {$packageNameExpr} AS package_name,
+                    CONCAT_WS(' ', t.first_name, t.last_name) AS teacher_name
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                LEFT JOIN tbl_teachers t ON t.teacher_id = COALESCE(e.assigned_teacher_id, ts.teacher_id)
+                {$packageJoin}
+                WHERE e.student_id = ?
+                  AND COALESCE(e.assigned_teacher_id, ts.teacher_id) = ?
+                  AND ts.status NOT IN ('Cancelled', 'cancelled_by_teacher', 'rescheduled')
+            ";
+            $params = [$studentId, $teacherId];
+            if ($branchId > 0) {
+                $sql .= " AND s.branch_id = ? ";
+                $params[] = $branchId;
+            }
+            $sql .= " ORDER BY ts.session_date ASC, ts.start_time ASC, ts.session_id ASC ";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            return [];
+        }
+    }
+
     public function getTeacherAvailableSlots()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -2134,6 +2186,7 @@ class StudentsApi
         }
 
         $slots = $this->buildTeacherAvailableSlots($teacherId, $branchId, $studentId, $roomId, [], $daysAhead);
+        $bookedSessions = $this->getStudentBookedSessionsForTeacher($teacherId, $studentId, $branchId);
         if ($startDate !== '') {
             $slots = array_values(array_filter($slots, function ($slot) use ($startDate) {
                 return !empty($slot['session_date']) && strcmp((string)$slot['session_date'], $startDate) >= 0;
@@ -2143,7 +2196,8 @@ class StudentsApi
         $this->sendJSON([
             'success' => true,
             'teacher_id' => $teacherId,
-            'slots' => $slots
+            'slots' => $slots,
+            'booked_sessions' => $bookedSessions
         ]);
     }
 
@@ -4659,6 +4713,7 @@ class StudentsApi
                 $this->sendJSON(['error' => 'Enrollment is not active'], 400);
             }
             $this->validateScheduleBranchAccess((int)($enrollment['branch_id'] ?? 0), $scopeBranchId, $editorRoleName);
+            $totalSessions = (int)($enrollment['total_sessions'] ?? 0);
 
             $stmtCheck = $this->conn->prepare("
                 SELECT session_id, session_date, status
@@ -4701,21 +4756,6 @@ class StudentsApi
                     )) &&
                     (int)($fixed['fixed_schedule_locked'] ?? 1) === 1
                 ) {
-                    if ($isEditingExisting && $existingSessionId > 0 && $canEditRecurringPattern) {
-                        $result = $this->updateFixedEnrollmentScheduleBeforeStart($enrollment, $sessionNumber, $sessionDate, $startTime, $endTime);
-                        $generatedCount = (int)($result['created'] ?? 0) + (int)($result['updated'] ?? 0);
-                        if ($generatedCount < $totalSessions) {
-                            $this->sendJSON([
-                                'error' => 'Selected instructor does not have enough available slots to regenerate the full recurring schedule.'
-                            ], 400);
-                        }
-                        $this->sendJSON([
-                            'success' => true,
-                            'message' => 'Recurring schedule updated successfully before classes started.',
-                            'auto_generated' => $result
-                        ]);
-                    }
-
                     if (!$isEditingExisting) {
                         $result = $this->generateFixedScheduleSessions($enrollmentId);
                         $generatedCount = (int)($result['created'] ?? 0) + (int)($result['updated'] ?? 0);
@@ -4732,7 +4772,6 @@ class StudentsApi
                     }
                 }
             }
-            $totalSessions = (int)($enrollment['total_sessions'] ?? 0);
             if ($totalSessions > 0 && $sessionNumber > $totalSessions) {
                 $this->sendJSON(['error' => 'Session number exceeds package total sessions'], 400);
             }
@@ -5599,8 +5638,13 @@ class StudentsApi
             $stmt->execute($params);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             $this->sendJSON(['success' => true, 'payments' => $rows]);
-        } catch (PDOException $e) {
-            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        } catch (Throwable $e) {
+            if (method_exists($this->conn, 'inTransaction') && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON([
+                'error' => 'Schedule session failed: ' . $e->getMessage()
+            ], 500);
         }
     }
 

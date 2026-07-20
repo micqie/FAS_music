@@ -780,7 +780,8 @@
                     showMessage(data.error || 'Failed to schedule session.', 'error');
                 }
             } catch (error) {
-                showMessage('Network error. Please try again.', 'error');
+                const backendMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message;
+                showMessage(backendMessage || 'Network error. Please try again.', 'error');
             }
         }
 

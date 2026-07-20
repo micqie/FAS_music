@@ -155,25 +155,66 @@
                 <p class="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-2">Review your teacher’s session-by-session assessment, scores, and remarks.</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
-                    <div class="portal-stat-label">Current Package</div>
-                    <div id="studentGradesPackage" class="mt-3 text-lg font-black text-zinc-900 dark:text-white">—</div>
+            <section class="rounded-[2rem] border border-zinc-200/80 dark:border-white/10 bg-white dark:bg-white/5 shadow-2xl dark:shadow-black/40 overflow-hidden mb-6">
+                <div class="p-6 sm:p-8 lg:p-10">
+                    <div class="flex flex-col gap-6">
+                        <div class="flex items-start gap-4">
+                            <div class="h-14 w-14 rounded-2xl bg-amber-100 dark:bg-gold-500/15 text-gold-600 dark:text-gold-400 grid place-items-center shadow-sm">
+                                <i class="fas fa-box-open text-xl"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-xs font-black uppercase tracking-[0.28em] text-zinc-400 dark:text-zinc-500">Your Package</div>
+                                <div id="studentGradesPackage" class="mt-1 text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white">—</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Track how far you are in your current lesson package.</div>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-2 rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                                <i class="fas fa-bolt text-gold-500"></i>
+                                <span id="studentGradesPending">0</span> waiting
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between gap-3 mb-3">
+                                <div class="text-base font-semibold text-zinc-700 dark:text-zinc-200">Sessions done</div>
+                                <div class="text-sm font-black text-zinc-900 dark:text-white"><span id="studentGradesSessionsDone">0</span> of <span id="studentGradesSessionsTotal">0</span></div>
+                            </div>
+                            <div class="h-3 rounded-full bg-zinc-100 dark:bg-white/10 overflow-hidden">
+                                <div id="studentGradesProgressBar" class="h-full rounded-full bg-gradient-to-r from-amber-400 via-gold-500 to-amber-600 transition-all duration-500 ease-out" style="width:0%"></div>
+                            </div>
+                            <div id="studentGradesSessionsLeft" class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">— sessions left to go</div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="rounded-[1.75rem] border border-zinc-100 dark:border-white/10 bg-zinc-50 dark:bg-white/5 p-5">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="portal-stat-label">Graded</div>
+                                        <div id="studentGradesCompleted" class="mt-2 text-4xl font-black text-zinc-900 dark:text-white">0</div>
+                                    </div>
+                                    <div class="h-12 w-12 rounded-2xl bg-white dark:bg-black/20 grid place-items-center text-zinc-400 dark:text-zinc-500">
+                                        <i class="fas fa-clipboard-check text-lg"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="rounded-[1.75rem] border border-amber-100 dark:border-amber-500/20 bg-amber-50/90 dark:bg-amber-500/10 p-5">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="portal-stat-label text-amber-700 dark:text-amber-200">Average</div>
+                                        <div class="mt-2 flex items-end gap-1">
+                                            <div id="studentGradesAverage" class="text-4xl font-black text-amber-700 dark:text-amber-300">—</div>
+                                            <div class="pb-1 text-lg font-bold text-amber-500 dark:text-amber-200">/5</div>
+                                        </div>
+                                        <div id="studentGradesLatest" class="mt-2 text-sm font-medium text-amber-700/80 dark:text-amber-100/80">—</div>
+                                    </div>
+                                    <div class="h-12 w-12 rounded-2xl bg-white/80 dark:bg-black/20 grid place-items-center text-amber-600 dark:text-amber-200">
+                                        <i class="fas fa-chart-line text-lg"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
-                    <div class="portal-stat-label">Average Grade</div>
-                    <div id="studentGradesAverage" class="mt-3 text-3xl font-black text-gold-500">—</div>
-                </div>
-                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
-                    <div class="portal-stat-label">Graded Sessions</div>
-                    <div id="studentGradesCompleted" class="mt-3 text-3xl font-black text-zinc-900 dark:text-white">0</div>
-                </div>
-                <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
-                    <div class="portal-stat-label">Waiting for Grade</div>
-                    <div id="studentGradesPending" class="mt-3 text-3xl font-black text-zinc-900 dark:text-white">0</div>
-                    <div id="studentGradesLatest" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">—</div>
-                </div>
-            </div>
+            </section>
 
 
             <section id="studentGradesList" class="space-y-5">

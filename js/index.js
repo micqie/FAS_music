@@ -89,6 +89,7 @@ let pendingRequestsById = {};
 let studentDashboardPortalState = null;
 let studentDashboardMetaState = null;
 let studentRegistrationRestartNotice = false;
+let _studentPerformanceRadarChartInstance = null;
 
 function normalizeRoleName(role) {
     return String(role || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -2219,32 +2220,150 @@ function buildStudentPerformanceMetrics(rows) {
     });
 }
 
-function renderStudentPerformanceBars(metrics) {
-    if (!Array.isArray(metrics) || metrics.length === 0) {
-        return '';
-    }
+function renderStudentPerformanceProfile(metrics, rows) {
+    const validMetrics = Array.isArray(metrics) ? metrics : [];
+    const gradedRows = Array.isArray(rows)
+        ? rows.filter(row => Number(row?.progress_id || 0) > 0)
+        : [];
+    const hasData = validMetrics.some(metric => Number(metric?.percent || 0) > 0);
 
-    return metrics.map(metric => {
-        const percent = Number.isFinite(Number(metric.percent)) ? Number(metric.percent) : 0;
-        const width = Math.max(0, Math.min(100, percent));
-        const valueLabel = metric.average === null ? 'Pending' : `${width}%`;
-        const helperText = metric.helper ? `<div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${escapeHtml(metric.helper)}</div>` : '';
-
+    if (!validMetrics.length || !hasData) {
         return `
-            <div class="space-y-2">
-                <div class="flex items-start justify-between gap-3">
+            <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40 mb-8">
+                <div class="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                        <div class="text-sm font-bold text-zinc-900 dark:text-white">${escapeHtml(metric.label)}</div>
-                        ${helperText}
+                        <p class="text-xs font-bold uppercase tracking-[0.28em] text-gold-500">Performance Profile</p>
+                        <h2 class="portal-section-title text-zinc-900 dark:text-white">Your Progress</h2>
                     </div>
-                    <div class="text-sm font-extrabold text-gold-600 dark:text-gold-400">${escapeHtml(valueLabel)}</div>
                 </div>
-                <div class="h-3 rounded-full bg-zinc-200 dark:bg-white/10 overflow-hidden">
-                    <div class="h-full rounded-full bg-gradient-to-r from-gold-500 via-amber-400 to-gold-300 transition-all" style="width: ${width}%"></div>
+                <div class="mt-6 rounded-3xl border border-dashed border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                    Grade a few sessions and your progress profile will appear here.
                 </div>
             </div>
         `;
-    }).join('');
+    }
+
+    const availableMetrics = validMetrics.filter(metric => Number.isFinite(Number(metric.percent)) && Number(metric.percent) > 0);
+    const averagePercent = availableMetrics.length
+        ? Math.round(availableMetrics.reduce((sum, metric) => sum + Number(metric.percent || 0), 0) / availableMetrics.length)
+        : 0;
+    const strongestMetric = availableMetrics.slice().sort((a, b) => Number(b.percent || 0) - Number(a.percent || 0))[0] || null;
+    const radarId = 'studentPerformanceRadarChart';
+    const radarEmptyId = 'studentPerformanceRadarEmpty';
+
+    return `
+        <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40 mb-8">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.28em] text-gold-500">Performance Profile</p>
+                    <h2 class="portal-section-title text-zinc-900 dark:text-white">Your Progress</h2>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                        Based on ${gradedRows.length} graded session${gradedRows.length === 1 ? '' : 's'}.
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-3 py-1.5 text-xs font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-300">
+                        Avg ${averagePercent}%
+                    </span>
+                    ${strongestMetric ? `<span class="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-bold text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">${escapeHtml(strongestMetric.label)} leading</span>` : ''}
+                </div>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.95fr)] gap-8 items-center">
+                <div class="relative rounded-3xl border border-zinc-100 dark:border-white/10 bg-gradient-to-br from-white to-zinc-50 dark:from-white/5 dark:to-white/3 p-5 min-h-[320px]">
+                    <canvas id="${radarId}" aria-label="Student performance radar chart"></canvas>
+                    <div id="${radarEmptyId}" class="hidden absolute inset-0 flex items-center justify-center text-center px-8 text-sm text-zinc-500 dark:text-zinc-400">
+                        Grade a session to see the radar snapshot.
+                    </div>
+                </div>
+
+                <div class="space-y-0 divide-y divide-zinc-100 dark:divide-white/10 rounded-3xl border border-zinc-100 dark:border-white/10 bg-white dark:bg-black/20 overflow-hidden">
+                    ${validMetrics.map(metric => {
+                        const percent = Number.isFinite(Number(metric.percent)) ? Number(metric.percent) : 0;
+                        const helperText = metric.helper
+                            ? `<div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">${escapeHtml(metric.helper)}</div>`
+                            : '';
+                        return `
+                            <div class="px-5 py-4 flex items-start justify-between gap-4">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-2.5 w-2.5 rounded-full bg-gold-500 shrink-0"></span>
+                                        <div class="text-base font-semibold text-zinc-900 dark:text-white">${escapeHtml(metric.label)}</div>
+                                    </div>
+                                    ${helperText}
+                                </div>
+                                <div class="text-lg font-black text-zinc-900 dark:text-white shrink-0">${percent}%</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderStudentPerformanceRadar(metrics) {
+    const validMetrics = Array.isArray(metrics) ? metrics : [];
+    const radarCanvas = document.getElementById('studentPerformanceRadarChart');
+    const radarEmpty = document.getElementById('studentPerformanceRadarEmpty');
+
+    if (_studentPerformanceRadarChartInstance) {
+        _studentPerformanceRadarChartInstance.destroy();
+        _studentPerformanceRadarChartInstance = null;
+    }
+
+    const hasData = validMetrics.some(metric => Number(metric?.percent || 0) > 0);
+    if (!radarCanvas) return;
+
+    if (!hasData || typeof Chart === 'undefined') {
+        radarCanvas.style.display = 'none';
+        if (radarEmpty) radarEmpty.classList.remove('hidden');
+        return;
+    }
+
+    if (radarEmpty) radarEmpty.classList.add('hidden');
+    radarCanvas.style.display = '';
+
+    _studentPerformanceRadarChartInstance = new Chart(radarCanvas, {
+        type: 'radar',
+        data: {
+            labels: validMetrics.map(metric => metric.label),
+            datasets: [{
+                data: validMetrics.map(metric => Number(metric.percent || 0)),
+                borderColor: '#b8860b',
+                backgroundColor: 'rgba(184, 134, 11, 0.16)',
+                pointBackgroundColor: '#b8860b',
+                pointBorderColor: '#ffffff',
+                pointHoverBackgroundColor: '#b8860b',
+                pointHoverBorderColor: '#ffffff',
+                pointRadius: 4,
+                borderWidth: 2.5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                r: {
+                    min: 0,
+                    max: 100,
+                    ticks: {
+                        stepSize: 20,
+                        backdropColor: 'transparent',
+                        color: '#9ca3af',
+                        font: { size: 10, weight: '600' }
+                    },
+                    grid: { color: 'rgba(212,175,55,0.12)' },
+                    angleLines: { color: 'rgba(212,175,55,0.12)' },
+                    pointLabels: {
+                        color: '#374151',
+                        font: { size: 11, weight: '700' }
+                    }
+                }
+            }
+        }
+    });
 }
 
 async function fetchGuardianPortalDataByEmail(email) {
@@ -2676,9 +2795,13 @@ function renderCurrentEnrollmentSummary(enrollment, student, instruments) {
 
 function getScheduleFreezeReservationNotice(enrollment) {
     if (!enrollment) return null;
+    const scheduleStatus = String(enrollment.schedule_status || '').trim().toLowerCase();
+    const paymentStatus = String(enrollment.__freeze_payment_status || '').trim().toLowerCase();
     const usedAbsences  = Number(enrollment.used_absences || 0);
+    if (paymentStatus === 'paid' || scheduleStatus === 'active') return null;
     const freezeRequired = Number(enrollment.schedule_freeze_required || 0) === 1
-        || (enrollment.schedule_freeze_required === undefined && usedAbsences >= 3);
+        || scheduleStatus === 'frozen'
+        || (enrollment.schedule_freeze_required === undefined && !scheduleStatus && usedAbsences >= 3);
     if (!freezeRequired) return null;
     const amount = Number(enrollment.reservation_fee_amount || 100) || 100;
     const amountLabel = formatCurrencyPHP(amount).replace(/\.00$/, '');
@@ -2691,10 +2814,17 @@ function getScheduleFreezeReservationNotice(enrollment) {
 }
 
 function renderEnrollmentHistoryList(history) {
-    if (!Array.isArray(history) || history.length === 0) {
+    const rows = (Array.isArray(history) ? history.slice() : []).sort((a, b) => {
+        const aTime = new Date(a?.first_session_date || a?.start_date || a?.enrollment_date || a?.created_at || 0).getTime() || 0;
+        const bTime = new Date(b?.first_session_date || b?.start_date || b?.enrollment_date || b?.created_at || 0).getTime() || 0;
+        if (aTime !== bTime) return bTime - aTime;
+        return Number(b?.enrollment_id || 0) - Number(a?.enrollment_id || 0);
+    });
+
+    if (!rows.length) {
         return '<div class="text-sm text-zinc-500">No previous enrollments yet.</div>';
     }
-    return history.map(row => {
+    return rows.map(row => {
         const startDate = formatDateLong(row.first_session_date || row.start_date || row.enrollment_date || '');
         return `<div class="rounded-xl border border-white/10 bg-black/20 p-3">
             <div class="flex items-center justify-between gap-2">
@@ -3639,6 +3769,8 @@ async function initGuardianDashboardPage() {
 
     const students = Array.isArray(portal.students) ? portal.students : [];
     guardianPortalStudents = students;
+    notifyFreezeRestoredForGuardianPortal(students);
+    startGuardianFreezeRefreshWatcher();
 
     const greetingName = `${guardian.first_name || ''}`.trim() || 'Guardian';
     setText('guardianDashboardGreeting', greetingName ? `Hello, ${greetingName}.` : '');
@@ -3688,6 +3820,8 @@ async function initGuardianStudentsPage() {
 
     const students = Array.isArray(portal.students) ? portal.students : [];
     guardianPortalStudents = students;
+    notifyFreezeRestoredForGuardianPortal(students);
+    startGuardianFreezeRefreshWatcher();
     updateGuardianTotals(students);
     setHtml('guardianStudentsList', renderGuardianStudentsList(students));
     await hydrateGuardianAttendance(students);
@@ -3715,6 +3849,8 @@ async function initGuardianPaymentsPage() {
 
     const students = Array.isArray(portal.students) ? portal.students : [];
     guardianPortalStudents = students;
+    notifyFreezeRestoredForGuardianPortal(students);
+    startGuardianFreezeRefreshWatcher();
     updateGuardianPaymentTotals(students);
     setHtml('guardianPaymentsList', renderGuardianPaymentsList(students));
     await hydrateGuardianAttendance(students);
@@ -3744,6 +3880,8 @@ async function initGuardianProfilePage() {
 
     window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
     applyGuardianPortalIdentity(user, portal);
+    notifyFreezeRestoredForGuardianPortal(students);
+    startGuardianFreezeRefreshWatcher();
     setText('guardianProfileHeading', `${guardian.first_name || ''} ${guardian.last_name || ''}`.trim() || 'Guardian Profile');
     setText('guardianProfileLinkedStudents', String(students.length));
     setText('guardianProfileBalance', formatCurrencyPHP(metrics.balance));
@@ -3834,6 +3972,8 @@ async function initGuardianAbsencePage() {
     const students = Array.isArray(portal.students) ? portal.students : [];
     guardianPortalStudents = students;
     window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    notifyFreezeRestoredForGuardianPortal(students);
+    startGuardianFreezeRefreshWatcher();
     applyGuardianPortalIdentity(user, portal);
 
     setText('guardianAbsenceName', `${guardian.first_name || ''} ${guardian.last_name || ''}`.trim() || 'Guardian');
@@ -5331,22 +5471,11 @@ async function initStudentDashboardPage() {
     if (isEnrolledStudent) {
         const performanceRows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
         const performanceMetrics = buildStudentPerformanceMetrics(performanceRows);
-        setHtml('studentPerformanceBars', renderStudentPerformanceBars(performanceMetrics) || `
-            <div class="rounded-2xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400 text-center">
-                <i class="fas fa-chart-line text-2xl mb-2"></i>
-                <div class="font-semibold text-zinc-900 dark:text-white">No progress scores yet</div>
-                <div class="mt-1">Your performance bars will appear after your teacher records session assessments.</div>
-            </div>
-        `);
-        setText(
-            'studentPerformanceNote',
-            performanceMetrics.some(metric => metric.average !== null)
-                ? 'Based on your recorded session assessments.'
-                : 'Your performance bars will appear after your teacher records session assessments.'
-        );
+        setHtml('studentPerformanceCard', renderStudentPerformanceProfile(performanceMetrics, performanceRows));
+        renderStudentPerformanceRadar(performanceMetrics);
     } else {
-        setHtml('studentPerformanceBars', '');
-        setText('studentPerformanceNote', 'Performance will appear after enrollment is active.');
+        setHtml('studentPerformanceCard', '');
+        renderStudentPerformanceRadar([]);
     }
 
     let meta = null;
@@ -5373,9 +5502,11 @@ async function initStudentDashboardPage() {
             }
         } catch (_) { /* non-critical */ }
     }
+    studentDashboardPortalState = portal;
+    notifyFreezeRestoredForStudentPortal(portal, s);
+    startStudentFreezeRefreshWatcher();
 
     if (!isEnrolledStudent) {
-        studentDashboardPortalState = portal;
         studentDashboardMetaState = meta;
         renderStudentActionBanner(s, meta, portal);
         renderStudentOnboardingSteps(s, meta, portal);
@@ -5542,6 +5673,10 @@ async function initStudentSessionsPage() {
             `);
         } else {
             setHtml('attendanceTableBody', sortedRows.map((r, index) => {
+                const dateValue = r.session_date ? new Date(r.session_date) : null;
+                const monthLabel = dateValue ? dateValue.toLocaleDateString('en-PH', { month: 'short' }).toUpperCase() : '—';
+                const dayLabel = dateValue ? dateValue.toLocaleDateString('en-PH', { day: '2-digit' }) : '—';
+                const weekdayLabel = dateValue ? dateValue.toLocaleDateString('en-PH', { weekday: 'short' }).toUpperCase() : '—';
                 const dateLabel = r.session_date ? formatDateLong(r.session_date) : 'Date pending';
                 const start = r.start_time ? formatTime12Hour(r.start_time) : '';
                 const end = r.end_time ? formatTime12Hour(r.end_time) : '';
@@ -5550,29 +5685,52 @@ async function initStudentSessionsPage() {
                 const attendanceLabel = r.attendance_status && r.attendance_status !== 'Pending'
                     ? r.attendance_status
                     : (r.status || 'Scheduled');
-                const roomLabel = r.room_name || 'Room pending';
+                const roomLabel = r.room_name || 'Room to be confirmed';
                 const teacherLabel = r.teacher_name || 'Teacher pending';
+                const sessionState = Number(r.progress_id || 0) > 0
+                    ? 'Graded'
+                    : ((String(r.status || '').toLowerCase() === 'completed' || String(r.attendance_status || '').toLowerCase() === 'present') ? 'Upcoming' : 'Upcoming');
+                const noteLabel = Number(r.progress_id || 0) > 0
+                    ? 'This session has already been graded. Open the details to review the score and remarks.'
+                    : 'Not scored yet - your coach will grade this after the session.';
 
                 return `
-                    <article class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-lg dark:shadow-black/20">
-                        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                            <div class="min-w-0">
-                                <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">${escapeHtml(sessionNumber)}</div>
-                                <div class="mt-2 text-lg font-black text-zinc-900 dark:text-white">${escapeHtml(dateLabel)}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(timeLabel)} • ${escapeHtml(roomLabel)} • ${escapeHtml(teacherLabel)}</div>
+                    <article class="rounded-2xl border ${Number(r.progress_id || 0) > 0 ? 'border-zinc-200 dark:border-white/10' : 'border-gold-500/30 dark:border-gold-500/20'} bg-white dark:bg-white/5 p-3 sm:p-4 shadow-sm hover:shadow-md transition">
+                        <div class="flex flex-col gap-3 md:flex-row md:items-center">
+                            <div class="flex items-start gap-3 min-w-0 flex-1">
+                                <div class="shrink-0 rounded-xl bg-amber-50 dark:bg-white/5 border border-amber-100 dark:border-white/10 px-2 py-2 text-center leading-none w-16">
+                                    <div class="text-[9px] font-black tracking-[0.18em] text-amber-700 dark:text-amber-300">${escapeHtml(monthLabel)}</div>
+                                    <div class="mt-1 text-2xl font-black text-zinc-900 dark:text-white">${escapeHtml(dayLabel)}</div>
+                                    <div class="mt-1 text-[9px] font-black tracking-[0.16em] text-amber-700/80 dark:text-amber-200">${escapeHtml(weekdayLabel)}</div>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <div class="text-[11px] uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold">${escapeHtml(sessionNumber)}</div>
+                                        <span class="inline-flex items-center rounded-full border border-gold-500/30 bg-gold-500/10 px-2.5 py-1 text-[10px] font-bold text-gold-700 dark:text-gold-300">
+                                            <i class="fas fa-calendar-day mr-1 text-[9px]"></i>${escapeHtml(sessionState)}
+                                        </span>
+                                    </div>
+                                    <div class="mt-1.5 text-lg sm:text-xl font-black text-zinc-900 dark:text-white">${escapeHtml(dateLabel)}</div>
+                                    <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-zinc-500 dark:text-zinc-300">
+                                        <span class="inline-flex items-center gap-1.5"><i class="far fa-clock text-zinc-400"></i>${escapeHtml(timeLabel)}</span>
+                                        <span class="inline-flex items-center gap-1.5"><i class="far fa-circle-dot text-zinc-400"></i>${escapeHtml(roomLabel)}</span>
+                                        <span class="inline-flex items-center gap-1.5"><i class="far fa-user text-zinc-400"></i>${escapeHtml(teacherLabel)}</span>
+                                    </div>
+                                    <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">${escapeHtml(noteLabel)}</div>
+                                </div>
                             </div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                ${renderAttendanceStatusBadge(attendanceLabel)}
-                                ${renderStudentGradeBadge(r.average_score, r.progress_id)}
-                                <button type="button" onclick="openStudentGradeDetails(${index})" class="inline-flex items-center px-4 py-2 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition whitespace-nowrap">
-                                    View Details
+                            <div class="flex flex-col items-start md:items-end gap-2">
+                                <button type="button" onclick="openStudentGradeDetails(${index})" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-gold-500 hover:bg-gold-400 text-black text-xs font-extrabold transition shadow-sm whitespace-nowrap">
+                                    View details <i class="fas fa-chevron-right text-[9px]"></i>
                                 </button>
+                                <div class="flex flex-wrap items-center justify-start md:justify-end gap-2">
+                                    ${renderAttendanceStatusBadge(attendanceLabel)}
+                                    ${renderStudentGradeBadge(r.average_score, r.progress_id)}
+                                </div>
                             </div>
                         </div>
-                        <div class="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
+                        <div class="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
                             Skill level: <span class="font-semibold text-zinc-700 dark:text-zinc-200">${escapeHtml(r.skill_level || 'Not graded yet')}</span>
-                            <span class="mx-2">•</span>
-                            Open the modal for the full score breakdown and teacher remarks.
                         </div>
                     </article>
                 `;
@@ -5626,54 +5784,125 @@ function buildStudentGradeDetailsMarkup(row) {
     const timeLabel = row.start_time && row.end_time
         ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
         : (row.start_time ? formatTime12Hour(row.start_time) : 'Time pending');
+    const hasGrade = Number(row.progress_id || 0) > 0 && Number(row.average_score || 0) > 0;
+    const averageScore = hasGrade ? Number(row.average_score).toFixed(2) : null;
     const remarksText = cleanSessionNoteText(row.teacher_remarks || row.remarks, 'No remarks recorded for this session.');
     const remarks = escapeHtml(remarksText);
     const scorePills = [
-        ['Performance', row.performance_score],
-        ['Technique', row.technique_score],
+        ['Perf', row.performance_score],
+        ['Tech', row.technique_score],
         ['Rhythm', row.rhythm_score],
         ['Focus', row.focus_score],
-        ['Assignment', row.assignment_score]
+        ['Assign', row.assignment_score]
     ].map(([label, value]) => `
-        <div class="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-3">
-            <div class="text-[11px] uppercase tracking-[0.18em] text-zinc-500 font-bold">${escapeHtml(label)}</div>
-            <div class="mt-1 text-lg font-black text-zinc-900">${value ? `${escapeHtml(String(value))}/5` : '—'}</div>
+        <div class="rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm">
+            <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.16em]">${escapeHtml(label)}</div>
+            <div class="mt-0.5 text-sm font-black text-zinc-900">${value ? `${escapeHtml(String(value))}/5` : '—'}</div>
         </div>
     `).join('');
 
     return `
-        <div class="text-left">
-            <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 font-bold">Session ${escapeHtml(String(row.session_number || ''))}</div>
-            <h3 class="mt-2 text-xl font-black text-zinc-900">${escapeHtml(row.instrument_name || 'Instrument Session')}</h3>
-            <div class="mt-2 text-sm text-zinc-500">${escapeHtml(dateLabel)} • ${escapeHtml(timeLabel)}</div>
-            <div class="mt-1 text-sm text-zinc-500">${escapeHtml(row.teacher_name || 'Teacher not assigned')} • ${escapeHtml(row.room_name || 'Room to be announced')}</div>
-            <div class="mt-4 flex flex-wrap items-center gap-2">
-                ${renderAttendanceStatusBadge(row.attendance_status && row.attendance_status !== 'Pending' ? row.attendance_status : (row.status || 'Scheduled'))}
-                ${renderStudentGradeBadge(row.average_score, row.progress_id)}
-            </div>
-            <div class="mt-5 grid grid-cols-2 xl:grid-cols-6 gap-3">
-                <div class="rounded-2xl border border-gold-500/20 bg-gold-500/10 px-4 py-4 xl:col-span-1">
-                    <div class="text-[11px] uppercase tracking-[0.18em] text-gold-700 font-bold">Skill Level</div>
-                    <div class="mt-1 text-lg font-black text-zinc-900">${escapeHtml(row.skill_level || 'Pending')}</div>
+        <div class="text-left overflow-hidden rounded-[1.25rem] bg-[#f8f4ea] max-w-[94vw] sm:max-w-none max-h-[calc(100vh-1rem)] flex flex-col">
+            <div class="flex items-start justify-between gap-3 bg-[#bd9525] px-4 py-3.5 text-white">
+                <div>
+                    <div class="text-[10px] font-black uppercase tracking-[0.22em] text-white/90">Session ${escapeHtml(String(row.session_number || ''))}</div>
+                    <h3 class="mt-1 text-base sm:text-lg font-black leading-tight">${escapeHtml(row.instrument_name || 'Instrument Session')}</h3>
                 </div>
-                ${scorePills}
+                <button type="button" onclick="Swal.close()" class="h-8 w-8 shrink-0 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition" aria-label="Close modal">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
             </div>
-            <div class="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4">
-                <div class="text-[11px] uppercase tracking-[0.18em] text-zinc-500 font-bold">Teacher Remarks</div>
-                <div class="mt-2 text-sm leading-6 text-zinc-700">${remarks}</div>
+            <div class="px-4 py-4 bg-white overflow-y-auto">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-3">
+                        <div class="h-9 w-9 rounded-xl bg-white border border-zinc-200 grid place-items-center text-gold-500 shrink-0">
+                            <i class="far fa-calendar text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-zinc-400 font-medium">Date</div>
+                            <div class="text-sm font-extrabold text-zinc-900">${escapeHtml(dateLabel)}</div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-3">
+                        <div class="h-9 w-9 rounded-xl bg-white border border-zinc-200 grid place-items-center text-gold-500 shrink-0">
+                            <i class="far fa-clock text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-zinc-400 font-medium">Time</div>
+                            <div class="text-sm font-extrabold text-zinc-900">${escapeHtml(timeLabel)}</div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-3">
+                        <div class="h-9 w-9 rounded-xl bg-white border border-zinc-200 grid place-items-center text-gold-500 shrink-0">
+                            <i class="far fa-circle-dot text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-zinc-400 font-medium">Location</div>
+                            <div class="text-sm font-extrabold text-zinc-900">${escapeHtml(row.room_name || 'To be confirmed')}</div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-3">
+                        <div class="h-9 w-9 rounded-xl bg-white border border-zinc-200 grid place-items-center text-gold-500 shrink-0">
+                            <i class="far fa-user text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-zinc-400 font-medium">Coach</div>
+                            <div class="text-sm font-extrabold text-zinc-900">${escapeHtml(row.teacher_name || 'Not assigned')}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    ${renderStudentGradeBadge(row.average_score, row.progress_id)}
+                </div>
+
+                <div class="mt-4 rounded-xl border border-zinc-100 bg-[#faf8f2] px-4 py-3">
+                    <div class="text-sm font-bold text-zinc-900">${hasGrade ? `Score ${escapeHtml(averageScore)}/5` : 'Not graded yet'}</div>
+                    <div class="mt-1 text-sm leading-6 text-zinc-600">
+                        ${hasGrade ? 'Feedback below.' : 'Coach will grade after the session.'}
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="rounded-xl border border-zinc-100 bg-white px-4 py-3 text-sm leading-6 text-zinc-600 shadow-sm">
+                        ${remarks}
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="flex items-center gap-2 text-sm font-bold text-zinc-900">
+                        <i class="fas fa-chart-pie text-gold-500"></i> Breakdown
+                    </div>
+                    <div class="mt-2 grid grid-cols-2 gap-2">
+                        ${scorePills}
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="button" onclick="Swal.close()" class="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#12192a] px-5 py-2.5 text-sm text-white font-extrabold shadow-lg shadow-[#12192a]/20 hover:bg-[#0d1322] transition">
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
     `;
 }
 
 function openStudentGradeDetails(index) {
-    const rows = Array.isArray(window.__studentGradesRows) ? window.__studentGradesRows : [];
+    const rows = Array.isArray(window.__studentSessionsRows) && window.__studentSessionsRows.length
+        ? window.__studentSessionsRows
+        : (Array.isArray(window.__studentGradesRows) ? window.__studentGradesRows : []);
     const row = rows[Number(index)];
     if (!row) return;
     Swal.fire({
-        width: 980,
-        confirmButtonText: 'Close',
-        confirmButtonColor: '#b8860b',
+        width: 390,
+        showConfirmButton: false,
+        showCloseButton: false,
+        background: 'transparent',
+        padding: 0,
+        customClass: {
+            popup: 'session-detail-swal'
+        },
         html: buildStudentGradeDetailsMarkup(row)
     });
 }
@@ -5705,14 +5934,28 @@ async function initStudentGradesPage() {
         const rows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
         const gradedRows = rows.filter(row => Number(row.progress_id || 0) > 0);
         const pendingRows = rows.filter(row => Number(row.progress_id || 0) < 1);
+        const packageSessions = Number(portal.current_enrollment?.package_sessions || portal.student?.package_sessions || 0);
+        const completedSessions = gradedRows.length;
+        const remainingSessions = packageSessions > 0 ? Math.max(0, packageSessions - completedSessions) : null;
+        const progressPercent = packageSessions > 0
+            ? Math.max(0, Math.min(100, Math.round((completedSessions / packageSessions) * 100)))
+            : 0;
         const averageValue = gradedRows.length
             ? (gradedRows.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / gradedRows.length).toFixed(2)
             : null;
         const latestGraded = gradedRows.find(row => row.assessment_date || row.updated_at) || null;
 
         setText('studentGradesPackage', portal.student?.package_name || 'No active package yet');
+        setText('studentGradesSessionsDone', String(completedSessions));
+        setText('studentGradesSessionsTotal', packageSessions > 0 ? String(packageSessions) : '—');
+        setText(
+            'studentGradesSessionsLeft',
+            packageSessions > 0
+                ? `${remainingSessions} session${remainingSessions === 1 ? '' : 's'} left to go`
+                : 'Session total not available yet'
+        );
         setText('studentGradesAverage', averageValue ? `${averageValue}/5` : 'Pending');
-        setText('studentGradesCompleted', String(gradedRows.length));
+        setText('studentGradesCompleted', String(completedSessions));
         setText('studentGradesPending', String(pendingRows.length));
         setText(
             'studentGradesLatest',
@@ -5720,6 +5963,10 @@ async function initStudentGradesPage() {
                 ? formatDateLong(latestGraded.assessment_date || latestGraded.session_date || '')
                 : (enrollmentApproved ? 'No graded session yet' : 'Locked until approval')
         );
+        const progressBar = document.getElementById('studentGradesProgressBar');
+        if (progressBar) {
+            progressBar.style.width = `${progressPercent}%`;
+        }
 
         if (!enrollmentApproved) {
             listEl.innerHTML = `
@@ -5735,12 +5982,15 @@ async function initStudentGradesPage() {
         const sortedRows = [...rows].sort((a, b) => {
             const aTime = new Date(`${a?.session_date || ''}T${a?.start_time || '00:00:00'}`).getTime() || 0;
             const bTime = new Date(`${b?.session_date || ''}T${b?.start_time || '00:00:00'}`).getTime() || 0;
-            return bTime - aTime;
+            if (aTime !== bTime) return aTime - bTime;
+            return Number(a?.session_number || 0) - Number(b?.session_number || 0);
         });
+        setText('studentSessionsCount', `${sortedRows.length} total`);
         const sortedGradedRows = sortedRows.filter(row => Number(row.progress_id || 0) > 0);
         const sortedPendingRows = sortedRows.filter(row => Number(row.progress_id || 0) < 1);
 
         if (!sortedRows.length) {
+            setText('studentSessionsCount', '0 total');
             listEl.innerHTML = `
                 <div class="rounded-3xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-6 py-12 text-center text-zinc-500 dark:text-zinc-400">
                     <i class="fas fa-chart-line text-2xl mb-3"></i>
@@ -6848,6 +7098,223 @@ function showMessage(message, type = 'error') {
     } else {
         alert(message);
     }
+}
+
+function showPortalToast(message, type = 'info', title = '') {
+    if (typeof Swal !== 'undefined' && typeof Swal.mixin === 'function') {
+        const toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3600,
+            timerProgressBar: true,
+            didOpen: (popup) => {
+                popup.addEventListener('mouseenter', Swal.stopTimer);
+                popup.addEventListener('mouseleave', Swal.resumeTimer);
+            }
+        });
+        return toast.fire({
+            icon: ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info',
+            title: title || message,
+            text: title ? message : ''
+        });
+    }
+
+    alert(message);
+    return Promise.resolve();
+}
+
+function getFreezeRestoreToastKey(context, enrollmentId) {
+    return `fas_freeze_restored_${String(context || 'student')}_${Number(enrollmentId || 0)}`;
+}
+
+function readFreezeRestoreToastState(context, enrollmentId) {
+    try {
+        return localStorage.getItem(getFreezeRestoreToastKey(context, enrollmentId)) || '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function writeFreezeRestoreToastState(context, enrollmentId, state) {
+    try {
+        localStorage.setItem(getFreezeRestoreToastKey(context, enrollmentId), String(state || ''));
+    } catch (e) {
+        // Ignore storage issues.
+    }
+}
+
+function getEnrollmentFreezePresenceState(enrollment) {
+    const scheduleStatus = String(enrollment?.schedule_status || '').trim().toLowerCase();
+    const paymentStatus = String(enrollment?.__freeze_payment_status || '').trim().toLowerCase();
+    if (scheduleStatus === 'frozen' || paymentStatus === 'pending' || paymentStatus === 'rejected') {
+        return 'frozen';
+    }
+    if (scheduleStatus === 'active') {
+        return 'active';
+    }
+    return scheduleStatus || 'active';
+}
+
+function notifyFreezeRestored(enrollment, personName = 'Your account', context = 'student') {
+    const enrollmentId = Number(enrollment?.enrollment_id || 0);
+    if (enrollmentId < 1) return false;
+
+    const currentState = getEnrollmentFreezePresenceState(enrollment);
+    const previousState = readFreezeRestoreToastState(context, enrollmentId);
+    const wasFrozenBefore = ['frozen', 'pending'].includes(previousState);
+    const isNowActive = currentState === 'active';
+
+    if (isNowActive && wasFrozenBefore) {
+        showPortalToast(
+            `${personName} can go back to sessions now. The frozen reservation has been cleared.`,
+            'success',
+            'Account Restored'
+        );
+    }
+
+    writeFreezeRestoreToastState(context, enrollmentId, currentState);
+    return isNowActive && wasFrozenBefore;
+}
+
+function notifyFreezeRestoredForStudentPortal(portal, student) {
+    const enrollment = portal?.current_enrollment || null;
+    const studentName = `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || 'Your account';
+    notifyFreezeRestored(enrollment, studentName, 'student');
+}
+
+function notifyFreezeRestoredForGuardianPortal(students) {
+    (Array.isArray(students) ? students : []).forEach((item) => {
+        const s = item?.student || {};
+        const studentName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'A linked student';
+        notifyFreezeRestored(item?.current_enrollment || null, studentName, 'guardian');
+    });
+}
+
+function hasPendingFreezeRestoration(enrollment) {
+    if (!enrollment) return false;
+    const presenceState = getEnrollmentFreezePresenceState(enrollment);
+    const paymentStatus = String(enrollment.__freeze_payment_status || '').trim().toLowerCase();
+    const scheduleStatus = String(enrollment.schedule_status || '').trim().toLowerCase();
+    if (paymentStatus === 'paid' || scheduleStatus === 'active') return false;
+    return ['frozen', 'pending', 'rejected'].includes(presenceState)
+        || ['pending', 'rejected'].includes(paymentStatus)
+        || (scheduleStatus && scheduleStatus !== 'active' && Number(enrollment.enrollment_id || 0) > 0);
+}
+
+function stopStudentFreezeRefreshWatcher() {
+    if (window.__studentFreezeRefreshTimer) {
+        window.clearInterval(window.__studentFreezeRefreshTimer);
+        window.__studentFreezeRefreshTimer = null;
+    }
+}
+
+function startStudentFreezeRefreshWatcher() {
+    stopStudentFreezeRefreshWatcher();
+    const enrollment = studentDashboardPortalState?.current_enrollment || null;
+    if (!hasPendingFreezeRestoration(enrollment)) return;
+    window.__studentFreezeRefreshBusy = false;
+    window.__studentFreezeRefreshTimer = window.setInterval(async () => {
+        if (window.__studentFreezeRefreshBusy) return;
+        window.__studentFreezeRefreshBusy = true;
+        try {
+            const restored = await refreshStudentFreezeStatusAndNotify();
+            if (restored) {
+                stopStudentFreezeRefreshWatcher();
+                window.location.reload();
+            }
+        } finally {
+            window.__studentFreezeRefreshBusy = false;
+        }
+    }, 15000);
+}
+
+function stopGuardianFreezeRefreshWatcher() {
+    if (window.__guardianFreezeRefreshTimer) {
+        window.clearInterval(window.__guardianFreezeRefreshTimer);
+        window.__guardianFreezeRefreshTimer = null;
+    }
+}
+
+function startGuardianFreezeRefreshWatcher() {
+    stopGuardianFreezeRefreshWatcher();
+    const needsPolling = (Array.isArray(guardianPortalStudents) ? guardianPortalStudents : [])
+        .some((item) => hasPendingFreezeRestoration(item?.current_enrollment || null));
+    if (!needsPolling) return;
+    window.__guardianFreezeRefreshBusy = false;
+    window.__guardianFreezeRefreshTimer = window.setInterval(async () => {
+        if (window.__guardianFreezeRefreshBusy) return;
+        window.__guardianFreezeRefreshBusy = true;
+        try {
+            const restored = await refreshGuardianFreezeStatusAndNotify();
+            if (restored) {
+                stopGuardianFreezeRefreshWatcher();
+                window.location.reload();
+            }
+        } finally {
+            window.__guardianFreezeRefreshBusy = false;
+        }
+    }, 15000);
+}
+
+async function refreshStudentFreezeStatusAndNotify() {
+    const portal = studentDashboardPortalState;
+    const enrollment = portal?.current_enrollment || null;
+    if (!portal?.student || !enrollment?.enrollment_id) return false;
+
+    try {
+        const res = await axios.get(`${baseApiUrl}/students.php?action=get-student-freeze-payment-status&enrollment_id=${encodeURIComponent(enrollment.enrollment_id)}`);
+        const data = res.data || {};
+        if (!data.success || !data.payment) return false;
+
+        const previousState = String(enrollment.__freeze_payment_status || '').trim();
+        enrollment.__freeze_payment_status = data.payment.status || '';
+        if (String(data.payment.status || '').toLowerCase() === 'paid') {
+            enrollment.schedule_status = 'Active';
+        }
+
+        const restored = notifyFreezeRestoredForStudentPortal(portal, portal.student);
+        if (restored && previousState !== 'Paid') {
+            return true;
+        }
+    } catch (e) {
+        // Non-critical polling failure.
+    }
+
+    return false;
+}
+
+async function refreshGuardianFreezeStatusAndNotify() {
+    if (!Array.isArray(guardianPortalStudents) || guardianPortalStudents.length === 0) return false;
+    let restoredAny = false;
+
+    for (const item of guardianPortalStudents) {
+        const enrollment = item?.current_enrollment || null;
+        const student = item?.student || null;
+        if (!enrollment?.enrollment_id) continue;
+
+        try {
+            const res = await axios.get(`${baseApiUrl}/students.php?action=get-student-freeze-payment-status&enrollment_id=${encodeURIComponent(enrollment.enrollment_id)}`);
+            const data = res.data || {};
+            if (!data.success || !data.payment) continue;
+
+            const previousState = String(enrollment.__freeze_payment_status || '').trim();
+            enrollment.__freeze_payment_status = data.payment.status || '';
+            if (String(data.payment.status || '').toLowerCase() === 'paid') {
+                enrollment.schedule_status = 'Active';
+            }
+
+            const before = readFreezeRestoreToastState('guardian', enrollment.enrollment_id);
+            const restored = notifyFreezeRestored(enrollment, `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || 'A linked student', 'guardian');
+            if (restored && (previousState !== 'Paid' || before !== 'active')) {
+                restoredAny = true;
+            }
+        } catch (e) {
+            // Non-critical polling failure.
+        }
+    }
+
+    return restoredAny;
 }
 
 // Load Pending Registrations
