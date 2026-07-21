@@ -2366,6 +2366,377 @@ function renderStudentPerformanceRadar(metrics) {
     });
 }
 
+function getStudentCertificateState(portal) {
+    const enrollment = portal?.current_enrollment || null;
+    const student = portal?.student || {};
+    const packageSessions = Number(enrollment?.package_sessions || student?.package_sessions || 0);
+    const completedSessionsRaw = Number(enrollment?.completed_sessions || 0);
+    const gradedSessions = Array.isArray(portal?.current_session_grades)
+        ? portal.current_session_grades.filter((row) => Number(row?.progress_id || 0) > 0).length
+        : 0;
+    const completedSessions = Math.max(completedSessionsRaw, gradedSessions);
+    const enrollmentStatus = String(enrollment?.status || '').trim().toLowerCase();
+    const isAvailable = enrollmentStatus === 'completed'
+        || (packageSessions > 0 && completedSessions >= packageSessions);
+
+    return {
+        isAvailable,
+        packageSessions,
+        completedSessions,
+        enrollmentStatus,
+        studentName: `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || 'Student',
+        packageName: enrollment?.package_name || student?.package_name || 'Lesson Package',
+        teacherName: `${enrollment?.teacher_first_name || ''} ${enrollment?.teacher_last_name || ''}`.trim() || 'Teacher',
+        issueDate: enrollment?.end_date || enrollment?.updated_at || enrollment?.created_at || new Date().toISOString().slice(0, 10),
+        branchName: student?.branch_name || enrollment?.branch_name || 'Father & Sons Music'
+    };
+}
+
+function isStudentEnrollmentCompleted(portal) {
+    return Boolean(getStudentCertificateState(portal).isAvailable);
+}
+
+function renderStudentCertificateCard(portal) {
+    const state = getStudentCertificateState(portal);
+    if (!state.isAvailable) {
+        return '';
+    }
+
+    const issuedLabel = formatDateLong(state.issueDate) || state.issueDate;
+    return `
+        <section class="rounded-[1.75rem] border border-gold-200/80 dark:border-gold-500/20 bg-gradient-to-br from-gold-50 via-white to-amber-50 dark:from-gold-500/10 dark:via-white/5 dark:to-white/3 px-5 py-5 sm:px-6 sm:py-5 mb-6">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-start gap-4">
+                    <div class="h-14 w-14 rounded-2xl bg-gold-500 text-black grid place-items-center shrink-0">
+                        <i class="fas fa-certificate text-2xl"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-black uppercase tracking-[0.3em] text-gold-600 dark:text-gold-300">Certificate Unlocked</p>
+                        <h2 class="mt-1 text-2xl font-black text-zinc-900 dark:text-white">Completion Certificate Ready</h2>
+                        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300 max-w-2xl">
+                            You finished ${escapeHtml(String(state.completedSessions))} of ${escapeHtml(String(state.packageSessions || state.completedSessions))} sessions for ${escapeHtml(state.packageName)}.
+                        </p>
+                        <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                            <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-3 py-1.5 dark:border-gold-500/20 dark:bg-white/5">
+                                <i class="fas fa-user-graduate mr-2 text-gold-500"></i>${escapeHtml(state.studentName)}
+                            </span>
+                            <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-3 py-1.5 dark:border-gold-500/20 dark:bg-white/5">
+                                <i class="fas fa-chalkboard-teacher mr-2 text-gold-500"></i>${escapeHtml(state.teacherName)}
+                            </span>
+                            <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-3 py-1.5 dark:border-gold-500/20 dark:bg-white/5">
+                                <i class="fas fa-calendar-check mr-2 text-gold-500"></i>${escapeHtml(issuedLabel)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <button type="button" onclick="openStudentCertificatePreview()" class="px-5 py-3 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-extrabold transition">
+                        <i class="fas fa-eye mr-2"></i>View Certificate
+                    </button>
+                    <button type="button" onclick="printStudentCertificate()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                        <i class="fas fa-print mr-2"></i>Print / Save PDF
+                    </button>
+                </div>
+            </div>
+        </section>
+    `;
+}
+
+function renderStudentCompletedSessionsPanel(portal) {
+    const state = getStudentCertificateState(portal);
+    if (!state.isAvailable) {
+        return '';
+    }
+
+    const completionEntries = [];
+    const enrollment = portal?.current_enrollment || null;
+
+    if (enrollment) {
+        completionEntries.push(enrollment);
+    }
+
+    (Array.isArray(portal?.enrollment_history) ? portal.enrollment_history : []).forEach((row) => {
+        if (!row) return;
+        const enrollmentId = Number(row.enrollment_id || 0);
+        if (enrollmentId > 0 && completionEntries.some((item) => Number(item?.enrollment_id || 0) === enrollmentId)) {
+            return;
+        }
+        completionEntries.push(row);
+    });
+
+    const rows = completionEntries
+        .filter((row) => {
+            const rowStatus = String(row?.status || '').trim().toLowerCase();
+            const rowCompletedSessions = Number(row?.completed_sessions || 0);
+            const rowPackageSessions = Number(row?.package_sessions || state.packageSessions || 0);
+            return rowStatus === 'completed' || (rowPackageSessions > 0 && rowCompletedSessions >= rowPackageSessions);
+        })
+        .sort((a, b) => {
+            const aTime = new Date(a?.end_date || a?.updated_at || a?.created_at || 0).getTime() || 0;
+            const bTime = new Date(b?.end_date || b?.updated_at || b?.created_at || 0).getTime() || 0;
+            if (aTime !== bTime) return bTime - aTime;
+            return Number(b?.enrollment_id || 0) - Number(a?.enrollment_id || 0);
+        });
+
+    const historyMarkup = rows.length
+        ? rows.map((row) => {
+            const completedLabel = formatDateLong(row?.end_date || row?.updated_at || row?.created_at || '') || 'Not set';
+            const paymentLabel = String(row?.payment_type || 'Partial Payment');
+            const amountLabel = formatCurrencyPHP(Number(row?.total_amount || 0));
+            const rowCompletedSessions = Number(row?.completed_sessions || 0);
+            const rowRequiredSessions = Number(row?.package_sessions || row?.total_sessions || state.packageSessions || rowCompletedSessions || 0);
+            const displayCompletedSessions = rowCompletedSessions > 0
+                ? rowCompletedSessions
+                : (String(row?.status || '').trim().toLowerCase() === 'completed' ? rowRequiredSessions : 0);
+            const sessionLabel = `${displayCompletedSessions} of ${rowRequiredSessions || displayCompletedSessions} sessions`;
+
+            return `
+                <article class="rounded-[1.5rem] border border-zinc-200/80 dark:border-white/10 bg-zinc-50/80 dark:bg-white/5 px-5 py-4 sm:px-6 sm:py-5">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="flex items-start gap-4 min-w-0">
+                            <div class="h-12 w-12 rounded-2xl border border-gold-100 dark:border-white/10 bg-gold-50 dark:bg-white/5 text-gold-600 grid place-items-center shrink-0">
+                                <i class="fas fa-calendar-check text-lg"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-lg font-extrabold text-zinc-900 dark:text-white truncate">${escapeHtml(row?.package_name || 'Session Package')}</div>
+                                <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">Completed on ${escapeHtml(completedLabel)}</div>
+                            </div>
+                        </div>
+                        <span class="inline-flex items-center self-start rounded-full border border-gold-200 bg-gold-50 px-3 py-1.5 text-xs font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-300">
+                            Completed
+                        </span>
+                    </div>
+                </article>
+            `;
+        }).join('')
+        : `
+            <div class="rounded-[1.75rem] border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50/70 dark:bg-white/5 px-6 py-10 text-center text-zinc-500 dark:text-zinc-400">
+                Your completed lessons will appear here.
+            </div>
+        `;
+
+    return `
+        <section class="rounded-[1.75rem] border border-zinc-200/80 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-5 sm:px-6 sm:py-6 mb-6">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="portal-section-title text-zinc-900 dark:text-white">Session History</h2>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Your completed lesson packages.</p>
+                </div>
+                <span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-4 py-2 text-sm font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-300 self-start sm:self-auto">
+                    Completed
+                </span>
+            </div>
+            <div class="mt-5 space-y-4">
+                ${historyMarkup}
+            </div>
+        </section>
+    `;
+}
+
+function ensureStudentCertificateModal() {
+    let modal = document.getElementById('studentCertificateModal');
+    if (modal) {
+        return modal;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+        <div id="studentCertificateModal" class="fixed inset-0 z-[80] hidden bg-black/60 backdrop-blur-sm p-0 sm:p-4" aria-hidden="true">
+            <div class="min-h-full flex items-stretch sm:items-center justify-center">
+                <div class="w-full h-full sm:h-auto sm:max-h-[94vh] sm:max-w-5xl bg-white dark:bg-obsidian rounded-none sm:rounded-3xl border-0 sm:border sm:border-zinc-200 dark:sm:border-white/10 shadow-2xl overflow-hidden">
+                    <div class="flex items-center justify-between gap-4 px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-white/10">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.25em] text-gold-600 dark:text-gold-300 font-bold">Certificate</div>
+                            <div class="text-lg font-extrabold text-zinc-900 dark:text-white mt-1">Completion Certificate Preview</div>
+                        </div>
+                        <button type="button" onclick="closeStudentCertificatePreview()" class="h-10 w-10 rounded-full border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 transition" aria-label="Close certificate preview">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="overflow-y-auto max-h-[calc(100vh-73px)] sm:max-h-[calc(94vh-73px)] px-4 sm:px-6 py-5 bg-zinc-50/80 dark:bg-black/20">
+                        <div id="studentCertificatePreview" class="mx-auto max-w-4xl"></div>
+                        <div class="mt-4 flex flex-wrap justify-end gap-3">
+                            <button type="button" onclick="printStudentCertificate()" class="px-4 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                                <i class="fas fa-print mr-2"></i>Print / Save PDF
+                            </button>
+                            <button type="button" onclick="closeStudentCertificatePreview()" class="px-4 py-3 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-extrabold transition">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(wrapper.firstElementChild);
+    return document.getElementById('studentCertificateModal');
+}
+
+function buildStudentCertificateMarkup(portal) {
+    const state = getStudentCertificateState(portal);
+    const issuedLabel = formatDateLong(state.issueDate) || state.issueDate;
+    return `
+        <div class="certificate-sheet relative overflow-hidden rounded-[2rem] border-2 border-gold-200 bg-white p-6 sm:p-10 shadow-2xl shadow-black/10">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(212,175,55,0.18),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(184,134,11,0.12),_transparent_35%)]"></div>
+            <div class="relative">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-[11px] font-black uppercase tracking-[0.45em] text-gold-600">Father & Sons Music</p>
+                        <h3 class="mt-2 text-3xl sm:text-5xl font-black text-zinc-900">Certificate of Completion</h3>
+                    </div>
+                    <div class="h-16 w-16 rounded-2xl bg-gold-500 text-black grid place-items-center shadow-lg shadow-gold-500/20 shrink-0">
+                        <i class="fas fa-award text-3xl"></i>
+                    </div>
+                </div>
+
+                <div class="mt-10 text-center">
+                    <p class="text-sm font-bold uppercase tracking-[0.3em] text-zinc-500">This certifies that</p>
+                    <div class="mt-4 text-3xl sm:text-5xl font-black text-zinc-900">${escapeHtml(state.studentName)}</div>
+                    <p class="mt-4 text-base sm:text-lg text-zinc-600">
+                        has successfully completed the <span class="font-bold text-zinc-900">${escapeHtml(state.packageName)}</span> lesson package
+                        at <span class="font-bold text-zinc-900">${escapeHtml(state.branchName)}</span>.
+                    </p>
+                </div>
+
+                <div class="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="rounded-3xl border border-zinc-200 bg-white/80 px-5 py-4 text-center">
+                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Sessions Completed</div>
+                        <div class="mt-2 text-3xl font-black text-zinc-900">${escapeHtml(String(state.completedSessions))}</div>
+                    </div>
+                    <div class="rounded-3xl border border-zinc-200 bg-white/80 px-5 py-4 text-center">
+                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Required Sessions</div>
+                        <div class="mt-2 text-3xl font-black text-zinc-900">${escapeHtml(String(state.packageSessions || state.completedSessions))}</div>
+                    </div>
+                    <div class="rounded-3xl border border-zinc-200 bg-white/80 px-5 py-4 text-center">
+                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Issued On</div>
+                        <div class="mt-2 text-lg font-black text-zinc-900">${escapeHtml(issuedLabel)}</div>
+                    </div>
+                </div>
+
+                <div class="mt-10 flex items-end justify-between gap-6">
+                    <div class="text-left">
+                        <div class="text-xs uppercase tracking-[0.3em] text-zinc-500 font-bold">Teacher</div>
+                        <div class="mt-2 text-lg font-bold text-zinc-900">${escapeHtml(state.teacherName)}</div>
+                        <div class="text-sm text-zinc-500">Lesson instructor</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs uppercase tracking-[0.3em] text-zinc-500 font-bold">Status</div>
+                        <div class="mt-2 text-lg font-black text-emerald-600">Completed</div>
+                        <div class="text-sm text-zinc-500">Ready for print</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderStudentCertificatePreview(portal) {
+    const modal = ensureStudentCertificateModal();
+    const preview = document.getElementById('studentCertificatePreview');
+    if (!modal || !preview) return false;
+    preview.innerHTML = buildStudentCertificateMarkup(portal);
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    return true;
+}
+
+function closeStudentCertificatePreview() {
+    const modal = document.getElementById('studentCertificateModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+function openStudentCertificatePreview() {
+    const portal = studentDashboardPortalState || studentDashboardMetaState || null;
+    if (!portal) {
+        showMessage('Certificate details are not available yet.', 'error');
+        return;
+    }
+    const state = getStudentCertificateState(portal);
+    if (!state.isAvailable) {
+        showMessage('Your certificate will unlock after all sessions are completed.', 'error');
+        return;
+    }
+    renderStudentCertificatePreview(portal);
+}
+
+function printStudentCertificate() {
+    const portal = studentDashboardPortalState || studentDashboardMetaState || null;
+    if (!portal) {
+        showMessage('Certificate details are not available yet.', 'error');
+        return;
+    }
+    const state = getStudentCertificateState(portal);
+    if (!state.isAvailable) {
+        showMessage('Your certificate will unlock after all sessions are completed.', 'error');
+        return;
+    }
+
+    const html = buildStudentCertificateMarkup(portal);
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+
+    const cleanup = () => {
+        window.setTimeout(() => {
+            try {
+                iframe.remove();
+            } catch (error) {
+                console.warn('Unable to remove certificate print iframe.', error);
+            }
+        }, 1500);
+    };
+
+    iframe.onload = () => {
+        try {
+            const win = iframe.contentWindow;
+            if (!win) {
+                cleanup();
+                return;
+            }
+            win.focus();
+            win.print();
+        } catch (error) {
+            console.warn('Unable to print certificate iframe.', error);
+        } finally {
+            cleanup();
+        }
+    };
+
+    const doc = `
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Completion Certificate</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        html, body { margin: 0; padding: 0; background: #f4f1e8; font-family: Inter, Arial, sans-serif; }
+        .print-wrap { max-width: 1100px; margin: 0 auto; padding: 32px; }
+        @media print {
+            html, body { background: #fff; }
+            .print-wrap { padding: 0; max-width: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-wrap">${html}</div>
+</body>
+</html>`;
+
+    document.body.appendChild(iframe);
+    iframe.srcdoc = doc;
+}
+
 async function fetchGuardianPortalDataByEmail(email) {
     const url = `${baseApiUrl}/students.php?action=get-guardian-portal&email=${encodeURIComponent(email)}`;
     const res = await axios.get(url);
@@ -4238,6 +4609,7 @@ function initStudentAdditionalSessionAction(student, portal, requestMeta, attend
 function initStudentRequestSection(student, requestMeta) {
     const statusEl = document.getElementById('studentRequestStatus');
     const packageSelect = document.getElementById('studentRequestPackage');
+    const packageCardsContainer = document.getElementById('studentRequestPackageCards');
     const amountEl = document.getElementById('studentRequestAmount');
     const instrumentsContainer = document.getElementById('studentRequestInstrumentContainer');
     const paymentModeEl = document.getElementById('studentRequestPaymentMode');
@@ -4248,7 +4620,7 @@ function initStudentRequestSection(student, requestMeta) {
     const paymentProofEl = document.getElementById('studentRequestPaymentProof');
     const autoDayEl = document.getElementById('studentRequestAutoDay');
 
-    if (!statusEl || !packageSelect || !amountEl || !instrumentsContainer || !paymentModeEl || !paymentMethodEl || !availabilityCalendar || !form || !submitBtn) {
+    if (!statusEl || !packageSelect || !packageCardsContainer || !amountEl || !instrumentsContainer || !paymentModeEl || !paymentMethodEl || !availabilityCalendar || !form || !submitBtn) {
         return;
     }
 
@@ -4257,6 +4629,7 @@ function initStudentRequestSection(student, requestMeta) {
     const availabilities = Array.isArray(requestMeta?.availabilities) ? requestMeta.availabilities : [];
     const latest = requestMeta?.latest_request || null;
     const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
+    let selectedPackageId = '';
 
     statusEl.innerHTML = renderStudentRequestStatus(latest);
     availabilityCalendar.innerHTML = '';
@@ -4268,24 +4641,84 @@ function initStudentRequestSection(student, requestMeta) {
         const instLabel = maxInst > 1 ? `up to ${maxInst} instruments` : '1 instrument';
         return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} — ${sessions} sessions, ${instLabel} · ${price}</option>`;
     }).join('');
+
+    const getSelectedPackageData = () => {
+        const selected = packageSelect.options[packageSelect.selectedIndex];
+        return {
+            maxInst: Number(selected?.getAttribute('data-max-instruments') || 0),
+            price: Number(selected?.getAttribute('data-price') || 0),
+            sessions: Number(selected?.getAttribute('data-sessions') || 0),
+            label: String(selected?.textContent || '').trim()
+        };
+    };
+
+    const renderPackageCards = () => {
+        if (!packages.length) {
+            packageCardsContainer.innerHTML = `
+                <div class="rounded-2xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-5 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                    No session packages are available right now.
+                </div>
+            `;
+            return;
+        }
+
+        packageCardsContainer.innerHTML = packages.map((pkg) => {
+            const packageId = String(pkg.package_id || '');
+            const sessions = Number(pkg.sessions || 0);
+            const maxInst = Number(pkg.max_instruments || 1);
+            const price = formatCurrencyPHP(pkg.price || 0);
+            const active = packageId === selectedPackageId;
+            const instLabel = maxInst > 1 ? `up to ${maxInst} instruments` : '1 instrument';
+
+            return `
+                <button type="button"
+                    class="student-request-package-card w-full text-left rounded-[1.25rem] border px-4 py-3 transition ${active ? 'border-gold-500 bg-gold-50/70 dark:bg-gold-500/10 ring-1 ring-gold-500/25' : 'border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900/40 hover:border-gold-300 dark:hover:border-gold-500/30'}"
+                    data-package-id="${escapeHtml(packageId)}"
+                    data-max-instruments="${maxInst}"
+                    data-sessions="${sessions}"
+                    data-price="${pkg.price || 0}">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-4 min-w-0">
+                            <span class="h-6 w-6 rounded-full border flex items-center justify-center shrink-0 ${active ? 'border-gold-500 bg-gold-500 text-white' : 'border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-950 text-transparent'}">
+                                <i class="fas fa-check text-[10px]"></i>
+                            </span>
+                            <div class="min-w-0">
+                                <div class="text-base font-semibold text-zinc-900 dark:text-white">${escapeHtml(pkg.package_name || 'Package')}</div>
+                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">${sessions} sessions · ${escapeHtml(instLabel)}</div>
+                            </div>
+                        </div>
+                        <div class="text-base font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">${escapeHtml(price)}</div>
+                    </div>
+                </button>
+            `;
+        }).join('');
+
+        packageCardsContainer.querySelectorAll('.student-request-package-card').forEach((card) => {
+            card.addEventListener('click', () => {
+                selectedPackageId = String(card.dataset.packageId || '');
+                packageSelect.value = selectedPackageId;
+                renderPackageCards();
+                updateRequestPackageUI();
+            });
+        });
+    };
+
     if (packages.length === 0) {
         statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">No session package is available for enrollment request right now. Please contact desk/admin.</div>';
     }
 
     const updateRequestPackageUI = () => {
-        const selected = packageSelect.options[packageSelect.selectedIndex];
-        const maxInst = Number(selected?.getAttribute('data-max-instruments') || 0);
-        const price = Number(selected?.getAttribute('data-price') || 0);
-        const sessions = Number(selected?.getAttribute('data-sessions') || 0);
+        const { maxInst, price, sessions, label } = getSelectedPackageData();
         const paymentType = String(paymentModeEl.value || 'Partial Payment');
         const registrationFeeDue = getRegistrationFeeDueAmount(student);
         const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType, registrationFeeDue);
         const enrollmentNow = computeStudentRequestPayableNow(price, sessions, paymentType);
+        const partialNow = computeStudentRequestPayableNow(price, sessions, 'Partial Payment', 0);
+        const fullNow = computeStudentRequestPayableNow(price, sessions, 'Full Payment', 0);
 
         if (!price) {
-            amountEl.innerHTML = `<p class="text-sm text-zinc-400 dark:text-zinc-500">Package details will appear here once you pick a package.</p>`;
+            amountEl.innerHTML = `<p class="text-sm text-zinc-400 dark:text-zinc-500">Select a package to see your payment breakdown.</p>`;
         } else {
-            // Only show the registration fee row when there's actually something due
             const regFeeRow = registrationFeeDue > 0 ? `
                 <div class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-white/8">
                     <div>
@@ -4300,18 +4733,48 @@ function initStudentRequestSection(student, requestMeta) {
                 </div>`;
 
             amountEl.innerHTML = `
-                <div class="space-y-1">
-                    ${regFeeRow}
-                    <div class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-white/8">
-                        <div>
-                            <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Lesson Package</p>
-                            <p class="text-xs text-zinc-400">${sessions} sessions · ${paymentType}</p>
-                        </div>
-                        <span class="text-sm font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(enrollmentNow)}</span>
+                <div class="space-y-4">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.25em] text-gold-600 dark:text-gold-400 font-bold">Summary</div>
+                        <h3 class="mt-2 text-lg font-extrabold text-zinc-900 dark:text-white">${escapeHtml(label || 'Selected package')}</h3>
+                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${sessions} sessions</p>
                     </div>
-                    <div class="flex items-center justify-between pt-2">
-                        <p class="text-sm font-black text-zinc-900 dark:text-white">Due now</p>
-                        <span class="text-lg font-black text-gold-600 dark:text-gold-400">${formatCurrencyPHP(payableNow)}</span>
+                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 space-y-2">
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-zinc-500 dark:text-zinc-400">Package price</span>
+                            <span class="font-semibold text-zinc-900 dark:text-white">${formatCurrencyPHP(price)}</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-zinc-500 dark:text-zinc-400">Payment mode</span>
+                            <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(paymentType)}</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-zinc-500 dark:text-zinc-400">Partial now</span>
+                            <span class="font-semibold text-zinc-900 dark:text-white">${formatCurrencyPHP(partialNow)}</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-zinc-500 dark:text-zinc-400">Full payment</span>
+                            <span class="font-semibold text-zinc-900 dark:text-white">${formatCurrencyPHP(fullNow)}</span>
+                        </div>
+                    </div>
+                    ${regFeeRow}
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-white/8">
+                            <div>
+                                <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Lesson Package</p>
+                                <p class="text-xs text-zinc-400">${sessions} sessions · ${paymentType}</p>
+                            </div>
+                            <span class="text-sm font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(enrollmentNow)}</span>
+                        </div>
+                        <div class="flex items-center justify-between pt-1">
+                            <p class="text-sm font-black text-zinc-900 dark:text-white">Due now</p>
+                            <span class="text-lg font-black text-gold-600 dark:text-gold-400">${formatCurrencyPHP(payableNow)}</span>
+                        </div>
+                        <div class="text-xs text-zinc-500 dark:text-zinc-400">
+                            ${paymentType === 'Full Payment'
+                                ? 'You will settle the full package and registration fee now.'
+                                : `You will still have ${formatCurrencyPHP(Math.max(0, price - partialNow))} left on the package after this payment.`}
+                        </div>
                     </div>
                 </div>`;
         }
@@ -4319,10 +4782,16 @@ function initStudentRequestSection(student, requestMeta) {
         instrumentsContainer.innerHTML = maxInst > 0
             ? renderStudentRequestInstrumentSelectors(maxInst, instruments)
             : '<div class="text-sm text-zinc-400 dark:text-zinc-500 text-center py-3">Choose a package first.</div>';
+
+        renderPackageCards();
     };
 
-    packageSelect.onchange = updateRequestPackageUI;
+    packageSelect.onchange = () => {
+        selectedPackageId = String(packageSelect.value || '');
+        updateRequestPackageUI();
+    };
     paymentModeEl.onchange = updateRequestPackageUI;
+    renderPackageCards();
     updateRequestPackageUI();
 
     if (autoDayEl) {
@@ -4953,9 +5422,10 @@ function renderStudentActionBanner(student, meta, portal) {
     const latestReq = meta?.latest_request || null;
     const hasPendingReq = latestReq && String(latestReq.status || '') === 'Pending';
     const enrollmentApproved = portal?.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
+    const enrollmentCompleted = isStudentEnrollmentCompleted(portal);
     const reservationNotice = getScheduleFreezeReservationNotice(portal?.current_enrollment || null);
 
-    if (enrollmentApproved && !reservationNotice) {
+    if (enrollmentApproved && !reservationNotice && !enrollmentCompleted) {
         banner.classList.add('hidden');
         return;
     }
@@ -4967,7 +5437,16 @@ function renderStudentActionBanner(student, meta, portal) {
         <a href="student_profile.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Profile</a>
     `;
 
-    if (reservationNotice) {
+    if (enrollmentCompleted) {
+        title = 'Ready for your next lesson package?';
+        text = 'Continue your music journey with a new enrollment.';
+        actions = `
+            <button type="button" onclick="openStudentRequestModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition flex items-center gap-2">
+                <i class="fas fa-rotate-right"></i>Enroll Again?
+            </button>
+            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white/90 dark:bg-white/5 border border-gold-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">View History</a>
+        `;
+    } else if (reservationNotice) {
         title = 'Your account is frozen';
         text = `You have ${reservationNotice.usedAbsences} recorded absence${reservationNotice.usedAbsences === 1 ? '' : 's'}. Pay the ₱${reservationNotice.amount} slot reservation fee to restore access.`;
 
@@ -5393,6 +5872,7 @@ async function initStudentDashboardPage() {
     const regPaid = ['Approved', 'Fee Paid'].includes(String(s.registration_status || 'Pending'));
     const isNewStudent = !profileComplete || !regPaid;
     const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
+    const enrollmentCompleted = isStudentEnrollmentCompleted(portal);
     const isEnrolledStudent = Boolean(enrollmentApproved);
     const overviewGrid = document.getElementById('studentOverviewGrid');
     const overviewCard = document.getElementById('studentEnrollmentOverviewCard');
@@ -5400,6 +5880,7 @@ async function initStudentDashboardPage() {
     const requestShortcutCard = document.getElementById('studentRequestShortcutCard');
     const upcomingCard = document.getElementById('studentUpcomingScheduleCard');
     const qrCard = document.getElementById('studentQrCard');
+    const completedState = document.getElementById('studentCompletedState');
     bindStudentModalFrame('studentRegistrationModal', closeStudentRegistrationModal);
     bindStudentModalFrame('studentRequestModal', closeStudentRequestModal);
     if (!window.__studentModalEscBound) {
@@ -5412,11 +5893,13 @@ async function initStudentDashboardPage() {
         });
     }
     if (overviewGrid) {
-        overviewGrid.classList.toggle('hidden', isNewStudent);
+        overviewGrid.classList.toggle('hidden', isNewStudent || enrollmentCompleted);
     }
     const welcomeNote = document.getElementById('studentWelcomeNote');
     if (welcomeNote) {
-        if (isEnrolledStudent) {
+        if (enrollmentCompleted) {
+            welcomeNote.textContent = 'Your previous package is complete. View your certificate or start a new enrollment.';
+        } else if (isEnrolledStudent) {
             welcomeNote.textContent = 'View your upcoming class, open your QR code, and keep your profile updated.';
         } else if (isNewStudent) {
             welcomeNote.textContent = 'Check your registration status here, then continue to enrollment once admin approval is complete.';
@@ -5424,11 +5907,20 @@ async function initStudentDashboardPage() {
             welcomeNote.textContent = 'Quick view of your account and QR. For full details, open Sessions or Profile.';
         }
     }
-    if (overviewCard) overviewCard.classList.toggle('hidden', isEnrolledStudent);
-    if (performanceCard) performanceCard.classList.toggle('hidden', !isEnrolledStudent);
-    if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent || !regPaid);
-    if (upcomingCard) upcomingCard.classList.toggle('hidden', !isEnrolledStudent);
+    if (overviewCard) overviewCard.classList.toggle('hidden', isEnrolledStudent || enrollmentCompleted);
+    if (performanceCard) performanceCard.classList.toggle('hidden', !isEnrolledStudent || enrollmentCompleted);
+    if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent || !regPaid || enrollmentCompleted);
+    if (upcomingCard) upcomingCard.classList.toggle('hidden', !isEnrolledStudent || enrollmentCompleted);
     if (qrCard) qrCard.classList.toggle('hidden', true);
+    if (completedState) {
+        if (enrollmentCompleted) {
+            completedState.innerHTML = renderStudentCompletedSessionsPanel(portal);
+            completedState.classList.remove('hidden');
+        } else {
+            completedState.innerHTML = '';
+            completedState.classList.add('hidden');
+        }
+    }
 
     // Package
     setText('packageName', s.package_name || 'Not assigned yet');
@@ -5478,6 +5970,13 @@ async function initStudentDashboardPage() {
         renderStudentPerformanceRadar([]);
     }
 
+    const dashboardCertificateCard = document.getElementById('studentCertificateCard');
+    if (dashboardCertificateCard) {
+        const certificateMarkup = renderStudentCertificateCard(portal);
+        dashboardCertificateCard.innerHTML = certificateMarkup;
+        dashboardCertificateCard.classList.toggle('hidden', certificateMarkup === '');
+    }
+
     let meta = null;
     try {
         const resMeta = await fetchStudentRequestMetaByEmail(user.email);
@@ -5506,7 +6005,7 @@ async function initStudentDashboardPage() {
     notifyFreezeRestoredForStudentPortal(portal, s);
     startStudentFreezeRefreshWatcher();
 
-    if (!isEnrolledStudent) {
+    if (!isEnrolledStudent && !enrollmentCompleted) {
         studentDashboardMetaState = meta;
         renderStudentActionBanner(s, meta, portal);
         renderStudentOnboardingSteps(s, meta, portal);
@@ -5930,12 +6429,14 @@ async function initStudentGradesPage() {
         }
 
         applyStudentPortalIdentity(user, portal);
+        studentDashboardPortalState = portal;
+        studentDashboardMetaState = portal;
         const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
         const rows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
         const gradedRows = rows.filter(row => Number(row.progress_id || 0) > 0);
         const pendingRows = rows.filter(row => Number(row.progress_id || 0) < 1);
         const packageSessions = Number(portal.current_enrollment?.package_sessions || portal.student?.package_sessions || 0);
-        const completedSessions = gradedRows.length;
+        const completedSessions = Math.max(Number(portal.current_enrollment?.completed_sessions || 0), gradedRows.length);
         const remainingSessions = packageSessions > 0 ? Math.max(0, packageSessions - completedSessions) : null;
         const progressPercent = packageSessions > 0
             ? Math.max(0, Math.min(100, Math.round((completedSessions / packageSessions) * 100)))
@@ -5966,6 +6467,13 @@ async function initStudentGradesPage() {
         const progressBar = document.getElementById('studentGradesProgressBar');
         if (progressBar) {
             progressBar.style.width = `${progressPercent}%`;
+        }
+
+        const gradesCertificateCard = document.getElementById('studentCertificateCard');
+        if (gradesCertificateCard) {
+            const certificateMarkup = renderStudentCertificateCard(portal);
+            gradesCertificateCard.innerHTML = certificateMarkup;
+            gradesCertificateCard.classList.toggle('hidden', certificateMarkup === '');
         }
 
         if (!enrollmentApproved) {

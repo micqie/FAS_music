@@ -2832,7 +2832,7 @@ class StudentsApi
             $firstStartExpr = "NULL";
             $firstEndExpr = "NULL";
             $firstRoomExpr = "NULL";
-            $teacherIdExpr = "NULL";
+            $teacherIdExpr = "e.assigned_teacher_id";
             if ($this->tableExists('tbl_sessions')) {
                 $todayYmd = date('Y-m-d');
                 $excludedUpcomingStatuses = "'Completed', 'Late', 'Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled'";
@@ -2865,7 +2865,7 @@ class StudentsApi
                 $firstDateExpr = "fs.session_date";
                 $firstStartExpr = "fs.start_time";
                 $firstEndExpr = "fs.end_time";
-                $teacherIdExpr = "fs.teacher_id";
+                $teacherIdExpr = "COALESCE(e.assigned_teacher_id, fs.teacher_id)";
                 if ($this->tableExists('tbl_rooms')) {
                     $sessionJoin .= " LEFT JOIN tbl_rooms rm ON fs.room_id = rm.room_id ";
                     $firstRoomExpr = "COALESCE(NULLIF(TRIM(rm.room_name), ''), NULLIF(TRIM(fs.notes), ''))";
@@ -2880,6 +2880,7 @@ class StudentsApi
                     {$packageNameExpr} AS package_name,
                     e.start_date,
                     e.end_date,
+                    e.completed_sessions,
                     {$firstDateExpr} AS first_session_date,
                     {$firstStartExpr} AS first_start_time,
                     {$firstEndExpr} AS first_end_time,
@@ -2946,6 +2947,22 @@ class StudentsApi
                 $student['package_price'] = (float)($currentEnrollment['total_amount'] ?? 0);
                 $student['balance_due'] = max(0, (float)$student['package_price'] - (float)($currentEnrollment['paid_amount'] ?? 0));
                 $currentSessionGrades = $this->getStudentEnrollmentSessionGrades((int)$student['student_id'], (int)($currentEnrollment['enrollment_id'] ?? 0));
+                $packageSessions = max(0, (int)($currentEnrollment['package_sessions'] ?? 0));
+                $completedSessions = max(0, (int)($currentEnrollment['completed_sessions'] ?? 0));
+                $gradedSessions = 0;
+                if (!empty($currentSessionGrades)) {
+                    foreach ($currentSessionGrades as $gradeRow) {
+                        if ((int)($gradeRow['progress_id'] ?? 0) > 0) {
+                            $gradedSessions++;
+                        }
+                    }
+                }
+                $certificateCompletedSessions = max($completedSessions, $gradedSessions);
+                $certificateAvailable = strtolower((string)($currentEnrollment['status'] ?? '')) === 'completed'
+                    || ($packageSessions > 0 && $certificateCompletedSessions >= $packageSessions);
+                $currentEnrollment['certificate_available'] = $certificateAvailable ? 1 : 0;
+                $currentEnrollment['certificate_completed_sessions'] = $certificateCompletedSessions;
+                $currentEnrollment['certificate_required_sessions'] = $packageSessions;
                 foreach ($allEnrollments as $idx => $row) {
                     if ($idx === $currentIndex) continue;
                     $enrollmentHistory[] = $row;
@@ -2964,7 +2981,17 @@ class StudentsApi
             'instruments' => $instruments,
             'current_enrollment' => $currentEnrollment,
             'enrollment_history' => $enrollmentHistory,
-            'current_session_grades' => $currentSessionGrades
+            'current_session_grades' => $currentSessionGrades,
+            'certificate' => [
+                'available' => !empty($currentEnrollment['certificate_available']) ? true : false,
+                'completed_sessions' => isset($currentEnrollment['certificate_completed_sessions']) ? (int)$currentEnrollment['certificate_completed_sessions'] : 0,
+                'required_sessions' => isset($currentEnrollment['certificate_required_sessions']) ? (int)$currentEnrollment['certificate_required_sessions'] : 0,
+                'enrollment_status' => $currentEnrollment['status'] ?? null,
+                'package_name' => $currentEnrollment['package_name'] ?? null,
+                'student_name' => trim((string)($student['first_name'] ?? '') . ' ' . (string)($student['last_name'] ?? '')),
+                'teacher_name' => trim((string)($currentEnrollment['teacher_first_name'] ?? '') . ' ' . (string)($currentEnrollment['teacher_last_name'] ?? '')),
+                'issue_date' => $currentEnrollment['end_date'] ?? date('Y-m-d')
+            ]
         ];
     }
 

@@ -31,7 +31,7 @@ function buildScoreFields() {
     return keys.map((key, i) => ({ key, label: criteria[i] || DEFAULT_CRITERIA[i], icon: icons[i], labelId: labelIds[i] }));
 }
 const SCORE_FIELDS = buildScoreFields();
-const SCORE_WORDS  = ['','Poor','Fair','Good','Very Good','Excellent'];
+const SCORE_WORDS  = ['','1','2','3','4','5'];
 
 const IMPROVEMENT_TIPS = {
     performance_score: { low:'Practice full pieces without stopping.', mid:'Record yourself and listen back.', high:'Challenge yourself with harder repertoire.' },
@@ -77,7 +77,7 @@ function renderScoreCriteria() {
         const labelId    = labelIds[i]  || `extraLabel${i}`;
         const currentVal = document.getElementById(fieldId)?.value || '';
         const activeWord = currentVal ? (SCORE_WORDS[Number(currentVal)] || '—') : '—';
-        const wordBtns   = ['Poor','Fair','Good','Very Good','Excellent'].map((word, wi) => {
+        const wordBtns   = ['1','2','3','4','5'].map((word, wi) => {
             const val = String(wi + 1);
             const isActive = currentVal === val;
             const activeCls = ['bg-red-100 border-red-400 text-red-700','bg-orange-100 border-orange-400 text-orange-700','bg-yellow-100 border-yellow-400 text-yellow-700','bg-green-100 border-green-400 text-green-700','bg-emerald-100 border-emerald-400 text-emerald-700'][wi];

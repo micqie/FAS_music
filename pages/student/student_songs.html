@@ -32,10 +32,12 @@
         .portal-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); }
         html.dark .portal-nav { background: rgba(15,17,21,0.92); }
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
+        .song-chip-active { background: #0f172a; color: #fff; }
+        .student-song-modal[aria-hidden="true"] { display: none; }
     </style>
 </head>
-<body class="portal-easy bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
-    <nav class="portal-nav fixed w-full z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
+<body class="portal-easy bg-[#f6f2e8] dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
+    <nav class="portal-nav fixed inset-x-0 top-0 z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-3 sm:gap-6">
             <a href="../../index.html" class="h-10 flex items-center">
                 <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
@@ -56,10 +58,11 @@
         </div>
     </nav>
 
-    <aside class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-black/60 z-40 pt-24 hidden lg:flex flex-col border-r border-zinc-200 dark:border-white/5">
-        <div class="px-6 space-y-8 flex-1 mt-4">
+    <aside class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-black/60 z-40 pt-20 hidden lg:flex flex-col border-r border-zinc-200 dark:border-white/5">
+        <div class="px-6 space-y-6 flex-1 mt-0">
             <div class="portal-sidebar-card rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-lg dark:shadow-black/30">
-                <div class="flex items-start gap-3"><div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center text-xl font-black shrink-0">
+                <div class="flex items-start gap-3">
+                    <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center text-xl font-black shrink-0">
                         <i class="fas fa-user"></i>
                     </div>
                     <div class="portal-sidebar-meta flex-1 min-w-0">
@@ -71,14 +74,28 @@
                 <div class="mt-3 h-1.5 rounded-full bg-gold-500"></div>
             </div>
             <div>
-                <h3 class="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-4">Student Menu</h3>
                 <nav class="space-y-2">
-                    <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-music mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Dashboard</a>
-                    <a href="student_songs.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all"><i class="fas fa-book-open mr-3"></i> My Songs</a>
-                    <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-calendar-check mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Sessions</a>
-                    <a href="student_grades.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-chart-line mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Grades</a>
-                    <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-clipboard-check mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Attendance</a>
-                    <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-user mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Profile</a>
+                    <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-music mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Dashboard
+                    </a>
+                    <a href="student_songs.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all">
+                        <i class="fas fa-book-open mr-3"></i> My Songs
+                    </a>
+                    <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Sessions
+                    </a>
+                    <a href="student_grades.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-chart-line mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Grades
+                    </a>
+                    <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-clipboard-check mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Attendance
+                    </a>
+                    <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-user mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> Profile
+                    </a>
+                    <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-qrcode mr-3 text-zinc-500 group-hover:text-gold-500 transition-colors"></i> My QR Code
+                    </a>
                 </nav>
             </div>
         </div>
@@ -88,7 +105,8 @@
         <div class="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-white dark:bg-obsidian border-r border-zinc-200 dark:border-white/10 pt-20 pb-6 flex flex-col shadow-xl">
             <div class="px-6 space-y-6 flex-1 overflow-y-auto">
                 <div class="portal-sidebar-card rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-lg dark:shadow-black/30">
-                    <div class="flex items-start gap-3"><div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center text-xl font-black shrink-0">
+                    <div class="flex items-start gap-3">
+                        <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-gold-500 to-gold-400 text-black grid place-items-center text-xl font-black shrink-0">
                             <i class="fas fa-user"></i>
                         </div>
                         <div class="portal-sidebar-meta flex-1 min-w-0">
@@ -99,17 +117,15 @@
                     </div>
                     <div class="mt-3 h-1.5 rounded-full bg-gold-500"></div>
                 </div>
-                <div>
-                    <h3 class="px-1 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-3">Student Menu</h3>
-                    <nav class="space-y-2">
-                        <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-music mr-3 text-zinc-500"></i> Dashboard</a>
-                        <a href="student_songs.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all"><i class="fas fa-book-open mr-3"></i> My Songs</a>
-                        <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-calendar-check mr-3 text-zinc-500"></i> Sessions</a>
-                        <a href="student_grades.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-chart-line mr-3 text-zinc-500"></i> Grades</a>
-                        <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-clipboard-check mr-3 text-zinc-500"></i> Attendance</a>
-                        <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-user mr-3 text-zinc-500"></i> Profile</a>
-                    </nav>
-                </div>
+                <nav class="space-y-2">
+                    <a href="student_dashboard.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-music mr-3 text-zinc-500"></i> Dashboard</a>
+                    <a href="student_songs.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-extrabold rounded-xl shadow-lg transition-all"><i class="fas fa-book-open mr-3"></i> My Songs</a>
+                    <a href="student_sessions.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-calendar-check mr-3 text-zinc-500"></i> Sessions</a>
+                    <a href="student_grades.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-chart-line mr-3 text-zinc-500"></i> Grades</a>
+                    <a href="student_attendance.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-clipboard-check mr-3 text-zinc-500"></i> Attendance</a>
+                    <a href="student_profile.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-user mr-3 text-zinc-500"></i> Profile</a>
+                    <a href="student_qr.html" class="flex items-center px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300 rounded-xl transition-all"><i class="fas fa-qrcode mr-3 text-zinc-500"></i> My QR Code</a>
+                </nav>
             </div>
             <div class="px-6 border-t border-zinc-200 dark:border-white/10 pt-4 flex items-center justify-between">
                 <div class="text-xs text-zinc-500 dark:text-zinc-400" id="studentMobileMenuName">Signed in</div>
@@ -120,44 +136,132 @@
         </div>
     </div>
 
-    <main class="lg:ml-72 pt-24 pb-8 px-4 sm:px-6 lg:px-8">
+    <main class="lg:ml-72 pt-20 pb-8 px-4 sm:px-6 lg:px-8">
         <div class="max-w-7xl mx-auto space-y-8">
-            <section class="rounded-[2rem] border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <div class="text-xs uppercase tracking-[0.25em] text-gold-500 font-bold">Repertoire</div>
-                        <h1 class="mt-3 text-3xl font-black tracking-tight text-zinc-900 dark:text-white">My Assigned Songs</h1>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 p-4">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Songs</div>
-                            <div id="studentSongCount" class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">0</div>
+            <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <h1 id="studentPageTitle" class="text-4xl sm:text-5xl font-black tracking-tight text-zinc-900 dark:text-white">Hi, ready to practice?</h1>
+                    <p id="studentPageSubtitle" class="mt-3 text-lg text-zinc-600 dark:text-zinc-300">Your teacher has new pieces ready for you. Take it one small step at a time.</p>
+                </div>
+                <div class="w-full max-w-sm rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-4 shadow-lg dark:shadow-black/30">
+                    <div class="flex items-center gap-4">
+                        <div class="grid h-12 w-12 rounded-2xl bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-200 place-items-center">
+                            <i class="fas fa-trophy text-lg"></i>
                         </div>
-                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 p-4">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Assigned</div>
-                            <div id="studentAssignedCount" class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">0</div>
-                        </div>
-                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 p-4">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Practicing</div>
-                            <div id="studentPracticingCount" class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">0</div>
-                        </div>
-                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 p-4">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 font-bold">Completed</div>
-                            <div id="studentCompletedCount" class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">0</div>
+                        <div class="min-w-0">
+                            <div class="text-xs font-black uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">This week</div>
+                            <div id="studentPracticeDays" class="text-2xl font-black text-zinc-900 dark:text-white">0 practice days</div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
-                <div class="flex items-center justify-between gap-4 flex-wrap">
-                    <div>
-                        <h2 class="text-xl font-black text-zinc-900 dark:text-white">Song References</h2>
-                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Everything your teacher assigned is collected here for easy review between lessons.</p>
+            <section class="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,0.75fr)]">
+                <div class="rounded-[2rem] overflow-hidden border border-zinc-200 dark:border-white/10 shadow-2xl dark:shadow-black/40 bg-white dark:bg-white/5">
+                    <div class="grid min-h-[28rem] lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.9fr)]">
+                        <div class="relative bg-[#10172b] px-6 py-8 sm:px-8 sm:py-10 text-white overflow-hidden">
+                            <div class="absolute inset-0 opacity-50">
+                                <div class="absolute -right-12 top-0 h-48 w-48 rounded-full border border-gold-400/25"></div>
+                                <div class="absolute right-10 top-10 h-64 w-64 rounded-full border border-gold-400/15"></div>
+                            </div>
+                            <div class="relative z-10 flex h-full flex-col justify-between">
+                                <div>
+                                    <div id="featuredBadge" class="inline-flex items-center rounded-full bg-white/8 px-4 py-2 text-sm font-bold text-gold-200">
+                                        <i class="fas fa-music mr-2"></i><span>Piano · Grade 3</span>
+                                    </div>
+                                    <div class="mt-8">
+                                        <div class="text-sm font-bold uppercase tracking-[0.24em] text-slate-300">Your new piece</div>
+                                        <h2 id="featuredTitle" class="mt-3 text-5xl font-black tracking-tight">Loading...</h2>
+                                        <p id="featuredComposer" class="mt-4 text-2xl text-slate-100">—</p>
+                                    </div>
+                                </div>
+                                <div class="space-y-3 text-base text-slate-100">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-calendar-days text-gold-400"></i>
+                                        <span id="featuredPracticeBy">Practice by your next lesson</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-clock text-gold-400"></i>
+                                        <span id="featuredStartTime">Start with 10 minutes</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#f9bf22] px-6 py-8 sm:px-8 sm:py-10 text-[#0f172a] flex flex-col justify-between">
+                            <div class="grid h-16 w-16 place-items-center rounded-3xl bg-[#10172b] text-gold-400 shadow-lg shadow-[#10172b]/30">
+                                <i class="fas fa-music text-3xl"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm font-bold uppercase tracking-[0.22em] text-[#a15d00]">Today’s goal</div>
+                                <h3 id="featuredGoal" class="mt-4 text-4xl font-black leading-tight">Learn the first eight measures slowly.</h3>
+                                <p id="featuredGoalNote" class="mt-5 text-lg leading-8 text-[#7d4a00]">Keep your left hand soft and listen for an even pulse.</p>
+                            </div>
+                        </div>
                     </div>
-                    <div id="studentSongStatus" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Loading songs...</div>
                 </div>
-                <div id="studentSongsGrid" class="mt-5 space-y-5"></div>
+
+                <div class="space-y-6">
+                    <section class="rounded-[2rem] border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <h2 class="text-2xl font-black text-zinc-900 dark:text-white">Practice materials</h2>
+                                <p class="mt-2 text-lg text-zinc-600 dark:text-zinc-300">Everything you need is here.</p>
+                            </div>
+                            <div id="practiceMaterialsCount" class="rounded-full bg-emerald-100 dark:bg-emerald-500/15 px-4 py-2 text-sm font-bold text-emerald-700 dark:text-emerald-200">0 items</div>
+                        </div>
+                        <div id="studentPracticeMaterials" class="mt-6 space-y-3"></div>
+                    </section>
+
+                    <section class="rounded-[2rem] border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                        <h2 class="text-2xl font-black text-zinc-900 dark:text-white">How did it go?</h2>
+                        <p class="mt-2 text-lg text-zinc-600 dark:text-zinc-300">A small check-in helps you build the habit.</p>
+                        <div class="mt-6 rounded-[1.5rem] bg-[#10172b] px-5 py-4 text-white">
+                            <div class="flex items-center gap-3">
+                                <div class="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-white">
+                                    <i class="fas fa-circle"></i>
+                                </div>
+                                <div>
+                                    <div id="studentCheckInStatus" class="text-lg font-bold">Keep practicing this piece</div>
+                                    <div class="text-sm text-slate-300">Mark this once you finish your daily session.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                            <button type="button" class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3 text-sm font-bold text-zinc-800 dark:text-zinc-100">
+                                <i class="fas fa-check-circle mr-2 text-emerald-500"></i>I practiced today
+                            </button>
+                            <button type="button" class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3 text-sm font-bold text-zinc-800 dark:text-zinc-100">
+                                <i class="fas fa-question-circle mr-2 text-gold-500"></i>I need help
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </section>
+
+            <section class="rounded-[2rem] border border-[#ead58d] bg-[#fff7dd] dark:bg-white/5 px-6 py-6 shadow-lg dark:shadow-black/30">
+                <div class="flex items-start gap-4">
+                    <div class="grid h-12 w-12 rounded-2xl bg-[#f7d45f] text-[#8f4f00] place-items-center shrink-0">
+                        <i class="fas fa-sparkles"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="text-xs font-black uppercase tracking-[0.2em] text-[#a15d00]">A note from your teacher</div>
+                        <p id="teacherNoteTitle" class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">Your teacher is preparing your next practice steps.</p>
+                        <p id="teacherNoteBody" class="mt-2 text-base leading-7 text-zinc-700 dark:text-zinc-300">Once a piece is assigned, this note will show the focus for your next lesson.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="space-y-5">
+                <div>
+                    <h2 class="text-3xl font-black text-zinc-900 dark:text-white">Keep these fresh</h2>
+                    <p class="mt-2 text-lg text-zinc-600 dark:text-zinc-300">A quick revisit will help you remember what you’ve learned.</p>
+                </div>
+                <div id="studentSongsGrid" class="grid gap-4 lg:grid-cols-3"></div>
+            </section>
+
+            <section id="studentCompletedEmptyState" class="hidden rounded-[2rem] border border-dashed border-zinc-200 dark:border-white/10 bg-white/70 dark:bg-white/5 px-6 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                No songs have been assigned to you yet. Your teacher will add them here after each lesson.
             </section>
         </div>
     </main>

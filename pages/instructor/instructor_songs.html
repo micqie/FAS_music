@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -5,7 +6,6 @@
     <title>Song Library | Father & Sons</title>
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <script src="https://cdn.tailwindcss.com"></script>
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
         tailwind.config = {
@@ -25,12 +25,12 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .dark-glass { background: rgba(15, 17, 21, 0.92); backdrop-filter: blur(10px); }
-        .soft-shadow { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12); }
+        .soft-shadow { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.10); }
         .song-modal[aria-hidden="true"] { display: none; }
     </style>
 </head>
-<body class="bg-[#f1f5f9] text-slate-900 antialiased">
-    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-6 py-3 flex justify-between items-center shadow-2xl">
+<body class="bg-[#eef3f8] text-slate-900 antialiased">
+    <nav class="fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b border-white/10 bg-[#0f1115]/95 px-6 py-3 shadow-2xl backdrop-blur-md">
         <div class="flex items-center gap-3">
             <button class="lg:hidden text-white/80 hover:text-white" onclick="toggleInstructorMenu()" aria-label="Toggle menu">
                 <i id="instructorMenuIcon" class="fas fa-bars text-lg"></i>
@@ -67,14 +67,14 @@
         </div>
     </div>
 
-    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto">
+    <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col overflow-y-auto border-r border-white/5 bg-obsidian pt-24 lg:flex">
         <div class="px-6 space-y-8 flex-1 mt-4">
             <div class="px-4 mb-4">
                 <h2 class="text-[1.5rem] leading-none font-extrabold text-white tracking-tight">Instructor Panel</h2>
                 <div class="mt-3 h-2 w-[14rem] rounded-full bg-gold-500"></div>
             </div>
             <div>
-                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Teaching</h3>
+                <h3 class="px-4 mb-4 text-[10px] font-bold uppercase tracking-[0.3em] text-slate-500">Teaching</h3>
                 <nav class="space-y-2">
                     <a href="instructor_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-chart-line mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Dashboard</a>
                     <a href="instructor_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> My Students</a>
@@ -88,215 +88,236 @@
         </div>
     </aside>
 
-    <main class="lg:ml-72 pt-28 p-6 md:p-8">
-        <div class="max-w-7xl mx-auto space-y-8">
-            <section class="rounded-[2rem] border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-6 py-8 text-white shadow-xl">
-                <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <div class="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-gold-300">
-                            <i class="fas fa-music mr-2"></i> Repertoire
+    <main class="lg:ml-72 pt-20 px-4 sm:px-6 py-6 sm:py-8">
+        <div class="mx-auto max-w-7xl space-y-6 sm:space-y-8">
+            <section class="rounded-[2rem] border border-slate-800/90 bg-gradient-to-br from-[#0d1324] via-[#101826] to-[#171d2d] px-6 py-8 text-white soft-shadow sm:px-8 sm:py-10">
+                <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="max-w-4xl">
+                        <div class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-gold-300">
+                            <i class="fas fa-music mr-2"></i> Home Practice
                         </div>
-                        <h1 class="mt-4 text-3xl font-black tracking-tight">Song Library & Assignments</h1>
-                        <p class="mt-2 max-w-3xl text-sm text-slate-300">Build a reusable song bank for piano, voice, and combined lessons, then assign each piece with progress tracking and lesson-by-lesson follow-up.</p>
+                        <h1 class="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Assign a song to practice</h1>
+                        <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
+                            Pick a song from your library and send its practice materials straight to your student.
+                        </p>
                     </div>
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <div class="rounded-2xl border border-white/10 bg-white/10 p-4">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-300 font-bold">Songs</div>
-                            <div id="songCountStat" class="mt-2 text-2xl font-black">0</div>
-                        </div>
-                        <div class="rounded-2xl border border-white/10 bg-white/10 p-4">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-300 font-bold">Assigned</div>
-                            <div id="assignedCountStat" class="mt-2 text-2xl font-black">0</div>
-                        </div>
-                        <div class="rounded-2xl border border-white/10 bg-white/10 p-4">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-300 font-bold">Practicing</div>
-                            <div id="practicingCountStat" class="mt-2 text-2xl font-black">0</div>
-                        </div>
-                        <div class="rounded-2xl border border-white/10 bg-white/10 p-4">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-300 font-bold">Completed</div>
-                            <div id="completedCountStat" class="mt-2 text-2xl font-black">0</div>
-                        </div>
+                    <div class="w-full max-w-md rounded-[1.75rem] border border-white/10 bg-white/5 px-5 py-4">
+                        <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">In session now</div>
+                        <div id="heroSessionSummary" class="mt-2 text-2xl font-black text-white">Loading session...</div>
+                        <div id="heroSessionMeta" class="mt-1 text-sm text-slate-300">Finding the student currently in session.</div>
                     </div>
                 </div>
             </section>
 
-            <section class="grid gap-4 sm:grid-cols-2">
-                <button type="button" data-open-song-modal="createSongModal" class="rounded-3xl border border-slate-200 bg-white p-5 text-left soft-shadow transition hover:-translate-y-0.5 hover:border-gold-300">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <div class="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Library</div>
-                            <h2 class="mt-2 text-xl font-black text-slate-900">Create Song</h2>
-                            <p class="mt-2 text-sm text-slate-500">Save a new song reference with PDF, audio, and links.</p>
+            <section class="grid gap-6 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+                <div class="space-y-6">
+                    <section class="rounded-[2rem] border border-slate-200 bg-white p-6 soft-shadow">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h2 class="text-sm font-black uppercase tracking-[0.22em] text-slate-500">Who are you assigning to?</h2>
+                                <p class="mt-2 text-sm text-slate-500">Use the student who is in session right now, or switch to another learner.</p>
+                            </div>
+                            <button type="button" data-open-song-modal="studentSwitcherModal" class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-4 py-2 text-sm font-bold text-[#a86100] transition hover:bg-gold-100">
+                                <i class="fas fa-repeat mr-2"></i> Switch student
+                            </button>
                         </div>
-                        <div class="grid h-12 w-12 place-items-center rounded-2xl bg-gold-500/10 text-gold-600">
-                            <i class="fas fa-plus"></i>
-                        </div>
-                    </div>
-                    <div class="mt-5 inline-flex items-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white">
-                        <i class="fas fa-pen mr-2"></i> Open Create Form
-                    </div>
-                </button>
 
-                <button type="button" data-open-song-modal="assignSongModal" class="rounded-3xl border border-slate-200 bg-white p-5 text-left soft-shadow transition hover:-translate-y-0.5 hover:border-emerald-300">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <div class="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Assignment</div>
-                            <h2 class="mt-2 text-xl font-black text-slate-900">Assign Song</h2>
-                            <p class="mt-2 text-sm text-slate-500">Pick a student, choose a song, and set the starting progress.</p>
+                        <div id="selectedStudentCard" class="mt-5 rounded-[1.75rem] border border-gold-400 bg-[#fff8e8] p-5">
+                            <div class="flex items-start gap-4">
+                                <div id="selectedStudentAvatar" class="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-[#d28a00] text-xl font-black text-white">--</div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 id="selectedStudentName" class="truncate text-2xl font-black text-slate-900">Loading...</h3>
+                                        <span id="selectedStudentCheck" class="grid h-10 w-10 place-items-center rounded-full bg-[#f8a500] text-white">
+                                            <i class="fas fa-check"></i>
+                                        </span>
+                                    </div>
+                                    <p id="selectedStudentMeta" class="mt-1 text-sm text-slate-600">Instrument · Grade</p>
+                                </div>
+                            </div>
+                            <div class="my-4 h-px bg-[#f0d79b]"></div>
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <div class="rounded-2xl bg-white/60 px-4 py-3">
+                                    <div class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Status</div>
+                                    <div id="selectedStudentStatus" class="mt-1 text-sm font-semibold text-emerald-700">Currently in session</div>
+                                </div>
+                                <div class="rounded-2xl bg-white/60 px-4 py-3">
+                                    <div class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Time</div>
+                                    <div id="selectedStudentTime" class="mt-1 text-sm font-semibold text-amber-700">In session now</div>
+                                </div>
+                                <div class="rounded-2xl bg-white/60 px-4 py-3">
+                                    <div class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Location</div>
+                                    <div id="selectedStudentLocation" class="mt-1 text-sm font-semibold text-slate-700">--</div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
-                            <i class="fas fa-user-check"></i>
-                        </div>
-                    </div>
-                    <div class="mt-5 inline-flex items-center rounded-2xl bg-gold-500 px-4 py-3 text-sm font-black text-black">
-                        <i class="fas fa-paper-plane mr-2"></i> Open Assign Form
-                    </div>
-                </button>
-            </section>
+                    </section>
 
-            <section class="rounded-3xl border border-slate-200 bg-white p-6 soft-shadow">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <h2 class="text-xl font-black text-slate-900">Song Lookup Library</h2>
-                        <p class="mt-1 text-sm text-slate-500">Filter by category or search by title, artist, genre, or tags.</p>
-                    </div>
-                    <div class="flex flex-col gap-3 sm:flex-row">
-                        <input id="songSearchInput" type="text" placeholder="Search songs..." class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                        <select id="songCategoryFilter" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                            <option value="">Loading categories...</option>
-                        </select>
-                    </div>
+                    <section class="rounded-[2rem] border border-slate-200 bg-white p-6 soft-shadow">
+                        <h2 class="text-sm font-black uppercase tracking-[0.22em] text-slate-500">Assignment</h2>
+                        <div id="assignmentSelectedSong" class="mt-5 rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-6">
+                            <div class="flex items-center gap-4">
+                                <div class="grid h-14 w-14 place-items-center rounded-2xl bg-white text-slate-400 border border-slate-200">
+                                    <i class="fas fa-music"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="text-base font-semibold text-slate-500">Choose a song from the library to begin.</div>
+                                    <div class="mt-1 text-sm text-slate-400">Your selected song will appear here with notes and practice timing.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form id="songQuickAssignForm" class="mt-5 space-y-5">
+                            <input type="hidden" name="student_id" id="quickAssignStudentId">
+                            <input type="hidden" name="song_id" id="quickAssignSongId">
+                            <input type="hidden" name="progress_status" id="quickAssignProgressStatus" value="assigned">
+
+                            <div>
+                                <label for="quickAssignNotes" class="mb-2 block text-sm font-black uppercase tracking-[0.18em] text-slate-500">Note for student <span class="text-slate-400 normal-case">(optional)</span></label>
+                                <textarea id="quickAssignNotes" name="assigned_notes" rows="4" class="w-full rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-gold-400 focus:bg-white" placeholder="Focus on the left hand and keep a steady tempo..."></textarea>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+                                    <i class="fas fa-calendar-days text-slate-400"></i> Practice by
+                                </div>
+                                <div class="mt-3 flex flex-wrap gap-3">
+                                    <button type="button" data-practice-by="next_lesson" class="practice-pill rounded-full border border-gold-400 bg-[#fff6de] px-4 py-2 text-sm font-bold text-[#a86100]">Next lesson</button>
+                                    <button type="button" data-practice-by="in_1_week" class="practice-pill rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600">In 1 week</button>
+                                    <button type="button" data-practice-by="in_2_weeks" class="practice-pill rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600">In 2 weeks</button>
+                                </div>
+                            </div>
+
+                            <div class="pt-2">
+                                <button type="submit" id="quickAssignSubmit" class="inline-flex w-full items-center justify-center rounded-[1.35rem] bg-[#0f172a] px-5 py-4 text-sm font-bold text-white transition hover:bg-[#111c31] disabled:cursor-not-allowed disabled:bg-slate-300">
+                                    <i class="fas fa-paper-plane mr-2"></i> Send to selected student
+                                </button>
+                                <p id="quickAssignHint" class="mt-3 text-center text-sm text-slate-500">Choose a student and a song to unlock sending.</p>
+                            </div>
+                        </form>
+                    </section>
                 </div>
-                <div id="songLibraryGrid" class="mt-5 grid gap-4 lg:grid-cols-2"></div>
+
+                <section class="rounded-[2rem] border border-slate-200 bg-white p-6 soft-shadow">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <h2 class="text-sm font-black uppercase tracking-[0.22em] text-slate-500">Choose a song</h2>
+                            <p id="songLibrarySubtitle" class="mt-2 text-sm text-slate-500">Your library is ready for this lesson.</p>
+                        </div>
+                        <button type="button" data-open-song-modal="createSongModal" class="inline-flex items-center rounded-full bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200">
+                            <i class="fas fa-plus mr-2 text-slate-500"></i> Add song
+                        </button>
+                    </div>
+
+                    <div id="songCategoryTabs" class="mt-5 flex flex-wrap gap-3"></div>
+
+                    <div class="mt-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3">
+                        <label for="songSearchInput" class="sr-only">Search songs</label>
+                        <div class="flex items-center gap-3 text-slate-400">
+                            <i class="fas fa-search text-lg"></i>
+                            <input id="songSearchInput" type="text" placeholder="Search piano songs" class="w-full bg-transparent text-sm outline-none placeholder:text-slate-400">
+                        </div>
+                    </div>
+
+                    <div id="songLibraryGrid" class="mt-5 space-y-3"></div>
+                </section>
             </section>
 
-            <section class="rounded-3xl border border-slate-200 bg-white p-6 soft-shadow">
-                <div class="flex items-center justify-between gap-4 flex-wrap">
+            <section class="rounded-[2rem] border border-slate-200 bg-white p-6 soft-shadow">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h2 class="text-xl font-black text-slate-900">Assigned Songs</h2>
-                        <p class="mt-1 text-sm text-slate-500">Update progress and save lesson history after every coaching session.</p>
+                        <p class="mt-1 text-sm text-slate-500">Track progress and leave lesson notes after every session.</p>
                     </div>
                     <div id="assignmentCountLabel" class="text-xs font-semibold text-slate-500">0 assignments</div>
                 </div>
-                <div id="assignmentList" class="mt-5 space-y-5"></div>
+                <div id="assignmentList" class="mt-5 space-y-4"></div>
             </section>
         </div>
     </main>
 
-    <div id="createSongModal" class="song-modal fixed inset-0 z-[80] px-0 py-0 sm:px-4 sm:py-6" aria-hidden="true">
+    <div id="studentSwitcherModal" class="song-modal fixed inset-0 z-[80] px-0 py-0 sm:px-4 sm:py-6" aria-hidden="true">
         <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" data-close-song-modal></div>
         <div class="relative mx-auto flex min-h-full w-full items-stretch justify-center sm:items-center">
-            <section class="flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-5xl sm:rounded-[2rem] sm:border sm:border-slate-200">
+            <section class="flex h-full w-full flex-col overflow-hidden bg-white sm:h-auto sm:max-h-[94vh] sm:max-w-3xl sm:rounded-[2rem] sm:border sm:border-slate-200">
                 <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
                     <div>
-                        <h2 class="text-xl font-black text-slate-900">Create Library Song</h2>
-                        <p class="mt-1 text-sm text-slate-500">Save references once, then reuse them across students and future lessons.</p>
+                        <h2 class="text-xl font-black text-slate-900">Who are you assigning to?</h2>
+                        <p class="mt-1 text-sm text-slate-500">Pick the current session student or switch to another student in your roster.</p>
                     </div>
                     <button type="button" data-close-song-modal class="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200">
                         <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="overflow-y-auto px-5 py-5 sm:px-6">
+                    <div id="studentSwitcherContent" class="space-y-4"></div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="createSongModal" class="song-modal fixed inset-0 z-[80] px-0 py-0 sm:px-4 sm:py-6" aria-hidden="true">
+        <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" data-close-song-modal></div>
+        <div class="relative mx-auto flex min-h-full w-full items-stretch justify-center sm:items-center">
+            <section class="flex h-full w-full flex-col overflow-hidden border border-[#d9a81f] bg-[#fffaf0] sm:h-auto sm:max-h-[94vh] sm:max-w-5xl sm:rounded-[2rem]">
+                <div class="flex items-center justify-between gap-4 border-b border-[#ecd99b] px-5 py-4 sm:px-6">
+                    <div>
+                        <h2 class="text-2xl font-black text-slate-900">Add a song to your library</h2>
+                        <p class="mt-1 text-sm text-slate-600">It will be saved under the instrument you choose.</p>
+                    </div>
+                    <button type="button" data-close-song-modal class="grid h-11 w-11 place-items-center rounded-2xl bg-white text-slate-500 transition hover:bg-slate-100">
+                        <i class="fas fa-times text-lg"></i>
                     </button>
                 </div>
                 <div class="overflow-y-auto px-5 py-5 sm:px-6">
                     <div id="songFormMessage" class="hidden rounded-2xl border px-4 py-3 text-sm"></div>
                     <form id="songCreateForm" class="mt-5 grid gap-4 md:grid-cols-2">
                         <input type="hidden" name="action" value="create-song">
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Title</label>
-                            <input name="title" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30" placeholder="Memory">
+                        <div class="md:col-span-2">
+                            <label class="mb-2 block text-sm font-bold text-slate-800">Song title</label>
+                            <input name="title" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-gold-400" placeholder="e.g. Clair de Lune">
                         </div>
                         <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Artist</label>
-                            <input name="artist" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30" placeholder="Cats">
+                            <label class="mb-2 block text-sm font-bold text-slate-800">Composer or artist <span class="font-normal text-slate-400">(optional)</span></label>
+                            <input name="artist" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-gold-400" placeholder="e.g. Debussy">
                         </div>
                         <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Genre</label>
-                            <input name="genre" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30" placeholder="Musical Theatre">
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Category</label>
-                            <select id="songCategorySelect" name="category" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30">
+                            <label class="mb-2 block text-sm font-bold text-slate-800">Instrument</label>
+                            <select id="songCategorySelect" name="category" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-gold-400">
                                 <option value="">Loading categories...</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Difficulty Level</label>
-                            <input name="difficulty_level" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30" placeholder="Beginner / Intermediate / Advanced">
+                        <div class="md:col-span-2">
+                            <label class="mb-2 block text-sm font-bold text-slate-800">Level</label>
+                            <input name="difficulty_level" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-gold-400" placeholder="All levels">
                         </div>
-
-
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">YouTube Link</label>
-                            <input name="youtube_link" type="url" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30" placeholder="https://youtube.com/...">
+                        <div class="md:col-span-2">
+                            <label class="mb-2 block text-sm font-bold text-slate-800">Practice materials</label>
+                            <p class="text-sm text-slate-600">Add sheet music and a video to watch at home.</p>
                         </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Spotify Link</label>
-                            <input name="spotify_link" type="url" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30" placeholder="https://open.spotify.com/...">
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">PDF Sheet Music</label>
+                        <div class="rounded-[1.6rem] border-2 border-dashed border-slate-300 bg-white p-5">
+                            <label class="mb-2 block text-sm font-bold text-slate-800">Upload sheet music</label>
                             <input name="sheet_music_file" type="file" accept=".pdf" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                         </div>
-        
+                        <div class="rounded-[1.6rem] border border-slate-200 bg-white p-5">
+                            <label class="mb-2 block text-sm font-bold text-slate-800">YouTube video</label>
+                            <input name="youtube_link" type="url" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-gold-400" placeholder="Paste a YouTube link">
+                            <label class="mt-4 mb-2 block text-sm font-bold text-slate-800">Optional audio</label>
+                            <input name="accompaniment_audio_file" type="file" accept=".mp3,.wav,.ogg,.m4a,.aac,.flac,.webm" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                        </div>
                         <div class="md:col-span-2">
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Notes</label>
-                            <textarea name="notes" rows="4" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30" placeholder="Teaching reminders, transposition notes, expression goals, or section focus."></textarea>
+                            <label class="mb-2 block text-sm font-bold text-slate-800">Spotify link <span class="font-normal text-slate-400">(optional)</span></label>
+                            <input name="spotify_link" type="url" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-gold-400" placeholder="https://open.spotify.com/...">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="mb-2 block text-sm font-bold text-slate-800">Notes</label>
+                            <textarea name="notes" rows="4" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-gold-400" placeholder="Teaching reminders, transposition notes, expression goals, or section focus."></textarea>
                         </div>
                         <div class="md:col-span-2 flex justify-end">
-                            <button type="submit" class="w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-700 sm:w-auto">
+                            <button type="submit" class="w-full rounded-2xl bg-[#0f172a] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#111c31] sm:w-auto">
                                 <i class="fas fa-save mr-2"></i> Save Song to Library
                             </button>
                         </div>
-                    </form>
-                </div>
-            </section>
-        </div>
-    </div>
-
-    <div id="assignSongModal" class="song-modal fixed inset-0 z-[80] px-0 py-0 sm:px-4 sm:py-6" aria-hidden="true">
-        <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" data-close-song-modal></div>
-        <div class="relative mx-auto flex min-h-full w-full items-stretch justify-center sm:items-center">
-            <section class="flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-3xl sm:rounded-[2rem] sm:border sm:border-slate-200">
-                <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
-                    <div>
-                        <h2 class="text-xl font-black text-slate-900">Assign Song to Student</h2>
-                        <p class="mt-1 text-sm text-slate-500">Use the library as your lookup page, then assign the right piece to the right learner.</p>
-                    </div>
-                    <button type="button" data-close-song-modal class="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="overflow-y-auto px-5 py-5 sm:px-6">
-                    <div id="assignFormMessage" class="hidden rounded-2xl border px-4 py-3 text-sm"></div>
-                    <form id="songAssignForm" class="mt-5 space-y-4">
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Student</label>
-                            <select id="assignmentStudentSelect" name="student_id" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                                <option value="">Loading students...</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Song</label>
-                            <select id="assignmentSongSelect" name="song_id" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                                <option value="">Loading songs...</option>
-                            </select>
-                            <div id="assignmentCategoryHint" class="mt-2 text-xs text-slate-500">Pick a student first to see which song categories fit their package.</div>
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Starting Progress</label>
-                            <select name="progress_status" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                                <option value="assigned">Assigned</option>
-                                <option value="practicing">Practicing</option>
-                                <option value="polishing">Polishing</option>
-                                <option value="completed">Completed</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Assignment Notes</label>
-                            <textarea name="assigned_notes" rows="4" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="Why this song, which section to start, and what to focus on next lesson."></textarea>
-                        </div>
-                        <button type="submit" class="w-full rounded-2xl bg-gold-500 px-5 py-3 text-sm font-black text-black transition hover:bg-gold-400">
-                            <i class="fas fa-paper-plane mr-2"></i> Assign Song
-                        </button>
                     </form>
                 </div>
             </section>
@@ -307,8 +328,7 @@
     <script src="../../js/index.js"></script>
     <script src="../../js/instructor/instructor_nav.js"></script>
     <script src="../../js/instructor/songs.js"></script>
-   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>
 </html>
-
