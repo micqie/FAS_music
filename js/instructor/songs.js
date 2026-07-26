@@ -420,7 +420,7 @@ function renderStudentSwitcherContent() {
     if (!mount) return;
 
     if (!instructorSongStudents.length) {
-        mount.innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">No students found for this instructor.</div>';
+        mount.innerHTML = '<div class="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-sm text-slate-500">No students found for this instructor.</div>';
         return;
     }
 
@@ -430,30 +430,30 @@ function renderStudentSwitcherContent() {
     const otherStudents = instructorSongStudents.filter(student => Number(student.student_id || 0) !== currentStudentId);
 
     const currentCard = currentStudent ? `
-        <button type="button" data-student-select="${Number(currentStudent.student_id || 0)}" class="w-full rounded-[1.75rem] border-2 border-[#f0a000] bg-[#fff7e6] p-5 text-left transition hover:-translate-y-0.5">
-            <div class="flex items-center gap-4">
-                <div class="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-[#d28a00] text-xl font-black text-white">${escapeSongHtml(getStudentInitials(currentStudent))}</div>
+        <button type="button" data-student-select="${Number(currentStudent.student_id || 0)}" class="w-full rounded-[1.35rem] border-2 border-[#f0a000] bg-[#fff7e6] p-4 text-left transition hover:-translate-y-0.5">
+            <div class="flex items-center gap-3">
+                <div class="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#d28a00] text-lg font-black text-white">${escapeSongHtml(getStudentInitials(currentStudent))}</div>
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
-                        <div class="truncate text-xl font-black text-slate-900">${escapeSongHtml(currentStudent.student_name || 'Student')}</div>
-                        <span class="rounded-full bg-[#f8a500] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white">Current session</span>
+                        <div class="truncate text-lg font-black text-slate-900">${escapeSongHtml(currentStudent.student_name || 'Student')}</div>
+                        <span class="rounded-full bg-[#f8a500] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white">Current session</span>
                     </div>
-                    <div class="mt-1 text-sm text-slate-600">${escapeSongHtml(currentStudent.instrument_name || 'Instrument')} · ${escapeSongHtml(currentStudent.package_name || currentStudent.branch_name || 'Student')}</div>
+                    <div class="mt-1 text-xs text-slate-600">${escapeSongHtml(currentStudent.instrument_name || 'Instrument')} · ${escapeSongHtml(currentStudent.package_name || currentStudent.branch_name || 'Student')}</div>
                 </div>
-                <div class="grid h-10 w-10 place-items-center rounded-full bg-[#f8a500] text-white">
+                <div class="grid h-9 w-9 place-items-center rounded-full bg-[#f8a500] text-white">
                     <i class="fas fa-check"></i>
                 </div>
             </div>
             <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                <div class="rounded-2xl bg-white/70 px-4 py-3 text-sm text-slate-700">
+                <div class="rounded-2xl bg-white/70 px-3 py-2.5 text-sm text-slate-700">
                     <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</div>
                     <div class="mt-1 font-semibold text-emerald-700">Currently in session</div>
                 </div>
-                <div class="rounded-2xl bg-white/70 px-4 py-3 text-sm text-slate-700">
+                <div class="rounded-2xl bg-white/70 px-3 py-2.5 text-sm text-slate-700">
                     <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Time</div>
                     <div class="mt-1 font-semibold text-amber-700">${escapeSongHtml(renderSessionTimeLabel(currentSession))}</div>
                 </div>
-                <div class="rounded-2xl bg-white/70 px-4 py-3 text-sm text-slate-700">
+                <div class="rounded-2xl bg-white/70 px-3 py-2.5 text-sm text-slate-700">
                     <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Location</div>
                     <div class="mt-1 font-semibold text-slate-700">${escapeSongHtml(currentSession?.room_name || currentStudent.branch_name || 'Studio')}</div>
                 </div>
@@ -466,20 +466,20 @@ function renderStudentSwitcherContent() {
             <div class="mb-3 text-sm font-black uppercase tracking-[0.22em] text-slate-500">Your other students</div>
             <div class="space-y-3">
                 ${otherStudents.map(student => `
-                    <button type="button" data-student-select="${Number(student.student_id || 0)}" class="w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4 text-left transition hover:border-gold-300 hover:bg-[#fffaf0]">
-                        <div class="flex items-center gap-4">
-                            <div class="grid h-12 w-12 shrink-0 place-items-center rounded-full text-base font-black text-white ${avatarTintForStudent(student.student_id)}">${escapeSongHtml(getStudentInitials(student))}</div>
+                    <button type="button" data-student-select="${Number(student.student_id || 0)}" class="w-full rounded-[1.15rem] border border-slate-200 bg-slate-50 px-3.5 py-3.5 text-left transition hover:border-gold-300 hover:bg-[#fffaf0]">
+                        <div class="flex items-center gap-3">
+                            <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full text-base font-black text-white ${avatarTintForStudent(student.student_id)}">${escapeSongHtml(getStudentInitials(student))}</div>
                             <div class="min-w-0 flex-1">
-                                <div class="truncate text-base font-black text-slate-900">${escapeSongHtml(student.student_name || 'Student')}</div>
-                                <div class="mt-0.5 text-sm text-slate-600">${escapeSongHtml(student.instrument_name || 'Instrument')} · ${escapeSongHtml(student.package_name || student.branch_name || 'Student')}</div>
+                                <div class="truncate text-sm font-black text-slate-900">${escapeSongHtml(student.student_name || 'Student')}</div>
+                                <div class="mt-0.5 text-[11px] text-slate-600">${escapeSongHtml(student.instrument_name || 'Instrument')} · ${escapeSongHtml(student.package_name || student.branch_name || 'Student')}</div>
                             </div>
-                            <i class="fas fa-chevron-right text-slate-300"></i>
+                            <i class="fas fa-chevron-right text-slate-300 text-xs"></i>
                         </div>
                     </button>
                 `).join('')}
             </div>
         </div>
-    ` : '<div class="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">No other students found.</div>';
+    ` : '<div class="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-sm text-slate-500">No other students found.</div>';
 
     mount.innerHTML = `${currentCard}${otherCards}`;
 }
@@ -628,7 +628,7 @@ function renderSongLibrary() {
     });
 
     if (!rows.length) {
-        grid.innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">No songs match the current filters.</div>';
+        grid.innerHTML = '<div class="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-sm text-slate-500">No songs match the current filters.</div>';
         return;
     }
 
@@ -636,19 +636,19 @@ function renderSongLibrary() {
         const selected = Number(song.song_id || 0) === Number(instructorSongSelectedSongId || 0);
         const allowed = !selectedStudent || songIsAllowedForStudent(selectedStudent, song);
         return `
-            <button type="button" data-song-select="${Number(song.song_id || 0)}" class="w-full rounded-[1.4rem] border px-4 py-4 text-left transition ${selected ? 'border-[#d9a81f] bg-[#fff8e8]' : 'border-slate-200 bg-white hover:border-gold-300 hover:bg-[#fffaf0]'} ${allowed ? '' : 'opacity-70'}">
-                <div class="flex items-start justify-between gap-4">
-                    <div class="flex min-w-0 items-start gap-4">
-                        <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${selected ? 'bg-[#0f172a] text-white' : 'bg-slate-100 text-slate-500'}">
+            <button type="button" data-song-select="${Number(song.song_id || 0)}" class="w-full rounded-[1.25rem] border px-3.5 py-3.5 text-left transition ${selected ? 'border-[#d9a81f] bg-[#fff8e8]' : 'border-slate-200 bg-white hover:border-gold-300 hover:bg-[#fffaf0]'} ${allowed ? '' : 'opacity-70'}">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${selected ? 'bg-[#0f172a] text-white' : 'bg-slate-100 text-slate-500'}">
                             <i class="fas fa-music"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="truncate text-lg font-black text-slate-900">${escapeSongHtml(song.title || 'Untitled')}</div>
-                            <div class="mt-0.5 text-sm text-slate-600">${escapeSongHtml(song.artist || 'Unknown Artist')} · ${escapeSongHtml(song.difficulty_level || 'No level')}</div>
+                            <div class="truncate text-base font-black text-slate-900">${escapeSongHtml(song.title || 'Untitled')}</div>
+                            <div class="mt-0.5 text-xs text-slate-600">${escapeSongHtml(song.artist || 'Unknown Artist')} · ${escapeSongHtml(song.difficulty_level || 'No level')}</div>
                             <div class="mt-2 flex flex-wrap gap-2">
-                                <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">${escapeSongHtml(song.category || 'Category')}</span>
-                                ${song.genre ? `<span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">${escapeSongHtml(song.genre)}</span>` : ''}
-                                ${allowed ? '<span class="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">Allowed</span>' : '<span class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">Not for selected student</span>'}
+                                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">${escapeSongHtml(song.category || 'Category')}</span>
+                                ${song.genre ? `<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">${escapeSongHtml(song.genre)}</span>` : ''}
+                                ${allowed ? '<span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Allowed</span>' : '<span class="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Not for selected student</span>'}
                             </div>
                         </div>
                     </div>
@@ -668,76 +668,76 @@ function renderAssignments() {
     if (!list) return;
 
     if (!instructorSongAssignments.length) {
-        list.innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">No song assignments yet. Pick a student and a song to start.</div>';
+        list.innerHTML = '<div class="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-sm text-slate-500">No song assignments yet. Pick a student and a song to start.</div>';
         updateSongStats();
         return;
     }
 
     list.innerHTML = instructorSongAssignments.map(item => `
-        <article class="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <article class="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
+            <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h3 class="text-lg font-black text-slate-900">${escapeSongHtml(item.title || 'Untitled')}</h3>
-                        <span class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${progressBadgeClass(item.progress_status)}">${escapeSongHtml(item.progress_status || 'assigned')}</span>
+                        <h3 class="text-base font-black text-slate-900">${escapeSongHtml(item.title || 'Untitled')}</h3>
+                        <span class="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${progressBadgeClass(item.progress_status)}">${escapeSongHtml(item.progress_status || 'assigned')}</span>
                     </div>
                     <div class="mt-1 text-sm text-slate-500">${escapeSongHtml(item.artist || 'Unknown Artist')} • ${escapeSongHtml(item.student_name || 'Student')}</div>
-                    <div class="mt-1 text-xs text-slate-400">Assigned ${formatSongDate(item.assigned_at)}</div>
+                    <div class="mt-1 text-[11px] text-slate-400">Assigned ${formatSongDate(item.assigned_at)}</div>
                 </div>
                 <div class="text-sm text-slate-500">${escapeSongHtml(item.category || 'Category')} • ${escapeSongHtml(item.difficulty_level || 'No difficulty set')}</div>
             </div>
 
-            <div class="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-                <div class="space-y-4">
-                    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="mt-3 grid gap-3 xl:grid-cols-[0.9fr_1.1fr]">
+                <div class="space-y-3">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
                         <div class="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Assignment Notes</div>
-                        <textarea data-assignment-notes="${Number(item.assignment_id || 0)}" rows="4" class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">${escapeSongHtml(item.assigned_notes || '')}</textarea>
-                        <div class="mt-3 flex flex-col gap-3 sm:flex-row">
-                            <select data-assignment-progress="${Number(item.assignment_id || 0)}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                        <textarea data-assignment-notes="${Number(item.assignment_id || 0)}" rows="3" class="mt-2.5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm">${escapeSongHtml(item.assigned_notes || '')}</textarea>
+                        <div class="mt-2.5 flex flex-col gap-2.5 sm:flex-row">
+                            <select data-assignment-progress="${Number(item.assignment_id || 0)}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm">
                                 <option value="assigned" ${String(item.progress_status) === 'assigned' ? 'selected' : ''}>Assigned</option>
                                 <option value="practicing" ${String(item.progress_status) === 'practicing' ? 'selected' : ''}>Practicing</option>
                                 <option value="polishing" ${String(item.progress_status) === 'polishing' ? 'selected' : ''}>Polishing</option>
                                 <option value="completed" ${String(item.progress_status) === 'completed' ? 'selected' : ''}>Completed</option>
                             </select>
-                            <button type="button" data-save-assignment="${Number(item.assignment_id || 0)}" class="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700">Save Progress</button>
+                            <button type="button" data-save-assignment="${Number(item.assignment_id || 0)}" class="rounded-2xl bg-slate-900 px-3.5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700">Save Progress</button>
                         </div>
                     </div>
-                    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
                         <div class="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Reference Links</div>
-                        <div class="mt-3 flex flex-wrap gap-2">
-                            ${item.youtube_link ? `<a href="${escapeSongHtml(item.youtube_link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700"><i class="fab fa-youtube mr-2"></i>YouTube</a>` : ''}
-                            ${item.spotify_link ? `<a href="${escapeSongHtml(item.spotify_link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"><i class="fab fa-spotify mr-2"></i>Spotify</a>` : ''}
-                            ${item.sheet_music_path ? `<a href="${escapeSongHtml(songAssetUrl(item.sheet_music_path))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700"><i class="fas fa-file-pdf mr-2"></i>Sheet PDF</a>` : ''}
-                            ${item.accompaniment_audio_path ? `<a href="${escapeSongHtml(songAssetUrl(item.accompaniment_audio_path))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700"><i class="fas fa-headphones mr-2"></i>Audio</a>` : ''}
+                        <div class="mt-2.5 flex flex-wrap gap-2">
+                            ${item.youtube_link ? `<a href="${escapeSongHtml(item.youtube_link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700"><i class="fab fa-youtube mr-2"></i>YouTube</a>` : ''}
+                            ${item.spotify_link ? `<a href="${escapeSongHtml(item.spotify_link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-emerald-50 px-2.5 py-2 text-xs font-bold text-emerald-700"><i class="fab fa-spotify mr-2"></i>Spotify</a>` : ''}
+                            ${item.sheet_music_path ? `<a href="${escapeSongHtml(songAssetUrl(item.sheet_music_path))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-sky-50 px-2.5 py-2 text-xs font-bold text-sky-700"><i class="fas fa-file-pdf mr-2"></i>Sheet PDF</a>` : ''}
+                            ${item.accompaniment_audio_path ? `<a href="${escapeSongHtml(songAssetUrl(item.accompaniment_audio_path))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-violet-50 px-2.5 py-2 text-xs font-bold text-violet-700"><i class="fas fa-headphones mr-2"></i>Audio</a>` : ''}
                         </div>
                     </div>
                 </div>
-                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
                     <div class="flex items-center justify-between gap-3">
                         <div class="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Lesson History</div>
                         <div class="text-xs text-slate-400">${(item.history || []).length} entr${(item.history || []).length === 1 ? 'y' : 'ies'}</div>
                     </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2">
-                        <input type="date" data-history-date="${Number(item.assignment_id || 0)}" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" value="${new Date().toISOString().slice(0, 10)}">
-                        <select data-history-progress="${Number(item.assignment_id || 0)}" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                    <div class="mt-2.5 grid gap-2.5 md:grid-cols-2">
+                        <input type="date" data-history-date="${Number(item.assignment_id || 0)}" class="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm" value="${new Date().toISOString().slice(0, 10)}">
+                        <select data-history-progress="${Number(item.assignment_id || 0)}" class="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm">
                             <option value="assigned">Assigned</option>
                             <option value="practicing">Practicing</option>
                             <option value="polishing">Polishing</option>
                             <option value="completed">Completed</option>
                         </select>
                     </div>
-                    <textarea data-history-notes="${Number(item.assignment_id || 0)}" rows="3" class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="What happened in today’s lesson? Which section improved, and what needs work next?"></textarea>
-                    <button type="button" data-save-history="${Number(item.assignment_id || 0)}" class="mt-3 rounded-2xl bg-gold-500 px-4 py-3 text-sm font-black text-black transition hover:bg-gold-400">Add Lesson History</button>
-                    <div class="mt-4 space-y-3">
+                    <textarea data-history-notes="${Number(item.assignment_id || 0)}" rows="3" class="mt-2.5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm" placeholder="What happened in today’s lesson? Which section improved, and what needs work next?"></textarea>
+                    <button type="button" data-save-history="${Number(item.assignment_id || 0)}" class="mt-2.5 rounded-2xl bg-gold-500 px-3.5 py-2.5 text-sm font-black text-black transition hover:bg-gold-400">Add Lesson History</button>
+                    <div class="mt-3 space-y-2.5">
                         ${(item.history || []).length ? item.history.map(history => `
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3.5">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                     <div class="text-sm font-bold text-slate-900">${formatSongDate(history.lesson_date)}</div>
-                                    <span class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${progressBadgeClass(history.progress_status)}">${escapeSongHtml(history.progress_status || 'assigned')}</span>
+                                    <span class="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${progressBadgeClass(history.progress_status)}">${escapeSongHtml(history.progress_status || 'assigned')}</span>
                                 </div>
-                                <div class="mt-2 text-sm text-slate-600">${escapeSongHtml(history.lesson_notes || 'No lesson note recorded.')}</div>
+                                <div class="mt-1.5 text-sm text-slate-600">${escapeSongHtml(history.lesson_notes || 'No lesson note recorded.')}</div>
                             </div>
-                        `).join('') : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">No lesson history yet for this song.</div>'}
+                        `).join('') : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3.5 py-4 text-sm text-slate-500">No lesson history yet for this song.</div>'}
                     </div>
                 </div>
             </div>

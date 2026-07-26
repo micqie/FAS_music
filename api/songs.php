@@ -214,7 +214,7 @@ class SongsApi
         }
     }
 
-    private function resolveStudentId($studentId, $email)
+    private function resolveStudentId($studentId, $email, $username = '')
     {
         $studentId = (int)$studentId;
         if ($studentId > 0) {
@@ -222,7 +222,11 @@ class SongsApi
         }
 
         $email = trim((string)$email);
-        if ($email === '' || !$this->tableExists('tbl_students')) {
+        $username = trim((string)$username);
+        if ($email === '' && $username === '') {
+            return 0;
+        }
+        if (!$this->tableExists('tbl_students')) {
             return 0;
         }
 
@@ -231,9 +235,10 @@ class SongsApi
                 SELECT student_id
                 FROM tbl_students
                 WHERE LOWER(TRIM(email)) = LOWER(?)
+                   OR LOWER(TRIM(email)) = LOWER(?)
                 LIMIT 1
             ");
-            $stmt->execute([$email]);
+            $stmt->execute([$email, $username]);
             return (int)($stmt->fetchColumn() ?: 0);
         } catch (PDOException $e) {
             return 0;
@@ -959,7 +964,11 @@ class SongsApi
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
 
-        $studentId = $this->resolveStudentId((int)($_GET['student_id'] ?? 0), $_GET['email'] ?? '');
+        $studentId = $this->resolveStudentId(
+            (int)($_GET['student_id'] ?? 0),
+            $_GET['email'] ?? '',
+            $_GET['username'] ?? ''
+        );
         if ($studentId < 1) {
             $this->sendJSON(['error' => 'student_id or email is required'], 400);
         }

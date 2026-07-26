@@ -310,6 +310,154 @@ Experience Prestige
         </div>
     </footer>
 
+    <button
+        type="button"
+        onclick="toggleParentAgreementModal(true)"
+        class="fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full border border-gold-400 bg-black text-gold-400 shadow-2xl shadow-black/25 transition hover:scale-105 hover:bg-zinc-950 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-obsidian"
+        aria-label="Open Parent Agreement"
+        title="Parent Agreement"
+    >
+        <span class="text-xl font-black">?</span>
+    </button>
+
+    <!-- Parent Agreement Modal -->
+    <div id="parentAgreementModal" class="fixed inset-0 z-[110] hidden items-start justify-center overflow-y-auto bg-black/60 p-3 pt-4 pb-4 backdrop-blur-sm sm:items-center sm:p-4">
+        <div class="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-sky-100 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+            <div class="flex shrink-0 items-start justify-between gap-3 border-b border-sky-100 bg-sky-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-sky-950/20">
+                <div>
+                    <p class="text-[10px] font-bold uppercase tracking-[0.28em] text-sky-600 dark:text-sky-300">Parent Guide</p>
+                    <h2 class="mt-1 text-xl sm:text-2xl font-serif leading-tight text-zinc-900 dark:text-white">📖 Parent Guide & School Policies</h2>
+                    <p class="mt-1 text-sm text-sky-900/80 dark:text-sky-100/80">Please read these reminders before enrollment.</p>
+                </div>
+                <button type="button" onclick="toggleParentAgreementModal(false)" class="rounded-full p-1.5 text-zinc-400 transition hover:bg-white hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white" aria-label="Close agreement modal">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+
+            <div class="shrink-0 border-b border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-zinc-800 dark:bg-sky-950/20 dark:text-sky-100">
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-circle-info mt-0.5 text-sm text-sky-500"></i>
+                    <p>Please read these reminders before enrollment. Continuing means you acknowledge the school policies and terms.</p>
+                </div>
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
+                <div class="space-y-3">
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">🎵 Enrollment</h3>
+                        <ul class="mt-2.5 space-y-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                            <li>Complete the enrollment form with accurate information.</li>
+                            <li>A one-time Registration Fee of ₱1,000 is required.</li>
+                            <li>Registration fees and payments are non-refundable.</li>
+                        </ul>
+                    </section>
+
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">💳 Payment Reminder</h3>
+                        <p class="mt-2.5 text-sm text-zinc-600 dark:text-zinc-300">Remaining balances must be completed before the deadline below:</p>
+                        <div class="mt-3 overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-zinc-50 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                                    <tr>
+                                        <th class="px-3 py-2.5 font-semibold">Package</th>
+                                        <th class="px-3 py-2.5 font-semibold">Payment Deadline</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
+                                    <tr>
+                                        <td class="px-3 py-2.5">12 Sessions</td>
+                                        <td class="px-3 py-2.5">Before 7th Session</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2.5">20 Sessions</td>
+                                        <td class="px-3 py-2.5">Before 11th Session</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2.5">50 Sessions</td>
+                                        <td class="px-3 py-2.5">Before 30th Session</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="mt-2.5 text-sm text-zinc-600 dark:text-zinc-300">Failure to settle payments may temporarily suspend lessons.</p>
+                    </section>
+
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">📅 Attendance & Absences</h3>
+                        <div class="mt-3 grid gap-2.5 text-sm text-zinc-600 dark:text-zinc-300 sm:grid-cols-3">
+                            <div class="rounded-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-900">12 Sessions → 2 allowable absences</div>
+                            <div class="rounded-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-900">20 Sessions → 3 allowable absences</div>
+                            <div class="rounded-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-900">50 Sessions → 5 allowable absences</div>
+                        </div>
+                        <p class="mt-2.5 text-sm text-zinc-600 dark:text-zinc-300">If absent due to illness or emergencies, kindly request a Make-Up Session. Unused make-up lessons will still be counted as used.</p>
+                    </section>
+
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">❄ Schedule Freeze</h3>
+                        <p class="mt-2.5 text-sm text-zinc-600 dark:text-zinc-300">Need to be away for 3 or more consecutive lessons? Request a Schedule Freeze to reserve your preferred schedule.</p>
+                        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">₱100 Slot Reservation Fee per missed session, credited toward future lesson payments.</p>
+                    </section>
+
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">⚠ Counted-In (CI) Policy</h3>
+                        <ul class="mt-2.5 space-y-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                            <li>A lesson is considered used when the student is absent.</li>
+                            <li>No prior notice was given.</li>
+                            <li>The scheduled lesson time has already passed.</li>
+                        </ul>
+                        <p class="mt-2.5 text-sm text-zinc-600 dark:text-zinc-300">Please inform the school ahead of time to avoid a Counted-In lesson.</p>
+                    </section>
+
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">⏳ Lesson Validity</h3>
+                        <p class="mt-2.5 text-sm text-zinc-600 dark:text-zinc-300">Unused lessons must be used within 3 months from the student's last attended lesson. After that period, remaining lessons may be forfeited unless approved by management.</p>
+                    </section>
+
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">🎒 Bring Every Lesson</h3>
+                        <ul class="mt-2.5 space-y-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                            <li>Attendance Card</li>
+                            <li>Music Book</li>
+                            <li>Long Clearbook</li>
+                        </ul>
+                    </section>
+
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">🚫 Inside the Music Room</h3>
+                        <ul class="mt-2.5 space-y-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                            <li>Food & drinks</li>
+                            <li>Vapes or cigarettes</li>
+                            <li>Hazardous materials</li>
+                            <li>Unrelated electronic devices</li>
+                        </ul>
+                    </section>
+
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">📆 Scheduling</h3>
+                        <p class="mt-2.5 text-sm text-zinc-600 dark:text-zinc-300">Follow your assigned schedule. Schedule changes depend on teacher and room availability. Please don't rely solely on reminder messages.</p>
+                        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">Missing a reminder does not exempt a student from the attendance policy.</p>
+                    </section>
+
+                    <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">🛡 Safety Reminder</h3>
+                        <p class="mt-2.5 text-sm text-zinc-600 dark:text-zinc-300">Please keep your valuables secured. Father & Sons' Music is not responsible for lost or damaged personal belongings.</p>
+                    </section>
+
+                    <section class="rounded-xl border border-gold-200 bg-gold-50 p-3.5 shadow-sm dark:border-gold-500/20 dark:bg-gold-500/10">
+                        <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">✅ Acknowledgement</h3>
+                        <p class="mt-2.5 text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">By enrolling, parents and students acknowledge that they have read, understood, and agreed to the school's policies and terms.</p>
+                    </section>
+                </div>
+            </div>
+
+            <div class="shrink-0 flex items-center justify-end gap-3 border-t border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                <button type="button" onclick="toggleParentAgreementModal(false)" class="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                    I Understand
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Login Modal: Clean Minimal Card -->
     <div id="loginModal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/20 backdrop-blur-sm dark:bg-black/80">
         <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl w-full max-w-md p-6 sm:p-8 relative">
@@ -469,11 +617,25 @@ Experience Prestige
                 </div>
 
                 <div class="pt-2">
-                    <button type="submit" id="registerSubmitBtn"
-                        class="w-full bg-zinc-900 hover:bg-black dark:bg-gold-500 dark:hover:bg-gold-600 text-white dark:text-black font-bold py-4 rounded-sm transition flex items-center justify-center uppercase tracking-widest text-sm shadow-lg">
-                        <span id="registerSubmitBtnText">Create Account</span>
-                        <i id="registerSubmitBtnIcon" class="fas fa-arrow-right ml-2"></i>
-                    </button>
+                    <div class="rounded-sm border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/40">
+                        <div class="flex items-start gap-3">
+                            <input id="parentAgreementCheckbox" type="checkbox" class="mt-1 h-4 w-4 rounded border-zinc-300 text-gold-500 focus:ring-gold-500">
+                            <div class="text-sm text-zinc-700 dark:text-zinc-300">
+                                I have read and understood the Parent Agreement.
+                                <button type="button" onclick="toggleParentAgreementModal(true)" class="ml-1 font-bold text-gold-500 underline decoration-gold-400 underline-offset-4 hover:text-gold-600">
+                                    View agreement
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                        <button type="submit" id="registerSubmitBtn"
+                            class="w-full bg-zinc-900 hover:bg-black dark:bg-gold-500 dark:hover:bg-gold-600 text-white dark:text-black font-bold py-4 rounded-sm transition flex items-center justify-center uppercase tracking-widest text-sm shadow-lg disabled:opacity-60 disabled:cursor-not-allowed">
+                            <span id="registerSubmitBtnText">Create Account</span>
+                            <i id="registerSubmitBtnIcon" class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
                 </div>
             </form>
 

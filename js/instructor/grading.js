@@ -31,7 +31,7 @@ function buildScoreFields() {
     return keys.map((key, i) => ({ key, label: criteria[i] || DEFAULT_CRITERIA[i], icon: icons[i], labelId: labelIds[i] }));
 }
 const SCORE_FIELDS = buildScoreFields();
-const SCORE_WORDS  = ['','1','2','3','4','5'];
+const SCORE_WORDS  = ['','Poor','Fair','Good','Very Good','Excellent'];
 
 const IMPROVEMENT_TIPS = {
     performance_score: { low:'Practice full pieces without stopping.', mid:'Record yourself and listen back.', high:'Challenge yourself with harder repertoire.' },
@@ -348,9 +348,13 @@ function setScoreButtonsDisabled(disabled) {
 
 // ── Average preview ────────────────────────────────────────────────
 function computeAverageFromInputs() {
-    const ids    = buildScoreFields().map(f => getFieldInputId(f.key));
+    // Only count the criteria the instructor has defined (may be fewer than 5)
+    const activeCriteria = loadCriteria();
+    const fieldKeys = ['performanceScoreInput','techniqueScoreInput','rhythmScoreInput','focusScoreInput','assignmentScoreInput'];
+    // Use only as many field IDs as there are active criteria
+    const ids    = fieldKeys.slice(0, activeCriteria.length);
     const values = ids.map(id => Number(document.getElementById(id)?.value || 0)).filter(v => v >= 1 && v <= 5);
-    if (values.length !== ids.length) return null;
+    if (!values.length || values.length !== ids.length) return null;
     return Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(2));
 }
 function updateScorePreview() {
@@ -380,11 +384,15 @@ function getAnalyticsPreviewSession(session) {
     if (!session) return null;
     const preview = { ...session };
     let has = false;
-    buildScoreFields().forEach(f => {
+    const activeCriteria   = loadCriteria();
+    const activeFields     = buildScoreFields().slice(0, activeCriteria.length);
+    activeFields.forEach(f => {
         const v = Number(document.getElementById(getFieldInputId(f.key))?.value || 0);
         preview[f.key] = v > 0 ? v : 0;
         if (v > 0) has = true;
     });
+    // Zero out unused criteria so they don't skew averages
+    buildScoreFields().slice(activeCriteria.length).forEach(f => { preview[f.key] = 0; });
     preview.skill_level    = document.getElementById('skillLevelInput')?.value || preview.skill_level || '';
     preview.remarks        = document.getElementById('remarksInput')?.value    || preview.remarks     || '';
     preview.average_score  = computeAverageFromInputs();
@@ -601,17 +609,23 @@ async function saveSessionGrade(event) {
         showGradeMessage('Attendance must be marked Present before grading.', 'error'); return;
     }
 
+    // Build score payload dynamically — only use active criteria, zero unused ones
+    const activeCriteria = loadCriteria();
+    const allScoreKeys = ['performance_score','technique_score','rhythm_score','focus_score','assignment_score'];
+    const allInputIds  = ['performanceScoreInput','techniqueScoreInput','rhythmScoreInput','focusScoreInput','assignmentScoreInput'];
+    const scorePayload = {};
+    allScoreKeys.forEach((key, i) => {
+        const isActive = i < activeCriteria.length;
+        scorePayload[key] = isActive ? Number(document.getElementById(allInputIds[i])?.value || 0) : 0;
+    });
+
     const payload = {
         action: 'save-session-grade',
         user_id: Number(user.user_id),
         session_id: sessionId,
-        skill_level:       document.getElementById('skillLevelInput').value,
-        performance_score: Number(document.getElementById('performanceScoreInput').value  || 0),
-        technique_score:   Number(document.getElementById('techniqueScoreInput').value    || 0),
-        rhythm_score:      Number(document.getElementById('rhythmScoreInput').value       || 0),
-        focus_score:       Number(document.getElementById('focusScoreInput').value        || 0),
-        assignment_score:  Number(document.getElementById('assignmentScoreInput').value   || 0),
-        remarks:           document.getElementById('remarksInput').value.trim()
+        skill_level: document.getElementById('skillLevelInput').value,
+        ...scorePayload,
+        remarks: document.getElementById('remarksInput').value.trim()
     };
 
     const btn = document.getElementById('saveGradeBtn');
@@ -651,7 +665,9 @@ function renderAnalytics(session) {
     if (panel) panel.classList.add('hidden');
     if (!session) return;
 
-    const SCORE_FIELDS_NOW = buildScoreFields();
+    // Only use the criteria the instructor has actually defined
+    const activeCriteria   = loadCriteria();
+    const SCORE_FIELDS_NOW = buildScoreFields().slice(0, activeCriteria.length);
     const preview          = getAnalyticsPreviewSession(session);
     const studentId        = Number(session.student_id || 0);
     const history          = getStudentGradedHistory(studentId);

@@ -258,8 +258,41 @@ function toggleRegisterModal(show) {
         if (form) form.reset();
         const msg = document.getElementById('registerMessage');
         if (msg) msg.classList.add('hidden');
+        const checkbox = document.getElementById('parentAgreementCheckbox');
+        if (checkbox) checkbox.checked = false;
+        syncParentAgreementConsentState();
     }
 }
+
+// Toggle Parent Agreement Modal
+function toggleParentAgreementModal(show) {
+    const modal = document.getElementById('parentAgreementModal');
+    if (!modal) return;
+
+    if (show) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    } else {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+// Keep the registration button gated behind the acknowledgment checkbox
+function syncParentAgreementConsentState() {
+    const checkbox = document.getElementById('parentAgreementCheckbox');
+    const button = document.getElementById('registerSubmitBtn');
+    if (!checkbox || !button) return;
+
+    const disabled = !checkbox.checked;
+    button.disabled = disabled;
+    button.classList.toggle('opacity-60', disabled);
+    button.classList.toggle('cursor-not-allowed', disabled);
+}
+
+// Make the modal helpers available to inline onclick handlers.
+window.toggleParentAgreementModal = toggleParentAgreementModal;
+window.syncParentAgreementConsentState = syncParentAgreementConsentState;
 
 // Toggle Password Visibility
 function togglePassword(inputId, iconId) {
@@ -945,6 +978,7 @@ function initRegisterForm() {
         const passwordInput = document.getElementById('registerPassword');
         const passwordConfirmInput = document.getElementById('registerPasswordConfirm');
         const emailInput = document.getElementById('student_email');
+        const agreementCheckbox = document.getElementById('parentAgreementCheckbox');
 
         if (passwordInput) {
             passwordInput.addEventListener('input', function() {
@@ -964,11 +998,23 @@ function initRegisterForm() {
             });
         }
 
+        if (agreementCheckbox) {
+            agreementCheckbox.addEventListener('change', syncParentAgreementConsentState);
+            syncParentAgreementConsentState();
+        }
+
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
             if (registerForm.dataset.submitting === '1') return;
             registerForm.dataset.submitting = '1';
+
+            if (!agreementCheckbox?.checked) {
+                showRegisterMessage('Please review and acknowledge the Parent Agreement before continuing.', 'error');
+                toggleParentAgreementModal(true);
+                registerForm.dataset.submitting = '0';
+                return;
+            }
 
             if (!validatePassword()) {
                 showRegisterMessage('Please ensure your password meets all requirements.', 'error');
@@ -1067,6 +1113,7 @@ function initRegisterForm() {
     const passwordInput = document.getElementById('registerPassword');
     const passwordConfirmInput = document.getElementById('registerPasswordConfirm');
     const emailInput = document.getElementById('student_email');
+    const agreementCheckbox = document.getElementById('parentAgreementCheckbox');
 
     if (passwordInput) {
         passwordInput.addEventListener('input', function() {
@@ -1086,6 +1133,11 @@ function initRegisterForm() {
         });
     }
 
+    if (agreementCheckbox) {
+        agreementCheckbox.addEventListener('change', syncParentAgreementConsentState);
+        syncParentAgreementConsentState();
+    }
+
     const dobInput = document.getElementById('student_date_of_birth');
     if (dobInput) {
         dobInput.addEventListener('change', updatePublicGuardianRequiredState);
@@ -1099,6 +1151,13 @@ function initRegisterForm() {
         // Prevent double submit
         if (registerForm.dataset.submitting === '1') return;
         registerForm.dataset.submitting = '1';
+
+        if (!agreementCheckbox?.checked) {
+            showRegisterMessage('Please review and acknowledge the Parent Agreement before continuing.', 'error');
+            toggleParentAgreementModal(true);
+            registerForm.dataset.submitting = '0';
+            return;
+        }
 
         // Validate password policy
         if (!validatePassword()) {
@@ -1924,6 +1983,7 @@ function initIndexPage() {
     initDatePicker();
     loadBranches();
     initScrollAnimations();
+    syncParentAgreementConsentState();
 }
 
 // Initialize scroll animations for About section

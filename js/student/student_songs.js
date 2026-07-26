@@ -1,4 +1,6 @@
 let studentAssignedSongs = [];
+let studentSelectedSongId = 0;
+let studentPortalProfile = null;
 
 function escapeStudentSongHtml(value) {
     return String(value ?? '')
@@ -42,12 +44,62 @@ function getStudentDisplayName() {
     return user?.username || user?.email || 'Maya';
 }
 
+function getStudentAssignedSongById(assignmentId) {
+    return studentAssignedSongs.find(item => Number(item.assignment_id || 0) === Number(assignmentId || 0)) || null;
+}
+
+function getStudentSelectedSong() {
+    return getStudentAssignedSongById(studentSelectedSongId) || getFeaturedSong();
+}
+
 function setStudentHeroGreeting(name) {
     const titleEl = document.getElementById('studentPageTitle');
     const subtitleEl = document.getElementById('studentPageSubtitle');
     const displayName = String(name || 'Maya').trim();
     if (titleEl) titleEl.textContent = `Hi ${displayName}, ready to practice?`;
     if (subtitleEl) subtitleEl.textContent = 'Your teacher has new pieces ready for you. Take it one small step at a time.';
+}
+
+function setStudentPortalIdentity(portal, user) {
+    const student = portal?.student || {};
+    const enrollment = portal?.current_enrollment || null;
+    const displayName = `${student.first_name || ''} ${student.last_name || ''}`.trim()
+        || student.full_name
+        || student.student_name
+        || user?.username
+        || user?.email
+        || 'Student';
+    const email = student.email || user?.email || '—';
+    const branchName = student.branch_name
+        || enrollment?.branch_name
+        || portal?.branch_name
+        || '—';
+
+    studentPortalProfile = portal;
+    window.__studentPortalBranchLabel = branchName;
+
+    const setText = (selector, value) => {
+        document.querySelectorAll(selector).forEach(node => {
+            node.textContent = value;
+        });
+    };
+
+    setText('#studentNavName', displayName);
+    setText('#studentMobileMenuName', displayName);
+    setText('#studentSidebarName, #studentSidebarMobileName, #studentName, #studentNameMobile', displayName);
+    setText('#studentSidebarEmail, #studentSidebarMobileEmail, #studentEmail, #studentEmailMobile', email);
+
+    if (typeof window.setPortalBranchText === 'function') {
+        window.setPortalBranchText('#studentSidebarBranch, #studentSidebarMobileBranch, #studentBranch, #studentBranchMobile', branchName);
+    } else {
+        setText('#studentSidebarBranch, #studentSidebarMobileBranch, #studentBranch, #studentBranchMobile', branchName);
+    }
+
+    if (typeof window.fitAllPortalBranchLabels === 'function') {
+        window.fitAllPortalBranchLabels();
+    }
+
+    setStudentHeroGreeting(displayName);
 }
 
 function getFeaturedSong() {
@@ -161,7 +213,7 @@ function renderPracticeMaterials(song) {
 
     if (!song) {
         mount.innerHTML = `
-            <div class="rounded-[1.4rem] border border-dashed border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-6 text-sm text-zinc-500 dark:text-zinc-400">
+            <div class="rounded-[1.25rem] border border-dashed border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-4 text-sm text-zinc-500 dark:text-zinc-400">
                 Your teacher will add practice materials here once a song is assigned.
             </div>
         `;
@@ -170,7 +222,7 @@ function renderPracticeMaterials(song) {
 
     if (!materials.length) {
         mount.innerHTML = `
-            <div class="rounded-[1.4rem] border border-dashed border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-6 text-sm text-zinc-500 dark:text-zinc-400">
+            <div class="rounded-[1.25rem] border border-dashed border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-4 text-sm text-zinc-500 dark:text-zinc-400">
                 No practice materials were attached yet.
             </div>
         `;
@@ -178,24 +230,24 @@ function renderPracticeMaterials(song) {
     }
 
     mount.innerHTML = materials.map(material => `
-        <a href="${escapeStudentSongHtml(material.href)}" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-4 rounded-[1.4rem] border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-4 transition hover:border-gold-300 hover:bg-[#fffdf2]">
-            <div class="flex items-center gap-4 min-w-0">
-                <div class="grid h-12 w-12 place-items-center rounded-2xl ${material.bg} ${material.color}">
+        <a href="${escapeStudentSongHtml(material.href)}" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-3 rounded-[1.25rem] border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 transition hover:border-gold-300 hover:bg-[#fffdf2]">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="grid h-11 w-11 place-items-center rounded-2xl ${material.bg} ${material.color}">
                     <i class="fas ${material.icon}"></i>
                 </div>
                 <div class="min-w-0">
-                    <div class="truncate text-lg font-black text-zinc-900 dark:text-white">${escapeStudentSongHtml(material.label)}</div>
+                    <div class="truncate text-base font-black text-zinc-900 dark:text-white">${escapeStudentSongHtml(material.label)}</div>
                     <div class="truncate text-sm text-zinc-500 dark:text-zinc-400">${escapeStudentSongHtml(material.subtitle || '')}</div>
                 </div>
             </div>
-            <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-zinc-300">
+            <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-zinc-300">
                 <i class="fas fa-arrow-right"></i>
             </div>
         </a>
     `).join('');
 }
 
-function renderFeaturedSong(song) {
+function renderSelectedSongHeader(song) {
     const titleEl = document.getElementById('featuredTitle');
     const composerEl = document.getElementById('featuredComposer');
     const badgeEl = document.getElementById('featuredBadge');
@@ -245,10 +297,10 @@ function renderFeaturedSong(song) {
 function renderStudentSongs() {
     const grid = document.getElementById('studentSongsGrid');
     const emptyState = document.getElementById('studentCompletedEmptyState');
-    const featured = getFeaturedSong();
+    const featured = getStudentSelectedSong() || getFeaturedSong();
     if (!grid) return;
 
-    renderFeaturedSong(featured);
+    renderSelectedSongHeader(featured);
     updateStudentSongStats();
 
     if (!studentAssignedSongs.length) {
@@ -259,21 +311,31 @@ function renderStudentSongs() {
 
     if (emptyState) emptyState.classList.add('hidden');
 
-    const songsToShow = [...studentAssignedSongs].slice(0, 3);
-    grid.innerHTML = songsToShow.map(item => `
-        <article class="rounded-[1.6rem] border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-lg dark:shadow-black/20">
-            <div class="flex items-start gap-4">
-                <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-zinc-300">
+    const selectedId = Number(featured?.assignment_id || 0);
+    grid.innerHTML = studentAssignedSongs.map(item => {
+        const active = Number(item.assignment_id || 0) === selectedId;
+        return `
+        <article class="rounded-[1.25rem] border ${active ? 'border-gold-400 ring-2 ring-gold-400/30' : 'border-zinc-200 dark:border-white/10'} bg-white dark:bg-white/5 p-4 shadow-lg dark:shadow-black/20 transition">
+            <div class="flex items-start gap-3">
+                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${active ? 'bg-gold-500 text-black' : 'bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-zinc-300'}">
                     <i class="fas fa-music"></i>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <div class="truncate text-xl font-black text-zinc-900 dark:text-white">${escapeStudentSongHtml(item.title || 'Untitled')}</div>
+                    <div class="truncate text-lg font-black text-zinc-900 dark:text-white">${escapeStudentSongHtml(item.title || 'Untitled')}</div>
                     <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeStudentSongHtml(item.artist || 'Unknown Artist')}</div>
-                    <span class="mt-3 inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${studentProgressBadgeClass(item.progress_status)}">${escapeStudentSongHtml(studentSongStatusLabel(item.progress_status))}</span>
+                    <div class="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">${escapeStudentSongHtml(item.teacher_name || 'Your teacher')} • ${escapeStudentSongHtml(formatStudentSongDate(item.assigned_at))}</div>
+                    <span class="mt-2 inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${studentProgressBadgeClass(item.progress_status)}">${escapeStudentSongHtml(studentSongStatusLabel(item.progress_status))}</span>
                 </div>
             </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <button type="button" data-student-song-open="${Number(item.assignment_id || 0)}" class="inline-flex items-center rounded-2xl ${active ? 'bg-gold-500 text-black' : 'bg-zinc-900 text-white dark:bg-white/10 dark:text-white'} px-3 py-2 text-sm font-bold transition hover:opacity-90">
+                    <i class="fas fa-folder-open mr-2"></i>Open practice song
+                </button>
+            </div>
+            ${item.assigned_notes ? `<p class="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">${escapeStudentSongHtml(item.assigned_notes)}</p>` : ''}
         </article>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function attachStudentSongMenu() {
@@ -300,22 +362,39 @@ async function loadStudentSongs() {
 
     const displayName = user.username || user.email || 'Student';
     setStudentHeroGreeting(displayName);
-    const navName = document.getElementById('studentNavName');
-    const mobileName = document.getElementById('studentMobileMenuName');
-    if (navName) navName.textContent = displayName;
-    if (mobileName) mobileName.textContent = displayName;
 
-    const response = await axios.get(`${baseApiUrl}/songs.php?action=get-student-assigned-songs&email=${encodeURIComponent(user.email)}`);
+    try {
+        if (typeof window.fetchStudentPortalDataByEmail === 'function') {
+            const portal = await window.fetchStudentPortalDataByEmail(user.email);
+            if (portal?.success) {
+                setStudentPortalIdentity(portal, user);
+            }
+        }
+    } catch (error) {
+        console.warn('Unable to load student profile data for songs page.', error);
+    }
+
+    const response = await axios.get(`${baseApiUrl}/songs.php?action=get-student-assigned-songs&email=${encodeURIComponent(user.email)}&username=${encodeURIComponent(user.username || '')}`);
     studentAssignedSongs = response.data?.success && Array.isArray(response.data.songs) ? response.data.songs : [];
+    if (!studentSelectedSongId && studentAssignedSongs.length) {
+        studentSelectedSongId = Number(studentAssignedSongs[0].assignment_id || 0);
+    }
     renderStudentSongs();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    if (typeof checkAuth === 'function') {
-        checkAuth();
+    if (typeof checkStudentAuth === 'function') {
+        checkStudentAuth();
     }
 
     attachStudentSongMenu();
+    document.getElementById('studentSongsGrid')?.addEventListener('click', event => {
+        const button = event.target.closest('[data-student-song-open]');
+        if (!button) return;
+        studentSelectedSongId = Number(button.getAttribute('data-student-song-open') || 0);
+        renderStudentSongs();
+        document.getElementById('featuredTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 
     try {
         await loadStudentSongs();
