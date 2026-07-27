@@ -26,6 +26,22 @@ body.admin-sidebar-open .admin-sidebar-backdrop {
     pointer-events: auto;
 }
 
+body.admin-responsive-ready body > aside {
+    padding-top: 5rem;
+}
+
+body.admin-responsive-ready body > aside > div.px-6[class*="space-y-"] {
+    margin-top: 0.5rem;
+}
+
+body.admin-responsive-ready body > aside > div.px-6[class*="space-y-"] > div:first-child {
+    margin-bottom: 0.5rem;
+}
+
+body.admin-responsive-ready body > aside > div.px-6[class*="space-y-"] h3 {
+    margin-bottom: 0.75rem;
+}
+
 @media (max-width: 1023px) {
     .admin-mobile-menu-toggle {
         display: inline-flex;

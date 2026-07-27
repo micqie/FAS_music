@@ -156,11 +156,11 @@
 </aside>
 
 <!-- ══ Main ═══════════════════════════════════════════════════════════ -->
-<main class="lg:ml-72 pt-28 p-6 md:p-8">
-<div class="max-w-7xl mx-auto space-y-6">
+<main class="lg:ml-72 pt-16 p-4 md:p-5">
+<div class="max-w-7xl mx-auto space-y-4">
 
     <!-- Page header -->
-    <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
                 <div class="h-10 w-10 rounded-2xl bg-obsidian flex items-center justify-center">
@@ -183,8 +183,8 @@
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 soft-shadow flex items-center gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-white rounded-2xl border border-slate-200 p-3.5 soft-shadow flex items-center gap-3">
             <div class="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
                 <i class="fas fa-list text-slate-500"></i>
             </div>
@@ -193,7 +193,7 @@
                 <p id="auditStatTotal" class="text-2xl font-black text-slate-900">—</p>
             </div>
         </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 soft-shadow flex items-center gap-3">
+        <div class="bg-white rounded-2xl border border-slate-200 p-3.5 soft-shadow flex items-center gap-3">
             <div class="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
                 <i class="fas fa-calendar-day text-blue-500"></i>
             </div>
@@ -202,7 +202,7 @@
                 <p id="auditStatToday" class="text-2xl font-black text-slate-900">—</p>
             </div>
         </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 soft-shadow flex items-center gap-3">
+        <div class="bg-white rounded-2xl border border-slate-200 p-3.5 soft-shadow flex items-center gap-3">
             <div class="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
                 <i class="fas fa-triangle-exclamation text-amber-500"></i>
             </div>
@@ -211,7 +211,7 @@
                 <p id="auditStatWarning" class="text-2xl font-black text-slate-900">—</p>
             </div>
         </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 soft-shadow flex items-center gap-3">
+        <div class="bg-white rounded-2xl border border-slate-200 p-3.5 soft-shadow flex items-center gap-3">
             <div class="h-10 w-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
                 <i class="fas fa-circle-xmark text-red-500"></i>
             </div>
@@ -223,8 +223,8 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-2xl border border-slate-200 p-4 soft-shadow">
-        <div class="flex flex-wrap items-end gap-3">
+    <div class="bg-white rounded-2xl border border-slate-200 p-3.5 soft-shadow">
+        <div class="flex flex-wrap items-end gap-2.5">
             <!-- Search -->
             <div class="relative flex-1 min-w-[180px]">
                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
@@ -254,13 +254,13 @@
             <div>
                 <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">From</label>
                 <input id="auditDateFrom" type="date"
-                    class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30">
+                class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30">
             </div>
             <!-- Date to -->
             <div>
                 <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">To</label>
                 <input id="auditDateTo" type="date"
-                    class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30">
+                class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/30">
             </div>
             <!-- Clear -->
             <button id="auditClearFilters"
@@ -272,7 +272,7 @@
 
     <!-- Table -->
     <div class="bg-white rounded-2xl border border-slate-200 soft-shadow overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
             <div class="flex items-center gap-2">
                 <i class="fas fa-table-list text-gold-500"></i>
                 <h2 class="text-sm font-bold text-slate-800">Log Entries</h2>

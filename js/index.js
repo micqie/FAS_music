@@ -1,4 +1,4 @@
-// Base API URL (same-origin, deployment-path safe)
+﻿// Base API URL (same-origin, deployment-path safe)
 let baseApiUrl;
 let appBaseUrl;
 (function initApiBaseUrl() {
@@ -8191,87 +8191,142 @@ async function viewDetails(studentId) {
 
         if (data.success) {
             const { student, guardians, payments, user_account } = data;
-
-            const detailsHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <h4 class="text-lg font-bold text-gold-400 mb-4">Student Information</h4>
-                        <div class="space-y-2 text-sm">
-                            <p><span class="text-zinc-400">Name:</span> <span class="text-white">${student.first_name} ${student.middle_name || ''} ${student.last_name}</span></p>
-                            <p><span class="text-zinc-400">Email:</span> <span class="text-white">${student.email || 'N/A'}</span></p>
-                            <p><span class="text-zinc-400">Phone:</span> <span class="text-white">${student.phone || 'N/A'}</span></p>
-                            <p><span class="text-zinc-400">Date of Birth:</span> <span class="text-white">${student.date_of_birth || 'N/A'}</span></p>
-                            <p><span class="text-zinc-400">Branch:</span> <span class="text-white">${student.branch_name || 'N/A'}</span></p>
-                            <p><span class="text-zinc-400">Source:</span> <span class="text-white">${String(student.registration_source || 'online').toLowerCase() === 'walkin' ? 'Walk-In' : 'Online'}</span></p>
-                        </div>
-                    </div>
-                    <div>
-                        <h4 class="text-lg font-bold text-gold-400 mb-4">Registration Status</h4>
-                        <div class="space-y-2 text-sm">
-                            <p><span class="text-zinc-400">Status:</span> <span class="text-white">${getWalkInRegistrationDisplayStatus(student)}</span></p>
-                            <p><span class="text-zinc-400">Fee Amount:</span> <span class="text-white">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</span></p>
-                            <p><span class="text-zinc-400">Paid Amount:</span> <span class="text-white">₱${parseFloat(student.registration_fee_paid || 0).toFixed(2)}</span></p>
-                            <p><span class="text-zinc-400">Remaining:</span> <span class="text-white">₱${getWalkInRegistrationRemainingAmount(student).toFixed(2)}</span></p>
-                            <p><span class="text-zinc-400">Payment Proof:</span> <span class="text-white">${student.registration_proof_path ? `<a class="text-gold-300 underline" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.registration_proof_path)}">View file</a>` : (String(student.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A')}</span></p>
-                            <p><span class="text-zinc-400">Proof ID:</span> <span class="text-white">${student.age_verification_proof_path ? `<a class="text-gold-300 underline" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.age_verification_proof_path)}">View file</a>` : (String(student.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A')}</span></p>
-                        </div>
-                    </div>
+            const studentName = [student?.first_name, student?.middle_name, student?.last_name]
+                .map(part => String(part || '').trim())
+                .filter(Boolean)
+                .join(' ') || 'Student';
+            const sourceLabel = String(student?.registration_source || 'online').toLowerCase() === 'walkin' ? 'Walk-In' : 'Online';
+            const feeAmount = Number(student?.registration_fee_amount || 0);
+            const paidAmount = Number(student?.registration_fee_paid || 0);
+            const remainingAmount = getWalkInRegistrationRemainingAmount(student);
+            const formatMoney = value => `&#8369;${Number(value || 0).toFixed(2)}`;
+            const detailRow = (label, value) => `
+                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500">${escapeHtml(label)}</div>
+                    <div class="mt-1 text-sm font-semibold text-slate-900 break-words">${value}</div>
                 </div>
-                ${guardians && guardians.length > 0 ? `
-                    <div>
-                        <h4 class="text-lg font-bold text-gold-400 mb-4">Guardian Information</h4>
-                        ${guardians.map(g => `
-                            <div class="bg-zinc-900/50 p-4 rounded mb-2">
-                                <p class="text-white font-medium">${g.first_name} ${g.last_name}</p>
-                                <p class="text-zinc-400 text-sm">${g.relationship_type} | ${g.phone || 'N/A'}</p>
+            `;
+            const statCard = (label, value) => `
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm">
+                    <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500">${escapeHtml(label)}</div>
+                    <div class="mt-2 text-lg font-bold text-slate-900">${value}</div>
+                </div>
+            `;
+            const paymentProofValue = student?.registration_proof_path
+                ? `<a class="text-amber-700 underline decoration-amber-300/60 underline-offset-4 hover:text-amber-900" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.registration_proof_path)}">View file</a>`
+                : escapeHtml(String(student?.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A');
+            const proofIdValue = student?.age_verification_proof_path
+                ? `<a class="text-amber-700 underline decoration-amber-300/60 underline-offset-4 hover:text-amber-900" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.age_verification_proof_path)}">View file</a>`
+                : escapeHtml(String(student?.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A');
+            const detailsHTML = `
+                <div class="space-y-5">
+                    <div class="rounded-3xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 p-5 shadow-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p class="text-[11px] uppercase tracking-[0.3em] text-amber-700/80">Registration</p>
+                                <h4 class="mt-1 text-xl font-bold text-slate-900">Registration Details</h4>
                             </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-                ${user_account ? `
-                    <div>
-                        <h4 class="text-lg font-bold text-gold-400 mb-4">User Account</h4>
-                        <div class="space-y-2 text-sm">
-                            <p><span class="text-zinc-400">Username:</span> <span class="text-white">${user_account.username}</span></p>
-                            <p><span class="text-zinc-400">Email:</span> <span class="text-white">${user_account.email || 'N/A'}</span></p>
-                            <p><span class="text-zinc-400">Status:</span> <span class="text-white">${user_account.status}</span></p>
+                            <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">${escapeHtml(getWalkInRegistrationDisplayStatus(student))}</span>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            ${statCard('Fee Amount', formatMoney(feeAmount))}
+                            ${statCard('Paid Amount', formatMoney(paidAmount))}
+                            ${statCard('Remaining', formatMoney(remainingAmount))}
                         </div>
                     </div>
-                ` : ''}
-                ${payments && payments.length > 0 ? `
-                    <div>
-                        <h4 class="text-lg font-bold text-gold-400 mb-4">Payment History</h4>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm text-white">
-                                <thead class="bg-zinc-900/50">
-                                    <tr>
-                                        <th class="px-4 py-2 text-left text-zinc-200">Date</th>
-                                        <th class="px-4 py-2 text-left text-zinc-200">Amount</th>
-                                        <th class="px-4 py-2 text-left text-zinc-200">Method</th>
-                                        <th class="px-4 py-2 text-left text-zinc-200">Receipt</th>
-                                        <th class="px-4 py-2 text-left text-zinc-200">Reference</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${payments.map(p => `
-                                        <tr class="border-t border-zinc-800">
-                                            <td class="px-4 py-2 text-white">${new Date(p.payment_date).toLocaleDateString()}</td>
-                                            <td class="px-4 py-2 text-white">₱${parseFloat(p.amount).toFixed(2)}</td>
-                                            <td class="px-4 py-2 text-white">${p.payment_method}</td>
-                                            <td class="px-4 py-2 text-white">${p.receipt_number || 'N/A'}</td>
-                                            <td class="px-4 py-2 text-white">${p.reference_number || 'N/A'}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-4">
+                        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h4 class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">Student Information</h4>
+                            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                ${detailRow('Name', escapeHtml(studentName))}
+                                ${detailRow('Email', escapeHtml(student?.email || 'N/A'))}
+                                ${detailRow('Phone', escapeHtml(student?.phone || 'N/A'))}
+                                ${detailRow('Date of Birth', escapeHtml(student?.date_of_birth || 'N/A'))}
+                                ${detailRow('Branch', escapeHtml(student?.branch_name || 'N/A'))}
+                                ${detailRow('Source', escapeHtml(sourceLabel))}
+                            </div>
+                        </section>
+
+                        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h4 class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">Registration Status</h4>
+                            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                ${detailRow('Status', escapeHtml(getWalkInRegistrationDisplayStatus(student)))}
+                                ${detailRow('Payment Proof', paymentProofValue)}
+                                ${detailRow('Proof ID', proofIdValue)}
+                            </div>
+                        </section>
                     </div>
-                ` : ''}
+
+                    ${guardians && guardians.length > 0 ? `
+                        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h4 class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">Guardian Information</h4>
+                            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                ${guardians.map(g => `
+                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <p class="font-semibold text-slate-900">${escapeHtml(`${g.first_name || ''} ${g.last_name || ''}`.trim() || 'Guardian')}</p>
+                                        <p class="mt-1 text-sm text-slate-600">${escapeHtml(g.relationship_type || 'Relationship not set')} · ${escapeHtml(g.phone || 'N/A')}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </section>
+                    ` : ''}
+
+                    ${user_account ? `
+                        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h4 class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">User Account</h4>
+                            <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                ${detailRow('Username', escapeHtml(user_account.username || 'N/A'))}
+                                ${detailRow('Email', escapeHtml(user_account.email || 'N/A'))}
+                                ${detailRow('Status', escapeHtml(user_account.status || 'N/A'))}
+                            </div>
+                        </section>
+                    ` : ''}
+
+                    ${payments && payments.length > 0 ? `
+                        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <h4 class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">Payment History</h4>
+                                    <p class="mt-1 text-sm text-slate-500">${payments.length} payment${payments.length === 1 ? '' : 's'} recorded</p>
+                                </div>
+                                <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">Scrollable list</span>
+                            </div>
+                            <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+                                <div class="max-h-72 overflow-y-auto">
+                                    <table class="min-w-full text-sm text-slate-900">
+                                        <thead class="sticky top-0 z-10 bg-slate-100 backdrop-blur">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left text-slate-700 font-semibold">Date</th>
+                                                <th class="px-4 py-3 text-left text-slate-700 font-semibold">Amount</th>
+                                                <th class="px-4 py-3 text-left text-slate-700 font-semibold">Method</th>
+                                                <th class="px-4 py-3 text-left text-slate-700 font-semibold">Receipt</th>
+                                                <th class="px-4 py-3 text-left text-slate-700 font-semibold">Reference</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-200">
+                                            ${payments.map((p, index) => `
+                                                <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-amber-50 transition-colors">
+                                                    <td class="px-4 py-3 whitespace-nowrap text-slate-700">${escapeHtml(new Date(p.payment_date).toLocaleDateString())}</td>
+                                                    <td class="px-4 py-3 whitespace-nowrap text-slate-900 font-semibold">${formatMoney(p.amount)}</td>
+                                                    <td class="px-4 py-3 text-slate-700">${escapeHtml(p.payment_method || 'N/A')}</td>
+                                                    <td class="px-4 py-3 text-slate-700">${escapeHtml(p.receipt_number || 'N/A')}</td>
+                                                    <td class="px-4 py-3 text-slate-700">${escapeHtml(p.reference_number || 'N/A')}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </section>
+                    ` : ''}
+                </div>
             `;
 
             document.getElementById('detailsContent').innerHTML = detailsHTML;
             document.getElementById('detailsModal').classList.remove('hidden');
             document.getElementById('detailsModal').classList.add('flex');
+            document.body.classList.add('overflow-hidden');
         }
     } catch (error) {
         showMessage('Failed to load details: ' + (error.message || error), 'error');
@@ -8283,6 +8338,7 @@ function closeDetailsModal() {
     const modal = document.getElementById('detailsModal');
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+    document.body.classList.remove('overflow-hidden');
 }
 
 // Open Payment Modal
@@ -8900,3 +8956,4 @@ document.addEventListener('DOMContentLoaded', () => {
         initGuardianAbsencePage();
     }
 });
+
