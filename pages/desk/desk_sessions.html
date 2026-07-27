@@ -673,6 +673,21 @@
             openAssignRequestModal(requestId);
         }
 
+        async function maybeAutoOpenScheduleModalFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const enrollmentId = Number(params.get('open_schedule_enrollment_id') || 0);
+            if (!enrollmentId) return;
+
+            const viewUrl = new URL(window.location.href);
+            viewUrl.searchParams.set('view', 'active');
+            window.history.replaceState({}, '', viewUrl.toString());
+            applySessionView();
+
+            await loadActiveStudents();
+            const autoEdit = String(params.get('open_schedule_auto_edit') || '0') === '1';
+            openSessionScheduleModal(enrollmentId, autoEdit ? { autoEditFirst: true } : {});
+        }
+
         async function loadWalkinStudents() {
             try {
                 if (!requireManagerBranch()) return;
@@ -2333,6 +2348,7 @@
             if (managerPageMode === 'enrollments') {
                 await maybeAutoOpenAssignRequestModalFromUrl();
             }
+            await maybeAutoOpenScheduleModalFromUrl();
             initAssignTeacherSearchBox();
 
             document.getElementById('closeAssignPackageModalBtn')?.addEventListener('click', closeAssignPackageModal);

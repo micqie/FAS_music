@@ -552,23 +552,38 @@
     async function approveFreeze(fpId) {
         const confirm = await Swal.fire({
             title: 'Approve Payment?',
-            text: 'This will mark the payment as Paid and unfreeze the student account.',
+            text: 'This will mark the payment as Paid and reactivate the student account.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Approve',
+            showDenyButton: true,
+            confirmButtonText: 'Resume schedule',
+            denyButtonText: 'Reschedule now',
             confirmButtonColor: '#16a34a',
+            denyButtonColor: '#b8860b',
             cancelButtonText: 'Cancel'
         });
         if (!confirm.isConfirmed) return;
         try {
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const freezeRow = freezePayments.find(row => Number(row.freeze_payment_id || 0) === Number(fpId || 0));
+            const enrollmentId = Number(freezeRow?.enrollment_id || 0);
             const res  = await axios.post(`${baseApiUrl}/students.php?action=approve-freeze-payment`, {
                 freeze_payment_id: fpId,
                 user_id: Number(user?.user_id || 0)
             });
             const data = res.data || {};
             if (data.success) {
-                Swal.fire({ icon:'success', title:'Approved', text: data.message || 'Account unfrozen.', confirmButtonColor:'#b8860b', timer: 2500, showConfirmButton: false });
+                if (confirm.isDenied && enrollmentId > 0) {
+                    const targetUrl = new URL(window.location.href);
+                    targetUrl.pathname = targetUrl.pathname.replace(/desk_freezeaccounts\.html$/, 'desk_sessions.html');
+                    targetUrl.searchParams.set('view', 'active');
+                    targetUrl.searchParams.set('open_schedule_enrollment_id', String(enrollmentId));
+                    targetUrl.searchParams.set('open_schedule_auto_edit', '1');
+                    window.location.href = targetUrl.toString();
+                    return;
+                }
+
+                Swal.fire({ icon:'success', title:'Approved', text: data.message || 'Account unfrozen and schedule resumed.', confirmButtonColor:'#b8860b', timer: 2500, showConfirmButton: false });
                 await loadFreezePayments();
             } else {
                 Swal.fire({ icon:'error', title:'Error', text: data.error || 'Could not approve.', confirmButtonColor:'#b8860b' });
@@ -641,7 +656,29 @@
             }
             const data = res.data || {};
             if (data.success) {
-                Swal.fire({ icon:'success', title:'Payment Confirmed', text: data.message || 'Account unfrozen.', confirmButtonColor:'#b8860b', timer: 2500, showConfirmButton: false });
+                const postApproval = await Swal.fire({
+                    title: 'Payment confirmed',
+                    text: 'What would you like to do next?',
+                    icon: 'success',
+                    showCancelButton: true,
+                    showDenyButton: true,
+                    confirmButtonText: 'Resume schedule',
+                    denyButtonText: 'Reschedule now',
+                    confirmButtonColor: '#16a34a',
+                    denyButtonColor: '#b8860b',
+                    cancelButtonText: 'Later'
+                });
+
+                if (postApproval.isDenied) {
+                    const targetUrl = new URL(window.location.href);
+                    targetUrl.pathname = targetUrl.pathname.replace(/desk_freezeaccounts\.html$/, 'desk_sessions.html');
+                    targetUrl.searchParams.set('view', 'active');
+                    targetUrl.searchParams.set('open_schedule_enrollment_id', String(enrollmentId));
+                    targetUrl.searchParams.set('open_schedule_auto_edit', '1');
+                    window.location.href = targetUrl.toString();
+                    return;
+                }
+
                 await loadFreezePayments();
             } else {
                 Swal.fire({ icon:'error', title:'Error', text: data.error || 'Could not process.', confirmButtonColor:'#b8860b' });
