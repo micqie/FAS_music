@@ -1001,7 +1001,15 @@ class SongsApi
                 INNER JOIN tbl_song_library sl ON sl.song_id = a.song_id
                 LEFT JOIN tbl_teachers t ON t.teacher_id = a.teacher_id
                 WHERE a.student_id = ?
-                ORDER BY a.updated_at DESC, a.assignment_id DESC
+                ORDER BY
+                    CASE a.progress_status
+                        WHEN 'assigned' THEN 1
+                        WHEN 'practicing' THEN 2
+                        WHEN 'polishing' THEN 3
+                        WHEN 'completed' THEN 4
+                        ELSE 5
+                    END ASC,
+                    a.assignment_id ASC
             ");
             $stmt->execute([$studentId]);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -1014,6 +1022,101 @@ class SongsApi
             unset($row);
 
             $this->sendJSON(['success' => true, 'songs' => $rows]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function completeStudentAssignment()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $studentId = $this->resolveStudentId(
+            (int)($data['student_id'] ?? 0),
+            $_POST['email'] ?? ($data['email'] ?? ''),
+            $_POST['username'] ?? ($data['username'] ?? '')
+        );
+        $assignmentId = (int)($data['assignment_id'] ?? 0);
+        $lessonDate = trim((string)($data['lesson_date'] ?? date('Y-m-d')));
+        $lessonNotes = trim((string)($data['lesson_notes'] ?? ''));
+        $sessionId = (int)($data['session_id'] ?? 0);
+
+        if ($studentId < 1 || $assignmentId < 1) {
+            $this->sendJSON(['error' => 'student_id/email/username and assignment_id are required'], 400);
+        }
+        if ($lessonDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $lessonDate)) {
+            $this->sendJSON(['error' => 'lesson_date must be in YYYY-MM-DD format'], 400);
+        }
+
+        try {
+            $stmtAssignment = $this->conn->prepare("
+                SELECT assignment_id, song_id, teacher_id, progress_status
+                FROM tbl_student_song_assignments
+                WHERE assignment_id = ?
+                  AND student_id = ?
+                LIMIT 1
+            ");
+            $stmtAssignment->execute([$assignmentId, $studentId]);
+            $assignment = $stmtAssignment->fetch(PDO::FETCH_ASSOC);
+            if (!$assignment) {
+                $this->sendJSON(['error' => 'Assignment not found for this student'], 404);
+            }
+
+            if (strtolower((string)($assignment['progress_status'] ?? '')) === 'completed') {
+                $this->sendJSON(['success' => true, 'message' => 'Song is already completed.', 'assignment_id' => $assignmentId]);
+            }
+
+            $stmtCurrent = $this->conn->prepare("
+                SELECT assignment_id
+                FROM tbl_student_song_assignments
+                WHERE student_id = ?
+                  AND progress_status <> 'completed'
+                ORDER BY
+                    CASE progress_status
+                        WHEN 'assigned' THEN 1
+                        WHEN 'practicing' THEN 2
+                        WHEN 'polishing' THEN 3
+                        ELSE 4
+                    END ASC,
+                    assignment_id ASC
+                LIMIT 1
+            ");
+            $stmtCurrent->execute([$studentId]);
+            $currentAssignmentId = (int)($stmtCurrent->fetchColumn() ?: 0);
+
+            if ($currentAssignmentId > 0 && $currentAssignmentId !== $assignmentId) {
+                $this->sendJSON(['error' => 'Finish the current song first before marking the next one done.'], 409);
+            }
+
+            $stmtHistory = $this->conn->prepare("
+                INSERT INTO tbl_song_lesson_history (
+                    assignment_id, session_id, teacher_id, lesson_date, progress_status, lesson_notes
+                ) VALUES (?, ?, ?, ?, 'completed', ?)
+            ");
+            $stmtHistory->execute([
+                $assignmentId,
+                ($sessionId > 0 ? $sessionId : null),
+                (int)$assignment['teacher_id'],
+                $lessonDate,
+                ($lessonNotes !== '' ? $lessonNotes : null)
+            ]);
+
+            $stmtUpdate = $this->conn->prepare("
+                UPDATE tbl_student_song_assignments
+                SET progress_status = 'completed'
+                WHERE assignment_id = ?
+                  AND student_id = ?
+            ");
+            $stmtUpdate->execute([$assignmentId, $studentId]);
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Song marked as completed.',
+                'assignment_id' => $assignmentId
+            ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
@@ -1059,6 +1162,9 @@ switch ($action) {
         break;
     case 'get-student-assigned-songs':
         $api->getStudentAssignedSongs();
+        break;
+    case 'complete-student-assignment':
+        $api->completeStudentAssignment();
         break;
     default:
         $api->sendJSON(['error' => 'Invalid action'], 400);

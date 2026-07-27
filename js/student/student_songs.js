@@ -39,6 +39,48 @@ function studentSongStatusLabel(status) {
     return 'Assigned';
 }
 
+function studentSongStatusRank(status) {
+    const normalized = String(status || 'assigned').toLowerCase();
+    if (normalized === 'assigned') return 1;
+    if (normalized === 'practicing') return 2;
+    if (normalized === 'polishing') return 3;
+    if (normalized === 'completed') return 4;
+    return 5;
+}
+
+function getSortedStudentSongs() {
+    return [...studentAssignedSongs].sort((a, b) => {
+        const aRank = studentSongStatusRank(a.progress_status);
+        const bRank = studentSongStatusRank(b.progress_status);
+        if (aRank !== bRank) return aRank - bRank;
+        return Number(a.assignment_id || 0) - Number(b.assignment_id || 0);
+    });
+}
+
+function getCurrentStudentSong() {
+    return getSortedStudentSongs().find(item => String(item.progress_status || '').toLowerCase() !== 'completed') || null;
+}
+
+function getStudentLocalDateKey(date = new Date()) {
+    const localDate = new Date(date);
+    localDate.setMinutes(localDate.getMinutes() - localDate.getTimezoneOffset());
+    return localDate.toISOString().slice(0, 10);
+}
+
+function showStudentSongAlert(icon, title, text) {
+    if (typeof Swal !== 'undefined' && Swal.fire) {
+        return Swal.fire({
+            icon,
+            title,
+            text,
+            confirmButtonColor: '#d4a017'
+        });
+    }
+
+    window.alert(`${title}\n\n${text}`);
+    return Promise.resolve();
+}
+
 function getStudentDisplayName() {
     const user = (typeof Auth !== 'undefined' && Auth.getUser) ? (Auth.getUser() || null) : null;
     return user?.username || user?.email || 'Maya';
@@ -49,7 +91,7 @@ function getStudentAssignedSongById(assignmentId) {
 }
 
 function getStudentSelectedSong() {
-    return getStudentAssignedSongById(studentSelectedSongId) || getFeaturedSong();
+    return getStudentAssignedSongById(studentSelectedSongId) || getCurrentStudentSong() || getFeaturedSong();
 }
 
 function setStudentHeroGreeting(name) {
@@ -103,16 +145,7 @@ function setStudentPortalIdentity(portal, user) {
 }
 
 function getFeaturedSong() {
-    if (!studentAssignedSongs.length) return null;
-    const priority = { assigned: 1, practicing: 2, polishing: 3, completed: 4 };
-    return [...studentAssignedSongs].sort((a, b) => {
-        const aPriority = priority[String(a.progress_status || 'assigned').toLowerCase()] || 99;
-        const bPriority = priority[String(b.progress_status || 'assigned').toLowerCase()] || 99;
-        if (aPriority !== bPriority) return aPriority - bPriority;
-        const aDate = new Date(a.assigned_at || a.updated_at || 0).getTime();
-        const bDate = new Date(b.assigned_at || b.updated_at || 0).getTime();
-        return bDate - aDate;
-    })[0];
+    return getCurrentStudentSong() || getSortedStudentSongs()[0] || null;
 }
 
 function getWeekPracticeDays() {
@@ -200,7 +233,11 @@ function updateStudentSongStats() {
     setText('studentPracticingCount', counts.practicing || 0);
     setText('studentCompletedCount', counts.completed || 0);
     setText('studentPracticeDays', `${practiceDays} practice day${practiceDays === 1 ? '' : 's'}`);
-    setText('studentSongStatus', `${studentAssignedSongs.length} assigned song${studentAssignedSongs.length === 1 ? '' : 's'}`);
+    const activeSongs = studentAssignedSongs.filter(item => String(item.progress_status || '').toLowerCase() !== 'completed').length;
+    const queuedSongs = Math.max(0, activeSongs - 1);
+    setText('studentSongStatus', activeSongs > 0
+        ? `${activeSongs} active song${activeSongs === 1 ? '' : 's'} · ${queuedSongs} queued`
+        : `${studentAssignedSongs.length} assigned song${studentAssignedSongs.length === 1 ? '' : 's'}`);
 }
 
 function renderPracticeMaterials(song) {
@@ -256,6 +293,7 @@ function renderSelectedSongHeader(song) {
     const goalEl = document.getElementById('featuredGoal');
     const goalNoteEl = document.getElementById('featuredGoalNote');
     const checkInEl = document.getElementById('studentCheckInStatus');
+    const queueCountEl = document.getElementById('studentQueueCount');
     const noteTitleEl = document.getElementById('teacherNoteTitle');
     const noteBodyEl = document.getElementById('teacherNoteBody');
 
@@ -268,6 +306,7 @@ function renderSelectedSongHeader(song) {
         if (goalEl) goalEl.textContent = 'A new piece will appear here once it is assigned.';
         if (goalNoteEl) goalNoteEl.textContent = 'Keep checking back after each lesson.';
         if (checkInEl) checkInEl.textContent = 'Waiting for your first practice piece';
+        if (queueCountEl) queueCountEl.textContent = '0 songs in queue';
         if (noteTitleEl) noteTitleEl.textContent = 'Your teacher is preparing your next practice steps.';
         if (noteBodyEl) noteBodyEl.textContent = 'Once a piece is assigned, this note will show the focus for your next lesson.';
         renderPracticeMaterials(null);
@@ -288,6 +327,13 @@ function renderSelectedSongHeader(song) {
     if (goalEl) goalEl.textContent = goalText.length > 72 ? `${goalText.slice(0, 72).trim()}...` : goalText;
     if (goalNoteEl) goalNoteEl.textContent = song.assigned_notes || song.song_notes || 'Keep your left hand soft and listen for an even pulse.';
     if (checkInEl) checkInEl.textContent = statusLabel === 'Completed' ? 'Great job, this piece is done' : `Your current status: ${statusLabel}`;
+    if (queueCountEl) {
+        const activeSongs = studentAssignedSongs.filter(item => String(item.progress_status || '').toLowerCase() !== 'completed').length;
+        const queuedSongs = Math.max(0, activeSongs - 1);
+        queueCountEl.textContent = activeSongs > 0
+            ? `${queuedSongs} song${queuedSongs === 1 ? '' : 's'} waiting after this one`
+            : 'No active songs';
+    }
     if (noteTitleEl) noteTitleEl.textContent = `A note from ${teacherName}`;
     if (noteBodyEl) noteBodyEl.textContent = song.assigned_notes || song.song_notes || 'Focus on short, steady practice and return to the tricky bars often.';
 
@@ -297,7 +343,8 @@ function renderSelectedSongHeader(song) {
 function renderStudentSongs() {
     const grid = document.getElementById('studentSongsGrid');
     const emptyState = document.getElementById('studentCompletedEmptyState');
-    const featured = getStudentSelectedSong() || getFeaturedSong();
+    const currentSong = getCurrentStudentSong();
+    const featured = getStudentAssignedSongById(studentSelectedSongId) || currentSong || getFeaturedSong();
     if (!grid) return;
 
     renderSelectedSongHeader(featured);
@@ -312,12 +359,16 @@ function renderStudentSongs() {
     if (emptyState) emptyState.classList.add('hidden');
 
     const selectedId = Number(featured?.assignment_id || 0);
-    grid.innerHTML = studentAssignedSongs.map(item => {
+    const currentId = Number(currentSong?.assignment_id || 0);
+    grid.innerHTML = getSortedStudentSongs().map(item => {
         const active = Number(item.assignment_id || 0) === selectedId;
+        const isCurrent = Number(item.assignment_id || 0) === currentId;
+        const isCompleted = String(item.progress_status || '').toLowerCase() === 'completed';
         return `
-        <article class="rounded-[1.25rem] border ${active ? 'border-gold-400 ring-2 ring-gold-400/30' : 'border-zinc-200 dark:border-white/10'} bg-white dark:bg-white/5 p-4 shadow-lg dark:shadow-black/20 transition">
+        <article class="rounded-[1.25rem] border ${active ? 'border-gold-400 ring-2 ring-gold-400/30' : 'border-zinc-200 dark:border-white/10'} bg-white dark:bg-white/5 p-4 shadow-lg dark:shadow-black/20 transition ${isCurrent ? 'relative' : ''}">
+            ${isCurrent ? '<div class="absolute right-4 top-4 rounded-full bg-gold-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#a15d00]">Current</div>' : ''}
             <div class="flex items-start gap-3">
-                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${active ? 'bg-gold-500 text-black' : 'bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-zinc-300'}">
+                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${active ? 'bg-gold-500 text-black' : isCompleted ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-200' : 'bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-zinc-300'}">
                     <i class="fas fa-music"></i>
                 </div>
                 <div class="min-w-0 flex-1">
@@ -332,10 +383,48 @@ function renderStudentSongs() {
                     <i class="fas fa-folder-open mr-2"></i>Open practice song
                 </button>
             </div>
+            ${isCurrent ? '<p class="mt-2 text-xs font-semibold text-[#a15d00]">This is the next song to finish.</p>' : ''}
             ${item.assigned_notes ? `<p class="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">${escapeStudentSongHtml(item.assigned_notes)}</p>` : ''}
         </article>
         `;
     }).join('');
+}
+
+async function markCurrentStudentSongDone() {
+    const user = (typeof Auth !== 'undefined' && Auth.getUser) ? (Auth.getUser() || null) : null;
+    const currentSong = getCurrentStudentSong();
+
+    if (!currentSong) {
+        await showStudentSongAlert('info', 'No active song yet', 'Your teacher has not assigned an active song to finish.');
+        return;
+    }
+
+    const studentId = Number(studentPortalProfile?.student?.student_id || user?.student_id || 0);
+    const payload = {
+        action: 'complete-student-assignment',
+        assignment_id: Number(currentSong.assignment_id || 0),
+        email: user?.email || studentPortalProfile?.student?.email || '',
+        username: user?.username || studentPortalProfile?.student?.username || '',
+        lesson_date: getStudentLocalDateKey(),
+        lesson_notes: `Completed from student portal on ${new Date().toLocaleDateString('en-PH')}`
+    };
+
+    if (studentId > 0) {
+        payload.student_id = studentId;
+    }
+
+    try {
+        const response = await axios.post(`${baseApiUrl}/songs.php`, payload);
+        if (response.data?.success) {
+            await showStudentSongAlert('success', 'Song marked done', 'Nice work — your next assigned song is now ready.');
+            studentSelectedSongId = 0;
+            await loadStudentSongs();
+            return;
+        }
+        await showStudentSongAlert('error', 'Could not mark song done', response.data?.error || 'Please try again.');
+    } catch (error) {
+        await showStudentSongAlert('error', 'Could not mark song done', error.response?.data?.error || 'Please try again.');
+    }
 }
 
 function attachStudentSongMenu() {
@@ -377,7 +466,7 @@ async function loadStudentSongs() {
     const response = await axios.get(`${baseApiUrl}/songs.php?action=get-student-assigned-songs&email=${encodeURIComponent(user.email)}&username=${encodeURIComponent(user.username || '')}`);
     studentAssignedSongs = response.data?.success && Array.isArray(response.data.songs) ? response.data.songs : [];
     if (!studentSelectedSongId && studentAssignedSongs.length) {
-        studentSelectedSongId = Number(studentAssignedSongs[0].assignment_id || 0);
+        studentSelectedSongId = Number((getCurrentStudentSong() || studentAssignedSongs[0])?.assignment_id || 0);
     }
     renderStudentSongs();
 }
@@ -394,6 +483,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         studentSelectedSongId = Number(button.getAttribute('data-student-song-open') || 0);
         renderStudentSongs();
         document.getElementById('featuredTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    document.getElementById('studentMarkSongDoneBtn')?.addEventListener('click', () => {
+        markCurrentStudentSongDone();
     });
 
     try {
