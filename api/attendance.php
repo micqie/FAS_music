@@ -724,9 +724,24 @@ class AttendanceApi
         $usedAbsences        = (int)($enrollment['used_absences'] ?? 0);
         $consecutiveAbsences = (int)($enrollment['consecutive_absences'] ?? 0);
         $scheduleStatus      = (string)($enrollment['schedule_status'] ?? 'Active');
-        $freezeThreshold     = $this->getAllowedAbsencesForEnrollment($enrollment);
-        if ($freezeThreshold <= 0) $freezeThreshold = 3; // safe fallback
-        $frozen = strcasecmp($scheduleStatus, 'Frozen') === 0 || $usedAbsences >= $freezeThreshold;
+        $freezePaymentStatus = 'None';
+        if ($enrollmentId > 0 && $this->tableExists('tbl_freeze_payments')) {
+            try {
+                $stmtPayment = $this->conn->prepare("
+                    SELECT status
+                    FROM tbl_freeze_payments
+                    WHERE enrollment_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ");
+                $stmtPayment->execute([$enrollmentId]);
+                $freezePaymentStatus = (string)($stmtPayment->fetchColumn() ?: 'None');
+            } catch (PDOException $e) {
+                $freezePaymentStatus = 'None';
+            }
+        }
+
+        $frozen = strcasecmp($scheduleStatus, 'Frozen') === 0 && strcasecmp($freezePaymentStatus, 'Paid') !== 0;
         $amount = 100;
 
         return [
@@ -736,7 +751,8 @@ class AttendanceApi
             'reservation_fee_amount' => $amount,
             'used_absences' => $usedAbsences,
             'consecutive_absences' => $consecutiveAbsences,
-            'schedule_status' => $frozen ? 'Frozen' : $scheduleStatus
+            'schedule_status' => $frozen ? 'Frozen' : 'Active',
+            'freeze_payment_status' => $freezePaymentStatus
         ];
     }
 

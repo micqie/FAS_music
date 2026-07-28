@@ -229,6 +229,7 @@
                             absences,
                             totalSessions: Number(student.sessions || 0),
                             scheduleStatus: String(student.schedule_status || 'Active'),
+                            freezePaymentStatus: String(student.freeze_payment_status || 'None'),
                             usedAbsences: Number(student.used_absences || 0),
                             scheduleFreezeRequired: Number(student.schedule_freeze_required || 0)
                         };
@@ -869,10 +870,8 @@
 
         function isEnrollmentFrozen(event) {
             const status = String(event.scheduleStatus || '').toLowerCase();
-            // Use server-computed field if present; fall back to used_absences >= 3 only as a last resort
-            if (status === 'frozen') return true;
-            if (typeof event.scheduleFreezeRequired !== 'undefined') return Number(event.scheduleFreezeRequired) === 1;
-            return Number(event.usedAbsences || 0) >= 3;
+            const freezePaymentStatus = String(event.freezePaymentStatus || 'None').toLowerCase();
+            return status === 'frozen' && freezePaymentStatus !== 'paid';
         }
 
         function showFrozenAttendanceAlert(event) {
@@ -1249,8 +1248,7 @@
             }
 
             const isFrozen = String(student.schedule_status || '').toLowerCase() === 'frozen'
-                || Number(student.schedule_freeze_required || 0) === 1
-                || (student.schedule_freeze_required === undefined && Number(student.used_absences || 0) >= 3);
+                && String(student.freeze_payment_status || 'None').toLowerCase() !== 'paid';
             const usedAbsences = Number(student.used_absences || 0);
 
             // If frozen, show the blocked alert instead of the details modal

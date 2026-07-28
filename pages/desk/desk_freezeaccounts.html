@@ -208,6 +208,82 @@
 
             </div>
         </main>
+</div>
+</div>
+
+<!-- Reschedule Modal -->
+<div id="rescheduleModal" class="fixed inset-0 z-[1200] hidden items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div class="flex w-full max-w-6xl max-h-[92vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-6 py-5">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-[0.25em] text-amber-700">Reschedule</p>
+                <h3 id="rescheduleModalTitle" class="mt-1 text-2xl font-black text-slate-900">Reschedule Student Session</h3>
+                <p id="rescheduleModalMeta" class="mt-1 text-sm text-slate-500">Loading...</p>
+            </div>
+            <button type="button" onclick="closeRescheduleModal()" class="rounded-full border border-slate-200 bg-white px-3 py-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800" aria-label="Close reschedule modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="grid gap-0 overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
+            <div class="border-b border-slate-200 p-6 lg:border-b-0 lg:border-r">
+                <div id="rescheduleStudentInfo" class="space-y-3"></div>
+                <div class="mt-6">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <h4 class="text-sm font-black uppercase tracking-[0.2em] text-slate-500">Choose Session</h4>
+                        <span class="text-xs font-semibold text-slate-400">Only future scheduled sessions are enabled</span>
+                    </div>
+                    <div id="rescheduleSessionHint" class="mb-3 text-sm text-slate-500">Select a session to continue.</div>
+                    <div id="rescheduleSessionList" class="space-y-3"></div>
+                </div>
+            </div>
+            <div class="p-6">
+                <!-- Teacher & Instrument context -->
+                <div class="mb-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-3">
+                    <div class="grid gap-3 text-sm sm:grid-cols-3">
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Instrument</p>
+                            <p id="rescheduleInstrumentLabel" class="font-semibold text-slate-800">—</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Package</p>
+                            <p id="reschedulePackageLabel" class="font-semibold text-slate-800">—</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Instrument Type</p>
+                            <p id="rescheduleInstrumentTypeLabel" class="font-semibold text-slate-800">—</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Instructor</label>
+                        <select id="rescheduleTeacherSelect"
+                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-gold-400 transition">
+                            <option value="">Loading teachers…</option>
+                        </select>
+                        <p id="rescheduleTeacherHint" class="mt-1 text-xs text-slate-400">Previous instructor pre-selected. Only instructors matched to this package instrument are shown.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h4 class="text-sm font-black uppercase tracking-[0.2em] text-slate-500">Available Slots</h4>
+                        <p id="rescheduleSelectedSessionInfo" class="mt-1 text-sm text-slate-500">Pick a session first.</p>
+                    </div>
+                </div>
+                <div id="rescheduleStatus" class="hidden mt-4"></div>
+                <div id="rescheduleSlotsWrap" class="mt-4">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                        Select a session to see available replacement slots.
+                    </div>
+                </div>
+                <div id="rescheduleSlotList" class="mt-4 space-y-3"></div>
+                <div class="mt-6 flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                    <button type="button" onclick="closeRescheduleModal()" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800">Cancel</button>
+                    <button type="button" id="rescheduleSubmitBtn" onclick="submitRescheduleFromModal()" class="rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50">
+                        <span id="rescheduleSubmitText">Confirm Reschedule</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -223,6 +299,15 @@
     let freezeHistory  = [];
     let currentFilter  = 'Pending';
     let activeFreezeView = 'students';
+    let activeEnrollmentsCache = [];
+    const rescheduleState = {
+        enrollmentId: 0,
+        sessionId: 0,
+        studentLabel: '',
+        sessionLabel: '',
+        slots: [],
+        selectedSlotIndex: -1
+    };
 
     function escHtml(t) {
         if (t == null) return '';
@@ -230,9 +315,511 @@
         d.textContent = t;
         return d.innerHTML;
     }
+
+    function escapeHtml(value) {
+        return escHtml(value);
+    }
     function fmtDate(d) {
         if (!d) return '—';
         return new Date(d).toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'numeric' });
+    }
+
+    function fmtTime12Hour(value) {
+        if (!value) return '—';
+        const raw = String(value).trim();
+        const parts = raw.split(':').map(Number);
+        if (parts.length < 2 || parts.some(num => Number.isNaN(num))) return raw;
+        const date = new Date();
+        date.setHours(parts[0] || 0, parts[1] || 0, parts[2] || 0, 0);
+        return date.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function normalizeScheduleStatus(status) {
+        return String(status || '').trim().toLowerCase();
+    }
+
+    function isReschedulableSession(session) {
+        if (!session) return false;
+        const status = normalizeScheduleStatus(session.status);
+        const dateValue = String(session.session_date || '').trim();
+        if (!dateValue) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const sessionDate = new Date(`${dateValue}T00:00:00`);
+        if (Number.isNaN(sessionDate.getTime())) return false;
+        return status === 'scheduled' && sessionDate.getTime() >= today.getTime();
+    }
+
+    function getSessionDisplayLabel(session) {
+        const dateText = fmtDate(session.session_date);
+        const timeText = session.start_time || session.end_time
+            ? `${fmtTime12Hour(session.start_time)} - ${fmtTime12Hour(session.end_time)}`
+            : '—';
+        const roomText = session.room_name ? ` • ${session.room_name}` : '';
+        return `${dateText} • ${timeText}${roomText}`;
+    }
+
+    function setRescheduleStatus(message, tone = 'info') {
+        const el = document.getElementById('rescheduleStatus');
+        if (!el) return;
+        const styles = {
+            info: 'border-slate-200 bg-slate-50 text-slate-600',
+            success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+            error: 'border-rose-200 bg-rose-50 text-rose-700'
+        };
+        el.className = `rounded-xl border px-4 py-3 text-sm ${styles[tone] || styles.info}`;
+        el.textContent = message;
+        el.classList.remove('hidden');
+    }
+
+    function clearRescheduleStatus() {
+        const el = document.getElementById('rescheduleStatus');
+        if (!el) return;
+        el.classList.add('hidden');
+        el.textContent = '';
+    }
+
+    function closeRescheduleModal() {
+        const modal = document.getElementById('rescheduleModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        rescheduleState.enrollmentId = 0;
+        rescheduleState.sessionId = 0;
+        rescheduleState.studentLabel = '';
+        rescheduleState.sessionLabel = '';
+        rescheduleState.slots = [];
+        rescheduleState.selectedSlotIndex = -1;
+        clearRescheduleStatus();
+    }
+
+    async function loadActiveEnrollmentsCache() {
+        if (activeEnrollmentsCache.length > 0) return activeEnrollmentsCache;
+        try {
+            let url = `${baseApiUrl}/students.php?action=get-active-enrollments`;
+            if (deskBranchId > 0) url += `&branch_id=${encodeURIComponent(deskBranchId)}`;
+            const res = await axios.get(url);
+            const data = res.data || {};
+            activeEnrollmentsCache = data.success && Array.isArray(data.enrollments) ? data.enrollments : [];
+        } catch (error) {
+            activeEnrollmentsCache = [];
+        }
+        return activeEnrollmentsCache;
+    }
+
+    function renderRescheduleSlots() {
+        const slotWrap = document.getElementById('rescheduleSlotsWrap');
+        const slotList = document.getElementById('rescheduleSlotList');
+        const sessionHint = document.getElementById('rescheduleSessionHint');
+        const submitBtn = document.getElementById('rescheduleSubmitBtn');
+        if (!slotList || !sessionHint || !submitBtn) return;
+        if (slotWrap) slotWrap.innerHTML = '';
+
+        const slots = Array.isArray(rescheduleState.slots) ? rescheduleState.slots : [];
+        if (!rescheduleState.sessionId) {
+            slotList.innerHTML = '';
+            sessionHint.textContent = 'Select a session first.';
+            submitBtn.disabled = true;
+            return;
+        }
+
+        sessionHint.textContent = slots.length
+            ? `${slots.length} available slot${slots.length === 1 ? '' : 's'} found.`
+            : 'No available slots found for this session.';
+
+        if (!slots.length) {
+            slotList.innerHTML = `
+                <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                    No available slots were returned for this student’s teacher.
+                </div>
+            `;
+            submitBtn.disabled = true;
+            return;
+        }
+
+        slotList.innerHTML = slots.map((slot, index) => {
+            const active = Number(rescheduleState.selectedSlotIndex) === index;
+            return `
+                <button type="button"
+                    class="w-full rounded-2xl border px-4 py-3 text-left transition ${active ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'}"
+                    data-slot-index="${index}">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-bold text-slate-900">${escapeHtml(fmtDate(slot.session_date))}</div>
+                            <div class="mt-1 text-xs text-slate-500">
+                                ${escapeHtml(fmtTime12Hour(slot.start_time))} - ${escapeHtml(fmtTime12Hour(slot.end_time))}
+                                ${slot.day_of_week ? ` • ${escapeHtml(slot.day_of_week)}` : ''}
+                                ${slot.room_name ? ` • ${escapeHtml(slot.room_name)}` : ''}
+                            </div>
+                        </div>
+                        <span class="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-600">Choose</span>
+                    </div>
+                </button>
+            `;
+        }).join('');
+
+        slotList.querySelectorAll('[data-slot-index]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                rescheduleState.selectedSlotIndex = Number(btn.dataset.slotIndex || -1);
+                renderRescheduleSlots();
+            });
+        });
+
+        submitBtn.disabled = rescheduleState.selectedSlotIndex < 0;
+    }
+
+    function renderRescheduleSessionCards(row) {
+        const listEl = document.getElementById('rescheduleSessionList');
+        const selectedSessionInfo = document.getElementById('rescheduleSelectedSessionInfo');
+        if (!listEl || !selectedSessionInfo) return;
+
+        const sessions = Array.isArray(row?.sessions_list) ? row.sessions_list : [];
+        if (!sessions.length) {
+            listEl.innerHTML = `
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    No sessions found for this enrollment.
+                </div>
+            `;
+            selectedSessionInfo.textContent = 'No schedulable sessions found yet.';
+            document.getElementById('rescheduleSlotsWrap').innerHTML = '';
+            return;
+        }
+
+        const eligibleSessions = sessions.filter(isReschedulableSession);
+        const sessionPool = sessions;
+        const defaultSession = eligibleSessions[0] || null;
+        if (defaultSession && (!rescheduleState.sessionId || !sessionPool.some(item => Number(item.session_id) === Number(rescheduleState.sessionId)))) {
+            rescheduleState.sessionId = Number(defaultSession.session_id || 0);
+        }
+
+        listEl.innerHTML = sessionPool.map((session) => {
+            const sessionId = Number(session.session_id || 0);
+            const active = Number(rescheduleState.sessionId || 0) === sessionId;
+            const disabled = !isReschedulableSession(session);
+            const status = normalizeScheduleStatus(session.status);
+            const badgeClass = status === 'scheduled'
+                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                : status === 'completed'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : status === 'absent'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-slate-50 text-slate-600 border-slate-200';
+            return `
+                <button type="button"
+                    class="w-full rounded-2xl border px-4 py-3 text-left transition ${active ? 'border-gold-500 bg-gold-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'} ${disabled ? 'opacity-70' : ''}"
+                    data-session-id="${sessionId}"
+                    ${disabled ? 'disabled' : ''}>
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-bold text-slate-900">Session ${escapeHtml(String(session.session_number || '—'))}</div>
+                            <div class="mt-1 text-xs text-slate-500">${escapeHtml(getSessionDisplayLabel(session))}</div>
+                        </div>
+                        <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${badgeClass}">${escapeHtml(session.status || '—')}</span>
+                    </div>
+                </button>
+            `;
+        }).join('');
+
+        if (!defaultSession) {
+            selectedSessionInfo.textContent = 'No future scheduled sessions are available to reschedule.';
+            const slotWrap = document.getElementById('rescheduleSlotsWrap');
+            const submitBtn = document.getElementById('rescheduleSubmitBtn');
+            if (slotWrap) slotWrap.innerHTML = '';
+            if (submitBtn) submitBtn.disabled = true;
+            return;
+        }
+
+        selectedSessionInfo.textContent = `Selected: Session ${defaultSession.session_number || '—'} • ${getSessionDisplayLabel(defaultSession)}`;
+
+        listEl.querySelectorAll('[data-session-id]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const sessionId = Number(btn.dataset.sessionId || 0);
+                if (!sessionId) return;
+                rescheduleState.sessionId = sessionId;
+                rescheduleState.selectedSlotIndex = -1;
+                selectedSessionInfo.textContent = `Selected: Session ${btn.querySelector('.text-sm.font-bold')?.textContent || '—'} • Loading slots...`;
+                await loadRescheduleSlots(sessionId, row);
+                renderRescheduleSessionCards(row);
+            });
+        });
+    }
+
+    async function loadRescheduleSlots(sessionId, row) {
+        const slotWrap = document.getElementById('rescheduleSlotsWrap');
+        const submitBtn = document.getElementById('rescheduleSubmitBtn');
+        if (slotWrap) {
+            slotWrap.innerHTML = `
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    Loading available slots...
+                </div>
+            `;
+        }
+        if (submitBtn) submitBtn.disabled = true;
+
+        // Use the teacher selected in the dropdown, fallback to session's assigned teacher
+        const selectedTeacherId = Number(document.getElementById('rescheduleTeacherSelect')?.value || 0)
+            || Number(rescheduleState.teacherId || 0);
+
+        try {
+            let url = `${baseApiUrl}/students.php?action=get-reschedule-slots&session_id=${encodeURIComponent(sessionId)}`;
+            if (selectedTeacherId > 0) {
+                url += `&override_teacher_id=${encodeURIComponent(selectedTeacherId)}`;
+            }
+            const response = await axios.get(url);
+            const data = response.data || {};
+            if (!data.success) {
+                setRescheduleStatus(data.error || 'Unable to load available slots.', 'error');
+                rescheduleState.slots = [];
+                renderRescheduleSlots();
+                return;
+            }
+            rescheduleState.slots = Array.isArray(data.slots) ? data.slots : [];
+            rescheduleState.selectedSlotIndex = rescheduleState.slots.length ? 0 : -1;
+            const selectedSessionInfo = document.getElementById('rescheduleSelectedSessionInfo');
+            if (selectedSessionInfo) {
+                const sessionName = Array.isArray(row?.sessions_list) ? row.sessions_list.find(item => Number(item.session_id) === Number(sessionId)) : null;
+                selectedSessionInfo.textContent = sessionName
+                    ? `Selected: Session ${sessionName.session_number || '—'} • ${getSessionDisplayLabel(sessionName)}`
+                    : 'Selected session loaded.';
+            }
+            renderRescheduleSlots();
+            if (rescheduleState.slots.length) {
+                clearRescheduleStatus();
+            } else {
+                setRescheduleStatus('No available slots found for this teacher. Try selecting a different instructor.', 'error');
+            }
+        } catch (error) {
+            rescheduleState.slots = [];
+            rescheduleState.selectedSlotIndex = -1;
+            renderRescheduleSlots();
+            setRescheduleStatus('Network error while loading available slots.', 'error');
+        }
+    }
+
+    async function openRescheduleModal(enrollmentId) {
+        const modal = document.getElementById('rescheduleModal');
+        const studentInfo = document.getElementById('rescheduleStudentInfo');
+        if (!modal || !studentInfo) return;
+
+        const enrollments = await loadActiveEnrollmentsCache();
+        const row = enrollments.find(item => Number(item.enrollment_id) === Number(enrollmentId));
+        if (!row) {
+            Swal.fire({ icon: 'error', title: 'Reschedule unavailable', text: 'The active enrollment for this student could not be loaded.', confirmButtonColor: '#b8860b' });
+            return;
+        }
+
+        const studentName = `${escapeHtml(row.first_name || '')} ${escapeHtml(row.last_name || '')}`.trim() || 'Student';
+        const sessionCount = Number(row.sessions || 0);
+        const sessionList = Array.isArray(row.sessions_list) ? row.sessions_list : [];
+        const defaultSession = sessionList.find(isReschedulableSession) || sessionList[0] || null;
+
+        rescheduleState.enrollmentId     = Number(row.enrollment_id || 0);
+        rescheduleState.studentLabel     = studentName;
+        rescheduleState.sessionId        = Number(defaultSession?.session_id || 0);
+        rescheduleState.sessionLabel     = defaultSession ? `Session ${defaultSession.session_number || '—'}` : '';
+        rescheduleState.slots            = [];
+        rescheduleState.selectedSlotIndex = -1;
+        rescheduleState.teacherId        = Number(row.assigned_teacher_id || 0);
+        rescheduleState.instrumentId     = Number(row.instrument_id || 0);
+        rescheduleState.branchId         = Number(row.branch_id || deskBranchId || 0);
+
+        // Populate right-panel context fields
+        const instrLabel   = document.getElementById('rescheduleInstrumentLabel');
+        const pkgLabel     = document.getElementById('reschedulePackageLabel');
+        const typeLabel    = document.getElementById('rescheduleInstrumentTypeLabel');
+        if (instrLabel) instrLabel.textContent = row.instrument_name || '—';
+        if (pkgLabel)   pkgLabel.textContent   = row.package_name   || '—';
+        if (typeLabel)  typeLabel.textContent  = row.type_name      || '—';
+
+        // Load instructors matched to this student's package instrument into the dropdown
+        await loadTeachersForReschedule(row);
+
+        studentInfo.innerHTML = `
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Student</div>
+                    <div class="mt-1 font-bold text-slate-900">${studentName}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Branch</div>
+                    <div class="mt-1 font-bold text-slate-900">${escapeHtml(row.branch_name || '—')}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Assigned Teacher</div>
+                    <div class="mt-1 font-bold text-slate-900">${escapeHtml(`${row.teacher_first_name || ''} ${row.teacher_last_name || ''}`.trim() || '—')}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Sessions</div>
+                    <div class="mt-1 font-bold text-slate-900">${sessionCount}</div>
+                </div>
+            </div>
+        `;
+
+        const modalTitle = document.getElementById('rescheduleModalTitle');
+        const modalMeta  = document.getElementById('rescheduleModalMeta');
+        if (modalTitle) modalTitle.textContent = 'Reschedule Student Session';
+        if (modalMeta)  modalMeta.textContent  = defaultSession
+            ? `Loaded ${sessionList.length} session${sessionList.length === 1 ? '' : 's'} for selection.`
+            : 'No session schedule available yet.';
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        renderRescheduleSessionCards(row);
+        if (defaultSession) {
+            await loadRescheduleSlots(Number(defaultSession.session_id || 0), row);
+        } else {
+            setRescheduleStatus('No session is available to reschedule yet.', 'error');
+        }
+    }
+
+    // Load instructors matched to the student's package instrument
+    async function loadTeachersForReschedule(row) {
+        const select = document.getElementById('rescheduleTeacherSelect');
+        const hint   = document.getElementById('rescheduleTeacherHint');
+        if (!select) return;
+        select.innerHTML = '<option value="">Loading…</option>';
+
+        try {
+            const branchId = Number(row?.branch_id || deskBranchId || 0);
+            const currentTeacherId = Number(row?.assigned_teacher_id || 0);
+            const instrumentTypeId = Number(row?.instrument_type_id || 0);
+            const instrumentName = String(row?.instrument_name || '').trim();
+            const instrumentTypeName = String(row?.type_name || '').trim();
+            const candidateMap = new Map();
+            const addCandidate = (teacher) => {
+                const tid = Number(teacher?.teacher_id || 0);
+                if (tid < 1 || candidateMap.has(tid)) return;
+                candidateMap.set(tid, {
+                    teacher_id: tid,
+                    teacher_name: String(teacher.teacher_name || `${teacher.first_name || ''} ${teacher.last_name || ''}`).trim() || 'Teacher',
+                    specialization: String(teacher.specialization || 'General').trim() || 'General'
+                });
+            };
+
+            if (Array.isArray(row?.teacher_candidates) && row.teacher_candidates.length) {
+                row.teacher_candidates.forEach(addCandidate);
+            } else {
+                let url = `${baseApiUrl}/teachers.php?action=get-teachers`;
+                if (branchId > 0) url += `&branch_id=${encodeURIComponent(branchId)}`;
+                const res  = await axios.get(url);
+                const data = res.data || {};
+                const teachers = Array.isArray(data.teachers) ? data.teachers : [];
+
+                teachers.forEach((teacher) => {
+                    const specText = String(teacher.specialization || '').toLowerCase();
+                    const specializationIds = Array.isArray(teacher.specialization_ids)
+                        ? teacher.specialization_ids.map(v => Number(v || 0)).filter(v => v > 0)
+                        : [];
+                    const matchesAllRound = specText.includes('all') || specText.includes('general') || specText.includes('multi');
+                    const matchesTypeId = instrumentTypeId > 0 && specializationIds.includes(instrumentTypeId);
+                    const matchesName = [instrumentName, instrumentTypeName].some(token => {
+                        const normalizedToken = String(token || '').trim().toLowerCase();
+                        return normalizedToken !== '' && (specText.includes(normalizedToken) || normalizedToken.includes(specText));
+                    });
+                    if (matchesAllRound || matchesTypeId || matchesName) {
+                        addCandidate({
+                            teacher_id: teacher.teacher_id,
+                            teacher_name: `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim(),
+                            specialization: teacher.specialization || 'General'
+                        });
+                    }
+                });
+            }
+
+            if (currentTeacherId > 0 && !candidateMap.has(currentTeacherId)) {
+                addCandidate({
+                    teacher_id: currentTeacherId,
+                    teacher_name: `${row?.teacher_first_name || ''} ${row?.teacher_last_name || ''}`.trim() || 'Previous instructor',
+                    specialization: 'Previous instructor'
+                });
+            }
+
+            const teachers = Array.from(candidateMap.values());
+
+            if (!teachers.length) {
+                select.innerHTML = '<option value="">No teachers available</option>';
+                if (hint) hint.textContent = 'No instructors matched this package instrument.';
+                return;
+            }
+
+            select.innerHTML = teachers.map(t => {
+                const tid  = Number(t.teacher_id || 0);
+                const name = String(t.teacher_name || 'Teacher').trim() || 'Teacher';
+                const spec = t.specialization ? ` — ${t.specialization}` : '';
+                const isCurrent = tid === Number(currentTeacherId);
+                const currentTag = isCurrent ? ' (Previous)' : '';
+                return `<option value="${tid}" ${isCurrent ? 'selected' : ''}>${escapeHtml(name)}${escapeHtml(spec)}${currentTag}</option>`;
+            }).join('');
+
+            rescheduleState.teacherId = Number(select.value || currentTeacherId || 0);
+
+            if (hint) {
+                const currentTeacher = teachers.find(t => Number(t.teacher_id) === Number(currentTeacherId));
+                const cname = currentTeacher ? currentTeacher.teacher_name : 'Previous instructor';
+                hint.textContent = `${cname} pre-selected for ${instrumentName || 'this instrument'}${instrumentTypeName ? ` (${instrumentTypeName})` : ''}.`;
+            }
+
+            // When teacher changes, reload the slots for the selected session
+            select.onchange = async () => {
+                rescheduleState.teacherId = Number(select.value || 0);
+                rescheduleState.slots = [];
+                rescheduleState.selectedSlotIndex = -1;
+                if (rescheduleState.sessionId) {
+                    const row = (await loadActiveEnrollmentsCache()).find(r => Number(r.enrollment_id) === Number(rescheduleState.enrollmentId));
+                    await loadRescheduleSlots(rescheduleState.sessionId, row);
+                }
+            };
+        } catch (e) {
+            const fallbackName = `${row?.teacher_first_name || ''} ${row?.teacher_last_name || ''}`.trim() || 'Previous instructor';
+            select.innerHTML = `<option value="${currentTeacherId}">${escapeHtml(fallbackName)} (offline)</option>`;
+            if (hint) hint.textContent = `Could not load instructor list. Using ${fallbackName}.`;
+        }
+    }
+
+    async function submitRescheduleFromModal() {
+        const sessionId = Number(rescheduleState.sessionId || 0);
+        const slot = rescheduleState.slots[Number(rescheduleState.selectedSlotIndex)];
+        if (!sessionId) {
+            setRescheduleStatus('Please choose a session first.', 'error');
+            return;
+        }
+        if (!slot) {
+            setRescheduleStatus('Please choose an available slot.', 'error');
+            return;
+        }
+
+        const submitBtn = document.getElementById('rescheduleSubmitBtn');
+        const submitText = document.getElementById('rescheduleSubmitText');
+        if (submitBtn) submitBtn.disabled = true;
+        if (submitText) submitText.textContent = 'Rescheduling...';
+
+        try {
+            const selectedTeacherId = Number(document.getElementById('rescheduleTeacherSelect')?.value || rescheduleState.teacherId || 0);
+            const res = await axios.post(`${baseApiUrl}/students.php?action=reschedule-session`, {
+                session_id: sessionId,
+                session_date: slot.session_date,
+                start_time: slot.start_time,
+                end_time: slot.end_time,
+                teacher_id: selectedTeacherId,
+                reason: 'Frozen account rescheduled by desk'
+            });
+            const data = res.data || {};
+            if (data.success) {
+                closeRescheduleModal();
+                Swal.fire({ icon: 'success', title: 'Rescheduled', text: data.message || 'Session rescheduled successfully.', confirmButtonColor: '#b8860b', timer: 2200, showConfirmButton: false });
+                activeEnrollmentsCache = [];
+                await Promise.all([loadFrozenStudents(), loadFreezePayments()]);
+            } else {
+                setRescheduleStatus(data.error || 'Failed to reschedule session.', 'error');
+            }
+        } catch (error) {
+            setRescheduleStatus(error?.response?.data?.error || 'Network error while rescheduling.', 'error');
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+            if (submitText) submitText.textContent = 'Confirm Reschedule';
+        }
     }
     function statusBadge(status) {
         const map = {
@@ -562,7 +1149,7 @@
             denyButtonColor: '#b8860b',
             cancelButtonText: 'Cancel'
         });
-        if (!confirm.isConfirmed) return;
+        if (!confirm.isConfirmed && !confirm.isDenied) return;
         try {
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
             const freezeRow = freezePayments.find(row => Number(row.freeze_payment_id || 0) === Number(fpId || 0));
@@ -574,12 +1161,8 @@
             const data = res.data || {};
             if (data.success) {
                 if (confirm.isDenied && enrollmentId > 0) {
-                    const targetUrl = new URL(window.location.href);
-                    targetUrl.pathname = targetUrl.pathname.replace(/desk_freezeaccounts\.html$/, 'desk_sessions.html');
-                    targetUrl.searchParams.set('view', 'active');
-                    targetUrl.searchParams.set('open_schedule_enrollment_id', String(enrollmentId));
-                    targetUrl.searchParams.set('open_schedule_auto_edit', '1');
-                    window.location.href = targetUrl.toString();
+                    activeEnrollmentsCache = [];
+                    await openRescheduleModal(enrollmentId);
                     return;
                 }
 
@@ -670,12 +1253,8 @@
                 });
 
                 if (postApproval.isDenied) {
-                    const targetUrl = new URL(window.location.href);
-                    targetUrl.pathname = targetUrl.pathname.replace(/desk_freezeaccounts\.html$/, 'desk_sessions.html');
-                    targetUrl.searchParams.set('view', 'active');
-                    targetUrl.searchParams.set('open_schedule_enrollment_id', String(enrollmentId));
-                    targetUrl.searchParams.set('open_schedule_auto_edit', '1');
-                    window.location.href = targetUrl.toString();
+                    activeEnrollmentsCache = [];
+                    await openRescheduleModal(enrollmentId);
                     return;
                 }
 
@@ -700,6 +1279,9 @@
     window.setFreezeView        = setFreezeView;
     window.showFrozenStudent    = showFrozenStudent;
     window.payNowFrozenStudent  = payNowFrozenStudent;
+    window.openRescheduleModal  = openRescheduleModal;
+    window.closeRescheduleModal = closeRescheduleModal;
+    window.submitRescheduleFromModal = submitRescheduleFromModal;
 
     document.addEventListener('DOMContentLoaded', async () => {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;

@@ -944,6 +944,34 @@ class StudentsApi
         return $candidates;
     }
 
+    private function buildTeacherCandidatesForEnrollment($branchId, $instrumentIds = [], $instrumentKeywords = [], $currentTeacherId = 0, $currentTeacherName = '', $currentTeacherSpecialization = '')
+    {
+        $candidates = $this->buildTeacherCandidates($branchId, $instrumentIds, $instrumentKeywords);
+        $currentTeacherId = (int)$currentTeacherId;
+        $currentTeacherName = trim((string)$currentTeacherName);
+        $currentTeacherSpecialization = trim((string)$currentTeacherSpecialization);
+
+        if ($currentTeacherId > 0) {
+            $found = false;
+            foreach ($candidates as $candidate) {
+                if ((int)($candidate['teacher_id'] ?? 0) === $currentTeacherId) {
+                    $found = true;
+                    break;
+                }
+            }
+
+            if (!$found) {
+                array_unshift($candidates, [
+                    'teacher_id' => $currentTeacherId,
+                    'teacher_name' => $currentTeacherName !== '' ? $currentTeacherName : 'Previous instructor',
+                    'specialization' => $currentTeacherSpecialization !== '' ? $currentTeacherSpecialization : 'Previous instructor'
+                ]);
+            }
+        }
+
+        return $candidates;
+    }
+
     private function isGeneralTeacherSpecialization($specialization)
     {
         $text = strtolower(trim((string)$specialization));
@@ -4108,6 +4136,15 @@ class StudentsApi
             $paySummaryPaymentTypeSelect = $paymentsHasType
                 ? "SUBSTRING_INDEX(GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC), ',', 1) AS payment_type"
                 : "'—' AS payment_type";
+            $freezePaymentStatusSelect = $this->tableExists('tbl_freeze_payments')
+                ? "COALESCE((
+                        SELECT fp.status
+                        FROM tbl_freeze_payments fp
+                        WHERE fp.enrollment_id = e.enrollment_id
+                        ORDER BY fp.created_at DESC
+                        LIMIT 1
+                    ), 'None') AS freeze_payment_status,"
+                : "'None' AS freeze_payment_status,";
             $sql = "
                 SELECT
                     e.enrollment_id,
@@ -4119,6 +4156,7 @@ class StudentsApi
                     b.branch_name,
                     e.package_id,
                     e.instrument_id,
+                    inst.type_id AS instrument_type_id,
                     COALESCE(inst.instrument_name, CONCAT('Instrument #', e.instrument_id)) AS instrument_name,
                     COALESCE(it.type_name, 'Other') AS type_name,
                     COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
@@ -4126,6 +4164,7 @@ class StudentsApi
                     COALESCE(sp.price, 0) AS total_amount,
                     COALESCE(pay.paid_amount, 0) AS paid_amount,
                     COALESCE(pay.payment_type, '—') AS payment_type,
+                    {$freezePaymentStatusSelect}
                     e.status,
                     e.assigned_teacher_id,
                     e.fixed_day_of_week,
@@ -4255,6 +4294,37 @@ class StudentsApi
                     $slots = $this->getEnrollmentScheduleSlots($eid);
                     $row['schedule_slots'] = $slots;
                     $row['schedule_summary'] = $this->formatScheduleSlotsSummary($slots);
+                }
+                unset($row);
+            }
+
+            if (!empty($rows)) {
+                foreach ($rows as &$row) {
+                    $instrumentIds = [];
+                    if (!empty($row['instrument_id'])) {
+                        $instrumentIds[] = (int)$row['instrument_id'];
+                    }
+                    $instrumentKeywords = [];
+                    if (!empty($row['instrument_name'])) {
+                        $instrumentKeywords[] = $row['instrument_name'];
+                    }
+                    if (!empty($row['type_name'])) {
+                        $instrumentKeywords[] = $row['type_name'];
+                    }
+                    $row['teacher_candidates'] = $this->buildTeacherCandidatesForEnrollment(
+                        (int)($row['branch_id'] ?? 0),
+                        $instrumentIds,
+                        $instrumentKeywords,
+                        (int)($row['assigned_teacher_id'] ?? 0),
+                        trim((string)(($row['teacher_first_name'] ?? '') . ' ' . ($row['teacher_last_name'] ?? '')))
+                    );
+
+                    $isFrozen = strcasecmp((string)($row['schedule_status'] ?? 'Active'), 'Frozen') === 0;
+                    if (strcasecmp((string)($row['freeze_payment_status'] ?? 'None'), 'Paid') === 0) {
+                        $isFrozen = false;
+                    }
+                    $row['schedule_freeze_required'] = $isFrozen ? 1 : 0;
+                    $row['reservation_fee_amount'] = $isFrozen ? 100 : 0;
                 }
                 unset($row);
             }
@@ -4474,6 +4544,7 @@ class StudentsApi
 
         $sessionId = (int)($_GET['session_id'] ?? 0);
         $daysAhead = (int)($_GET['days_ahead'] ?? 30);
+        $requestedTeacherId = (int)($_GET['override_teacher_id'] ?? 0);
         if ($sessionId < 1) {
             $this->sendJSON(['error' => 'session_id is required'], 400);
         }
@@ -4491,14 +4562,22 @@ class StudentsApi
                     e.student_id,
                     s.branch_id,
                     e.assigned_teacher_id,
+                    e.instrument_id,
+                    e.package_id,
                     s.first_name AS student_first_name,
                     s.last_name AS student_last_name,
                     t.first_name AS teacher_first_name,
-                    t.last_name AS teacher_last_name
+                    t.last_name AS teacher_last_name,
+                    COALESCE(inst.instrument_name, CONCAT('Instrument #', e.instrument_id)) AS instrument_name,
+                    COALESCE(it.type_name, 'Other') AS type_name,
+                    COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name
                 FROM tbl_sessions ts
                 INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
                 INNER JOIN tbl_students s ON s.student_id = e.student_id
                 LEFT JOIN tbl_teachers t ON t.teacher_id = COALESCE(e.assigned_teacher_id, ts.teacher_id)
+                LEFT JOIN tbl_instruments inst ON inst.instrument_id = e.instrument_id
+                LEFT JOIN tbl_instrument_types it ON it.type_id = inst.type_id
+                LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
                 WHERE ts.session_id = ?
                 LIMIT 1
             ");
@@ -4522,6 +4601,35 @@ class StudentsApi
                 $this->sendJSON(['error' => 'No fixed teacher is assigned to this enrollment'], 400);
             }
 
+            $instrumentIds = [];
+            if (!empty($session['instrument_id'])) {
+                $instrumentIds[] = (int)$session['instrument_id'];
+            }
+            $instrumentKeywords = [];
+            if (!empty($session['instrument_name'])) {
+                $instrumentKeywords[] = $session['instrument_name'];
+            }
+            if (!empty($session['type_name'])) {
+                $instrumentKeywords[] = $session['type_name'];
+            }
+            $teacherCandidates = $this->buildTeacherCandidatesForEnrollment(
+                (int)($session['branch_id'] ?? 0),
+                $instrumentIds,
+                $instrumentKeywords,
+                $teacherId,
+                trim((string)(($session['teacher_first_name'] ?? '') . ' ' . ($session['teacher_last_name'] ?? '')))
+            );
+
+            if ($requestedTeacherId > 0) {
+                $candidateIds = array_map(function ($candidate) {
+                    return (int)($candidate['teacher_id'] ?? 0);
+                }, $teacherCandidates);
+                if (!in_array($requestedTeacherId, $candidateIds, true)) {
+                    $this->sendJSON(['error' => 'Selected instructor does not match this package instrument'], 400);
+                }
+                $teacherId = $requestedTeacherId;
+            }
+
             $slots = $this->buildTeacherAvailableSlots(
                 $teacherId,
                 (int)($session['branch_id'] ?? 0),
@@ -4534,7 +4642,9 @@ class StudentsApi
             $this->sendJSON([
                 'success' => true,
                 'session' => $session,
-                'slots' => $slots
+                'slots' => $slots,
+                'teacher_candidates' => $teacherCandidates,
+                'selected_teacher_id' => $teacherId
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
@@ -4566,6 +4676,8 @@ class StudentsApi
                     ts.*,
                     e.student_id,
                     e.assigned_teacher_id,
+                    e.instrument_id,
+                    e.package_id,
                     s.branch_id
                 FROM tbl_sessions ts
                 INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
@@ -4592,6 +4704,49 @@ class StudentsApi
             if ($teacherId < 1) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'No fixed teacher is assigned to this enrollment'], 400);
+            }
+
+            $instrumentIds = [];
+            if (!empty($sourceSession['instrument_id'])) {
+                $instrumentIds[] = (int)$sourceSession['instrument_id'];
+            }
+            $instrumentKeywords = [];
+            if (!empty($sourceSession['instrument_id']) && $this->tableExists('tbl_instruments')) {
+                try {
+                    $stmtInstrument = $this->conn->prepare("
+                        SELECT i.instrument_name, it.type_name
+                        FROM tbl_instruments i
+                        LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
+                        WHERE i.instrument_id = ?
+                        LIMIT 1
+                    ");
+                    $stmtInstrument->execute([(int)$sourceSession['instrument_id']]);
+                    $instrumentRow = $stmtInstrument->fetch(PDO::FETCH_ASSOC) ?: [];
+                    if (!empty($instrumentRow['instrument_name'])) {
+                        $instrumentKeywords[] = $instrumentRow['instrument_name'];
+                    }
+                    if (!empty($instrumentRow['type_name'])) {
+                        $instrumentKeywords[] = $instrumentRow['type_name'];
+                    }
+                } catch (PDOException $e) {
+                    // Fall back to the assigned teacher if instrument metadata cannot be loaded.
+                }
+            }
+            $teacherCandidates = $this->buildTeacherCandidatesForEnrollment(
+                (int)($sourceSession['branch_id'] ?? 0),
+                $instrumentIds,
+                $instrumentKeywords,
+                $teacherId
+            );
+            if ($requestedTeacherId > 0) {
+                $candidateIds = array_map(function ($candidate) {
+                    return (int)($candidate['teacher_id'] ?? 0);
+                }, $teacherCandidates);
+                if (!in_array($requestedTeacherId, $candidateIds, true)) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'Selected instructor does not match this package instrument'], 400);
+                }
+                $teacherId = $requestedTeacherId;
             }
 
             if (!$this->teacherHasAvailabilityForSlot($teacherId, $sessionDate, $startTime, $endTime)) {
@@ -5376,6 +5531,7 @@ class StudentsApi
         $sessionDate = trim((string)($data['session_date'] ?? ''));
         $startTime = trim((string)($data['start_time'] ?? ''));
         $endTime = trim((string)($data['end_time'] ?? ''));
+        $requestedTeacherId = (int)($data['teacher_id'] ?? 0);
 
         $this->ensureFutureOrTodayDateOrFail($sessionDate, 'Reschedule date cannot be in the past.');
         $reason = trim((string)($data['reason'] ?? 'Student emergency reschedule'));
@@ -5422,6 +5578,49 @@ class StudentsApi
             if ($teacherId < 1) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'No fixed teacher is assigned to this enrollment'], 400);
+            }
+
+            $instrumentIds = [];
+            if (!empty($sourceSession['instrument_id'])) {
+                $instrumentIds[] = (int)$sourceSession['instrument_id'];
+            }
+            $instrumentKeywords = [];
+            if (!empty($sourceSession['instrument_id']) && $this->tableExists('tbl_instruments')) {
+                try {
+                    $stmtInstrument = $this->conn->prepare("
+                        SELECT i.instrument_name, it.type_name
+                        FROM tbl_instruments i
+                        LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
+                        WHERE i.instrument_id = ?
+                        LIMIT 1
+                    ");
+                    $stmtInstrument->execute([(int)$sourceSession['instrument_id']]);
+                    $instrumentRow = $stmtInstrument->fetch(PDO::FETCH_ASSOC) ?: [];
+                    if (!empty($instrumentRow['instrument_name'])) {
+                        $instrumentKeywords[] = $instrumentRow['instrument_name'];
+                    }
+                    if (!empty($instrumentRow['type_name'])) {
+                        $instrumentKeywords[] = $instrumentRow['type_name'];
+                    }
+                } catch (PDOException $e) {
+                    // Use the existing teacher if instrument metadata lookup fails.
+                }
+            }
+            $teacherCandidates = $this->buildTeacherCandidatesForEnrollment(
+                (int)($sourceSession['branch_id'] ?? 0),
+                $instrumentIds,
+                $instrumentKeywords,
+                $teacherId
+            );
+            if ($requestedTeacherId > 0) {
+                $candidateIds = array_map(function ($candidate) {
+                    return (int)($candidate['teacher_id'] ?? 0);
+                }, $teacherCandidates);
+                if (!in_array($requestedTeacherId, $candidateIds, true)) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'Selected instructor does not match this package instrument'], 400);
+                }
+                $teacherId = $requestedTeacherId;
             }
 
             if (!$this->teacherHasAvailabilityForSlot($teacherId, $sessionDate, $startTime, $endTime)) {
@@ -5839,6 +6038,7 @@ class StudentsApi
             $this->conn->prepare("
                 UPDATE tbl_enrollments
                 SET schedule_status      = 'Active',
+                    used_absences        = 0,
                     consecutive_absences = 0
                 WHERE enrollment_id = ?
             ")->execute([$enrollmentId]);
