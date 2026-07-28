@@ -2,6 +2,11 @@ body.admin-responsive-ready {
     overflow-x: hidden;
 }
 
+body.admin-responsive-ready body > main {
+    margin-top: 5rem;
+    padding-top: 1rem !important;
+}
+
 .admin-mobile-menu-toggle {
     display: none;
 }
@@ -92,7 +97,8 @@ body.admin-responsive-ready body > aside > div.px-6[class*="space-y-"] h3 {
     /* Main content — no left margin on mobile/tablet */
     body > main {
         margin-left: 0 !important;
-        padding: 5.25rem 1rem 1.5rem !important;
+        margin-top: 4.75rem !important;
+        padding: 1rem 1rem 1.5rem !important;
     }
 
     body > main .max-w-7xl {
