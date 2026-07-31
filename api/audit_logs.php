@@ -40,6 +40,7 @@ class AuditLogs
                     target_id     INT          NULL,
                     description   TEXT         NULL,
                     ip_address    VARCHAR(45)  NULL,
+                    device_label  VARCHAR(255) NULL,
                     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_user_id   (user_id),
                     INDEX idx_action    (action),
@@ -59,6 +60,7 @@ class AuditLogs
             'old_value'    => "ALTER TABLE tbl_audit_logs ADD COLUMN old_value    JSON NULL AFTER severity",
             'new_value'    => "ALTER TABLE tbl_audit_logs ADD COLUMN new_value    JSON NULL AFTER old_value",
             'user_agent'   => "ALTER TABLE tbl_audit_logs ADD COLUMN user_agent   VARCHAR(512) NULL AFTER ip_address",
+            'device_label' => "ALTER TABLE tbl_audit_logs ADD COLUMN device_label VARCHAR(255) NULL AFTER user_agent",
         ];
 
         foreach ($addColumns as $col => $sql) {
@@ -81,6 +83,65 @@ class AuditLogs
         } catch (\PDOException $e) {
             return false;
         }
+    }
+
+    private static function isLocalAddress($ipAddress)
+    {
+        $ip = strtolower(trim((string)$ipAddress));
+        return in_array($ip, ['127.0.0.1', '::1', 'localhost', ''], true);
+    }
+
+    private static function buildDeviceLabel($userAgent = null, $ipAddress = null)
+    {
+        if (self::isLocalAddress($ipAddress)) {
+            return 'Local System';
+        }
+
+        $ua = trim((string)$userAgent);
+        if ($ua === '') {
+            return 'Unknown Device';
+        }
+
+        $os = 'Unknown OS';
+        if (preg_match('/Windows NT 11/i', $ua)) {
+            $os = 'Windows 11';
+        } elseif (preg_match('/Windows NT 10/i', $ua)) {
+            $os = 'Windows 10';
+        } elseif (preg_match('/Windows NT 6\.3/i', $ua)) {
+            $os = 'Windows 8.1';
+        } elseif (preg_match('/Windows NT 6\.1/i', $ua)) {
+            $os = 'Windows 7';
+        } elseif (preg_match('/Android/i', $ua)) {
+            $os = 'Android';
+        } elseif (preg_match('/iPhone|iPad|iPod/i', $ua)) {
+            $os = 'iOS';
+        } elseif (preg_match('/Mac OS X/i', $ua)) {
+            $os = 'macOS';
+        } elseif (preg_match('/Linux/i', $ua)) {
+            $os = 'Linux';
+        }
+
+        $browser = 'Browser';
+        if (preg_match('/Edg\//i', $ua)) {
+            $browser = 'Edge';
+        } elseif (preg_match('/OPR\//i', $ua) || preg_match('/Opera/i', $ua)) {
+            $browser = 'Opera';
+        } elseif (preg_match('/Firefox\//i', $ua)) {
+            $browser = 'Firefox';
+        } elseif (preg_match('/Chrome\//i', $ua) && !preg_match('/Edg\//i', $ua) && !preg_match('/OPR\//i', $ua)) {
+            $browser = 'Chrome';
+        } elseif (preg_match('/Safari\//i', $ua)) {
+            $browser = 'Safari';
+        }
+
+        $deviceType = 'Desktop';
+        if (preg_match('/Tablet|iPad/i', $ua)) {
+            $deviceType = 'Tablet';
+        } elseif (preg_match('/Mobi|Android|iPhone|iPod/i', $ua)) {
+            $deviceType = 'Mobile';
+        }
+
+        return trim("{$os} {$deviceType} • {$browser}");
     }
 
     // ── Write a log entry (called internally or from other APIs) ──────
@@ -115,6 +176,7 @@ class AuditLogs
                         target_id INT NULL, target_label VARCHAR(255) NULL,
                         description TEXT NULL, ip_address VARCHAR(45) NULL,
                         user_agent VARCHAR(512) NULL,
+                        device_label VARCHAR(255) NULL,
                         severity ENUM('info','warning','critical') NOT NULL DEFAULT 'info',
                         old_value JSON NULL, new_value JSON NULL,
                         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -126,6 +188,7 @@ class AuditLogs
 
             $ip      = $_SERVER['REMOTE_ADDR']     ?? null;
             $ua      = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            $device  = self::buildDeviceLabel($ua, $ip);
             $oldJson = $oldValue !== null ? json_encode($oldValue) : null;
             $newJson = $newValue !== null ? json_encode($newValue) : null;
 
@@ -134,9 +197,9 @@ class AuditLogs
                     (user_id, user_email, user_name, user_role,
                      action, module,
                      target_type, target_table, target_id, target_label,
-                     description, ip_address, user_agent,
+                     description, ip_address, user_agent, device_label,
                      severity, old_value, new_value)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ");
             $stmt->execute([
                 $userId, $userEmail, $userName, $userRole,
@@ -144,7 +207,7 @@ class AuditLogs
                 $targetType, $targetType,
                 $targetId, $targetLabel,
                 $description,
-                $ip, $ua ? substr($ua, 0, 512) : null,
+                $ip, $ua ? substr($ua, 0, 512) : null, $device,
                 $severity, $oldJson, $newJson
             ]);
         } catch (\PDOException $e) {
@@ -227,6 +290,8 @@ class AuditLogs
                        target_label,
                        description,
                        ip_address,
+                       user_agent,
+                       device_label,
                        COALESCE(severity, 'info') AS severity,
                        old_value, new_value, created_at
                 FROM tbl_audit_logs
@@ -253,6 +318,11 @@ class AuditLogs
                 if ($row['new_value'] !== null) {
                     $row['new_value'] = json_decode($row['new_value'], true);
                 }
+                $device = trim((string)($row['device_label'] ?? ''));
+                if ($device === '') {
+                    $device = self::buildDeviceLabel($row['user_agent'] ?? '', $row['ip_address'] ?? '');
+                }
+                $row['device_label'] = $device;
             }
             unset($row);
 
@@ -360,7 +430,7 @@ class AuditLogs
                 $this->conn, $action, $module, $desc,
                 $targetType, $targetId, $targetLabel,
                 $severity, $old, $new,
-                $u[0], $u[1], $u[3], $u[1]
+                $u[0], $u[2], $u[3], $u[1]
             );
             $inserted++;
         }

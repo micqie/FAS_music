@@ -21,6 +21,37 @@ function getWalkInRegistrationDisplayStatus(row) {
     return status;
 }
 
+function buildStudentLedgerUrl(row) {
+    const studentId = Number(row?.student_id || 0);
+    if (studentId > 0) {
+        return `admin_student_ledger.html?student_id=${encodeURIComponent(String(studentId))}`;
+    }
+
+    const studentKey = String(row?.email || `${row?.first_name || ''} ${row?.last_name || ''}`.trim() || '').trim();
+    if (!studentKey) return '';
+    return `admin_student_ledger.html?student_key=${encodeURIComponent(studentKey)}`;
+}
+
+function parseDateInput(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isWithinDateRange(value, from, to) {
+    if (!from && !to) return true;
+    const date = new Date(value || '');
+    if (Number.isNaN(date.getTime())) return false;
+    const time = date.getTime();
+    if (from && time < from.getTime()) return false;
+    if (to) {
+        const end = new Date(to);
+        end.setHours(23, 59, 59, 999);
+        if (time > end.getTime()) return false;
+    }
+    return true;
+}
+
 const paymentPaginationState = {
     largestBalances: 1,
     enrollmentTable: 1,
@@ -111,7 +142,7 @@ function paymentBadgeClass(status) {
 }
 
 function renderPill(label, type) {
-    return `<span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${paymentBadgeClass(type || label)}">${escapeHtml(label || '—')}</span>`;
+    return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${paymentBadgeClass(type || label)}">${escapeHtml(label || '—')}</span>`;
 }
 
 function formatPercent(value) {
@@ -176,17 +207,21 @@ function normalizeEnrollments(enrollments, branchMap) {
             total_amount: total,
             paid_amount: paid,
             balance_amount: balance,
-            collection_rate: collectionRate
+            collection_rate: collectionRate,
+            created_at: row.created_at || row.enrolled_at || row.enrollment_date || row.payment_date || null
         };
     });
 }
 
 function filterEnrollmentRows(rows, filters) {
     const search = String(filters.search || '').trim().toLowerCase();
+    const from = parseDateInput(filters.dateFrom);
+    const to = parseDateInput(filters.dateTo);
     return rows.filter(row => {
         if (filters.branchId > 0 && Number(row.branch_id || 0) !== filters.branchId) return false;
         if (filters.balanceMode === 'with_balance' && Number(row.balance_amount || 0) <= 0) return false;
         if (filters.balanceMode === 'paid' && Number(row.balance_amount || 0) > 0) return false;
+        if (!isWithinDateRange(row.created_at, from, to)) return false;
         if (search) {
             const haystack = [
                 row.first_name,
@@ -194,7 +229,8 @@ function filterEnrollmentRows(rows, filters) {
                 row.email,
                 row.branch_name,
                 row.package_name,
-                row.payment_type
+                row.payment_type,
+                row.student_id
             ].join(' ').toLowerCase();
             if (!haystack.includes(search)) return false;
         }
@@ -204,10 +240,13 @@ function filterEnrollmentRows(rows, filters) {
 
 function filterRegistrationRows(rows, filters) {
     const search = String(filters.search || '').trim().toLowerCase();
+    const from = parseDateInput(filters.dateFrom);
+    const to = parseDateInput(filters.dateTo);
     return rows.filter(row => {
         if (filters.branchId > 0 && Number(row.branch_id || 0) !== filters.branchId) return false;
         if (filters.balanceMode === 'with_balance' && Number(row.registration_balance || 0) <= 0) return false;
         if (filters.balanceMode === 'paid' && Number(row.registration_balance || 0) > 0) return false;
+        if (!isWithinDateRange(row.created_at, from, to)) return false;
         if (search) {
             const haystack = [
                 row.first_name,
@@ -215,7 +254,8 @@ function filterRegistrationRows(rows, filters) {
                 row.email,
                 row.branch_name,
                 row.registration_source,
-                row.registration_status
+                row.registration_status,
+                row.student_id
             ].join(' ').toLowerCase();
             if (!haystack.includes(search)) return false;
         }
@@ -279,122 +319,25 @@ function renderOverview(filteredRegistrations, filteredEnrollments) {
     const enrollmentOutstanding = filteredEnrollments.reduce((sum, item) => sum + Number(item.balance_amount || 0), 0);
     const totalCollected = registrationRevenue + enrollmentRevenue;
     const totalOutstanding = registrationOutstanding + enrollmentOutstanding;
+    const totalCharges = totalCollected + totalOutstanding;
     const accountsWithBalance =
         filteredRegistrations.filter(item => Number(item.registration_balance || 0) > 0).length +
         filteredEnrollments.filter(item => Number(item.balance_amount || 0) > 0).length;
 
-    setText('heroOutstanding', formatCurrencyPHP(totalOutstanding));
-    setText('heroOutstandingHint', `${accountsWithBalance} account${accountsWithBalance === 1 ? '' : 's'} still carrying balances`);
-    setText('heroCollected', formatCurrencyPHP(totalCollected));
-    setText('heroCollectedHint', `${filteredRegistrations.length} registration record${filteredRegistrations.length === 1 ? '' : 's'} and ${filteredEnrollments.length} enrollment record${filteredEnrollments.length === 1 ? '' : 's'} in view`);
-
     setText('statCollected', formatCurrencyPHP(totalCollected));
     setText('statOutstanding', formatCurrencyPHP(totalOutstanding));
-    setText('statRegistrationRevenue', formatCurrencyPHP(registrationRevenue));
-    setText('statEnrollmentRevenue', formatCurrencyPHP(enrollmentRevenue));
+    setText('statTotalCharges', formatCurrencyPHP(totalCharges));
     setText('statBalanceAccounts', String(accountsWithBalance));
+    setText('paymentCollectionRate', totalCharges > 0 ? `${Math.round((totalCollected / totalCharges) * 100)}%` : '0%');
+    setText('paymentCollectedAmount', formatCurrencyPHP(totalCollected));
+    setText('paymentOutstandingAmount', formatCurrencyPHP(totalOutstanding));
+    const bar = document.getElementById('paymentCollectionBar');
+    if (bar) bar.style.width = `${Math.max(0, Math.min(100, totalCharges > 0 ? (totalCollected / totalCharges) * 100 : 0)).toFixed(1)}%`;
 }
 
-function renderBranchBoard(branchMetrics) {
-    const board = document.getElementById('branchRevenueBoard');
-    const summary = document.getElementById('branchBoardSummary');
-    if (!board) return;
+function renderBranchBoard() {}
 
-    if (!branchMetrics.length) {
-        board.innerHTML = '<div class="lg:col-span-2 rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">No branch payment activity matches the current filters.</div>';
-        if (summary) summary.textContent = 'No branches in current view';
-        return;
-    }
-
-    const sorted = [...branchMetrics].sort((a, b) => Number(b.totalOutstanding || 0) - Number(a.totalOutstanding || 0));
-    if (summary) summary.textContent = `${branchMetrics.length} branch${branchMetrics.length === 1 ? '' : 'es'} in current payment view`;
-
-    board.innerHTML = sorted.map(branch => `
-        <article class="rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5">
-            <div class="flex items-start justify-between gap-4">
-                <div>
-                    <div class="text-lg font-black text-slate-900">${escapeHtml(branch.branch_name || 'Branch')}</div>
-                    <div class="mt-1 text-xs text-slate-500">${escapeHtml(branch.address || 'Branch payment summary')}</div>
-                </div>
-                <div class="rounded-2xl bg-slate-900 px-3 py-2 text-right text-white">
-                    <div class="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold">Collection</div>
-                    <div class="text-lg font-black">${formatPercent(branch.collectionRate)}</div>
-                </div>
-            </div>
-            <div class="mt-4 grid grid-cols-2 gap-3">
-                <div class="rounded-2xl bg-emerald-50 border border-emerald-100 px-3 py-3">
-                    <div class="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-bold">Collected</div>
-                    <div class="mt-2 text-xl font-black text-emerald-900">${formatCurrencyPHP(branch.totalCollected)}</div>
-                </div>
-                <div class="rounded-2xl bg-amber-50 border border-amber-100 px-3 py-3">
-                    <div class="text-[10px] uppercase tracking-[0.18em] text-amber-700 font-bold">Outstanding</div>
-                    <div class="mt-2 text-xl font-black text-amber-900">${formatCurrencyPHP(branch.totalOutstanding)}</div>
-                </div>
-            </div>
-            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div class="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                    <div class="text-xs text-slate-500">Registration Fees</div>
-                    <div class="mt-1 font-bold text-slate-900">${formatCurrencyPHP(branch.registrationRevenue)}</div>
-                    <div class="text-xs text-slate-400 mt-1">${branch.pendingRegistrations} pending confirmation</div>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                    <div class="text-xs text-slate-500">Enrollment Revenue</div>
-                    <div class="mt-1 font-bold text-slate-900">${formatCurrencyPHP(branch.enrollmentRevenue)}</div>
-                    <div class="text-xs text-slate-400 mt-1">${branch.activeBalances} account${branch.activeBalances === 1 ? '' : 's'} with balance</div>
-                </div>
-            </div>
-        </article>
-    `).join('');
-}
-
-function renderCollectionHealth(registrations, enrollments) {
-    const box = document.getElementById('collectionHealth');
-    if (!box) return;
-
-    const partialCount = enrollments.filter(item => String(item.payment_type || '').toLowerCase() === 'partial payment').length;
-    const fullCount = enrollments.filter(item => String(item.payment_type || '').toLowerCase() === 'full payment').length;
-    const installmentCount = enrollments.filter(item => String(item.payment_type || '').toLowerCase() === 'installment').length;
-    const pendingRegistrationCount = registrations.filter(item => String(item.registration_status || '').toLowerCase() === 'pending').length;
-    const approvedRegistrationCount = registrations.filter(item => ['approved', 'fee paid'].includes(String(item.registration_status || '').toLowerCase())).length;
-    const fullyPaidEnrollments = enrollments.filter(item => Number(item.balance_amount || 0) <= 0).length;
-
-    box.innerHTML = `
-        <div class="grid grid-cols-2 gap-3">
-            <div class="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-4">
-                <div class="text-[10px] uppercase tracking-[0.18em] text-amber-700 font-bold">Partial</div>
-                <div class="mt-2 text-2xl font-black text-amber-900">${partialCount}</div>
-            </div>
-            <div class="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-4">
-                <div class="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-bold">Full</div>
-                <div class="mt-2 text-2xl font-black text-emerald-900">${fullCount}</div>
-            </div>
-            <div class="rounded-2xl bg-violet-50 border border-violet-100 px-4 py-4">
-                <div class="text-[10px] uppercase tracking-[0.18em] text-violet-700 font-bold">Installment</div>
-                <div class="mt-2 text-2xl font-black text-violet-900">${installmentCount}</div>
-            </div>
-            <div class="rounded-2xl bg-slate-100 border border-slate-200 px-4 py-4">
-                <div class="text-[10px] uppercase tracking-[0.18em] text-slate-600 font-bold">Fully Paid</div>
-                <div class="mt-2 text-2xl font-black text-slate-900">${fullyPaidEnrollments}</div>
-            </div>
-        </div>
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <div class="flex items-center justify-between gap-3">
-                <div>
-                    <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-bold">Registration Queue</div>
-                    <div class="mt-1 text-sm text-slate-600">Pending fee confirmations versus already accepted fees.</div>
-                </div>
-                <div class="text-right">
-                    <div class="text-lg font-black text-slate-900">${pendingRegistrationCount}</div>
-                    <div class="text-[11px] text-slate-500">pending</div>
-                </div>
-            </div>
-            <div class="mt-3 h-2 rounded-full bg-slate-200 overflow-hidden">
-                <div class="h-full rounded-full bg-gold-500" style="width:${pendingRegistrationCount + approvedRegistrationCount > 0 ? ((approvedRegistrationCount / (pendingRegistrationCount + approvedRegistrationCount)) * 100).toFixed(1) : 0}%"></div>
-            </div>
-            <div class="mt-2 text-xs text-slate-500">${approvedRegistrationCount} fee-confirmed registration${approvedRegistrationCount === 1 ? '' : 's'} in current view.</div>
-        </div>
-    `;
-}
+function renderCollectionHealth() {}
 
 function setPaymentModalVisibility(modalId, shouldOpen) {
     const modal = document.getElementById(modalId);
@@ -446,79 +389,103 @@ function renderLargestBalances(enrollments) {
 
     if (!rows.length) {
         list.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">No remaining balances for the current filter.</div>';
-        renderPaymentPagination('largestBalancesPagination', 'largestBalances', page);
         return;
     }
 
     list.innerHTML = rows.map(item => {
         const studentName = `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Student';
         return `
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
                         <div class="truncate text-sm font-bold text-slate-900">${escapeHtml(studentName)}</div>
-                        <div class="truncate text-xs text-slate-500 mt-1">${escapeHtml(item.branch_name || '—')} • ${escapeHtml(item.package_name || 'Package')}</div>
+                        <div class="truncate text-xs text-slate-500 mt-0.5">${escapeHtml(item.branch_name || '—')} • ${escapeHtml(item.package_name || 'Package')}</div>
                     </div>
                     ${renderPill(item.payment_type || '—', item.payment_type || '—')}
                 </div>
-                <div class="mt-3 flex items-center justify-between gap-3">
+                <div class="mt-2 flex items-center justify-between gap-3">
                     <div class="text-xs text-slate-500">Paid ${formatCurrencyPHP(item.paid_amount || 0)} of ${formatCurrencyPHP(item.total_amount || 0)}</div>
-                    <div class="text-lg font-black text-amber-700">${formatCurrencyPHP(item.balance_amount || 0)}</div>
+                    <div class="text-base font-black text-amber-700">${formatCurrencyPHP(item.balance_amount || 0)}</div>
                 </div>
             </div>
         `;
     }).join('');
-    renderPaymentPagination('largestBalancesPagination', 'largestBalances', page);
 }
 
 function renderEnrollmentTable(enrollments) {
-    const body = document.getElementById('enrollmentPaymentsTable');
+    const body    = document.getElementById('enrollmentPaymentsTable');
     const summary = document.getElementById('enrollmentTableSummary');
     if (!body) return;
-    const page = getPaginatedRows(enrollments, 'enrollmentTable');
+    const page        = getPaginatedRows(enrollments, 'enrollmentTable');
     const visibleRows = page.rows;
 
     if (!enrollments.length) {
         body.innerHTML = `
             <tr>
-                <td colspan="8" class="px-6 py-10 text-center text-slate-500">
-                    <i class="fas fa-wallet text-2xl mb-3 text-slate-300"></i>
+                <td colspan="7" class="px-5 py-10 text-center text-slate-400 text-sm">
+                    <i class="fas fa-wallet text-xl mb-2 text-slate-200"></i>
                     <p>No enrollment payment records match the current filters.</p>
                 </td>
-            </tr>
-        `;
-        if (summary) summary.textContent = '0 enrollment rows';
+            </tr>`;
+        if (summary) summary.textContent = '0 records';
         renderPaymentPagination('enrollmentTablePagination', 'enrollmentTable', page);
         return;
     }
 
-    if (summary) summary.textContent = `${enrollments.length} enrollment record${enrollments.length === 1 ? '' : 's'}`;
+    if (summary) summary.textContent = `${enrollments.length} record${enrollments.length === 1 ? '' : 's'}`;
+
     body.innerHTML = visibleRows.map(row => {
-        const studentName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Student';
+        const studentName  = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Student';
+        const stuId        = row.student_id ? `STU-${String(row.student_id).padStart(4,'0')}` : '';
+        const enrollDate   = row.enrollment_date || row.created_at || '';
+        let   subLine      = stuId;
+        if (enrollDate) {
+            const d = new Date(enrollDate);
+            if (!Number.isNaN(d.getTime())) {
+                subLine += (subLine ? ' \u00B7 ' : '') + 'Enrolled ' + d.toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'numeric' });
+            }
+        }
+
+        const balance      = Number(row.balance_amount  || 0);
+        const paid         = Number(row.paid_amount     || 0);
+        const totalCharges = Number(row.total_charges   || row.charge_amount || (paid + balance) || 0);
+
+        const statusLabel  = balance <= 0 ? 'Paid' : (paid > 0 ? 'Partial' : 'Unpaid');
+        const statusCls    = statusLabel === 'Paid'
+            ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+            : statusLabel === 'Partial'
+                ? 'border border-amber-200 bg-amber-50 text-amber-700'
+                : 'border border-red-200 bg-red-50 text-red-700';
+
+        const balanceDisplay = balance <= 0
+            ? `<span class="text-sm font-medium text-slate-900">${formatCurrencyPHP(0)}</span>`
+            : `<span class="text-sm font-medium text-slate-900">${formatCurrencyPHP(balance)}</span>`;
+
+        const ledgerUrl = buildStudentLedgerUrl(row);
+
         return `
-            <tr class="hover:bg-slate-50/80 transition">
-                <td class="px-6 py-4">
-                    <div class="font-semibold text-slate-900">${escapeHtml(studentName)}</div>
-                    <div class="text-sm text-slate-500">${escapeHtml(row.email || '')}</div>
-                </td>
-                <td class="px-6 py-4 text-sm text-slate-700">${escapeHtml(row.branch_name || '—')}</td>
-                <td class="px-6 py-4">
-                    <div class="text-sm font-semibold text-slate-900">${escapeHtml(row.package_name || 'Package')}</div>
-                    <div class="text-xs text-slate-500 mt-1">${escapeHtml(row.instrument_name || 'Instrument')}</div>
-                </td>
-                <td class="px-6 py-4 text-sm">${renderPill(row.payment_type || '—', row.payment_type || '—')}</td>
-                <td class="px-6 py-4 text-sm font-semibold text-slate-900">${formatCurrencyPHP(row.total_amount || 0)}</td>
-                <td class="px-6 py-4 text-sm text-emerald-700 font-semibold">${formatCurrencyPHP(row.paid_amount || 0)}</td>
-                <td class="px-6 py-4 text-sm font-bold ${Number(row.balance_amount || 0) > 0 ? 'text-amber-700' : 'text-slate-700'}">${formatCurrencyPHP(row.balance_amount || 0)}</td>
-                <td class="px-6 py-4">
-                    <div class="text-sm font-semibold text-slate-900">${formatPercent(row.collection_rate || 0)}</div>
-                    <div class="mt-2 h-2 w-28 rounded-full bg-slate-200 overflow-hidden">
-                        <div class="h-full rounded-full bg-emerald-500" style="width:${Math.max(0, Math.min(100, Number(row.collection_rate || 0))).toFixed(1)}%"></div>
-                    </div>
-                </td>
-            </tr>
-        `;
+        <tr class="hover:bg-slate-50 transition-colors">
+            <td class="px-5 py-4">
+                <div class="text-sm font-semibold text-slate-900 leading-tight">${escapeHtml(studentName)}</div>
+                ${subLine ? `<div class="text-xs text-slate-400 mt-0.5">${escapeHtml(subLine)}</div>` : ''}
+            </td>
+            <td class="px-5 py-4 text-sm text-slate-600">${escapeHtml(row.branch_name || '\u2014')}</td>
+            <td class="px-5 py-4 text-right text-sm text-slate-700">${formatCurrencyPHP(totalCharges)}</td>
+            <td class="px-5 py-4 text-right text-sm font-medium text-emerald-600">${formatCurrencyPHP(paid)}</td>
+            <td class="px-5 py-4 text-right">${balanceDisplay}</td>
+            <td class="px-5 py-4 text-center">
+                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCls}">${statusLabel}</span>
+            </td>
+            <td class="px-5 py-4 text-right">
+                ${ledgerUrl
+                    ? `<a href="${ledgerUrl}" class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition">
+                           <i class="fas fa-eye text-slate-400 text-[10px]"></i> View Ledger
+                       </a>`
+                    : ''}
+            </td>
+        </tr>`;
     }).join('');
+
     renderPaymentPagination('enrollmentTablePagination', 'enrollmentTable', page);
 }
 
@@ -526,42 +493,49 @@ function renderRegistrationTable(registrations) {
     const body = document.getElementById('registrationPaymentsTable');
     const summary = document.getElementById('registrationTableSummary');
     if (!body) return;
-    const page = getPaginatedRows(registrations, 'registrationTable');
+    const grouped = Object.values(registrations.reduce((acc, row) => {
+        const branchName = row.branch_name || 'Unassigned Branch';
+        if (!acc[branchName]) {
+            acc[branchName] = {
+                branch_name: branchName,
+                registration_paid: 0,
+                registration_balance: 0,
+                student_count: 0
+            };
+        }
+        acc[branchName].registration_paid += Number(row.registration_paid || 0);
+        acc[branchName].registration_balance += Number(row.registration_balance || 0);
+        acc[branchName].student_count += 1;
+        return acc;
+    }, {})).sort((a, b) => Number(b.registration_paid || 0) - Number(a.registration_paid || 0));
+
+    const page = getPaginatedRows(grouped, 'registrationTable');
     const visibleRows = page.rows;
 
-    if (!registrations.length) {
+    if (!grouped.length) {
         body.innerHTML = `
-            <tr>
-                <td colspan="6" class="px-6 py-10 text-center text-slate-500">
-                    <i class="fas fa-receipt text-2xl mb-3 text-slate-300"></i>
-                    <p>No registration fee records match the current filters.</p>
-                </td>
-            </tr>
+            <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">No registration fee records match the current filters.</div>
         `;
-        if (summary) summary.textContent = '0 registration rows';
+        if (summary) summary.textContent = '0 branches in view';
         renderPaymentPagination('registrationTablePagination', 'registrationTable', page);
         return;
     }
 
-    if (summary) summary.textContent = `${registrations.length} registration record${registrations.length === 1 ? '' : 's'}`;
-    body.innerHTML = visibleRows.map(row => {
-        const studentName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Student';
-        const sourceLabel = String(row.registration_source || 'online').toLowerCase() === 'walkin' ? 'Walk-In' : 'Online';
-        const displayStatus = getWalkInRegistrationDisplayStatus(row);
-        return `
-            <tr class="hover:bg-slate-50/80 transition">
-                <td class="px-6 py-4">
-                    <div class="font-semibold text-slate-900">${escapeHtml(studentName)}</div>
-                    <div class="text-sm text-slate-500">${escapeHtml(row.email || '')}</div>
-                </td>
-                <td class="px-6 py-4 text-sm text-slate-700">${escapeHtml(row.branch_name || '—')}</td>
-                <td class="px-6 py-4 text-sm text-slate-700">${renderPill(sourceLabel, sourceLabel)}</td>
-                <td class="px-6 py-4 text-sm font-semibold text-emerald-700">${formatCurrencyPHP(row.registration_paid || 0)}</td>
-                <td class="px-6 py-4 text-sm">${renderPill(displayStatus, displayStatus)}</td>
-                <td class="px-6 py-4 text-sm text-slate-600">${formatDateLabel(row.created_at)}</td>
-            </tr>
-        `;
-    }).join('');
+    if (summary) summary.textContent = `${grouped.length} branch${grouped.length === 1 ? '' : 'es'} in current view`;
+    body.innerHTML = visibleRows.map(row => `
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <div class="text-base font-semibold text-slate-900">${escapeHtml(row.branch_name || 'Branch')}</div>
+                    <div class="text-xs text-slate-500 mt-1">${row.student_count} student${row.student_count === 1 ? '' : 's'} in view</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-lg font-black text-slate-900">${formatCurrencyPHP(row.registration_paid || 0)}</div>
+                    <div class="text-xs text-slate-500">Fees collected</div>
+                </div>
+            </div>
+        </div>
+    `).join('');
     renderPaymentPagination('registrationTablePagination', 'registrationTable', page);
 }
 
@@ -582,12 +556,14 @@ function getFilters() {
         search: document.getElementById('paymentSearch')?.value || '',
         branchId: Number(document.getElementById('paymentBranchFilter')?.value || 0),
         balanceMode: document.getElementById('paymentBalanceFilter')?.value || 'all',
-        sortMode: document.getElementById('paymentSort')?.value || 'highest_balance'
+        dateFrom: document.getElementById('paymentDateFrom')?.value || '',
+        dateTo: document.getElementById('paymentDateTo')?.value || '',
+        sortMode: 'highest_balance'
     };
 }
 
 function attachPaymentFilters(refresh) {
-    ['paymentSearch', 'paymentBranchFilter', 'paymentBalanceFilter', 'paymentSort'].forEach(id => {
+    ['paymentSearch', 'paymentBranchFilter', 'paymentBalanceFilter', 'paymentDateFrom', 'paymentDateTo'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         const eventName = id === 'paymentSearch' ? 'input' : 'change';
@@ -595,6 +571,24 @@ function attachPaymentFilters(refresh) {
             resetPaymentPagination();
             refresh();
         });
+    });
+
+    document.getElementById('paymentSort')?.addEventListener('click', () => {
+        resetPaymentPagination();
+        ['paymentSearch', 'paymentBranchFilter', 'paymentBalanceFilter', 'paymentDateFrom', 'paymentDateTo'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        refresh();
+    });
+
+    document.getElementById('paymentBalanceModeBtn')?.addEventListener('click', () => {
+        resetPaymentPagination();
+        ['paymentSearch', 'paymentBranchFilter', 'paymentBalanceFilter', 'paymentDateFrom', 'paymentDateTo'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        refresh();
     });
 }
 
@@ -630,11 +624,8 @@ function renderPaymentCenter(data) {
     const filters = getFilters();
     const filteredRegistrations = filterRegistrationRows(data.registrations, filters);
     const filteredEnrollments = sortEnrollmentRows(filterEnrollmentRows(data.enrollments, filters), filters.sortMode);
-    const branchMetrics = computeBranchMetrics(data.branches, filteredRegistrations, filteredEnrollments);
 
     renderOverview(filteredRegistrations, filteredEnrollments);
-    renderBranchBoard(branchMetrics);
-    renderCollectionHealth(filteredRegistrations, filteredEnrollments);
     renderLargestBalances(filteredEnrollments);
     renderEnrollmentTable(filteredEnrollments);
     renderRegistrationTable(filteredRegistrations);
@@ -660,11 +651,49 @@ document.addEventListener('DOMContentLoaded', async function() {
         attachPaymentModals();
         attachPaymentFilters(refresh);
         refresh();
+        document.getElementById('paymentPrintBtn')?.addEventListener('click', () => window.print());
+        document.getElementById('paymentExportBtn')?.addEventListener('click', async () => {
+            try {
+                const params = new URLSearchParams({
+                    action: 'get-active-enrollments',
+                    ...Object.fromEntries(Object.entries(getFilters()).filter(([, v]) => v !== ''))
+                });
+                const res = await axios.get(`${baseApiUrl}/students.php?action=get-active-enrollments`);
+                const rows = res.data?.enrollments || [];
+                if (!rows.length) {
+                    showPaymentsMessage('No payment data to export.', 'info');
+                    return;
+                }
+                const headers = ['Student', 'Email', 'Branch', 'Package', 'Total', 'Paid', 'Balance', 'Status'];
+                const csvRows = rows.map(row => {
+                    const studentName = `${row.first_name || ''} ${row.last_name || ''}`.trim();
+                    const status = Number(row.balance_amount || 0) > 0 ? 'Partial' : 'Paid';
+                    return [
+                        studentName,
+                        row.email || '',
+                        row.branch_name || '',
+                        row.package_name || '',
+                        row.total_amount || 0,
+                        row.paid_amount || 0,
+                        row.balance_amount || 0,
+                        status
+                    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+                });
+                const csv = [headers.join(','), ...csvRows].join('\\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `payment_center_${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                showPaymentsMessage('Failed to export CSV.', 'error');
+            }
+        });
     } catch (error) {
         console.error('Failed to load admin payment center:', error);
         showPaymentsMessage('Failed to load payment data. Please refresh and try again.', 'error');
-        renderBranchBoard([]);
-        renderCollectionHealth([], []);
         renderLargestBalances([]);
         renderEnrollmentTable([]);
         renderRegistrationTable([]);

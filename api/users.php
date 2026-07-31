@@ -5,6 +5,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
+require_once 'audit_logs.php';
 
 if (!defined('FAS_USERS_CLASS_ONLY')) {
     header("Content-Type: application/json");
@@ -1133,6 +1134,26 @@ class User
             }
 
             unset($user['password']);
+
+            $loginUserName  = trim((string)(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')));
+            $loginUserName  = $loginUserName !== '' ? $loginUserName : ($user['username'] ?? null);
+            AuditLogs::record(
+                $this->conn,
+                'User Login',
+                'Authentication',
+                "User logged in successfully.",
+                'user',
+                (int)($user['user_id'] ?? 0),
+                $user['username'] ?? $username,
+                'info',
+                null,
+                ['status' => 'Authenticated', 'role' => $user['role_name'] ?? null],
+                (int)($user['user_id'] ?? 0),
+                $loginUserName,
+                $user['role_name'] ?? null,
+                $user['email'] ?? ($user['username'] ?? null)
+            );
+
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Login successful',
@@ -1500,9 +1521,41 @@ class User
                 }
             }
 
+            $stmtCurrent = $this->conn->prepare("SELECT user_id, username, email, role_id FROM tbl_users WHERE user_id = ? LIMIT 1");
+            $stmtCurrent->execute([$userId]);
+            $currentUser = $stmtCurrent->fetch(PDO::FETCH_ASSOC) ?: [];
+
             $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
             $update = $this->conn->prepare("UPDATE tbl_users SET password = ? WHERE user_id = ?");
             $update->execute([$hashed, $userId]);
+
+            AuditLogs::record(
+                $this->conn,
+                'Password Changed',
+                'Users',
+                $isAdminOverride
+                    ? "Password reset by admin for user ID {$userId}."
+                    : "Password changed for user ID {$userId}.",
+                'user',
+                $userId,
+                $currentUser['email'] ?? ($currentUser['username'] ?? null),
+                'info',
+                null,
+                ['password_changed' => true],
+                // performer: admin override uses performed_by_* from payload; self-change uses own account
+                $isAdminOverride
+                    ? (isset($data['performed_by_id']) ? (int)$data['performed_by_id'] : null)
+                    : $userId,
+                $isAdminOverride
+                    ? (trim((string)($data['performed_by_name'] ?? '')) ?: null)
+                    : null,
+                $isAdminOverride
+                    ? (trim((string)($data['performed_by_role'] ?? '')) ?: null)
+                    : null,
+                $isAdminOverride
+                    ? (trim((string)($data['performed_by_email'] ?? '')) ?: null)
+                    : ($currentUser['email'] ?? ($currentUser['username'] ?? null))
+            );
 
             $this->sendJSON(['success' => true, 'message' => 'Password changed successfully']);
         } catch (PDOException $e) {

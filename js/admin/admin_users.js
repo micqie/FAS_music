@@ -443,12 +443,21 @@
                         }
 
                         // Reuse existing change-password API, but mark as admin override.
+                        const pwdActor = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
                         const payload = {
                             user_id: userId,
                             old_password: '__ADMIN_OVERRIDE__',
                             new_password: pwdNew.value,
                             is_admin_override: true
                         };
+                        if (pwdActor) {
+                            const fn = String(pwdActor.first_name || '').trim();
+                            const ln = String(pwdActor.last_name  || '').trim();
+                            payload.performed_by_id    = pwdActor.user_id  || null;
+                            payload.performed_by_name  = [fn, ln].filter(Boolean).join(' ') || pwdActor.username || null;
+                            payload.performed_by_role  = pwdActor.role_name || null;
+                            payload.performed_by_email = pwdActor.email || pwdActor.username || null;
+                        }
                         const res = await axios.post(`${baseApiUrl}/users.php?action=change-password`, payload);
                         const data = res.data;
                         if (!data || !data.success) {
@@ -518,6 +527,16 @@
                             btnText.textContent = 'Saving...';
                             btnIcon.classList.remove('fa-pen');
                             btnIcon.classList.add('fa-spinner', 'fa-spin');
+                        }
+
+                        const actor = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+                        if (actor) {
+                            const fn = String(actor.first_name || '').trim();
+                            const ln = String(actor.last_name  || '').trim();
+                            payload.performed_by_id    = actor.user_id  || null;
+                            payload.performed_by_name  = [fn, ln].filter(Boolean).join(' ') || actor.username || null;
+                            payload.performed_by_role  = actor.role_name || null;
+                            payload.performed_by_email = actor.email || actor.username || null;
                         }
 
                         const res = await axios.post(`${baseApiUrl}/admin.php?action=update-user`, payload);
@@ -661,10 +680,19 @@
             if (!confirmed) return;
 
             try {
-                const res = await axios.post(`${baseApiUrl}/admin.php?action=set-user-status`, {
-                    user_id: userId,
-                    status: nextStatus
-                });
+                const res = await axios.post(`${baseApiUrl}/admin.php?action=set-user-status`, (() => {
+                    const actor = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+                    const payload = { user_id: userId, status: nextStatus };
+                    if (actor) {
+                        const fn = String(actor.first_name || '').trim();
+                        const ln = String(actor.last_name  || '').trim();
+                        payload.performed_by_id    = actor.user_id  || null;
+                        payload.performed_by_name  = [fn, ln].filter(Boolean).join(' ') || actor.username || null;
+                        payload.performed_by_role  = actor.role_name || null;
+                        payload.performed_by_email = actor.email || actor.username || null;
+                    }
+                    return payload;
+                })());
                 const data = res.data;
                 if (!data || !data.success) {
                     const errText = (data && data.error) || 'Failed to update status.';
@@ -858,6 +886,17 @@
                 payload.system_login_name = '';
             } else {
                 payload.email = '';
+            }
+
+            // Performer identity for audit log
+            const actor = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            if (actor) {
+                const fn = String(actor.first_name || '').trim();
+                const ln = String(actor.last_name  || '').trim();
+                payload.performed_by_id    = actor.user_id  || null;
+                payload.performed_by_name  = [fn, ln].filter(Boolean).join(' ') || actor.username || null;
+                payload.performed_by_role  = actor.role_name || null;
+                payload.performed_by_email = actor.email || actor.username || null;
             }
 
             try {

@@ -33,6 +33,19 @@ class Admin
         exit;
     }
 
+    /**
+     * Extract the "performed by" staff/admin info from a decoded request payload.
+     * Returns [userId, userName, userRole, userEmail].
+     */
+    private function getPerformer(array $data): array
+    {
+        $userId    = isset($data['performed_by_id'])    ? (int)$data['performed_by_id']                   : null;
+        $userName  = trim((string)($data['performed_by_name']  ?? '')) ?: null;
+        $userRole  = trim((string)($data['performed_by_role']  ?? '')) ?: null;
+        $userEmail = trim((string)($data['performed_by_email'] ?? '')) ?: null;
+        return [$userId, $userName, $userRole, $userEmail];
+    }
+
     private function hasStudentColumn($columnName)
     {
         try {
@@ -424,6 +437,54 @@ class Admin
         return (float)($stmt->fetchColumn() ?: 0);
     }
 
+    private function resolveRegistrationStudentId($studentKey)
+    {
+        $rawKey = trim((string)$studentKey);
+        if ($rawKey === '') {
+            return 0;
+        }
+
+        if (ctype_digit($rawKey)) {
+            $studentId = (int)$rawKey;
+            return $studentId > 0 ? $studentId : 0;
+        }
+
+        try {
+            if (filter_var($rawKey, FILTER_VALIDATE_EMAIL)) {
+                $stmt = $this->conn->prepare("
+                    SELECT student_id
+                    FROM tbl_students
+                    WHERE email = ?
+                    ORDER BY created_at DESC, student_id DESC
+                    LIMIT 1
+                ");
+                $stmt->execute([$rawKey]);
+                $studentId = (int)($stmt->fetchColumn() ?: 0);
+                if ($studentId > 0) {
+                    return $studentId;
+                }
+            }
+
+            $normalized = preg_replace('/\s+/', ' ', $rawKey);
+            $like = '%' . $normalized . '%';
+            $stmt = $this->conn->prepare("
+                SELECT student_id
+                FROM tbl_students
+                WHERE CONCAT_WS(' ', first_name, middle_name, last_name) LIKE ?
+                   OR CONCAT_WS(' ', first_name, last_name) LIKE ?
+                   OR first_name LIKE ?
+                   OR last_name LIKE ?
+                   OR email LIKE ?
+                ORDER BY created_at DESC, student_id DESC
+                LIMIT 1
+            ");
+            $stmt->execute([$like, $like, $like, $like, $like]);
+            return (int)($stmt->fetchColumn() ?: 0);
+        } catch (PDOException $e) {
+            return 0;
+        }
+    }
+
     private function getLatestEnrollmentIdByStudent($studentId, $statuses = [])
     {
         if (!$this->tableExists('tbl_enrollments')) {
@@ -810,13 +871,15 @@ class Admin
 
             $this->conn->commit();
 
+            [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);
             AuditLogs::record(
                 $this->conn,
                 'Student Approved',
                 'Registrations',
                 "Registration approved for student ID {$data['student_id']}.",
                 'student', (int)$data['student_id'], $student['email'] ?? null,
-                'info', ['status' => 'Pending'], ['status' => 'Active']
+                'info', ['status' => 'Pending'], ['status' => 'Active'],
+                $pById, $pByName, $pByRole, $pByEmail
             );
 
             $this->sendJSON([
@@ -891,13 +954,15 @@ class Admin
 
             $this->conn->commit();
 
+            [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);
             AuditLogs::record(
                 $this->conn,
                 'Student Rejected',
                 'Registrations',
                 "Registration rejected for student ID {$studentId}.",
                 'student', $studentId, $student['email'] ?? null,
-                'warning', ['status' => 'Pending'], ['status' => 'Rejected']
+                'warning', ['status' => 'Pending'], ['status' => 'Rejected'],
+                $pById, $pByName, $pByRole, $pByEmail
             );
 
             $this->sendJSON([
@@ -1069,13 +1134,15 @@ class Admin
 
             $this->conn->commit();
 
+            [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);
             AuditLogs::record(
                 $this->conn,
                 'Payment Confirmed',
                 'Payments',
                 "Registration payment of ₱{$paymentAmount} confirmed for student ID {$data['student_id']} via {$paymentMethod}.",
                 'student', (int)$data['student_id'], $student['email'] ?? null,
-                'info', null, ['amount' => $paymentAmount, 'method' => $paymentMethod, 'status' => $newStatus]
+                'info', null, ['amount' => $paymentAmount, 'method' => $paymentMethod, 'status' => $newStatus],
+                $pById, $pByName, $pByRole, $pByEmail
             );
 
             $this->sendJSON([
@@ -1096,8 +1163,9 @@ class Admin
     // 🔍 Get Registration Details
     public function getRegistrationDetails($studentId)
     {
-        if (empty($studentId)) {
-            $this->sendJSON(['error' => 'Student ID is required'], 400);
+        $resolvedStudentId = $this->resolveRegistrationStudentId($studentId);
+        if ($resolvedStudentId < 1) {
+            $this->sendJSON(['error' => 'Student not found'], 404);
         }
 
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
@@ -1175,7 +1243,7 @@ class Admin
                 INNER JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
                 WHERE sg.student_id = ?
             ");
-            $stmtGuardians->execute([$studentId]);
+            $stmtGuardians->execute([$resolvedStudentId]);
             $guardians = $stmtGuardians->fetchAll(PDO::FETCH_ASSOC);
 
             // Get payments
@@ -1184,11 +1252,11 @@ class Admin
 
             if ($hasStudentId) {
                 $stmtPayments = $this->conn->prepare("
-                    SELECT * FROM tbl_registration_payments
-                    WHERE student_id = ?
-                    ORDER BY payment_date DESC
-                ");
-                $stmtPayments->execute([$studentId]);
+                SELECT * FROM tbl_registration_payments
+                WHERE student_id = ?
+                ORDER BY payment_date DESC
+            ");
+                $stmtPayments->execute([$resolvedStudentId]);
             } else {
                 // fas_db.sql structure - get via enrollments
                 $stmtPayments = $this->conn->prepare("
@@ -1197,7 +1265,7 @@ class Admin
                     WHERE e.student_id = ?
                     ORDER BY rp.payment_date DESC
                 ");
-                $stmtPayments->execute([$studentId]);
+                $stmtPayments->execute([$resolvedStudentId]);
             }
             $payments = $stmtPayments->fetchAll(PDO::FETCH_ASSOC);
 
@@ -1213,6 +1281,7 @@ class Admin
 
             $this->sendJSON([
                 'success' => true,
+                'resolved_student_id' => $resolvedStudentId,
                 'student' => $student,
                 'guardians' => $guardians,
                 'payments' => $payments,
@@ -1447,13 +1516,15 @@ class Admin
                 );
             }
 
+            [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);
             AuditLogs::record(
                 $this->conn,
                 'User Created',
                 'Users',
                 "New user account created: {$username} with role {$roleName}.",
                 'user', $userId, $username,
-                'info', null, ['name' => "{$firstName} {$lastName}", 'email' => $storedEmail, 'username' => $username, 'role' => $roleName]
+                'info', null, ['name' => "{$firstName} {$lastName}", 'email' => $storedEmail, 'username' => $username, 'role' => $roleName],
+                $pById, $pByName, $pByRole, $pByEmail
             );
 
             $this->sendJSON([
@@ -1561,13 +1632,15 @@ class Admin
                 ]);
             }
 
+            [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);
             AuditLogs::record(
                 $this->conn,
                 'User Updated',
                 'Users',
                 "User profile updated for user ID {$userId} ({$email}).",
                 'user', $userId, $email,
-                'info', ['email' => $currentUser['email'] ?? ''], ['first_name' => $firstName, 'last_name' => $lastName, 'email' => $email]
+                'info', ['email' => $currentUser['email'] ?? ''], ['first_name' => $firstName, 'last_name' => $lastName, 'email' => $email],
+                $pById, $pByName, $pByRole, $pByEmail
             );
 
             $this->sendJSON([
@@ -1600,8 +1673,28 @@ class Admin
         }
 
         try {
+            $stmtUserInfo = $this->conn->prepare("SELECT username, email, first_name, last_name FROM tbl_users WHERE user_id = ? LIMIT 1");
+            $stmtUserInfo->execute([$userId]);
+            $targetUser = $stmtUserInfo->fetch(PDO::FETCH_ASSOC) ?: [];
+            $targetLabel = trim((string)(($targetUser['first_name'] ?? '') . ' ' . ($targetUser['last_name'] ?? '')));
+            if ($targetLabel === '') $targetLabel = $targetUser['email'] ?? ($targetUser['username'] ?? "User #{$userId}");
+
             $stmt = $this->conn->prepare("UPDATE tbl_users SET status = ? WHERE user_id = ?");
             $stmt->execute([$normalized, $userId]);
+
+            [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);
+            AuditLogs::record(
+                $this->conn,
+                $normalized === 'Active' ? 'User Activated' : 'User Deactivated',
+                'Users',
+                "User account {$targetLabel} set to {$normalized}.",
+                'user', $userId, $targetLabel,
+                $normalized === 'Inactive' ? 'warning' : 'info',
+                ['status' => $normalized === 'Active' ? 'Inactive' : 'Active'],
+                ['status' => $normalized],
+                $pById, $pByName, $pByRole, $pByEmail
+            );
+
             $this->sendJSON([
                 'success' => true,
                 'message' => 'User status updated successfully.'

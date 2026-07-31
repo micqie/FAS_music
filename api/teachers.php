@@ -195,6 +195,48 @@ class TeachersApi
         }
     }
 
+    private function normalizeRoleName($roleName)
+    {
+        return strtolower(trim((string)$roleName));
+    }
+
+    private function resolveUserContext($userId)
+    {
+        $userId = (int)$userId;
+        if ($userId < 1 || !$this->tableExists('tbl_users') || !$this->tableExists('tbl_roles')) {
+            return null;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT u.user_id, u.branch_id, u.status, r.role_name
+                FROM tbl_users u
+                LEFT JOIN tbl_roles r ON r.role_id = u.role_id
+                WHERE u.user_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$user) {
+                return null;
+            }
+
+            return [
+                'user_id' => (int)($user['user_id'] ?? 0),
+                'branch_id' => (int)($user['branch_id'] ?? 0),
+                'status' => (string)($user['status'] ?? ''),
+                'role_name' => (string)($user['role_name'] ?? '')
+            ];
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+
+    private function isManagerRole($roleName)
+    {
+        return in_array($this->normalizeRoleName($roleName), ['manager', 'branch manager'], true);
+    }
+
     private function ensureStudentProgressTable()
     {
         try {
@@ -972,6 +1014,7 @@ class TeachersApi
         }
 
         $teacherId = $this->resolveTeacherId((int)($_GET['teacher_id'] ?? 0), (int)($_GET['user_id'] ?? 0));
+        $requestUserId = (int)($_GET['user_id'] ?? 0);
         if ($teacherId < 1) {
             $this->sendJSON(['error' => 'teacher_id or user_id is required'], 400);
         }
@@ -980,6 +1023,34 @@ class TeachersApi
         }
 
         try {
+            if ($requestUserId > 0) {
+                $requester = $this->resolveUserContext($requestUserId);
+                if (!$requester) {
+                    $this->sendJSON(['error' => 'Unable to resolve your account'], 404);
+                }
+
+                $teacherStmt = $this->conn->prepare("SELECT teacher_id, branch_id FROM tbl_teachers WHERE teacher_id = ? LIMIT 1");
+                $teacherStmt->execute([$teacherId]);
+                $teacher = $teacherStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$teacher) {
+                    $this->sendJSON(['error' => 'Teacher not found'], 404);
+                }
+
+                $requesterRole = $this->normalizeRoleName($requester['role_name'] ?? '');
+                if ($this->isManagerRole($requesterRole)) {
+                    $requesterBranchId = (int)($requester['branch_id'] ?? 0);
+                    $teacherBranchId = (int)($teacher['branch_id'] ?? 0);
+                    if ($requesterBranchId > 0 && $teacherBranchId > 0 && $requesterBranchId !== $teacherBranchId) {
+                        $this->sendJSON(['error' => 'You can only view teachers in your branch'], 403);
+                    }
+                } elseif ($requestUserId !== (int)($teacher['teacher_id'] ?? 0)) {
+                    $requestTeacherId = $this->resolveTeacherId(0, $requestUserId);
+                    if ($requestTeacherId !== (int)($teacher['teacher_id'] ?? 0)) {
+                        $this->sendJSON(['error' => 'You can only view your own availability'], 403);
+                    }
+                }
+            }
+
             $branchStmt = $this->conn->prepare("SELECT branch_id FROM tbl_teachers WHERE teacher_id = ? LIMIT 1");
             $branchStmt->execute([$teacherId]);
             $branchId = (int)($branchStmt->fetchColumn() ?: 0);
@@ -1012,17 +1083,30 @@ class TeachersApi
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $requestUserId = (int)($data['user_id'] ?? 0);
         $entries = is_array($data['availability'] ?? null) ? $data['availability'] : [];
         $validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
         if ($teacherId < 1) {
             $this->sendJSON(['error' => 'teacher_id or user_id is required'], 400);
         }
+        if ($requestUserId < 1) {
+            $this->sendJSON(['error' => 'user_id is required'], 400);
+        }
         if (!$this->tableExists('tbl_teacher_availability')) {
             $this->sendJSON(['error' => 'tbl_teacher_availability table not found'], 500);
         }
 
         try {
+            $requester = $this->resolveUserContext($requestUserId);
+            if (!$requester) {
+                $this->sendJSON(['error' => 'Unable to resolve your account'], 404);
+            }
+
+            if (!$this->isManagerRole($requester['role_name'] ?? '')) {
+                $this->sendJSON(['error' => 'Only branch managers can edit teacher availability'], 403);
+            }
+
             $teacherStmt = $this->conn->prepare("
                 SELECT teacher_id, branch_id
                 FROM tbl_teachers
@@ -1033,6 +1117,15 @@ class TeachersApi
             $teacher = $teacherStmt->fetch(PDO::FETCH_ASSOC);
             if (!$teacher) {
                 $this->sendJSON(['error' => 'Teacher not found'], 404);
+            }
+
+            $requesterBranchId = (int)($requester['branch_id'] ?? 0);
+            $teacherBranchId = (int)($teacher['branch_id'] ?? 0);
+            if ($requesterBranchId < 1) {
+                $this->sendJSON(['error' => 'Your account is not linked to a branch'], 403);
+            }
+            if ($teacherBranchId > 0 && $requesterBranchId !== $teacherBranchId) {
+                $this->sendJSON(['error' => 'You can only edit teachers in your branch'], 403);
             }
 
             $normalized = [];

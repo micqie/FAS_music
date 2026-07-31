@@ -6886,6 +6886,31 @@ async function initStudentProfilePage() {
 
 // Logout
 function logout() {
+    const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+
+    if (user && typeof baseApiUrl !== 'undefined' && typeof fetch === 'function') {
+        try {
+            fetch(`${baseApiUrl}/audit_logs.php?action=log`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action_name: 'User Logout',
+                    module: 'Authentication',
+                    description: 'User signed out successfully.',
+                    severity: 'info',
+                    user_id: user.user_id || null,
+                    user_name: user.email || user.username || null,
+                    user_role: user.role_name || null
+                }),
+                keepalive: true
+            }).catch(() => {});
+        } catch (e) {
+            // Ignore logging failures on logout.
+        }
+        setTimeout(() => Auth.logout(), 150);
+        return;
+    }
+
     Auth.logout();
 }
 
@@ -8500,6 +8525,16 @@ function initPaymentForm() {
             const staffBranchId = branchScopedRole ? Number(user.branch_id || 0) : 0;
             if (staffBranchId > 0) paymentData.branch_id = staffBranchId;
 
+            // Performer identity for audit log
+            if (user) {
+                const firstName = String(user.first_name || '').trim();
+                const lastName  = String(user.last_name  || '').trim();
+                paymentData.performed_by_id    = user.user_id  || null;
+                paymentData.performed_by_name  = [firstName, lastName].filter(Boolean).join(' ') || user.username || null;
+                paymentData.performed_by_role  = user.role_name || null;
+                paymentData.performed_by_email = user.email || user.username || null;
+            }
+
             const res = await axios.post(`${baseApiUrl}/admin.php?action=confirm-payment`, paymentData);
             const data = res.data;
             if (data.success) {
@@ -8541,6 +8576,16 @@ async function rejectRegistration(studentId) {
         const staffBranchId = branchScopedRole ? Number(user.branch_id || 0) : 0;
         const payload = { student_id: studentId };
         if (staffBranchId > 0) payload.branch_id = staffBranchId;
+
+        // Performer identity for audit log
+        if (user) {
+            const firstName = String(user.first_name || '').trim();
+            const lastName  = String(user.last_name  || '').trim();
+            payload.performed_by_id    = user.user_id  || null;
+            payload.performed_by_name  = [firstName, lastName].filter(Boolean).join(' ') || user.username || null;
+            payload.performed_by_role  = user.role_name || null;
+            payload.performed_by_email = user.email || user.username || null;
+        }
 
         const res = await axios.post(`${baseApiUrl}/admin.php?action=reject-registration`, payload);
         const data = res.data;

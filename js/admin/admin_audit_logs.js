@@ -43,6 +43,7 @@ function moduleBadge(m) {
         'Enrollments':   'bg-sky-100 text-sky-700',
         'Payments':      'bg-emerald-100 text-emerald-700',
         'Users':         'bg-orange-100 text-orange-700',
+        'Authentication':'bg-cyan-100 text-cyan-700',
         'Registrations': 'bg-pink-100 text-pink-700',
         'Sessions':      'bg-teal-100 text-teal-700',
         'General':       'bg-slate-100 text-slate-600'
@@ -131,7 +132,8 @@ async function loadAuditLogs(page = 1) {
                         <td class="px-4 py-3 text-sm text-slate-600 max-w-[240px] truncate" title="${escapeHtml(log.description || '')}">${escapeHtml(log.description || '—')}</td>
                         <td class="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">
                             <div class="font-medium text-slate-800">${escapeHtml(log.user_name || '—')}</div>
-                            ${log.user_role ? `<div class="text-[11px] text-slate-400 uppercase tracking-wide">${escapeHtml(log.user_role)}</div>` : ''}
+                            ${log.user_role  ? `<div class="text-[11px] text-slate-400 uppercase tracking-wide">${escapeHtml(log.user_role)}</div>` : ''}
+                            ${log.user_email ? `<div class="text-[11px] text-slate-400">${escapeHtml(log.user_email)}</div>` : ''}
                         </td>
                         <td class="px-4 py-3 text-center">
                             <button type="button" class="audit-detail-btn text-gold-500 hover:text-gold-600 text-sm transition"
@@ -232,7 +234,7 @@ function openAuditDetail(log) {
             </div>
 
             <!-- Info grid -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                     <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Severity</p>
                     <div>${severityBadge(log.severity)}</div>
@@ -242,9 +244,14 @@ function openAuditDetail(log) {
                     <div>${moduleBadge(log.module)}</div>
                 </div>
                 <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">User</p>
+                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Performed By</p>
                     <p class="font-semibold text-slate-800">${escapeHtml(log.user_name || '—')}</p>
-                    ${log.user_role ? `<p class="text-[11px] text-slate-400 uppercase tracking-wide">${escapeHtml(log.user_role)}</p>` : ''}
+                    ${log.user_role  ? `<p class="text-[11px] text-slate-400 uppercase tracking-wide">${escapeHtml(log.user_role)}</p>` : ''}
+                    ${log.user_email ? `<p class="text-[11px] text-slate-500 break-all">${escapeHtml(log.user_email)}</p>` : ''}
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Device</p>
+                    <p class="font-semibold text-slate-800">${escapeHtml(log.device_label || '—')}</p>
                 </div>
                 ${log.target_type ? `
                 <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
@@ -310,7 +317,7 @@ async function exportAuditCSV() {
         const logs = res.data?.logs || [];
         if (!logs.length) { alert('No logs to export.'); return; }
 
-        const headers = ['Log ID','Date/Time','Severity','Module','Action','Description','User','Role','Target','IP'];
+        const headers = ['Log ID','Date/Time','Severity','Module','Action','Description','User','Role','Email','Target','Device','IP'];
         const rows = logs.map(l => [
             l.log_id,
             formatDateTime(l.created_at),
@@ -320,7 +327,9 @@ async function exportAuditCSV() {
             (l.description || '').replace(/"/g,'""'),
             l.user_name || '',
             l.user_role || '',
+            l.user_email || '',
             l.target_label || (l.target_type ? `${l.target_type} #${l.target_id}` : ''),
+            l.device_label || '',
             l.ip_address || ''
         ].map(v => `"${v}"`).join(','));
 

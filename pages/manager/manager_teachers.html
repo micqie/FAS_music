@@ -216,17 +216,79 @@
         </div>
     </div>
 
+    <div id="teacherAvailabilityModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden">
+            <div class="border-b border-slate-200 px-6 py-5 flex items-start justify-between gap-4">
+                <div>
+                    <h3 id="teacherAvailabilityModalTitle" class="text-2xl font-black text-slate-900">Teacher Availability</h3>
+                    <p id="teacherAvailabilityModalMeta" class="mt-1 text-sm text-slate-500">Manage the weekly schedule blocks for this instructor.</p>
+                </div>
+                <button id="closeTeacherAvailabilityModalBtn" class="rounded-full p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-[1.35fr_0.9fr] gap-0">
+                <div class="p-6 bg-slate-50/70 border-b lg:border-b-0 lg:border-r border-slate-200">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                            <h4 class="text-lg font-bold text-slate-900">Weekly Schedule</h4>
+                            <p class="text-sm text-slate-500">Set the exact time ranges the instructor can be scheduled.</p>
+                        </div>
+                        <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">Manager editable</span>
+                    </div>
+                    <div id="teacherAvailabilityStatus" class="hidden mt-4 rounded-2xl border px-4 py-3 text-sm"></div>
+                    <div id="teacherAvailabilityGrid" class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                </div>
+                <div class="p-6">
+                    <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h4 class="text-base font-bold text-slate-900">Editing Notes</h4>
+                        <ul class="mt-3 space-y-3 text-sm text-slate-600">
+                            <li class="flex gap-3"><i class="fas fa-circle text-[8px] mt-2 text-amber-500"></i><span>Only branch managers can edit availability.</span></li>
+                            <li class="flex gap-3"><i class="fas fa-circle text-[8px] mt-2 text-amber-500"></i><span>Instructors will only see the saved schedule as read-only.</span></li>
+                            <li class="flex gap-3"><i class="fas fa-circle text-[8px] mt-2 text-amber-500"></i><span>Leave a day unchecked if the teacher is not available.</span></li>
+                        </ul>
+                        <div class="mt-6 flex items-center gap-3">
+                            <button type="button" id="saveTeacherAvailabilityBtn" onclick="saveTeacherAvailability()" class="inline-flex items-center px-5 py-2.5 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-xl shadow transition">
+                                <span id="saveTeacherAvailabilityText">Save Availability</span>
+                            </button>
+                            <button type="button" onclick="closeTeacherAvailabilityModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <template id="teacherAvailabilityCardTemplate">
+                <div class="availability-card p-4 rounded-2xl border border-slate-200 bg-white space-y-3 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="availability-label font-semibold text-slate-900"></span>
+                        <input type="checkbox" class="availability-enabled h-4 w-4">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <input type="time" class="availability-start rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                        <input type="time" class="availability-end rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                    </div>
+                    <p class="text-xs text-slate-500">Set one available time block for this day.</p>
+                </div>
+            </template>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/index.js"></script>
     <script src="../../js/shared/teacher_form_ui.js"></script>
     <script src="../../js/manager/dashboard.js"></script>
+    <script src="../../js/session_timeout.js"></script>
     <script>
         let allTeachers = [];
         let filteredTeachers = [];
         let allSpecializations = [];
         let managerBranchId = 0;
         let managerBranchName = '';
+        let managerUserId = 0;
+        const availabilityDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const availabilityState = {
+            teacherId: 0,
+            teacherName: '',
+            rows: []
+        };
 
         function esc(v) {
             if (v == null) return '';
@@ -247,6 +309,173 @@
         function statusBadge(status) {
             if (status === 'Active') return 'bg-green-100 text-green-700 border-green-200';
             return 'bg-slate-100 text-slate-700 border-slate-200';
+        }
+
+        function setAvailabilityStatus(message, type = 'success') {
+            const box = document.getElementById('teacherAvailabilityStatus');
+            if (!box) return;
+            box.textContent = message;
+            box.className = `mt-4 rounded-2xl border px-4 py-3 text-sm ${type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`;
+            box.classList.remove('hidden');
+        }
+
+        function clearAvailabilityStatus() {
+            const box = document.getElementById('teacherAvailabilityStatus');
+            if (!box) return;
+            box.textContent = '';
+            box.className = 'hidden mt-4 rounded-2xl border px-4 py-3 text-sm';
+        }
+
+        function renderTeacherAvailabilityGrid(entries = []) {
+            const grid = document.getElementById('teacherAvailabilityGrid');
+            const template = document.getElementById('teacherAvailabilityCardTemplate');
+            if (!grid || !template) return;
+
+            const byDay = new Map(entries.map(item => [item.day_of_week, item]));
+            grid.innerHTML = '';
+
+            availabilityDays.forEach(day => {
+                const row = byDay.get(day) || {};
+                const card = template.content.firstElementChild.cloneNode(true);
+                card.dataset.day = day;
+                card.querySelector('.availability-label').textContent = day;
+
+                const enabled = card.querySelector('.availability-enabled');
+                const start = card.querySelector('.availability-start');
+                const end = card.querySelector('.availability-end');
+
+                enabled.checked = !!row.start_time;
+                start.value = String(row.start_time || '09:00:00').slice(0, 5);
+                end.value = String(row.end_time || '17:00:00').slice(0, 5);
+
+                const syncDisabled = () => {
+                    const disabled = !enabled.checked;
+                    start.disabled = disabled;
+                    end.disabled = disabled;
+                    card.classList.toggle('opacity-60', disabled);
+                };
+                enabled.addEventListener('change', syncDisabled);
+                syncDisabled();
+
+                grid.appendChild(card);
+            });
+        }
+
+        async function loadAvailabilityForTeacher(teacherId) {
+            if (!teacherId || !managerUserId) {
+                renderTeacherAvailabilityGrid([]);
+                return;
+            }
+
+            try {
+                const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-availability&teacher_id=${encodeURIComponent(teacherId)}&user_id=${encodeURIComponent(managerUserId)}`);
+                const data = res.data || {};
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load availability');
+                }
+                availabilityState.rows = Array.isArray(data.availability) ? data.availability : [];
+                renderTeacherAvailabilityGrid(availabilityState.rows);
+                clearAvailabilityStatus();
+            } catch (error) {
+                console.error('Failed to load teacher availability:', error);
+                availabilityState.rows = [];
+                renderTeacherAvailabilityGrid([]);
+                setAvailabilityStatus(error.response?.data?.error || 'Failed to load instructor availability.', 'error');
+            }
+        }
+
+        async function openTeacherAvailabilityModal(teacherId) {
+            if (!requireManagerBranch()) return;
+            const teacher = allTeachers.find(t => Number(t.teacher_id) === Number(teacherId));
+            if (!teacher) return;
+
+            availabilityState.teacherId = Number(teacher.teacher_id || 0);
+            availabilityState.teacherName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Teacher';
+            availabilityState.rows = [];
+
+            const modal = document.getElementById('teacherAvailabilityModal');
+            const title = document.getElementById('teacherAvailabilityModalTitle');
+            const meta = document.getElementById('teacherAvailabilityModalMeta');
+            if (title) title.textContent = `${availabilityState.teacherName} Availability`;
+            if (meta) meta.textContent = `${teacher.specialization || 'General'} • ${managerBranchName || 'Branch'} • Read/write managed by branch manager`;
+
+            clearAvailabilityStatus();
+            renderTeacherAvailabilityGrid([]);
+            if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+            await loadAvailabilityForTeacher(availabilityState.teacherId);
+        }
+
+        function closeTeacherAvailabilityModal() {
+            const modal = document.getElementById('teacherAvailabilityModal');
+            if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+            availabilityState.teacherId = 0;
+            availabilityState.teacherName = '';
+            availabilityState.rows = [];
+            clearAvailabilityStatus();
+        }
+
+        function collectTeacherAvailabilityPayload() {
+            return Array.from(document.querySelectorAll('#teacherAvailabilityGrid .availability-card')).map(card => ({
+                day_of_week: card.dataset.day || '',
+                enabled: !!card.querySelector('.availability-enabled')?.checked,
+                start_time: card.querySelector('.availability-start')?.value || '',
+                end_time: card.querySelector('.availability-end')?.value || ''
+            }));
+        }
+
+        async function saveTeacherAvailability() {
+            if (!managerUserId) {
+                setAvailabilityStatus('Manager session not found. Please log in again.', 'error');
+                return;
+            }
+            if (!availabilityState.teacherId) {
+                setAvailabilityStatus('Please select a teacher first.', 'error');
+                return;
+            }
+
+            const payload = collectTeacherAvailabilityPayload();
+            for (const row of payload) {
+                if (!row.enabled) continue;
+                if (!row.start_time || !row.end_time) {
+                    setAvailabilityStatus(`Please complete the time range for ${row.day_of_week}.`, 'error');
+                    return;
+                }
+                if (row.end_time <= row.start_time) {
+                    setAvailabilityStatus(`End time must be later than start time for ${row.day_of_week}.`, 'error');
+                    return;
+                }
+            }
+
+            const btn = document.getElementById('saveTeacherAvailabilityBtn');
+            const btnText = document.getElementById('saveTeacherAvailabilityText');
+            if (btn) btn.disabled = true;
+            if (btnText) btnText.textContent = 'Saving...';
+
+            try {
+                const res = await axios.post(`${baseApiUrl}/teachers.php?action=save-teacher-availability`, {
+                    action: 'save-teacher-availability',
+                    user_id: Number(managerUserId),
+                    teacher_id: Number(availabilityState.teacherId),
+                    availability: payload
+                });
+                const data = res.data || {};
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to save availability.');
+                }
+
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Saved',
+                    text: data.message || 'Teacher availability updated successfully.',
+                    confirmButtonColor: '#b8860b'
+                });
+                await loadAvailabilityForTeacher(availabilityState.teacherId);
+            } catch (error) {
+                setAvailabilityStatus(error.response?.data?.error || error.message || 'Network error while saving availability.', 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+                if (btnText) btnText.textContent = 'Save Availability';
+            }
         }
 
         function requireManagerBranch() {
@@ -322,6 +551,7 @@
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
                             <button onclick="openEditTeacher(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold">Edit</button>
+                            <button onclick="openTeacherAvailabilityModal(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-bold">Availability</button>
                             <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" class="px-3 py-1.5 rounded-lg ${t.status === 'Active' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'} text-xs font-bold">${t.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
                         </div>
                     </td>
@@ -441,6 +671,7 @@
                     return;
                 }
                 const displayName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || user.email || 'Manager';
+                managerUserId = Number(user.user_id || 0);
                 managerBranchId = Number(user.branch_id || 0);
                 managerBranchName = user.branch_name || '';
                 document.getElementById('managerNameNav').textContent = displayName;
@@ -459,6 +690,7 @@
             document.getElementById('teacherForm')?.addEventListener('submit', saveTeacher);
             document.getElementById('statusFilter')?.addEventListener('change', applyFilters);
             document.getElementById('searchInput')?.addEventListener('input', applyFilters);
+            document.getElementById('closeTeacherAvailabilityModalBtn')?.addEventListener('click', closeTeacherAvailabilityModal);
         });
     </script>
 </body>
