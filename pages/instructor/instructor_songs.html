@@ -109,6 +109,8 @@
                 </div>
             </section>
 
+            <section id="currentSessionFocusBanner" class="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 soft-shadow"></section>
+
             <section class="grid gap-4 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
                 <div class="space-y-4">
                     <section class="rounded-[1.5rem] border border-slate-200 bg-white p-4 sm:p-5 soft-shadow">
@@ -215,7 +217,7 @@
                         <label for="songSearchInput" class="sr-only">Search songs</label>
                         <div class="flex items-center gap-3 text-slate-400">
                             <i class="fas fa-search text-lg"></i>
-                            <input id="songSearchInput" type="text" placeholder="Search piano songs" class="w-full bg-transparent text-sm outline-none placeholder:text-slate-400">
+                            <input id="songSearchInput" type="text" placeholder="Search your songs" class="w-full bg-transparent text-sm outline-none placeholder:text-slate-400">
                         </div>
                     </div>
 
@@ -275,11 +277,11 @@
                         <input type="hidden" name="action" value="create-song">
                         <div class="md:col-span-2">
                             <label class="mb-1.5 block text-sm font-bold text-slate-800">Song title</label>
-                            <input name="title" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400" placeholder="e.g. Clair de Lune">
+                            <input name="title" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400" placeholder="Song title">
                         </div>
                         <div>
                             <label class="mb-1.5 block text-sm font-bold text-slate-800">Composer or artist <span class="font-normal text-slate-400">(optional)</span></label>
-                            <input name="artist" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400" placeholder="e.g. Debussy">
+                            <input name="artist" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400" placeholder="Artist name">
                         </div>
                         <div>
                             <label class="mb-1.5 block text-sm font-bold text-slate-800">Instrument</label>
@@ -289,7 +291,7 @@
                         </div>
                         <div class="md:col-span-2">
                             <label class="mb-1.5 block text-sm font-bold text-slate-800">Level</label>
-                            <input name="difficulty_level" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400" placeholder="All levels">
+                            <input name="difficulty_level" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400" placeholder="Difficulty level">
                         </div>
                         <div class="md:col-span-2">
                             <label class="mb-1.5 block text-sm font-bold text-slate-800">Practice materials</label>

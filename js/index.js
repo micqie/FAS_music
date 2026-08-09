@@ -4202,6 +4202,7 @@ async function initGuardianDashboardPage() {
     guardianPortalStudents = students;
     notifyFreezeRestoredForGuardianPortal(students);
     startGuardianFreezeRefreshWatcher();
+    startGuardianSessionRefreshWatcher();
 
     const greetingName = `${guardian.first_name || ''}`.trim() || 'Guardian';
     setText('guardianDashboardGreeting', greetingName ? `Hello, ${greetingName}.` : '');
@@ -4253,6 +4254,7 @@ async function initGuardianStudentsPage() {
     guardianPortalStudents = students;
     notifyFreezeRestoredForGuardianPortal(students);
     startGuardianFreezeRefreshWatcher();
+    startGuardianSessionRefreshWatcher();
     updateGuardianTotals(students);
     setHtml('guardianStudentsList', renderGuardianStudentsList(students));
     await hydrateGuardianAttendance(students);
@@ -4282,6 +4284,7 @@ async function initGuardianPaymentsPage() {
     guardianPortalStudents = students;
     notifyFreezeRestoredForGuardianPortal(students);
     startGuardianFreezeRefreshWatcher();
+    startGuardianSessionRefreshWatcher();
     updateGuardianPaymentTotals(students);
     setHtml('guardianPaymentsList', renderGuardianPaymentsList(students));
     await hydrateGuardianAttendance(students);
@@ -4313,6 +4316,7 @@ async function initGuardianProfilePage() {
     applyGuardianPortalIdentity(user, portal);
     notifyFreezeRestoredForGuardianPortal(students);
     startGuardianFreezeRefreshWatcher();
+    startGuardianSessionRefreshWatcher();
     setText('guardianProfileHeading', `${guardian.first_name || ''} ${guardian.last_name || ''}`.trim() || 'Guardian Profile');
     setText('guardianProfileLinkedStudents', String(students.length));
     setText('guardianProfileBalance', formatCurrencyPHP(metrics.balance));
@@ -4405,6 +4409,7 @@ async function initGuardianAbsencePage() {
     window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
     notifyFreezeRestoredForGuardianPortal(students);
     startGuardianFreezeRefreshWatcher();
+    startGuardianSessionRefreshWatcher();
     applyGuardianPortalIdentity(user, portal);
 
     setText('guardianAbsenceName', `${guardian.first_name || ''} ${guardian.last_name || ''}`.trim() || 'Guardian');
@@ -5085,7 +5090,7 @@ function openFreezePaymentModal() {
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Reference Number *</label>
-                        <input type="text" id="fpReference" placeholder="e.g. GCash ref #..."
+                        <input type="text" id="fpReference" placeholder="Reference number"
                             class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-blue-400"
                             maxlength="100">
                     </div>
@@ -5357,7 +5362,7 @@ function renderStudentRegistrationModal(student, portal) {
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Relationship *</label>
-                            <input id="guardianRelationshipInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="e.g., Mother, Father, Guardian" />
+                            <input id="guardianRelationshipInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Relationship" />
                         </div>
                     </div>
                 </div>
@@ -7458,7 +7463,7 @@ function syncWalkinLoginModeUI() {
 
     emailInput.type = 'text';
     emailInput.autocomplete = 'off';
-    emailInput.placeholder = 'Example: juan or juan.dela.cruz';
+    emailInput.placeholder = 'Login name';
     emailInput.required = true;
 
     if (emailLabel) {
@@ -7549,7 +7554,7 @@ function initWalkinPage() {
 
             if (result.success) {
                 const guardianLabel = result.guardian_username
-                    ? `<strong>Guardian Username:</strong> ${escapeHtml(result.guardian_username)}<br><strong>Guardian Temporary Password:</strong> fasmusic@2020<br>`
+                    ? `<strong>Guardian Username:</strong> ${escapeHtml(result.guardian_username)}<br><strong>Guardian Temporary Password:</strong> Generated automatically<br>`
                     : '';
                 const loginLabel = 'Login Email';
                 const loginValue = result.login_email || result.username || data['student_email'] || '—';
@@ -7569,7 +7574,7 @@ function initWalkinPage() {
                     title: 'Student Registered',
                     html: `Student account was created successfully.<br><br>
                            <strong>${loginLabel}:</strong> ${escapeHtml(loginValue)}<br>
-                           <strong>Student Temporary Password:</strong> fas@123<br>
+                           <strong>Student Temporary Password:</strong> Generated automatically<br>
                            ${guardianLabel}
                            ${isWalkInAccount
                         ? '<br>The student can log in immediately using the login email above.'
@@ -7782,6 +7787,125 @@ function notifyFreezeRestoredForGuardianPortal(students) {
         const studentName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'A linked student';
         notifyFreezeRestored(item?.current_enrollment || null, studentName, 'guardian');
     });
+}
+
+function getGuardianSessionCompletionState(row) {
+    const status = String(row?.status || '').trim().toLowerCase();
+    const attendance = String(row?.attendance_status || '').trim().toLowerCase();
+    if (status === 'completed' || attendance === 'present' || attendance === 'late' || status === 'late') {
+        return 'completed';
+    }
+    if (['cancelled', 'no show', 'cancelled_by_teacher', 'rescheduled'].includes(status) || ['absent', 'ci'].includes(attendance)) {
+        return 'inactive';
+    }
+    return 'pending';
+}
+
+function getGuardianSessionToastKey(sessionId) {
+    return `fas_guardian_session_${Number(sessionId || 0)}`;
+}
+
+function readGuardianSessionToastState(sessionId) {
+    try {
+        return localStorage.getItem(getGuardianSessionToastKey(sessionId)) || '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function writeGuardianSessionToastState(sessionId, state) {
+    try {
+        localStorage.setItem(getGuardianSessionToastKey(sessionId), String(state || ''));
+    } catch (e) {
+        // Ignore storage failures.
+    }
+}
+
+function getLocalYmd(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function isGuardianSessionCompletionTrackable(row) {
+    if (!row?.session_id || !row?.session_date) return false;
+    const sessionDate = String(row.session_date || '');
+    const todayYmd = getLocalYmd();
+    return sessionDate >= todayYmd;
+}
+
+function notifyGuardianSessionCompletion(row, studentName = 'A linked student') {
+    const sessionId = Number(row?.session_id || 0);
+    if (sessionId < 1 || !isGuardianSessionCompletionTrackable(row)) return false;
+
+    const currentState = getGuardianSessionCompletionState(row);
+    const previousState = readGuardianSessionToastState(sessionId);
+    writeGuardianSessionToastState(sessionId, currentState);
+
+    if (currentState === 'completed' && previousState !== 'completed') {
+        const dateLabel = row?.session_date ? formatDateLong(row.session_date) : 'today';
+        showPortalToast(
+            `${studentName} has finished the session for ${dateLabel}.`,
+            'success',
+            'Session Completed'
+        );
+        return true;
+    }
+
+    return false;
+}
+
+function notifyGuardianSessionCompletions(students) {
+    let notified = false;
+    (Array.isArray(students) ? students : []).forEach((item) => {
+        const s = item?.student || {};
+        const studentName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'A linked student';
+        getGuardianSessionRows(item)
+            .filter(isGuardianSessionCompletionTrackable)
+            .forEach((row) => {
+                if (notifyGuardianSessionCompletion(row, studentName)) {
+                    notified = true;
+                }
+            });
+    });
+    return notified;
+}
+
+function stopGuardianSessionRefreshWatcher() {
+    if (window.__guardianSessionRefreshTimer) {
+        window.clearInterval(window.__guardianSessionRefreshTimer);
+        window.__guardianSessionRefreshTimer = null;
+    }
+}
+
+function startGuardianSessionRefreshWatcher() {
+    stopGuardianSessionRefreshWatcher();
+    const needsPolling = (Array.isArray(guardianPortalStudents) ? guardianPortalStudents : [])
+        .some((item) => getGuardianSessionRows(item).some(isGuardianSessionCompletionTrackable));
+    if (!needsPolling) return;
+
+    window.__guardianSessionRefreshBusy = false;
+    window.__guardianSessionRefreshTimer = window.setInterval(async () => {
+        if (window.__guardianSessionRefreshBusy) return;
+        window.__guardianSessionRefreshBusy = true;
+        try {
+            const user = Auth.getUser();
+            const portal = await fetchGuardianPortalDataByEmail(user?.email || '');
+            if (portal?.success && Array.isArray(portal.students)) {
+                guardianPortalStudents = portal.students;
+                const notified = notifyGuardianSessionCompletions(portal.students);
+                if (notified) {
+                    stopGuardianSessionRefreshWatcher();
+                    window.location.reload();
+                }
+            }
+        } catch (e) {
+            // Non-critical polling failure.
+        } finally {
+            window.__guardianSessionRefreshBusy = false;
+        }
+    }, 15000);
 }
 
 function hasPendingFreezeRestoration(enrollment) {

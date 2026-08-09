@@ -162,9 +162,10 @@
                     <button id="paymentExportBtn" type="button" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50">
                         <i class="fas fa-download text-slate-500"></i> Export CSV
                     </button>
-                    <a href="admin_registration.html" class="inline-flex items-center gap-2 rounded-2xl bg-obsidian px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                    <button id="openRecordPaymentModalBtn" type="button"
+                        class="inline-flex items-center gap-2 rounded-2xl bg-obsidian px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
                         <i class="fas fa-plus"></i> Record Payment
-                    </a>
+                    </button>
                 </div>
             </div>
 
@@ -360,5 +361,106 @@
     <script src="../../js/index.js"></script>
     <script src="../../js/admin/admin_payments.js"></script>
     <script src="../../js/session_timeout.js"></script>
+
+<!-- ══ Record Payment Modal ═══════════════════════════════════════════ -->
+<div id="recordPaymentModal"
+     class="fixed inset-0 z-[90] hidden items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg">
+
+        <!-- Header -->
+        <div class="flex items-start justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+            <div>
+                <h2 class="text-lg font-bold text-slate-900">Record Payment</h2>
+                <p class="text-sm text-slate-400 mt-0.5">Posts straight into the student ledger.</p>
+            </div>
+            <button id="closeRecordPaymentModal" type="button"
+                class="text-slate-400 hover:text-slate-600 transition text-lg leading-none mt-0.5">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <form id="recordPaymentForm" class="px-6 py-5 space-y-5" novalidate>
+
+            <!-- Branch filter (scoped to logged-in admin) -->
+            <div id="rpBranchRow" class="hidden">
+                <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Branch</label>
+                <select id="rpBranchSelect"
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                    <option value="">All branches</option>
+                </select>
+            </div>
+
+            <!-- Student -->
+            <div>
+                <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Student</label>
+                <select id="rpStudentSelect" required
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                    <option value="">Select a student…</option>
+                </select>
+                <p id="rpBalanceHint" class="mt-1.5 text-xs text-slate-400 hidden">
+                    Outstanding balance: <strong id="rpBalanceAmount" class="text-slate-700"></strong>
+                </p>
+            </div>
+
+            <!-- Amount + Date -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Amount (₱)</label>
+                    <input id="rpAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required
+                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Payment Date</label>
+                    <input id="rpDate" type="date" required
+                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                </div>
+            </div>
+
+            <!-- Method + Receipt -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Method</label>
+                    <select id="rpMethod"
+                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                        <option value="Cash">Cash Payment</option>
+                        <option value="GCash">GCash</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Check">Check</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Receipt No.</label>
+                    <input id="rpReceipt" type="text" placeholder="Receipt number"
+                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                </div>
+            </div>
+
+            <!-- Note -->
+            <div>
+                <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Note (Optional)</label>
+                <input id="rpNote" type="text" placeholder="Payment note"
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+            </div>
+
+            <!-- Feedback -->
+            <p id="rpMessage" class="hidden rounded-xl border px-3 py-2.5 text-sm"></p>
+
+            <!-- Footer -->
+            <div class="flex items-center justify-end gap-3 pt-1 border-t border-slate-100">
+                <button type="button" id="rpCancelBtn"
+                    class="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
+                    Cancel
+                </button>
+                <button type="submit" id="rpSubmitBtn"
+                    class="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition disabled:opacity-50">
+                    <span id="rpSubmitText">Save Payment</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 </body>
 </html>

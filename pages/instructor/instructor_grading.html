@@ -175,17 +175,11 @@
         </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Search -->
     <div class="flex flex-col sm:flex-row gap-2 mb-5">
-        <select id="gradeFilter" class="sm:w-52 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:border-teal-500 transition-colors">
-            <option value="all">All Sessions</option>
-            <option value="completed">Ready to Grade</option>
-            <option value="graded">Already Graded</option>
-            <option value="ungraded">Needs Grade</option>
-        </select>
         <div class="relative flex-1">
             <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 text-sm"></i>
-            <input id="gradeSearch" type="text" placeholder="Search student or instrument…"
+            <input id="gradeSearch" type="text" placeholder="Search today's students or instruments..."
                 class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-teal-500 transition-colors">
         </div>
     </div>
@@ -320,6 +314,15 @@
 
                     </form>
                 </div>
+            </div>
+
+            <div class="mt-5 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden fade-in">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <p class="text-xs font-bold text-teal-600 uppercase tracking-widest mb-1">Student history</p>
+                    <h3 id="studentHistoryHeading" class="text-lg font-bold text-gray-900">Select a student</h3>
+                    <p class="text-sm text-gray-400 mt-0.5">All sessions and grades for the selected student.</p>
+                </div>
+                <div id="studentHistoryList" class="divide-y divide-gray-100 max-h-[32rem] overflow-y-auto scroll-thin"></div>
             </div>
         </div>
 

@@ -295,7 +295,7 @@
 
             if (systemLoginInput) {
                 if (!systemLoginInput.dataset.originalPlaceholder) {
-                    systemLoginInput.dataset.originalPlaceholder = systemLoginInput.getAttribute('placeholder') || 'e.g. juan.delacruz';
+                    systemLoginInput.dataset.originalPlaceholder = systemLoginInput.getAttribute('placeholder') || 'username';
                 }
                 systemLoginInput.required = false;
                 systemLoginInput.placeholder = normalized === 'system_account'

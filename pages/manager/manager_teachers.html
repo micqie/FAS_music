@@ -634,7 +634,7 @@
                 Swal.fire({
                     icon: data.email_sent === false && data.account_mode === 'real_email' ? 'warning' : 'success',
                     title: 'Teacher Created',
-                    html: `<p><strong>Login:</strong> ${esc(data.username)}</p><p><strong>Temporary password:</strong> <span class="font-mono">${esc(data.temp_password || 'fasmusic@2020')}</span></p>`,
+                    html: `<p><strong>Login:</strong> ${esc(data.username)}</p><p><strong>Temporary password:</strong> <span class="font-mono">${esc(data.temp_password || 'Generated automatically')}</span></p>`,
                     confirmButtonColor: '#b8860b'
                 });
             } else {

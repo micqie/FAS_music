@@ -692,6 +692,37 @@ class AttendanceApi
         ]);
     }
 
+    private function syncEnrollmentCompletedSessions($enrollmentId)
+    {
+        $enrollmentId = (int)$enrollmentId;
+        if ($enrollmentId < 1 || !$this->tableExists('tbl_enrollments') || !$this->tableExists('tbl_sessions')) {
+            return;
+        }
+
+        try {
+            $stmtCount = $this->conn->prepare("
+                SELECT COUNT(*)
+                FROM tbl_sessions
+                WHERE enrollment_id = ?
+                  AND (
+                      status IN ('Completed', 'Late')
+                      OR attendance_status IN ('Present', 'Late')
+                  )
+            ");
+            $stmtCount->execute([$enrollmentId]);
+            $completedSessions = (int)($stmtCount->fetchColumn() ?: 0);
+
+            $stmtUpdate = $this->conn->prepare("
+                UPDATE tbl_enrollments
+                SET completed_sessions = ?
+                WHERE enrollment_id = ?
+            ");
+            $stmtUpdate->execute([$completedSessions, $enrollmentId]);
+        } catch (PDOException $e) {
+            // Keep attendance updates working even if the completion sync fails.
+        }
+    }
+
     private function getStudentScheduleFreezeStatus($studentId)
     {
         $studentId = (int)$studentId;
@@ -893,6 +924,7 @@ class AttendanceApi
         }
 
         $this->syncEnrollmentPolicyState($enrollmentId);
+        $this->syncEnrollmentCompletedSessions($enrollmentId);
         return $this->getStudentSessionForDate($studentId, $dateYmd, false);
     }
 
@@ -1932,7 +1964,7 @@ class AttendanceApi
                 $this->sendJSON([
                     'success' => true,
                     'already_marked' => true,
-                    'message' => 'This student is already marked present.',
+                    'message' => 'This session is already completed.',
                     'student' => $session
                 ]);
             }
@@ -1963,7 +1995,7 @@ class AttendanceApi
                 'success' => true,
                 'already_marked' => (bool)$existing,
                 'attendance_id' => $attendanceId,
-                'message' => $existing ? 'Attendance was already recorded. Session is now marked present.' : 'Student marked present.',
+                'message' => $existing ? 'Attendance was already recorded. The session is now marked complete.' : 'Session ended successfully.',
                 'student' => $session
             ]);
         } catch (PDOException $e) {

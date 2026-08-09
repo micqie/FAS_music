@@ -699,3 +699,202 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderRegistrationTable([]);
     }
 });
+
+// ══ Record Payment Modal ════════════════════════════════════════════
+
+const rpState = {
+    enrollments: [],   // full list loaded once
+    filtered:    [],   // filtered by branch
+    adminBranchId: 0,  // 0 = super admin (all branches), >0 = scoped
+};
+
+function rpShowMessage(text, type = 'error') {
+    const el = document.getElementById('rpMessage');
+    if (!el) return;
+    const cls = type === 'success'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        : 'border-red-200 bg-red-50 text-red-700';
+    el.className = `rounded-xl border px-3 py-2.5 text-sm ${cls}`;
+    el.textContent = text;
+    el.classList.remove('hidden');
+}
+
+function rpHideMessage() {
+    document.getElementById('rpMessage')?.classList.add('hidden');
+}
+
+function rpPopulateStudents(enrollments) {
+    const sel = document.getElementById('rpStudentSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Select a student…</option>' +
+        enrollments.map(e => {
+            const name = `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Student';
+            const branch = e.branch_name || '';
+            const balance = Math.max(0, Number(e.total_amount || 0) - Number(e.paid_amount || 0));
+            return `<option value="${e.enrollment_id}" data-balance="${balance}" data-branch="${escapeHtml(branch)}">
+                ${escapeHtml(name)} — ${escapeHtml(branch)}
+            </option>`;
+        }).join('');
+
+    // Reset balance hint
+    document.getElementById('rpBalanceHint')?.classList.add('hidden');
+}
+
+function rpFilterByBranch(branchId) {
+    rpState.filtered = branchId > 0
+        ? rpState.enrollments.filter(e => Number(e.branch_id || 0) === branchId)
+        : rpState.enrollments;
+    rpPopulateStudents(rpState.filtered);
+}
+
+function openRecordPaymentModal() {
+    const modal = document.getElementById('recordPaymentModal');
+    if (!modal) return;
+
+    // Determine if admin is branch-scoped
+    const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+    const role = String(user?.role_name || '').toLowerCase();
+    rpState.adminBranchId = ['staff','desk','front desk','manager','branch manager'].includes(role)
+        ? Number(user?.branch_id || 0)
+        : 0;
+
+    // Set today's date
+    const dateInput = document.getElementById('rpDate');
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+
+    // Reset form
+    document.getElementById('recordPaymentForm')?.reset();
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    rpHideMessage();
+    document.getElementById('rpBalanceHint')?.classList.add('hidden');
+
+    // Show or hide branch filter
+    const branchRow = document.getElementById('rpBranchRow');
+    const branchSel = document.getElementById('rpBranchSelect');
+    if (rpState.adminBranchId > 0) {
+        // Scoped: hide branch filter, filter directly
+        branchRow?.classList.add('hidden');
+        rpFilterByBranch(rpState.adminBranchId);
+    } else {
+        // Super admin: show branch filter
+        branchRow?.classList.remove('hidden');
+        // Populate branch dropdown from cached data
+        if (paymentCenterDataCache?.branches?.length && branchSel) {
+            branchSel.innerHTML = '<option value="">All branches</option>' +
+                paymentCenterDataCache.branches
+                    .filter(b => String(b.status || 'Active').toLowerCase() === 'active')
+                    .map(b => `<option value="${b.branch_id}">${escapeHtml(b.branch_name || 'Branch')}</option>`)
+                    .join('');
+        }
+        rpFilterByBranch(0);
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeRecordPaymentModal() {
+    const modal = document.getElementById('recordPaymentModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function initRecordPaymentModal() {
+    // Use enrollments already loaded by the payment center
+    // Refresh whenever modal opens via paymentCenterDataCache
+    document.getElementById('openRecordPaymentModalBtn')?.addEventListener('click', () => {
+        if (paymentCenterDataCache?.enrollments) {
+            rpState.enrollments = paymentCenterDataCache.enrollments;
+        }
+        openRecordPaymentModal();
+    });
+
+    document.getElementById('closeRecordPaymentModal')?.addEventListener('click', closeRecordPaymentModal);
+    document.getElementById('rpCancelBtn')?.addEventListener('click', closeRecordPaymentModal);
+
+    // Close on backdrop click
+    document.getElementById('recordPaymentModal')?.addEventListener('click', e => {
+        if (e.target === e.currentTarget) closeRecordPaymentModal();
+    });
+
+    // Branch filter change (super admin only)
+    document.getElementById('rpBranchSelect')?.addEventListener('change', function () {
+        rpFilterByBranch(Number(this.value) || 0);
+        document.getElementById('rpBalanceHint')?.classList.add('hidden');
+    });
+
+    // Student change → show balance
+    document.getElementById('rpStudentSelect')?.addEventListener('change', function () {
+        const opt = this.options[this.selectedIndex];
+        const balance = parseFloat(opt?.dataset?.balance || '0');
+        const hint   = document.getElementById('rpBalanceHint');
+        const amt    = document.getElementById('rpBalanceAmount');
+        if (this.value && hint && amt) {
+            amt.textContent = `₱${balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+            hint.classList.remove('hidden');
+            // Pre-fill amount with full balance
+            const amtInput = document.getElementById('rpAmount');
+            if (amtInput && balance > 0) amtInput.value = balance.toFixed(2);
+        } else {
+            hint?.classList.add('hidden');
+        }
+        rpHideMessage();
+    });
+
+    // Form submit
+    document.getElementById('recordPaymentForm')?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        rpHideMessage();
+
+        const enrollmentId = Number(document.getElementById('rpStudentSelect')?.value || 0);
+        const amount       = parseFloat(document.getElementById('rpAmount')?.value   || '0');
+        const date         = document.getElementById('rpDate')?.value    || '';
+        const method       = document.getElementById('rpMethod')?.value  || 'Cash';
+        const receipt      = document.getElementById('rpReceipt')?.value || '';
+        const notes        = document.getElementById('rpNote')?.value    || '';
+
+        if (!enrollmentId) { rpShowMessage('Please select a student.'); return; }
+        if (!(amount > 0))  { rpShowMessage('Enter a valid amount greater than 0.'); return; }
+
+        const btn      = document.getElementById('rpSubmitBtn');
+        const btnText  = document.getElementById('rpSubmitText');
+        btn.disabled   = true;
+        btnText.textContent = 'Saving…';
+
+        try {
+            const res  = await axios.post(`${baseApiUrl}/students.php?action=record-enrollment-payment`, {
+                enrollment_id:  enrollmentId,
+                amount,
+                payment_date:   date,
+                payment_method: method,
+                receipt_number: receipt,
+                notes
+            });
+            const data = res.data || {};
+            if (!data.success) {
+                rpShowMessage(data.error || 'Failed to record payment.'); return;
+            }
+
+            rpShowMessage(data.message || 'Payment saved.', 'success');
+
+            // Refresh the payment center data in background
+            try {
+                const fresh = await loadPaymentCenter();
+                Object.assign(paymentCenterDataCache, fresh);
+                rpState.enrollments = fresh.enrollments || [];
+                renderPaymentCenter(paymentCenterDataCache);
+            } catch (_) { /* non-fatal */ }
+
+            setTimeout(closeRecordPaymentModal, 1400);
+        } catch (err) {
+            rpShowMessage(err?.response?.data?.error || err.message || 'Network error.');
+        } finally {
+            btn.disabled = false;
+            btnText.textContent = 'Save Payment';
+        }
+    });
+}
+
+// Initialise after DOMContentLoaded is already wired above — piggyback safely
+document.addEventListener('DOMContentLoaded', initRecordPaymentModal);

@@ -169,6 +169,10 @@ function formatTime12Hour(t) {
     if (Number.isNaN(h)) return t;
     return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
+function getLocalISODate(date = new Date()) {
+    const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+    return local.toISOString().slice(0, 10);
+}
 
 // ── Gradeability ───────────────────────────────────────────────────
 function isGradeable(session) {
@@ -207,13 +211,16 @@ function getGradeSessionSortRank(s) {
 function getGradeSessionSortTime(s) {
     return new Date(`${s?.session_date || ''}T${s?.start_time || '00:00:00'}`).getTime() || 0;
 }
+function isTodaySession(session) {
+    return String(session?.session_date || '') === getLocalISODate();
+}
 
 // ── Attendance control ─────────────────────────────────────────────
 // Rules:
 //   graded (progress_id > 0)          → read-only "Present — Graded" badge
 //   att = present / late              → read-only desk-confirmed badge, grading unlocked
 //   att = absent / excused / ci / etc → read-only badge, grading locked
-//   att = pending / not set           → "Mark as Present" button (instructor override)
+//   att = pending / not set           → "End Session" button (instructor override)
 function renderAttendanceControl(session) {
     const container = document.getElementById('attendanceControl');
     const descEl    = document.getElementById('attendanceSectionDesc');
@@ -258,7 +265,7 @@ function renderAttendanceControl(session) {
         return;
     }
 
-    // Pending / Scheduled — instructor can mark present
+    // Pending / Scheduled — instructor can end the session
     container.innerHTML = `
         <div class="flex flex-wrap items-center gap-3">
             <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
@@ -267,17 +274,17 @@ function renderAttendanceControl(session) {
             <button type="button" id="markPresentBtn"
                 onclick="instructorMarkPresent()"
                 class="inline-flex items-center gap-2 rounded-xl border border-teal-300 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-700 hover:bg-teal-100 transition">
-                <i class="fas fa-user-check text-sm"></i>Mark as Present
+                <i class="fas fa-circle-check text-sm"></i>End Session
             </button>
         </div>`;
-    if (descEl) descEl.textContent = 'Not yet confirmed by desk. You can mark the student present if they\'re here.';
+    if (descEl) descEl.textContent = 'Not yet confirmed by desk. End the session once the lesson is finished.';
 }
 
 async function instructorMarkPresent() {
     const session = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
     if (!session) return;
     const btn  = document.getElementById('markPresentBtn');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs mr-2"></i>Marking…'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs mr-2"></i>Ending…'; }
     const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
     try {
         const res  = await axios.post(`${baseApiUrl}/attendance.php?action=mark-present-by-instructor`, {
@@ -287,7 +294,7 @@ async function instructorMarkPresent() {
         const data = res.data || {};
         if (!data.success) {
             showGradeMessage(data.error || 'Could not mark attendance. Please try again.', 'error');
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-check text-sm"></i>Mark as Present'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-circle-check text-sm"></i>End Session'; }
             return;
         }
         await loadGradeSessions(currentGradeFilter);
@@ -297,7 +304,7 @@ async function instructorMarkPresent() {
     } catch (e) {
         console.error('Mark present failed:', e);
         showGradeMessage('Network error — please try again.', 'error');
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-check text-sm"></i>Mark as Present'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-circle-check text-sm"></i>End Session'; }
     }
 }
 window.instructorMarkPresent = instructorMarkPresent;
@@ -497,6 +504,7 @@ function populateGradeForm(session) {
     if (vpBtn) vpBtn.classList.toggle('hidden', !graded);
 
     updateScorePreview();
+    renderStudentHistory(session);
 }
 
 // ── Stats ──────────────────────────────────────────────────────────
@@ -513,6 +521,7 @@ function renderGradeStats(rows) {
 function getVisibleGradeSessions() {
     const q = String(document.getElementById('gradeSearch')?.value || '').trim().toLowerCase();
     return instructorGradeSessions
+        .filter(isTodaySession)
         .filter(s => !q || [s.student_first_name, s.student_last_name, s.instrument_name, s.package_name].join(' ').toLowerCase().includes(q))
         .slice()
         .sort((a, b) => {
@@ -535,13 +544,15 @@ function renderGradeSessions() {
     if (!rows.length) {
         list.innerHTML = `<div class="px-4 py-10 text-center text-sm text-gray-400">
             <i class="fas fa-calendar-xmark text-2xl text-gray-200 block mb-3"></i>
-            No sessions match this filter.
+            No sessions found for today.
         </div>`;
-        populateGradeForm(null);
+        if (selectedGradeSessionId === 0 || isTodaySession(instructorGradeSessions.find(s => Number(s.session_id || 0) === selectedGradeSessionId))) {
+            populateGradeForm(null);
+        }
         return;
     }
 
-    if (!rows.some(s => Number(s.session_id) === selectedGradeSessionId)) {
+    if (!selectedGradeSessionId || (selectedGradeSessionId && !rows.some(s => Number(s.session_id) === selectedGradeSessionId) && isTodaySession(instructorGradeSessions.find(s => Number(s.session_id || 0) === selectedGradeSessionId)))) {
         populateGradeForm(rows[0]);
     }
 
@@ -576,6 +587,86 @@ function renderGradeSessions() {
             if (window.innerWidth < 1024) {
                 document.getElementById('gradingForm')?.closest('.bg-white')?.scrollIntoView({ behavior:'smooth', block:'start' });
             }
+        });
+    });
+}
+
+// ── Student history panel ─────────────────────────────────────────
+function getStudentSessionHistory(studentId) {
+    return instructorGradeSessions
+        .filter(s => Number(s.student_id || 0) === Number(studentId || 0))
+        .slice()
+        .sort((a, b) => {
+            const da = new Date(`${a.session_date || ''}T${a.start_time || '00:00:00'}`).getTime();
+            const db = new Date(`${b.session_date || ''}T${b.start_time || '00:00:00'}`).getTime();
+            return db !== da ? db - da : Number(b.session_id || 0) - Number(a.session_id || 0);
+        });
+}
+
+function renderStudentHistory(session) {
+    const heading = document.getElementById('studentHistoryHeading');
+    const list = document.getElementById('studentHistoryList');
+    if (!heading || !list) return;
+
+    if (!session) {
+        heading.textContent = 'Select a student';
+        list.innerHTML = `
+            <div class="px-6 py-10 text-center text-sm text-gray-400">
+                Select a session above to view the student's grading history.
+            </div>`;
+        return;
+    }
+
+    const studentName = `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student';
+    const history = getStudentSessionHistory(session.student_id);
+    const gradedCount = history.filter(row => Number(row.progress_id || 0) > 0).length;
+
+    heading.textContent = studentName;
+    list.innerHTML = history.length ? `
+        <div class="px-6 py-3 border-b border-gray-100 bg-gray-50/70 text-xs text-gray-500">
+            ${history.length} session${history.length === 1 ? '' : 's'} total · ${gradedCount} graded
+        </div>
+        ${history.map(row => {
+        const sid = Number(row.session_id || 0);
+        const isSelected = sid === Number(selectedGradeSessionId || 0);
+        const graded = Number(row.progress_id || 0) > 0;
+        const scoreText = graded && row.average_score !== null && row.average_score !== undefined
+            ? `${Number(row.average_score).toFixed(2)}/5`
+            : 'Not graded';
+        const state = getGradeState(row);
+        const stateCls = getGradeStateCls(row);
+        const meta = [
+            formatShortDate(row.session_date),
+            `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`,
+            row.instrument_name || 'Instrument'
+        ].join(' • ');
+
+        return `
+            <button type="button" data-history-session-id="${sid}"
+                class="w-full text-left px-6 py-4 transition ${isSelected ? 'bg-teal-50/80' : 'hover:bg-gray-50'}">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-gray-900">${escapeHtml(state)} Session</p>
+                        <p class="text-xs text-gray-400 mt-1 truncate">${escapeHtml(meta)}</p>
+                    </div>
+                    <div class="shrink-0 text-right">
+                        <div class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${stateCls}">
+                            ${escapeHtml(scoreText)}
+                        </div>
+                        <div class="mt-1 text-[11px] font-medium text-gray-400">${escapeHtml(graded ? `${row.skill_level || '—'}` : 'Awaiting grade')}</div>
+                    </div>
+                </div>
+            </button>`;
+    }).join('')}` : `
+        <div class="px-6 py-10 text-center text-sm text-gray-400">
+            No sessions found for this student.
+        </div>`;
+
+    document.querySelectorAll('[data-history-session-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(btn.dataset.historySessionId || 0)) || null;
+            populateGradeForm(target);
+            renderGradeSessions();
         });
     });
 }
@@ -789,7 +880,6 @@ function renderAnalytics(session) {
 document.addEventListener('DOMContentLoaded', async () => {
     renderScoreCriteria();
     await loadGradeSessions('all');
-    document.getElementById('gradeFilter')?.addEventListener('change',  e => loadGradeSessions(e.target.value));
     document.getElementById('gradeSearch')?.addEventListener('input',   () => renderGradeSessions());
     document.getElementById('gradingForm')?.addEventListener('submit',  saveSessionGrade);
     document.getElementById('skillLevelInput')?.addEventListener('change', updateScorePreview);

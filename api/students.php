@@ -6044,6 +6044,112 @@ class StudentsApi
             ")->execute([$enrollmentId]);
         } catch (PDOException $e) { /* non-fatal */ }
     }
+
+    // ── Admin: Record a payment against an active enrollment ─────────
+    public function recordEnrollmentPayment()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+
+        $enrollmentId  = isset($data['enrollment_id'])  ? (int)$data['enrollment_id']         : 0;
+        $amount        = isset($data['amount'])          ? (float)$data['amount']               : 0;
+        $paymentDate   = trim((string)($data['payment_date']   ?? date('Y-m-d')));
+        $paymentMethod = trim((string)($data['payment_method'] ?? 'Cash'));
+        $receiptNumber = trim((string)($data['receipt_number'] ?? ''));
+        $notes         = trim((string)($data['notes']          ?? ''));
+
+        if ($enrollmentId <= 0) {
+            $this->sendJSON(['error' => 'enrollment_id is required'], 400);
+        }
+        if ($amount <= 0) {
+            $this->sendJSON(['error' => 'Amount must be greater than 0'], 400);
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $paymentDate)) {
+            $paymentDate = date('Y-m-d');
+        }
+
+        try {
+            // Verify enrollment exists and is active
+            $stmtCheck = $this->conn->prepare("
+                SELECT e.enrollment_id, e.student_id, s.first_name, s.last_name,
+                       COALESCE(sp.price, 0) AS total_amount,
+                       COALESCE((
+                           SELECT SUM(p2.amount) FROM tbl_payments p2
+                           WHERE p2.enrollment_id = e.enrollment_id AND p2.status = 'Paid'
+                       ), 0) AS paid_amount
+                FROM tbl_enrollments e
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
+                WHERE e.enrollment_id = ? AND e.status = 'Active'
+                LIMIT 1
+            ");
+            $stmtCheck->execute([$enrollmentId]);
+            $enrollment = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
+            if (!$enrollment) {
+                $this->sendJSON(['error' => 'Active enrollment not found'], 404);
+            }
+
+            $balance = max(0, (float)$enrollment['total_amount'] - (float)$enrollment['paid_amount']);
+            if ($amount > $balance + 0.01) {
+                $this->sendJSON(['error' => sprintf('Amount exceeds outstanding balance of ₱%.2f', $balance)], 400);
+            }
+
+            // Auto-generate receipt if not provided
+            if ($receiptNumber === '') {
+                $receiptNumber = 'OR-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            }
+
+            // Build insert dynamically to handle any schema
+            $cols = ['enrollment_id', 'amount', 'payment_method', 'payment_date', 'status'];
+            $vals = [$enrollmentId, $amount, $paymentMethod, $paymentDate, 'Paid'];
+
+            if ($this->tableHasColumn('tbl_payments', 'receipt_number')) {
+                $cols[] = 'receipt_number';
+                $vals[] = $receiptNumber;
+            }
+            if ($this->tableHasColumn('tbl_payments', 'notes') && $notes !== '') {
+                $cols[] = 'notes';
+                $vals[] = $notes;
+            }
+            if ($this->tableHasColumn('tbl_payments', 'payment_type')) {
+                $cols[] = 'payment_type';
+                $vals[] = 'Installment';
+            }
+
+            $placeholders = implode(', ', array_fill(0, count($cols), '?'));
+            $this->conn->prepare(
+                "INSERT INTO tbl_payments (" . implode(', ', $cols) . ") VALUES ({$placeholders})"
+            )->execute($vals);
+
+            $paymentId = (int)$this->conn->lastInsertId();
+
+            // Update enrollment_financials if it exists
+            if ($this->tableExists('tbl_enrollment_financials')) {
+                $this->conn->prepare("
+                    UPDATE tbl_enrollment_financials
+                    SET paid_amount = paid_amount + ?
+                    WHERE enrollment_id = ?
+                ")->execute([$amount, $enrollmentId]);
+            }
+
+            $newPaid    = (float)$enrollment['paid_amount'] + $amount;
+            $newBalance = max(0, (float)$enrollment['total_amount'] - $newPaid);
+            $studentName = trim($enrollment['first_name'] . ' ' . $enrollment['last_name']);
+
+            $this->sendJSON([
+                'success'        => true,
+                'message'        => "Payment of ₱" . number_format($amount, 2) . " recorded for {$studentName}.",
+                'payment_id'     => $paymentId,
+                'receipt_number' => $receiptNumber,
+                'new_paid'       => $newPaid,
+                'new_balance'    => $newBalance,
+            ]);
+        } catch (\PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
 }
 
 $studentsApi = new StudentsApi($conn);
@@ -6147,6 +6253,9 @@ switch ($action) {
         break;
     case 'get-student-freeze-payment-status':
         $studentsApi->getStudentFreezePaymentStatus();
+        break;
+    case 'record-enrollment-payment':
+        $studentsApi->recordEnrollmentPayment();
         break;
     default:
         $studentsApi->sendJSON(['error' => 'Invalid action'], 400);

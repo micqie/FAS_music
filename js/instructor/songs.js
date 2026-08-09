@@ -3,6 +3,7 @@ let instructorSongAssignments = [];
 let instructorSongStudents = [];
 let instructorSongSessions = [];
 let instructorSongCategories = [];
+let instructorSongSpecializations = [];
 let currentInstructorUser = null;
 let activeSongModalId = null;
 let instructorSongSelectedStudentId = 0;
@@ -131,6 +132,21 @@ function normalizeCategory(value) {
     return String(value || '').trim().toLowerCase();
 }
 
+function formatCategoryLabel(value) {
+    return String(value || '')
+        .trim()
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function getTeacherSpecializationValues() {
+    const values = Array.isArray(instructorSongSpecializations)
+        ? instructorSongSpecializations.map(item => normalizeCategory(item?.value || item?.label)).filter(Boolean)
+        : [];
+    return Array.from(new Set(values));
+}
+
 function getStudentInitials(student) {
     const parts = String(student?.student_name || 'Student').trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return 'ST';
@@ -216,6 +232,15 @@ function getCurrentSessionStudentId() {
     return Number(currentSession?.student_id || 0) || 0;
 }
 
+function getCurrentSessionFocus() {
+    const session = getCurrentSessionRecord();
+    const student = session ? getStudentById(session.student_id) : null;
+    const instrument = session?.instrument_name || student?.instrument_name || 'Instrument';
+    const studentName = student?.student_name || session?.student_first_name || 'Student';
+    const room = session?.room_name || student?.branch_name || 'Studio';
+    return { session, student, instrument, studentName, room };
+}
+
 function getAllowedCategoriesForStudent(student) {
     const categories = Array.isArray(student?.song_eligibility?.allowed_categories)
         ? student.song_eligibility.allowed_categories
@@ -243,10 +268,23 @@ function getPreferredCategoryForStudent(student) {
 
 function getAvailableCategories() {
     if (Array.isArray(instructorSongCategories) && instructorSongCategories.length) {
-        return instructorSongCategories.map(category => ({
+        const available = instructorSongCategories.map(category => ({
             value: normalizeCategory(category.value || category.label),
             label: category.label || category.value || 'Category'
         })).filter(category => category.value);
+        const allowed = getTeacherSpecializationValues();
+        if (!allowed.length) {
+            return available;
+        }
+        const allowedSet = new Set(allowed);
+        const filtered = available.filter(category => allowedSet.has(category.value));
+        if (filtered.length) {
+            return filtered;
+        }
+        return allowed.map(value => ({
+            value,
+            label: formatCategoryLabel(value)
+        }));
     }
 
     const fromLibrary = [];
@@ -260,7 +298,19 @@ function getAvailableCategories() {
             label: String(song.category || value).replace(/\b\w/g, char => char.toUpperCase())
         });
     });
-    return fromLibrary;
+    const allowed = getTeacherSpecializationValues();
+    if (!allowed.length) {
+        return fromLibrary;
+    }
+    const allowedSet = new Set(allowed);
+    const filtered = fromLibrary.filter(category => allowedSet.has(category.value));
+    if (filtered.length) {
+        return filtered;
+    }
+    return allowed.map(value => ({
+        value,
+        label: formatCategoryLabel(value)
+    }));
 }
 
 function syncSelectionState() {
@@ -332,36 +382,60 @@ function setPracticeBy(value) {
 }
 
 function renderHeroSession() {
-    const session = getCurrentSessionRecord();
-    const student = session ? getStudentById(session.student_id) : null;
+    const { session, student, instrument, studentName, room } = getCurrentSessionFocus();
     const summaryEl = document.getElementById('heroSessionSummary');
     const metaEl = document.getElementById('heroSessionMeta');
+    const bannerEl = document.getElementById('currentSessionFocusBanner');
 
     if (!summaryEl || !metaEl) return;
 
     if (!session) {
-        summaryEl.textContent = 'No student in session right now';
+        summaryEl.textContent = 'No active lesson right now';
         metaEl.textContent = 'Once a lesson begins, the active student will appear here.';
+        if (bannerEl) {
+            bannerEl.innerHTML = `
+                <div class="text-sm font-semibold text-slate-700">No active session selected.</div>
+                <div class="mt-1 text-sm text-slate-500">The song library will focus on the current lesson instrument as soon as a session starts.</div>
+            `;
+        }
         return;
     }
 
-    summaryEl.textContent = `${student?.student_name || session.student_first_name || 'Student'} · ${session.instrument_name || student?.instrument_name || 'Instrument'}`;
+    summaryEl.textContent = `${studentName} · ${instrument}`;
 
     if (isActiveSession(session)) {
         const end = getSessionEndDateTime(session);
         const minutesLeft = end ? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 60000)) : null;
-        const room = session.room_name || student?.branch_name || 'Studio';
         metaEl.textContent = `${minutesLeft !== null ? `In session ${minutesLeft} min` : 'In session now'} • ${room}`;
     } else {
         const start = getSessionDateTime(session);
         const minutesUntil = start ? Math.max(0, Math.ceil((start.getTime() - Date.now()) / 60000)) : null;
-        metaEl.textContent = `${minutesUntil !== null ? `Starts in ${minutesUntil} min` : 'Next session'} • ${session.room_name || student?.branch_name || 'Studio'}`;
+        metaEl.textContent = `${minutesUntil !== null ? `Starts in ${minutesUntil} min` : 'Next session'} • ${room}`;
+    }
+
+    if (bannerEl) {
+        const active = isActiveSession(session);
+        bannerEl.innerHTML = `
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0">
+                    <div class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] ${active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
+                        ${active ? 'Current lesson focus' : 'Next lesson focus'}
+                    </div>
+                    <div class="mt-2 text-lg font-black text-slate-900 truncate">${escapeSongHtml(studentName)} - ${escapeSongHtml(instrument)}</div>
+                    <div class="mt-1 text-sm text-slate-500">${escapeSongHtml(room)}${active ? ' • Available for song matching now' : ' • Upcoming session'} </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                    <span class="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">${escapeSongHtml(instrument)}</span>
+                    <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">${active ? 'Live' : 'Upcoming'}</span>
+                </div>
+            </div>
+        `;
     }
 }
 
 function renderSelectedStudentCard() {
     const student = getStudentById(instructorSongSelectedStudentId);
-    const session = getCurrentSessionRecord();
+    const { session } = getCurrentSessionFocus();
     const selectedStudentIsCurrent = !!student && Number(student.student_id || 0) === Number(session?.student_id || 0) && isActiveSession(session);
 
     const avatarEl = document.getElementById('selectedStudentAvatar');
@@ -384,11 +458,11 @@ function renderSelectedStudentCard() {
     if (avatarEl) avatarEl.textContent = getStudentInitials(student);
     if (nameEl) nameEl.textContent = student.student_name || 'Student';
     if (metaEl) {
-        metaEl.textContent = `${student.instrument_name || 'Instrument'} · ${student.package_name || student.branch_name || 'Student'}`;
+        metaEl.textContent = `${student.instrument_name || 'Instrument'} focus · ${student.package_name || student.branch_name || 'Student'}`;
     }
     if (statusEl) {
         if (selectedStudentIsCurrent) {
-            statusEl.textContent = 'Currently in session';
+            statusEl.textContent = 'Current lesson student';
             statusEl.className = 'mt-1 text-sm font-semibold text-emerald-700';
         } else {
             statusEl.textContent = 'Selected from roster';
@@ -410,7 +484,7 @@ function renderSelectedStudentCard() {
     }
     if (locationEl) {
         locationEl.textContent = session && Number(session.student_id || 0) === Number(student.student_id || 0)
-            ? (session.room_name || student.branch_name || 'Studio')
+            ? `${session.room_name || student.branch_name || 'Studio'} • ${session.instrument_name || student.instrument_name || 'Instrument'}`
             : (student.branch_name || student.package_name || '—');
     }
 }
@@ -529,29 +603,25 @@ function renderSongCategoryTabs() {
     const categories = getAvailableCategories();
     const selectedStudent = getStudentById(instructorSongSelectedStudentId);
     const selectedLabel = selectedCategoryLabel();
+    const { session, instrument, studentName } = getCurrentSessionFocus();
 
     if (subtitle) {
         subtitle.textContent = selectedLabel
-            ? `Your ${selectedLabel} library is ready for this lesson.`
-            : 'Your library is ready for this lesson.';
+            ? `Focused on ${selectedLabel} for ${session ? `${studentName} - ${instrument}` : 'your current lesson'}.`
+            : `Focused on ${session ? `${studentName} - ${instrument}` : 'your current lesson'}.`;
     }
 
     if (!mount) return;
 
-    const tabs = categories.length ? categories : [{ value: '', label: 'All' }];
-    mount.innerHTML = `
-        <button type="button" data-song-category-filter="" class="song-category-tab rounded-full border px-4 py-2 text-sm font-semibold transition ${!instructorSongSelectedCategory ? 'border-[#0f172a] bg-[#0f172a] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-gold-300'}">
-            All
-        </button>
-        ${tabs.map(category => {
-            const active = normalizeCategory(instructorSongSelectedCategory) === category.value;
-            return `
-                <button type="button" data-song-category-filter="${escapeSongHtml(category.value)}" class="song-category-tab rounded-full border px-4 py-2 text-sm font-semibold transition ${active ? 'border-[#0f172a] bg-[#0f172a] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-gold-300'}">
-                    ${escapeSongHtml(category.label)}
-                </button>
-            `;
-        }).join('')}
-    `;
+    const tabs = categories.length ? categories : [];
+    mount.innerHTML = tabs.length ? tabs.map(category => {
+        const active = normalizeCategory(instructorSongSelectedCategory) === category.value;
+        return `
+            <button type="button" data-song-category-filter="${escapeSongHtml(category.value)}" class="song-category-tab rounded-full border px-4 py-2 text-sm font-semibold transition ${active ? 'border-[#0f172a] bg-[#0f172a] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-gold-300'}">
+                ${escapeSongHtml(category.label)}
+            </button>
+        `;
+    }).join('') : '<div class="rounded-full border border-dashed border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500">No matching specializations configured.</div>';
 
     if (selectedStudent) {
         const preferred = getPreferredCategoryForStudent(selectedStudent);
@@ -614,13 +684,18 @@ function renderSelectedSongPreview() {
 
 function renderSongLibrary() {
     const grid = document.getElementById('songLibraryGrid');
+    const subtitle = document.getElementById('songLibrarySubtitle');
     if (!grid) return;
 
     const search = String(document.getElementById('songSearchInput')?.value || '').trim().toLowerCase();
     const category = normalizeCategory(instructorSongSelectedCategory);
     const selectedStudent = getStudentById(instructorSongSelectedStudentId);
+    const allowedCategories = getAvailableCategories();
+    const allowedCategoryValues = new Set(allowedCategories.map(item => item.value));
+    const { session, instrument, studentName } = getCurrentSessionFocus();
 
     let rows = instructorSongLibrary.filter(song => {
+        if (allowedCategoryValues.size && !allowedCategoryValues.has(normalizeCategory(song.category))) return false;
         if (category && normalizeCategory(song.category) !== category) return false;
         if (!search) return true;
         const haystack = [song.title, song.artist, song.genre, song.tags, song.notes].join(' ').toLowerCase();
@@ -628,7 +703,10 @@ function renderSongLibrary() {
     });
 
     if (!rows.length) {
-        grid.innerHTML = '<div class="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-sm text-slate-500">No songs match the current filters.</div>';
+        grid.innerHTML = '<div class="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-sm text-slate-500">No songs match your specializations yet.</div>';
+        if (subtitle && allowedCategories.length) {
+            subtitle.textContent = `Focused on ${allowedCategories.map(item => item.label).join(', ')} for ${session ? `${studentName} - ${instrument}` : 'your current lesson'}.`;
+        }
         return;
     }
 
@@ -792,6 +870,24 @@ async function loadSongCategories() {
     } catch (error) {
         console.error('Failed to load song categories:', error);
         instructorSongCategories = [];
+    }
+}
+
+async function loadInstructorSpecializations() {
+    try {
+        const response = await axios.get(`${baseApiUrl}/teachers.php?action=get-teachers&user_id=${encodeURIComponent(currentInstructorUser.user_id)}`);
+        const teachers = response.data?.success && Array.isArray(response.data.teachers) ? response.data.teachers : [];
+        const teacher = teachers.find(item => Number(item.user_id || 0) === Number(currentInstructorUser.user_id || 0)) || teachers[0] || null;
+        const rawNames = String(teacher?.specialization || '')
+            .split(',')
+            .map(name => normalizeCategory(name))
+            .filter(Boolean);
+        instructorSongSpecializations = rawNames.length
+            ? rawNames.map(value => ({ value, label: formatCategoryLabel(value) }))
+            : [];
+    } catch (error) {
+        console.error('Failed to load instructor specializations:', error);
+        instructorSongSpecializations = [];
     }
 }
 
@@ -1033,6 +1129,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
         await Promise.all([
+            loadInstructorSpecializations(),
             loadSongCategories(),
             loadSongLibrary(),
             loadInstructorSongStudents(),
