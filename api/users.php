@@ -166,6 +166,11 @@ class User
         return filter_var(trim((string)$email), FILTER_VALIDATE_EMAIL) !== false;
     }
 
+    private function isSchoolLoginEmail($email)
+    {
+        return preg_match('/@fas\.com$/i', trim((string)$email)) === 1;
+    }
+
     private function isWalkInSystemEmail($email)
     {
         return preg_match('/@fas\.com$/i', trim((string)$email)) === 1;
@@ -324,12 +329,24 @@ class User
             $replyTo = $fromAddress;
         }
 
+        $host = $fileValue('MAIL_HOST', $env('MAIL_HOST', ''));
+        $port = (int) $fileValue('MAIL_PORT', $env('MAIL_PORT', '587'));
+        $encryption = strtolower((string) $fileValue('MAIL_ENCRYPTION', $env('MAIL_ENCRYPTION', 'tls')));
+        if ($encryption === 'starttls') {
+            $encryption = 'tls';
+        } elseif (in_array($encryption, ['smtps', 'ssl/tls'], true)) {
+            $encryption = 'ssl';
+        }
+        if ($port <= 0) {
+            $port = $encryption === 'ssl' ? 465 : 587;
+        }
+
         return [
-            'host' => $fileValue('MAIL_HOST', $env('MAIL_HOST', '')),
-            'port' => (int) $fileValue('MAIL_PORT', $env('MAIL_PORT', '587')),
+            'host' => $host,
+            'port' => $port,
             'username' => $username,
             'password' => preg_replace('/\s+/', '', (string) $fileValue('MAIL_PASSWORD', $env('MAIL_PASSWORD', ''))),
-            'encryption' => strtolower($fileValue('MAIL_ENCRYPTION', $env('MAIL_ENCRYPTION', 'tls'))),
+            'encryption' => $encryption,
             'from_address' => $fromAddress,
             'from_name' => $fileValue('MAIL_FROM_NAME', $env('MAIL_FROM_NAME', 'Father & Sons Music Academy')),
             'reply_to' => $replyTo,
@@ -350,8 +367,8 @@ class User
 
         $mailer->isSMTP();
         $mailer->Host = $mail['host'];
-        $mailer->Port = $mail['port'] > 0 ? $mail['port'] : 587;
-        $mailer->SMTPAuth = true;
+        $mailer->Port = $mail['port'];
+        $mailer->SMTPAuth = $mail['username'] !== '';
         $mailer->Username = $mail['username'];
         $mailer->Password = $mail['password'];
         $mailer->Timeout = 20;
@@ -377,6 +394,24 @@ class User
             $mailer->SMTPSecure = '';
             $mailer->SMTPAutoTLS = false;
         }
+    }
+
+    private function getFriendlyMailError($message)
+    {
+        $message = trim((string)$message);
+        $lower = strtolower($message);
+
+        if (strpos($lower, 'could not authenticate') !== false || strpos($lower, 'authenticate') !== false) {
+            return 'Gmail rejected the SMTP login. Generate a new Gmail App Password for the sender account and update api/mail_config.php.';
+        }
+        if (strpos($lower, 'could not connect') !== false || strpos($lower, 'failed to connect') !== false) {
+            return 'Could not connect to Gmail SMTP. Check internet access, firewall/antivirus SMTP blocking, MAIL_HOST, MAIL_PORT, and MAIL_ENCRYPTION.';
+        }
+        if (strpos($lower, 'certificate') !== false || strpos($lower, 'verify') !== false) {
+            return 'SMTP TLS certificate verification failed. On local XAMPP, keep MAIL_VERIFY_PEER false or configure a PHP CA certificate bundle.';
+        }
+
+        return $message !== '' ? $message : 'Verification email could not be sent.';
     }
 
     private function sendVerificationEmail($toEmail, $toName, $verificationCode)
@@ -417,12 +452,13 @@ class User
             $mailer->send();
             return true;
         } catch (\PHPMailer\PHPMailer\Exception $e) {
-            $this->lastMailError = trim($e->getMessage() . ' ' . $mailer->ErrorInfo);
-            error_log('Verification email failed: ' . $this->lastMailError);
+            $rawError = trim($e->getMessage() . ' ' . $mailer->ErrorInfo);
+            $this->lastMailError = $this->getFriendlyMailError($rawError);
+            error_log('Verification email failed: ' . $rawError);
             return false;
         } catch (Exception $e) {
-            $this->lastMailError = $e->getMessage();
-            error_log('Verification email failed: ' . $this->lastMailError);
+            $this->lastMailError = $this->getFriendlyMailError($e->getMessage());
+            error_log('Verification email failed: ' . $e->getMessage());
             return false;
         }
     }
@@ -572,27 +608,8 @@ class User
         }
 
         $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
-        $mailer->CharSet = 'UTF-8';
-        $mailer->isHTML(true);
-        $mailer->setFrom($mail['from_address'], $mail['from_name']);
+        $this->configurePhpMailer($mailer, $mail);
         $mailer->addAddress($toEmail, $toName ?: $toEmail);
-
-        if (!empty($mail['reply_to'])) {
-            $mailer->addReplyTo($mail['reply_to'], $mail['from_name']);
-        }
-
-        $mailer->isSMTP();
-        $mailer->Host = $mail['host'];
-        $mailer->Port = $mail['port'] > 0 ? $mail['port'] : 587;
-        $mailer->SMTPAuth = $mail['username'] !== '';
-        $mailer->Username = $mail['username'];
-        $mailer->Password = $mail['password'];
-
-        if ($mail['encryption'] === 'ssl') {
-            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-        } elseif ($mail['encryption'] === 'tls') {
-            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-        }
 
         $safeName = htmlspecialchars($toName ?: 'Student', ENT_QUOTES, 'UTF-8');
         $safeLogin = htmlspecialchars($loginEmail, ENT_QUOTES, 'UTF-8');
@@ -1601,6 +1618,9 @@ class User
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $this->sendJSON(['error' => 'Invalid email address format'], 400);
         }
+        if ($this->isSchoolLoginEmail($email)) {
+            $this->sendJSON(['error' => 'Online registration must use a real email address. @fas.com logins are only for walk-in registrations.'], 400);
+        }
         if (strlen($email) > 254) {
             $this->sendJSON(['error' => 'Email address is too long (max 254 characters)'], 400);
         }
@@ -1687,18 +1707,14 @@ class User
             );
 
             if (!(bool)($verificationResult['email_sent'] ?? false)) {
-                throw new Exception($verificationResult['mail_error'] ?? 'Verification email could not be sent.');
+                $mailError = $verificationResult['mail_error'] ?? 'Verification email could not be sent.';
+                throw new Exception('Account was not created because the verification email could not be sent. ' . $mailError);
             }
 
             $this->conn->commit();
 
-            $mailConfigured = $this->isMailConfigured();
-            $emailSent = (bool)($verificationResult['email_sent'] ?? false);
-            $message = $emailSent
-                ? 'Account created successfully. Please check your email for the verification code.'
-                : ($mailConfigured
-                    ? 'Account created, but the verification email could not be sent. Use Resend code or contact the branch.'
-                    : 'Account created successfully. Email is not configured on the server yet.');
+            $emailSent = true;
+            $message = 'Account created successfully. Please check your email for the verification code.';
 
             $this->sendJSON([
                 'success' => true,
@@ -1938,42 +1954,8 @@ class User
                 $stmtVerifyUser->execute([$userId]);
             }
 
-            $guardianEmail = trim((string)($data['guardian_email'] ?? ''));
-            if ($guardianId && $guardianEmail !== '' && $guardianRoleId) {
-                $guardianExistsStmt = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
-                $guardianExistsStmt->execute([$guardianEmail, $guardianEmail]);
-                if (!$guardianExistsStmt->fetch()) {
-                    $guardianHashedPassword = password_hash('fasmusic@2020', PASSWORD_DEFAULT);
-                    $stmtGuardianUser = $this->conn->prepare("
-                        INSERT INTO tbl_users (
-                            username, password, role_id, first_name, last_name,
-                            email, phone, status
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
-                    ");
-                    $stmtGuardianUser->execute([
-                        $guardianEmail,
-                        $guardianHashedPassword,
-                        $guardianRoleId,
-                        $data['guardian_first_name'] ?? 'Guardian',
-                        $data['guardian_last_name'] ?? '',
-                        $guardianEmail,
-                        $data['guardian_phone'] ?? null
-                    ]);
-                    $guardianUserId = (int)$this->conn->lastInsertId();
-                    $guardianUsername = $guardianEmail;
-                    if ($this->hasUserColumn('email_verified_at')) {
-                        $stmtVerifyGuardian = $this->conn->prepare("
-                            UPDATE tbl_users
-                            SET email_verified_at = NOW(),
-                                email_verification_code_hash = NULL,
-                                email_verification_code_expires_at = NULL,
-                                email_verification_sent_at = NULL
-                            WHERE user_id = ?
-                        ");
-                        $stmtVerifyGuardian->execute([$guardianUserId]);
-                    }
-                }
-            }
+            // Walk-in registrations create only the student's generated @fas.com portal login.
+            // Guardian email, when provided, remains contact information on tbl_guardians.
 
             if (!empty($data['instruments']) && is_array($data['instruments'])) {
                 $stmtInstrument = $this->conn->prepare("
@@ -2074,6 +2056,9 @@ class User
 
         if (!filter_var($submittedEmail, FILTER_VALIDATE_EMAIL)) {
             $this->sendJSON(['error' => 'Invalid email address format'], 400);
+        }
+        if ($this->isSchoolLoginEmail($submittedEmail)) {
+            $this->sendJSON(['error' => 'Online registration must use a real email address. @fas.com logins are only for walk-in registrations.'], 400);
         }
         if (strlen($submittedEmail) > 254) {
             $this->sendJSON(['error' => 'Email address is too long (max 254 characters)'], 400);
@@ -2291,7 +2276,7 @@ class User
             }
 
             $userStatus = 'Inactive';
-            $username = $data['username'] ?? $data['student_email'];
+            $username = $data['student_email'];
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
             $stmtUser = $this->conn->prepare("
@@ -2361,18 +2346,14 @@ class User
             );
 
             if (!(bool)($verificationResult['email_sent'] ?? false)) {
-                throw new Exception($verificationResult['mail_error'] ?? 'Verification email could not be sent.');
+                $mailError = $verificationResult['mail_error'] ?? 'Verification email could not be sent.';
+                throw new Exception('Registration was not saved because the verification email could not be sent. ' . $mailError);
             }
 
             $this->conn->commit();
 
-            $emailSent = (bool)($verificationResult['email_sent'] ?? false);
-            $onlineMessage = $emailSent
-                ? 'Registration submitted successfully. Check your email for the verification code before logging in.'
-                : ($this->isMailConfigured()
-                    ? 'Registration submitted, but the verification email could not be sent. Use Resend code after signing up.'
-                    : 'Registration submitted successfully. Email is not configured on the server yet.');
-            $mailConfigured = $this->isMailConfigured();
+            $emailSent = true;
+            $onlineMessage = 'Registration submitted successfully. Check your email for the verification code before logging in.';
 
             $this->sendJSON([
                 'success' => true,

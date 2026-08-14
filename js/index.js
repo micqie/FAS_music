@@ -1060,39 +1060,34 @@ function initRegisterForm() {
 
                 if (response.status === 200 && data.success) {
                     const verificationEmail = data.verification_email || payload.student_email;
-                    const emailSent = Boolean(data.verification_email_sent);
                     registerForm.reset();
                     toggleRegisterModal(false);
-                    if (emailSent) {
-                        await Swal.fire({
-                            icon: 'success',
-                            title: 'Check Your Email',
-                            text: `We sent a 6-digit code to ${verificationEmail}.`,
-                            confirmButtonColor: '#b8860b'
-                        });
-                    } else {
-                        await Swal.fire({
-                            icon: 'error',
-                            title: 'Email Delivery Failed',
-                            text: data.mail_error || data.message || 'The verification email could not be sent.',
-                            confirmButtonColor: '#b8860b'
-                        });
-                    }
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'Check Your Email',
+                        text: `We sent a 6-digit code to ${verificationEmail}.`,
+                        confirmButtonColor: '#b8860b'
+                    });
                     await showRegisterMessage(
                         data.message || 'Your student account was created.',
-                        emailSent ? 'success' : 'info',
+                        'success',
                         'Account Created'
                     );
-                    if (emailSent) {
-                        await promptEmailVerification(verificationEmail);
-                    }
+                    await promptEmailVerification(verificationEmail);
                 } else {
                     showRegisterMessage(data.error || 'Registration failed. Please try again.', 'error');
                 }
             } catch (error) {
                 console.error('Basic registration error:', error);
                 const serverError = error?.response?.data?.error;
-                showRegisterMessage(serverError || error?.message || 'Network error. Please try again.', 'error');
+                const message = serverError || error?.message || 'Network error. Please try again.';
+                showRegisterMessage(message, 'error');
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Account Not Created',
+                    text: message,
+                    confirmButtonColor: '#b8860b'
+                });
             } finally {
                 registerForm.dataset.submitting = '0';
                 if (registerBtn) registerBtn.disabled = false;
@@ -1239,7 +1234,11 @@ function initRegisterForm() {
 
             if (result.success) {
                 registerForm.dataset.submitting = '0';
-                showRegisterMessage(result.message || 'Registration submitted successfully! Your account is pending admin approval.', 'success');
+                const emailSent = Boolean(result.verification_email_sent);
+                const registerNotice = !emailSent && result.mail_error
+                    ? `${result.message || 'Registration submitted successfully.'} ${result.mail_error}`
+                    : (result.message || 'Registration submitted successfully! Your account is pending admin approval.');
+                showRegisterMessage(registerNotice, emailSent ? 'success' : 'info');
                 registerForm.reset();
 
                 // Reset password validation indicators
@@ -1262,12 +1261,13 @@ function initRegisterForm() {
 
                 // Show success message with SweetAlert
                 Swal.fire({
-                    icon: 'success',
+                    icon: emailSent ? 'success' : 'warning',
                     title: 'Registration Submitted!',
                     html: `Your registration has been submitted successfully.<br><br>
                            <strong>Status:</strong> Pending Admin Approval<br>
                            <strong>Registration Fee:</strong> ₱1,000.00<br>
                            <strong>Username:</strong> ${result.username || studentEmailVal}<br><br>
+                           ${!emailSent && result.mail_error ? `<strong>Email notice:</strong> ${escapeHtml(result.mail_error)}<br><br>` : ''}
                            Once approved, you can log in and choose your package/instruments from your dashboard.`,
                     confirmButtonColor: '#b8860b'
                 });
@@ -1278,7 +1278,8 @@ function initRegisterForm() {
             }
         } catch (error) {
             console.error('Registration error:', error);
-            showRegisterMessage('An error occurred. Please try again.', 'error');
+            const serverError = error?.response?.data?.error;
+            showRegisterMessage(serverError || 'Registration was not saved. Please try again.', 'error');
         } finally {
             registerForm.dataset.submitting = '0';
             if (registerBtn) registerBtn.disabled = false;
