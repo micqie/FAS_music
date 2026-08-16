@@ -11,6 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0);
 class AttendanceApi
 {
     private $conn;
+    private $phpMailerLoaded = false;
+    private $lastMailError = null;
 
     public function __construct($pdo)
     {
@@ -45,6 +47,214 @@ class AttendanceApi
         } catch (PDOException $e) {
             return false;
         }
+    }
+
+    private function isValidEmailAddress($email)
+    {
+        return filter_var(trim((string)$email), FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    private function isWalkInSystemEmail($email)
+    {
+        return preg_match('/@fas\.com$/i', trim((string)$email)) === 1;
+    }
+
+    private function ensurePhpMailerLoaded()
+    {
+        if ($this->phpMailerLoaded) {
+            return;
+        }
+        require_once dirname(__DIR__) . '/phpmailer/src/Exception.php';
+        require_once dirname(__DIR__) . '/phpmailer/src/PHPMailer.php';
+        require_once dirname(__DIR__) . '/phpmailer/src/SMTP.php';
+        $this->phpMailerLoaded = true;
+    }
+
+    private function getMailSettings()
+    {
+        $defaults = [
+            'host' => 'smtp.gmail.com',
+            'port' => 587,
+            'encryption' => 'tls',
+            'username' => '',
+            'password' => '',
+            'from_address' => '',
+            'from_name' => 'Father & Sons Music School',
+            'reply_to' => '',
+            'verify_peer' => false
+        ];
+
+        $mailConfigPath = __DIR__ . DIRECTORY_SEPARATOR . 'mail_config.php';
+        if (is_file($mailConfigPath)) {
+            $loadedConfig = include $mailConfigPath;
+            if (is_array($loadedConfig)) {
+                $defaults = array_merge($defaults, [
+                    'host' => $loadedConfig['MAIL_HOST'] ?? $defaults['host'],
+                    'port' => (int)($loadedConfig['MAIL_PORT'] ?? $defaults['port']),
+                    'encryption' => strtolower((string)($loadedConfig['MAIL_ENCRYPTION'] ?? $defaults['encryption'])),
+                    'username' => $loadedConfig['MAIL_USERNAME'] ?? $defaults['username'],
+                    'password' => $loadedConfig['MAIL_PASSWORD'] ?? $defaults['password'],
+                    'from_address' => $loadedConfig['MAIL_FROM_ADDRESS'] ?? $defaults['from_address'],
+                    'from_name' => $loadedConfig['MAIL_FROM_NAME'] ?? $defaults['from_name'],
+                    'reply_to' => $loadedConfig['MAIL_REPLY_TO'] ?? $defaults['reply_to'],
+                    'verify_peer' => isset($loadedConfig['MAIL_VERIFY_PEER']) ? (bool)$loadedConfig['MAIL_VERIFY_PEER'] : $defaults['verify_peer']
+                ]);
+            }
+        }
+
+        if (!$this->isValidEmailAddress($defaults['from_address']) && $this->isValidEmailAddress($defaults['username'])) {
+            $defaults['from_address'] = $defaults['username'];
+        }
+        if (!$this->isValidEmailAddress($defaults['reply_to'])) {
+            $defaults['reply_to'] = $defaults['from_address'];
+        }
+
+        return $defaults;
+    }
+
+    private function configurePhpMailer($mailer, array $mail)
+    {
+        $mailer->CharSet = 'UTF-8';
+        $mailer->isHTML(true);
+        $mailer->setFrom($mail['from_address'], $mail['from_name']);
+        if ($this->isValidEmailAddress($mail['reply_to'])) {
+            $mailer->addReplyTo($mail['reply_to'], $mail['from_name']);
+        }
+        $mailer->isSMTP();
+        $mailer->Host = $mail['host'];
+        $mailer->Port = $mail['port'] > 0 ? $mail['port'] : 587;
+        $mailer->SMTPAuth = true;
+        $mailer->Username = $mail['username'];
+        $mailer->Password = $mail['password'];
+        $mailer->Timeout = 20;
+        $mailer->SMTPOptions = [
+            'ssl' => [
+                'verify_peer' => $mail['verify_peer'] !== false,
+                'verify_peer_name' => $mail['verify_peer'] !== false,
+                'allow_self_signed' => $mail['verify_peer'] === false
+            ]
+        ];
+
+        if ($mail['encryption'] === 'ssl') {
+            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+        } elseif ($mail['encryption'] === 'tls') {
+            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        } else {
+            $mailer->SMTPSecure = '';
+            $mailer->SMTPAutoTLS = false;
+        }
+    }
+
+    private function getLinkedGuardiansForStudent($studentId)
+    {
+        if ($studentId < 1 || !$this->tableExists('tbl_student_guardians') || !$this->tableExists('tbl_guardians')) {
+            return [];
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    g.guardian_id,
+                    g.first_name,
+                    g.last_name,
+                    g.email,
+                    g.phone,
+                    sg.is_primary_guardian
+                FROM tbl_student_guardians sg
+                INNER JOIN tbl_guardians g ON g.guardian_id = sg.guardian_id
+                WHERE sg.student_id = ?
+                ORDER BY CASE WHEN sg.is_primary_guardian = 'Y' THEN 0 ELSE 1 END, g.guardian_id ASC
+            ");
+            $stmt->execute([$studentId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            return [];
+        }
+    }
+
+    private function sendSessionCompletionEmail($toEmail, $toName, array $session)
+    {
+        $toEmail = trim((string)$toEmail);
+        if ($toEmail === '' || !$this->isValidEmailAddress($toEmail) || $this->isWalkInSystemEmail($toEmail)) {
+            return false;
+        }
+
+        $mail = $this->getMailSettings();
+        if (!$this->isValidEmailAddress($mail['from_address']) || !$this->isValidEmailAddress($mail['username']) || trim((string)$mail['password']) === '') {
+            return false;
+        }
+
+        try {
+            $this->ensurePhpMailerLoaded();
+            $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $this->configurePhpMailer($mailer, $mail);
+            $mailer->addAddress($toEmail, $toName ?: $toEmail);
+
+            $studentName = trim((string)($session['first_name'] ?? '') . ' ' . (string)($session['last_name'] ?? '')) ?: 'Your student';
+            $sessionDate = $this->formatLongDate($session['session_date'] ?? '');
+            $branchName = trim((string)($session['branch_name'] ?? '')) ?: 'your branch';
+            $teacherName = trim((string)($session['teacher_first_name'] ?? '') . ' ' . (string)($session['teacher_last_name'] ?? ''));
+            $subject = "Session completed for {$studentName}";
+
+            $mailer->Subject = $subject;
+            $mailer->Body = '
+                <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+                    <h2 style="margin: 0 0 12px; color: #b8860b;">Session Completed</h2>
+                    <p style="margin: 0 0 12px;">Good news. <strong>' . htmlspecialchars($studentName, ENT_QUOTES, 'UTF-8') . '</strong> has completed a lesson.</p>
+                    <div style="padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fafafa;">
+                        <div><strong>Date:</strong> ' . htmlspecialchars($sessionDate, ENT_QUOTES, 'UTF-8') . '</div>
+                        <div><strong>Branch:</strong> ' . htmlspecialchars($branchName, ENT_QUOTES, 'UTF-8') . '</div>
+                        ' . ($teacherName !== '' ? '<div><strong>Instructor:</strong> ' . htmlspecialchars($teacherName, ENT_QUOTES, 'UTF-8') . '</div>' : '') . '
+                    </div>
+                    <p style="margin: 12px 0 0;">Please open your guardian dashboard to review the latest update.</p>
+                </div>
+            ';
+            $mailer->AltBody = trim(
+                "Session completed for {$studentName}\n" .
+                "Date: {$sessionDate}\n" .
+                "Branch: {$branchName}\n" .
+                ($teacherName !== '' ? "Instructor: {$teacherName}\n" : '') .
+                "Please open your guardian dashboard to review the latest update."
+            );
+            $mailer->send();
+            return true;
+        } catch (\PHPMailer\PHPMailer\Exception $e) {
+            $this->lastMailError = trim($e->getMessage() . ' ' . ($mailer->ErrorInfo ?? ''));
+            error_log('Guardian session completion email failed: ' . $this->lastMailError);
+        } catch (\Throwable $e) {
+            $this->lastMailError = trim($e->getMessage());
+            error_log('Guardian session completion email failed: ' . $this->lastMailError);
+        }
+
+        return false;
+    }
+
+    private function notifyGuardiansOfSessionCompletion(array $session)
+    {
+        $studentId = (int)($session['student_id'] ?? 0);
+        if ($studentId < 1) {
+            return 0;
+        }
+
+        $guardians = $this->getLinkedGuardiansForStudent($studentId);
+        if (empty($guardians)) {
+            return 0;
+        }
+
+        $sentCount = 0;
+        $seenEmails = [];
+        foreach ($guardians as $guardian) {
+            $email = trim((string)($guardian['email'] ?? ''));
+            if ($email === '' || isset($seenEmails[strtolower($email)])) {
+                continue;
+            }
+            $seenEmails[strtolower($email)] = true;
+            if ($this->sendSessionCompletionEmail($email, trim((string)($guardian['first_name'] ?? '') . ' ' . (string)($guardian['last_name'] ?? '')), $session)) {
+                $sentCount++;
+            }
+        }
+
+        return $sentCount;
     }
 
     private function ensureAttendanceTable()
@@ -1991,11 +2201,23 @@ class AttendanceApi
             ]);
 
             $this->conn->commit();
+            $guardianEmailsNotified = 0;
+            try {
+                $guardianEmailsNotified = $this->notifyGuardiansOfSessionCompletion($session);
+            } catch (\Throwable $notifyError) {
+                error_log('Guardian session completion notification failed: ' . $notifyError->getMessage());
+            }
+
+            $message = $existing ? 'Attendance was already recorded. The session is now marked complete.' : 'Session ended successfully.';
+            if ($guardianEmailsNotified > 0) {
+                $message .= ' Guardian email notification sent.';
+            }
             $this->sendJSON([
                 'success' => true,
                 'already_marked' => (bool)$existing,
                 'attendance_id' => $attendanceId,
-                'message' => $existing ? 'Attendance was already recorded. The session is now marked complete.' : 'Session ended successfully.',
+                'message' => $message,
+                'guardian_email_notifications_sent' => $guardianEmailsNotified,
                 'student' => $session
             ]);
         } catch (PDOException $e) {

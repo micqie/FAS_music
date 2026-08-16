@@ -247,6 +247,49 @@ class User
         return $raw !== '' ? $raw : 'student';
     }
 
+    private function formatStudentLoginIdentifier($studentId)
+    {
+        $studentId = (int) $studentId;
+        if ($studentId < 1) {
+            return '';
+        }
+
+        return 'STU-' . date('Y') . '-' . str_pad((string) $studentId, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function resolveStudentLoginEmail($loginInput)
+    {
+        $loginInput = trim((string) $loginInput);
+        if ($loginInput === '') {
+            return null;
+        }
+
+        $studentId = 0;
+        if (ctype_digit($loginInput)) {
+            $studentId = (int) $loginInput;
+        } elseif (preg_match('/^STU-(\d{4})-(\d{4,})$/i', $loginInput, $matches)) {
+            $studentId = (int) $matches[2];
+        }
+
+        if ($studentId < 1) {
+            return null;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT s.email
+                FROM tbl_students s
+                WHERE s.student_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$studentId]);
+            $email = trim((string) ($stmt->fetchColumn() ?: ''));
+            return $email !== '' ? $email : null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+
     private function walkInEmailExists($email)
     {
         $stmt = $this->conn->prepare("SELECT 1 FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
@@ -464,7 +507,7 @@ class User
     }
 
     // ── Welcome email sent once after successful verification ─────────
-    private function sendWelcomeEmail($toEmail, $toName)
+    private function sendWelcomeEmail($toEmail, $toName, $studentId = 0)
     {
         $this->ensurePhpMailerLoaded();
         $this->lastMailError = null;
@@ -484,9 +527,11 @@ class User
 
             $safeName  = htmlspecialchars($toName  ?: 'Student',  ENT_QUOTES, 'UTF-8');
             $safeEmail = htmlspecialchars($toEmail, ENT_QUOTES, 'UTF-8');
+            $studentLoginIdentifier = $this->formatStudentLoginIdentifier($studentId);
+            $safeStudentUsername = htmlspecialchars($studentLoginIdentifier !== '' ? $studentLoginIdentifier : 'Not available', ENT_QUOTES, 'UTF-8');
             $year      = date('Y');
 
-            $mailer->Subject = 'Welcome to Father & Sons Music School 🎵';
+            $mailer->Subject = 'Your Father & Sons student username';
             $mailer->isHTML(true);
             $mailer->Body = '
 <!DOCTYPE html>
@@ -520,6 +565,16 @@ class User
               Congratulations! Your email has been successfully verified and your
               <strong style="color:#0f172a;">Father &amp; Sons Music School</strong> account is now active.
             </p>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+              <tr>
+                <td style="background:#fff7e6;border:2px solid #d4af37;border-radius:16px;padding:22px 24px;text-align:center;">
+                  <p style="margin:0 0 10px;font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#946200;">Your Username</p>
+                  <p style="margin:0;font-size:34px;line-height:1.1;font-weight:900;letter-spacing:2px;color:#0f172a;">' . $safeStudentUsername . '</p>
+                  <p style="margin:10px 0 0;font-size:14px;color:#475569;">Use this username when logging in.</p>
+                </td>
+              </tr>
+            </table>
 
             <!-- Green checkmark box -->
             <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
@@ -583,7 +638,8 @@ class User
 </body>
 </html>';
 
-            $mailer->AltBody = "Hello {$toName},\n\nCongratulations! Your email has been verified and your Father & Sons Music School account is now active.\n\nYou can now:\n✓ Log in to your account\n✓ Enroll in music lessons\n✓ View your schedule\n✓ Access your student portal\n\nWelcome to the Father & Sons Music School family!\n\n© {$year} Father & Sons Music School";
+            $plainStudentId = $studentLoginIdentifier !== '' ? $studentLoginIdentifier : 'Not available';
+            $mailer->AltBody = "Hello {$toName},\n\nCongratulations! Your email has been verified and your Father & Sons Music School account is now active.\n\nYour Username: {$plainStudentId}\nUse this username when logging in.\n\nYou can now:\n✓ Log in to your account\n✓ Enroll in music lessons\n✓ View your schedule\n✓ Access your student portal\n\nWelcome to the Father & Sons Music School family!\n\n© {$year} Father & Sons Music School";
 
             $mailer->send();
             return true;
@@ -1076,9 +1132,11 @@ class User
         try {
             $this->ensureUserVerificationColumns();
             $this->ensureWalkInAccountsSynced();
-            $resolvedUsername = $this->resolveWalkInLoginIdentifier($username);
+            $studentLoginEmail = $this->resolveStudentLoginEmail($username);
+            $resolvedUsername = $studentLoginEmail ?: $this->resolveWalkInLoginIdentifier($username);
             $loginCandidates = array_values(array_unique(array_filter([
                 $username,
+                $studentLoginEmail,
                 $resolvedUsername
             ], static function ($value) {
                 return trim((string)$value) !== '';
@@ -1273,7 +1331,18 @@ class User
             $firstName  = trim((string)($user['first_name'] ?? ''));
             $lastName   = trim((string)($user['last_name']  ?? ''));
             $displayName = trim("$firstName $lastName") ?: ($user['email'] ?? $email);
-            $this->sendWelcomeEmail($user['email'] ?? $email, $displayName);
+            $studentId = 0;
+            $stmtStudent = $this->conn->prepare("
+                SELECT student_id
+                FROM tbl_students
+                WHERE email = ?
+                ORDER BY student_id DESC
+                LIMIT 1
+            ");
+            $stmtStudent->execute([$user['email'] ?? $email]);
+            $studentId = (int) ($stmtStudent->fetchColumn() ?: 0);
+
+            $this->sendWelcomeEmail($user['email'] ?? $email, $displayName, $studentId);
 
             $this->sendJSON([
                 'success' => true,
@@ -1682,6 +1751,7 @@ class User
             ");
             $stmtStudent->execute($studentValues);
             $studentId = (int)$this->conn->lastInsertId();
+            $studentLoginIdentifier = $this->formatStudentLoginIdentifier($studentId);
 
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
             $stmtUser = $this->conn->prepare("
@@ -1690,7 +1760,7 @@ class User
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Inactive')
             ");
             $stmtUser->execute([
-                $email,
+                $studentLoginIdentifier !== '' ? $studentLoginIdentifier : $email,
                 $hashedPassword,
                 $roleId,
                 $data['student_first_name'],
@@ -1720,6 +1790,7 @@ class User
                 'success' => true,
                 'message' => $message,
                 'student_id' => $studentId,
+                'student_login_identifier' => $studentLoginIdentifier,
                 'user_id' => $userId,
                 'verification_required' => true,
                 'verification_email' => $email,
@@ -2211,6 +2282,7 @@ class User
             $stmtStudent->execute($studentValues);
 
             $studentId = (int)$this->conn->lastInsertId();
+            $studentLoginIdentifier = $this->formatStudentLoginIdentifier($studentId);
 
             $registrationNotes = $registrationProofPath ? ('Payment proof: ' . $registrationProofPath) : null;
             if ($registrationProofPath && $this->hasStudentColumn('registration_proof_path')) {
@@ -2276,7 +2348,7 @@ class User
             }
 
             $userStatus = 'Inactive';
-            $username = $data['student_email'];
+            $username = $studentLoginIdentifier !== '' ? $studentLoginIdentifier : $data['student_email'];
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
             $stmtUser = $this->conn->prepare("
@@ -2352,6 +2424,7 @@ class User
 
             $this->conn->commit();
 
+            $studentLoginIdentifier = $this->formatStudentLoginIdentifier($studentId);
             $emailSent = true;
             $onlineMessage = 'Registration submitted successfully. Check your email for the verification code before logging in.';
 
@@ -2359,10 +2432,11 @@ class User
                 'success' => true,
                 'message' => $onlineMessage,
                 'student_id' => $studentId,
+                'student_login_identifier' => $studentLoginIdentifier,
                 'guardian_id' => $guardianId,
                 'guardian_username' => $guardianUsername,
                 'user_id' => $userId,
-                'username' => $username,
+                'username' => $studentLoginIdentifier !== '' ? $studentLoginIdentifier : $username,
                 'login_email' => $data['student_email'],
                 'registration_status' => $regStatus,
                 'registration_fee_amount' => $data['registration_fee_amount'],

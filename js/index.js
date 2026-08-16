@@ -91,6 +91,44 @@ let studentDashboardMetaState = null;
 let studentRegistrationRestartNotice = false;
 let _studentPerformanceRadarChartInstance = null;
 
+function setStudentRegistrationPassword(password) {
+    const value = String(password || '').trim();
+    try {
+        if (value) {
+            sessionStorage.setItem('student_registration_password', value);
+        } else {
+            sessionStorage.removeItem('student_registration_password');
+        }
+    } catch (e) {
+        // Ignore storage failures.
+    }
+    try {
+        if (value) {
+            localStorage.setItem('student_registration_password', value);
+        } else {
+            localStorage.removeItem('student_registration_password');
+        }
+    } catch (e) {
+        // Ignore storage failures.
+    }
+}
+
+function getStudentRegistrationPassword() {
+    try {
+        const sessionValue = sessionStorage.getItem('student_registration_password') || '';
+        if (sessionValue) return sessionValue;
+    } catch (e) {
+        // Ignore storage failures.
+    }
+    try {
+        const localValue = localStorage.getItem('student_registration_password') || '';
+        if (localValue) return localValue;
+    } catch (e) {
+        // Ignore storage failures.
+    }
+    return '';
+}
+
 function normalizeRoleName(role) {
     return String(role || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -189,11 +227,13 @@ const Auth = {
     logout() {
         try {
             sessionStorage.removeItem('user');
+            sessionStorage.removeItem('student_registration_password');
         } catch (e) {
             // Ignore
         }
         try {
             localStorage.removeItem('user');
+            localStorage.removeItem('student_registration_password');
         } catch (e) {
             // Ignore
         }
@@ -828,7 +868,7 @@ function initLoginForm() {
         const loginBtnIcon = document.getElementById('loginBtnIcon');
 
         if (!username || !password) {
-            showLoginMessage('Please enter both username and password', 'error');
+            showLoginMessage('Please enter your Student ID or guardian email, plus your password.', 'error');
             return;
         }
 
@@ -879,6 +919,9 @@ function initLoginForm() {
 
                 // Store user in sessionStorage
                 Auth.setUser(data.user);
+                if (getRoleCategory(data.user.role_name) === 'student') {
+                    setStudentRegistrationPassword(password);
+                }
 
                 showLoginMessage('Welcome back. Redirecting to your dashboard...', 'success', 'Login Successful');
 
@@ -1059,13 +1102,23 @@ function initRegisterForm() {
                 const data = response.data || {};
 
                 if (response.status === 200 && data.success) {
+                    const studentLoginId = data.student_login_identifier || `STU-${new Date().getFullYear()}-${String(data.student_id || '').padStart(4, '0')}`;
                     const verificationEmail = data.verification_email || payload.student_email;
+                    setStudentRegistrationPassword(payload.password || '');
                     registerForm.reset();
                     toggleRegisterModal(false);
                     await Swal.fire({
                         icon: 'success',
                         title: 'Check Your Email',
-                        text: `We sent a 6-digit code to ${verificationEmail}.`,
+                        html: `
+                            <div class="text-left text-sm leading-6">
+                                <p>Your student account is ready.</p>
+                                <p class="mt-2">We sent a verification code to <strong>${escapeHtml(verificationEmail)}</strong>.</p>
+                                <p class="mt-3">Your Username / Student ID is:</p>
+                                <p class="mt-2 text-2xl font-extrabold">${escapeHtml(studentLoginId)}</p>
+                                <p class="mt-2">Use this username and the password you created to sign in to the Student Dashboard after verifying your email.</p>
+                            </div>
+                        `,
                         confirmButtonColor: '#b8860b'
                     });
                     await showRegisterMessage(
@@ -1131,13 +1184,6 @@ function initRegisterForm() {
     if (agreementCheckbox) {
         agreementCheckbox.addEventListener('change', syncParentAgreementConsentState);
         syncParentAgreementConsentState();
-    }
-
-    const dobInput = document.getElementById('student_date_of_birth');
-    if (dobInput) {
-        dobInput.addEventListener('change', updatePublicGuardianRequiredState);
-        dobInput.addEventListener('input', updatePublicGuardianRequiredState);
-        updatePublicGuardianRequiredState();
     }
 
     registerForm.addEventListener('submit', async (e) => {
@@ -1266,7 +1312,7 @@ function initRegisterForm() {
                     html: `Your registration has been submitted successfully.<br><br>
                            <strong>Status:</strong> Pending Admin Approval<br>
                            <strong>Registration Fee:</strong> ₱1,000.00<br>
-                           <strong>Username:</strong> ${result.username || studentEmailVal}<br><br>
+                           <strong>Username / Student ID:</strong> ${result.student_login_identifier || result.username || studentEmailVal}<br><br>
                            ${!emailSent && result.mail_error ? `<strong>Email notice:</strong> ${escapeHtml(result.mail_error)}<br><br>` : ''}
                            Once approved, you can log in and choose your package/instruments from your dashboard.`,
                     confirmButtonColor: '#b8860b'
@@ -2865,7 +2911,9 @@ async function setGuardianMode(studentId, guardianMode, guardianEmail = '', guar
         guardian_first_name: guardianDetails.first_name || '',
         guardian_last_name: guardianDetails.last_name || '',
         guardian_phone: guardianDetails.phone || '',
-        guardian_relationship: guardianDetails.relationship || ''
+        guardian_relationship: guardianDetails.relationship || '',
+        guardian_password_mode: guardianDetails.password_mode || 'default',
+        guardian_password: guardianDetails.password || ''
     });
     return res.data;
 }
@@ -3589,6 +3637,31 @@ function getGuardianSessionRows(item) {
     });
 }
 
+function getGuardianLatestCompletedSessionRow(item) {
+    const rows = getGuardianSessionRows(item).filter((row) => getGuardianSessionCompletionState(row) === 'completed');
+    return rows.length > 0 ? rows[rows.length - 1] : null;
+}
+
+function getGuardianSessionCompletionAlertKey(sessionId) {
+    return `fas_guardian_session_alert_${Number(sessionId || 0)}`;
+}
+
+function isGuardianSessionCompletionAlertDismissed(sessionId) {
+    try {
+        return localStorage.getItem(getGuardianSessionCompletionAlertKey(sessionId)) === 'dismissed';
+    } catch (e) {
+        return false;
+    }
+}
+
+function dismissGuardianSessionCompletionAlert(sessionId) {
+    try {
+        localStorage.setItem(getGuardianSessionCompletionAlertKey(sessionId), 'dismissed');
+    } catch (e) {
+        // Ignore storage failures.
+    }
+}
+
 function isGuardianUpcomingSessionRow(row) {
     const raw = String(row?.attendance_status || row?.status || 'Scheduled').trim().toLowerCase();
     if (['present', 'late', 'completed', 'absent', 'cancelled', 'no show', 'cancelled_by_teacher', 'rescheduled'].includes(raw)) {
@@ -3644,6 +3717,69 @@ function renderGuardianDashboardAlerts(students) {
     const rows = Array.isArray(students) ? students : [];
     const dueStudents = rows.filter((item) => getGuardianPaymentMetrics(item).totalBalance > 0);
     const alerts = [];
+
+    const completionAlerts = rows.map((item) => {
+        const row = getGuardianLatestCompletedSessionRow(item);
+        if (!row) return null;
+        const sessionId = Number(row.session_id || 0);
+        if (sessionId < 1 || isGuardianSessionCompletionAlertDismissed(sessionId)) return null;
+        const studentName = getGuardianStudentName(item, 0);
+        const dateLabel = row?.session_date ? formatDateLong(row.session_date) : 'recently';
+        const timeLabel = row?.start_time && row?.end_time
+            ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
+            : (row?.start_time ? formatTime12Hour(row.start_time) : '');
+        return { item, row, sessionId, studentName, dateLabel, timeLabel };
+    }).filter(Boolean).sort((a, b) => {
+        const aTime = new Date(`${a.row?.session_date || ''}T${a.row?.start_time || '00:00:00'}`).getTime() || 0;
+        const bTime = new Date(`${b.row?.session_date || ''}T${b.row?.start_time || '00:00:00'}`).getTime() || 0;
+        return bTime - aTime;
+    });
+
+    if (completionAlerts.length > 0) {
+        const previewItems = completionAlerts.slice(0, 3).map((entry) => `
+            <div class="rounded-2xl border border-gold-200 bg-white/80 dark:bg-black/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <div class="text-sm font-bold text-zinc-900 dark:text-white">
+                        ${escapeHtml(entry.studentName)} finished a session
+                    </div>
+                    <div class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+                        ${escapeHtml(entry.dateLabel)}${entry.timeLabel ? ` • ${escapeHtml(entry.timeLabel)}` : ''}
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <a href="guardian_students.html" class="inline-flex items-center gap-2 rounded-xl bg-gold-500 px-3 py-2 text-xs font-bold text-black hover:bg-gold-400 transition">
+                        <i class="fas fa-eye"></i> View
+                    </a>
+                    <button type="button" onclick="dismissGuardianSessionCompletionAlert(${entry.sessionId}); window.location.reload();" class="inline-flex items-center gap-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-white/10 transition">
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        alerts.push(`
+            <div class="rounded-3xl border border-gold-300 bg-gradient-to-br from-amber-50 via-white to-gold-50 dark:from-gold-500/15 dark:via-black/20 dark:to-black/10 px-4 py-4 shadow-xl dark:shadow-black/30">
+                <div class="flex items-start justify-between gap-4 mb-3">
+                    <div class="flex items-start gap-3">
+                        <div class="h-11 w-11 rounded-2xl bg-gold-500/15 text-gold-600 dark:text-gold-300 grid place-items-center">
+                            <i class="fas fa-bell text-lg"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-black uppercase tracking-[0.18em] text-gold-700 dark:text-gold-300">Session Completed</div>
+                            <div class="text-lg font-extrabold text-zinc-900 dark:text-white">You have a new lesson update for your linked student(s).</div>
+                            <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">Check the details below. Real email guardians will also receive an email notification when available.</div>
+                        </div>
+                    </div>
+                    <span class="inline-flex items-center rounded-full border border-gold-300 bg-white/90 dark:bg-white/5 px-3 py-1 text-xs font-bold text-gold-700 dark:text-gold-300">
+                        New Alert
+                    </span>
+                </div>
+                <div class="space-y-3">
+                    ${previewItems}
+                </div>
+            </div>
+        `);
+    }
 
     // ── Frozen account notices ──
     const frozenStudents = rows.filter(item => {
@@ -4169,6 +4305,375 @@ function closeGuardianStudentModal() {
     guardianActiveStudentIndex = null;
 }
 
+function getGuardianPortalDefaultBranchId() {
+    const portalBranchId = Number(window.__guardianPortalBranchId || 0);
+    if (portalBranchId > 0) return portalBranchId;
+    const firstStudent = Array.isArray(guardianPortalStudents) ? guardianPortalStudents[0] : null;
+    return Number(firstStudent?.student?.branch_id || firstStudent?.branch_id || 0);
+}
+
+function setGuardianPortalBranchContext(portal, students = []) {
+    const portalBranchId = Number(portal?.branch_id || portal?.current_enrollment?.branch_id || 0);
+    if (portalBranchId > 0) {
+        window.__guardianPortalBranchId = portalBranchId;
+        return;
+    }
+
+    if (Number(window.__guardianPortalBranchId || 0) > 0) {
+        return;
+    }
+
+    const firstStudent = Array.isArray(students) ? students[0] : null;
+    const studentBranchId = Number(firstStudent?.student?.branch_id || firstStudent?.branch_id || 0);
+    if (studentBranchId > 0) {
+        window.__guardianPortalBranchId = studentBranchId;
+    }
+}
+
+async function fetchGuardianBranchOptionsHtml(selectedBranchId = '') {
+    try {
+        const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
+        const data = response.data || {};
+        const branches = Array.isArray(data.branches) ? data.branches : [];
+        const selectedValue = String(selectedBranchId || '');
+
+        if (!branches.length) {
+            return '<option value="">No branches available</option>';
+        }
+
+        return branches.map((branch) => {
+            const value = String(branch.branch_id || '');
+            const selected = selectedValue && value === selectedValue ? ' selected' : '';
+            return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(branch.branch_name || 'Branch')}</option>`;
+        }).join('');
+    } catch (error) {
+        return '<option value="">Unable to load branches</option>';
+    }
+}
+
+function getGuardianPortalCurrentEmail() {
+    return Auth.getUser()?.email || '';
+}
+
+function getGuardianPortalCurrentName() {
+    const user = Auth.getUser() || {};
+    return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'Guardian';
+}
+
+async function guardianAddChildMenu() {
+    return guardianRegisterNewStudent();
+}
+
+async function guardianRegisterNewStudent() {
+    const branchId = getGuardianPortalDefaultBranchId();
+    const guardianEmail = getGuardianPortalCurrentEmail();
+    const branchOptionsHtml = await fetchGuardianBranchOptionsHtml(branchId);
+    const result = await Swal.fire({
+        width: 920,
+        padding: '0',
+        showCancelButton: true,
+        confirmButtonText: 'Request Register',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#b8860b',
+        cancelButtonColor: '#6b7280',
+        allowOutsideClick: false,
+        background: '#ffffff',
+        customClass: {
+            popup: 'guardian-register-popup'
+        },
+        html: `
+            <div class="guardian-register-shell text-left">
+                <div class="space-y-4">
+                    <div class="rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
+                        Fill in only the details that are not already saved in your guardian portal. The request stays pending until the academy reviews it and assigns the Student ID.
+                    </div>
+
+                    <div class="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
+                        <div class="space-y-4">
+                            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
+                                <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                                    <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">1</span></div>
+                                    <p class="text-sm font-semibold text-zinc-900 dark:text-white">Student Details</p>
+                                </div>
+                                <div class="px-4 py-4 space-y-3">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <input id="guardian-new-first" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="First name">
+                                        <input id="guardian-new-last" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Last name">
+                                        <input id="guardian-new-dob" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" type="date" placeholder="Date of birth">
+                                        <input id="guardian-new-age" class="w-full px-3 py-2 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-500 dark:text-zinc-300 cursor-not-allowed" type="text" readonly placeholder="Age will appear here">
+                                        <div class="relative">
+                                            <input id="guardian-new-password" class="w-full px-3 py-2 pr-11 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" type="password" placeholder="Password">
+                                            <button type="button" onclick="togglePassword('guardian-new-password', 'guardian-new-password-eye')" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" aria-label="Toggle password visibility">
+                                                <i id="guardian-new-password-eye" class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                        <div class="relative">
+                                            <input id="guardian-new-password-confirm" class="w-full px-3 py-2 pr-11 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" type="password" placeholder="Confirm password">
+                                            <button type="button" onclick="togglePassword('guardian-new-password-confirm', 'guardian-new-password-confirm-eye')" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" aria-label="Toggle confirm password visibility">
+                                                <i id="guardian-new-password-confirm-eye" class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                        <div class="md:col-span-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3">
+                                            <div class="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400 mb-2">Password checker</div>
+                                            <div class="space-y-1.5 text-xs">
+                                                <div id="guardian-pass-req-length" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>At least 8 characters</span></div>
+                                                <div id="guardian-pass-req-uppercase" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>One uppercase letter</span></div>
+                                                <div id="guardian-pass-req-lowercase" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>One lowercase letter</span></div>
+                                                <div id="guardian-pass-req-number" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>One number</span></div>
+                                                <div id="guardian-pass-req-special" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>One special character (!@#$%^&*)</span></div>
+                                                <div id="guardian-pass-match" class="pt-1 text-xs"></div>
+                                            </div>
+                                        </div>
+                                        <div class="rounded-xl border border-dashed border-gold-300 bg-gold-50/70 dark:bg-gold-500/10 px-4 py-3">
+                                            <div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Guardian Email</div>
+                                            <div class="mt-1 text-sm text-zinc-700 dark:text-zinc-200 break-words">${escapeHtml(guardianEmail || 'No guardian email found')}</div>
+                                            <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">This account will be linked automatically.</div>
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Branch</label>
+                                            <select id="guardian-new-branch" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                                                <option value="">Select branch</option>
+                                                ${branchOptionsHtml}
+                                            </select>
+                                            <div class="mt-1 text-[11px] text-zinc-400">Choose the branch where the student should register.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden xl:self-start">
+                            <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                                <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">2</span></div>
+                                <p class="text-sm font-semibold text-zinc-900 dark:text-white">Registration Payment</p>
+                            </div>
+                            <div class="px-4 py-4 space-y-3">
+                                <div class="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/30 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-200">
+                                    A <strong>₱1,000 lifetime registration fee</strong> is required before approval.
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Payment Method *</label>
+                                    <select id="guardian-new-payment-method" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                                        <option value="">Select payment method</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="GCash">GCash</option>
+                                        <option value="Bank Transfer">Bank Transfer</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Reference Number *</label>
+                                    <input id="guardian-new-reference-number" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" type="text" placeholder="Transaction / reference no.">
+                                    <p class="mt-1 text-[11px] text-zinc-400">Enter the payment reference or transaction number.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Registration Proof *</label>
+                                    <input id="guardian-new-registration-proof" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" type="file" accept=".jpg,.jpeg,.png,.pdf,image/*">
+                                    <p class="mt-1 text-[11px] text-zinc-400">Upload proof of payment for the ₱1,000 registration.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">ID Proof *</label>
+                                    <input id="guardian-new-id-proof" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" type="file" accept=".jpg,.jpeg,.png,.pdf,image/*">
+                                    <p class="mt-1 text-[11px] text-zinc-400">Upload a valid ID or school ID proof.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `,
+        focusConfirm: false,
+        didOpen: () => {
+            const firstInput = document.getElementById('guardian-new-first');
+            if (firstInput) firstInput.focus();
+
+            const dobInput = document.getElementById('guardian-new-dob');
+            const ageInput = document.getElementById('guardian-new-age');
+            const passwordInput = document.getElementById('guardian-new-password');
+            const confirmInput = document.getElementById('guardian-new-password-confirm');
+            const updateGuardianAge = () => {
+                if (!dobInput || !ageInput) return;
+                const age = calculateAgeFromBirthdate(dobInput.value);
+                ageInput.value = age === null || age < 0 ? '' : `${age} years old`;
+            };
+            const updatePasswordRequirement = (id, met) => {
+                const element = document.getElementById(id);
+                if (!element) return;
+                const icon = element.querySelector('i');
+                if (!icon) return;
+
+                if (met) {
+                    icon.classList.remove('fa-circle', 'text-zinc-400');
+                    icon.classList.add('fa-check-circle', 'text-green-500');
+                    element.classList.remove('text-zinc-500', 'dark:text-zinc-300');
+                    element.classList.add('text-zinc-700', 'dark:text-zinc-100');
+                } else {
+                    icon.classList.remove('fa-check-circle', 'text-green-500');
+                    icon.classList.add('fa-circle', 'text-zinc-400');
+                    element.classList.add('text-zinc-500', 'dark:text-zinc-300');
+                    element.classList.remove('text-zinc-700', 'dark:text-zinc-100');
+                }
+            };
+            const updateGuardianPasswordChecker = () => {
+                const password = String(passwordInput?.value || '');
+                const confirm = String(confirmInput?.value || '');
+                const hasPassword = password.length > 0;
+                const requirements = {
+                    length: password.length >= 8,
+                    uppercase: /[A-Z]/.test(password),
+                    lowercase: /[a-z]/.test(password),
+                    number: /[0-9]/.test(password),
+                    special: /[!@#$%^&*]/.test(password)
+                };
+
+                updatePasswordRequirement('guardian-pass-req-length', requirements.length);
+                updatePasswordRequirement('guardian-pass-req-uppercase', requirements.uppercase);
+                updatePasswordRequirement('guardian-pass-req-lowercase', requirements.lowercase);
+                updatePasswordRequirement('guardian-pass-req-number', requirements.number);
+                updatePasswordRequirement('guardian-pass-req-special', requirements.special);
+
+                const matchDiv = document.getElementById('guardian-pass-match');
+                if (matchDiv) {
+                    if (!hasPassword && !confirm) {
+                        matchDiv.textContent = '';
+                        matchDiv.className = 'pt-1 text-xs';
+                    } else if (password === confirm) {
+                        matchDiv.textContent = 'Passwords match';
+                        matchDiv.className = 'pt-1 text-xs text-green-500';
+                    } else {
+                        matchDiv.textContent = 'Passwords do not match';
+                        matchDiv.className = 'pt-1 text-xs text-red-500';
+                    }
+                }
+            };
+
+            updateGuardianAge();
+            dobInput?.addEventListener('input', updateGuardianAge);
+            dobInput?.addEventListener('change', updateGuardianAge);
+            updateGuardianPasswordChecker();
+            passwordInput?.addEventListener('input', updateGuardianPasswordChecker);
+            confirmInput?.addEventListener('input', updateGuardianPasswordChecker);
+        },
+        preConfirm: () => {
+            const paymentProofFile = document.getElementById('guardian-new-registration-proof')?.files?.[0] || null;
+            const idProofFile = document.getElementById('guardian-new-id-proof')?.files?.[0] || null;
+            const paymentMethod = String(document.getElementById('guardian-new-payment-method')?.value || '').trim();
+            const referenceNumber = String(document.getElementById('guardian-new-reference-number')?.value || '').trim();
+            const password1 = String(document.getElementById('guardian-new-password')?.value || '');
+            const password2 = String(document.getElementById('guardian-new-password-confirm')?.value || '');
+            const data = {
+                student_first_name: String(document.getElementById('guardian-new-first')?.value || '').trim(),
+                student_last_name: String(document.getElementById('guardian-new-last')?.value || '').trim(),
+                student_date_of_birth: String(document.getElementById('guardian-new-dob')?.value || '').trim(),
+                password1,
+                password2,
+                branch_id: Number(String(document.getElementById('guardian-new-branch')?.value || branchId || 0).trim() || branchId || 0),
+                payment_method: paymentMethod,
+                reference_number: referenceNumber,
+                registration_proof_file: paymentProofFile,
+                age_verification_proof_file: idProofFile
+            };
+
+            if (!data.student_first_name || !data.student_last_name || !data.student_date_of_birth) {
+                Swal.showValidationMessage('Please fill in all required student fields.');
+                return false;
+            }
+            if (!data.branch_id) {
+                Swal.showValidationMessage('Please choose a branch.');
+                return false;
+            }
+            if (!data.payment_method) {
+                Swal.showValidationMessage('Please select a payment method.');
+                return false;
+            }
+            if (!data.reference_number) {
+                Swal.showValidationMessage('Please enter the payment reference number.');
+                return false;
+            }
+            if (!data.registration_proof_file) {
+                Swal.showValidationMessage('Please upload proof of payment.');
+                return false;
+            }
+            if (!data.age_verification_proof_file) {
+                Swal.showValidationMessage('Please upload an ID proof.');
+                return false;
+            }
+            if (!password1 || !password2) {
+                Swal.showValidationMessage('Please fill in both password fields.');
+                return false;
+            }
+            if (password1 !== password2) {
+                Swal.showValidationMessage('Passwords do not match.');
+                return false;
+            }
+            if (
+                password1.length < 8 ||
+                !/[A-Z]/.test(password1) ||
+                !/[a-z]/.test(password1) ||
+                !/[0-9]/.test(password1) ||
+                !/[!@#$%^&*]/.test(password1)
+            ) {
+                Swal.showValidationMessage('Password does not meet the requirements.');
+                return false;
+            }
+            return data;
+        }
+        });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'guardian-register-child');
+        formData.append('guardian_email', guardianEmail);
+        formData.append('student_first_name', result.value.student_first_name);
+        formData.append('student_last_name', result.value.student_last_name);
+        formData.append('student_date_of_birth', result.value.student_date_of_birth);
+        formData.append('branch_id', String(result.value.branch_id || branchId || 0));
+        formData.append('password', result.value.password1);
+        formData.append('payment_method', result.value.payment_method);
+        formData.append('reference_number', result.value.reference_number);
+        if (result.value.registration_proof_file) {
+            formData.append('registration_proof_file', result.value.registration_proof_file);
+        }
+        if (result.value.age_verification_proof_file) {
+            formData.append('age_verification_proof_file', result.value.age_verification_proof_file);
+        }
+
+        const data = await postStudentPackageRequest(formData);
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to register student.');
+        }
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Registration Submitted',
+            html: `
+                <div class="text-left text-sm leading-6">
+                    <p>The student registration is now pending review.</p>
+                    <p class="mt-2">The guardian will be notified once the academy accepts the registration.</p>
+                    <p class="mt-2 text-xs text-zinc-500">The Student ID will be issued after approval.</p>
+                </div>
+            `,
+            confirmButtonColor: '#b8860b'
+        });
+
+        if (document.getElementById('guardianStudentsList')) {
+            await initGuardianStudentsPage();
+        }
+    } catch (error) {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Registration Failed',
+            text: error?.response?.data?.error || error?.message || 'Unable to create the student.',
+            confirmButtonColor: '#b8860b'
+        });
+    }
+}
+
+window.guardianAddChildMenu = guardianAddChildMenu;
+window.guardianRegisterNewStudent = guardianRegisterNewStudent;
+
 function bindGuardianStudentModalEvents() {
     const modal = document.getElementById('guardianStudentModal');
     if (modal && !modal.dataset.bound) {
@@ -4197,6 +4702,7 @@ async function initGuardianDashboardPage() {
 
     const guardian = getGuardianPrimaryGuardian(portal, user) || {};
     window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    setGuardianPortalBranchContext(portal, []);
     applyGuardianPortalIdentity(user, portal);
 
     const students = Array.isArray(portal.students) ? portal.students : [];
@@ -4246,6 +4752,7 @@ async function initGuardianStudentsPage() {
 
     const primaryGuardian = getGuardianPrimaryGuardian(portal, user) || {};
     window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    setGuardianPortalBranchContext(portal, portal.students || []);
     applyGuardianPortalIdentity(user, portal);
     setText('guardianName', `${primaryGuardian.first_name || ''} ${primaryGuardian.last_name || ''}`.trim() || (user?.username || 'Guardian'));
     setText('guardianEmail', primaryGuardian.email || user?.email || '—');
@@ -4277,6 +4784,7 @@ async function initGuardianPaymentsPage() {
 
     const primaryGuardian = getGuardianPrimaryGuardian(portal, user) || {};
     window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    setGuardianPortalBranchContext(portal, portal.students || []);
     applyGuardianPortalIdentity(user, portal);
     const guardianName = `${primaryGuardian.first_name || ''} ${primaryGuardian.last_name || ''}`.trim() || (user?.username || 'Guardian');
     setText('guardianNameInline', guardianName);
@@ -4373,6 +4881,7 @@ async function initGuardianProfilePage() {
                 };
                 Auth.setUser(nextUser);
                 window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+                setGuardianPortalBranchContext(portal, portal.students || []);
                 applyGuardianPortalIdentity(nextUser, portal);
                 setText('guardianProfileHeading', `${payload.first_name} ${payload.last_name}`.trim() || 'Guardian Profile');
                 showMessage(data.message || 'Guardian profile updated.', 'success');
@@ -4408,6 +4917,7 @@ async function initGuardianAbsencePage() {
     const students = Array.isArray(portal.students) ? portal.students : [];
     guardianPortalStudents = students;
     window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
+    setGuardianPortalBranchContext(portal, students);
     notifyFreezeRestoredForGuardianPortal(students);
     startGuardianFreezeRefreshWatcher();
     startGuardianSessionRefreshWatcher();
@@ -4743,7 +5253,7 @@ function initStudentRequestSection(student, requestMeta) {
                     data-max-instruments="${maxInst}"
                     data-sessions="${sessions}"
                     data-price="${pkg.price || 0}">
-                    <div class="flex items-center justify-between gap-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                         <div class="flex items-center gap-4 min-w-0">
                             <span class="h-6 w-6 rounded-full border flex items-center justify-center shrink-0 ${active ? 'border-gold-500 bg-gold-500 text-white' : 'border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-950 text-transparent'}">
                                 <i class="fas fa-check text-[10px]"></i>
@@ -4753,7 +5263,7 @@ function initStudentRequestSection(student, requestMeta) {
                                 <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">${sessions} sessions · ${escapeHtml(instLabel)}</div>
                             </div>
                         </div>
-                        <div class="text-base font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">${escapeHtml(price)}</div>
+                        <div class="text-base font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap sm:text-right">${escapeHtml(price)}</div>
                     </div>
                 </button>
             `;
@@ -5018,10 +5528,18 @@ function setStudentModalState(modalId, shouldOpen) {
 }
 
 function openStudentRegistrationModal() {
-    const regStatus = String(studentDashboardPortalState?.student?.registration_status || 'Pending');
+    const student = studentDashboardPortalState?.student || null;
+    const regStatus = String(student?.registration_status || 'Pending');
+    const latestPaymentStatus = String(student?.registration_payment_status || '');
+    const registrationApproved = ['Approved', 'Fee Paid'].includes(regStatus) || ['Approved', 'Fee Paid'].includes(latestPaymentStatus);
+
     if (regStatus === 'Rejected') {
         void handleRejectedStudentRegistrationOpen();
         return;
+    }
+
+    if (registrationApproved) {
+        renderStudentRegistrationModal(student, studentDashboardPortalState || null);
     }
 
     setStudentModalState('studentRegistrationModal', true);
@@ -5274,6 +5792,12 @@ function renderStudentRegistrationModal(student, portal) {
     const regStatus = String(student?.registration_status || 'Pending');
     const latestPaymentStatus = String(student?.registration_payment_status || '');
     const profileComplete = isRegistrationProfileComplete(student);
+    const guardian = Array.isArray(portal?.guardians) && portal.guardians.length > 0
+        ? (portal?.primary_guardian || portal.guardians[0])
+        : null;
+    const registrationSettled = profileComplete && (
+        ['Approved', 'Fee Paid'].includes(regStatus) || ['Approved', 'Fee Paid'].includes(latestPaymentStatus)
+    );
     const hasSubmittedPendingRegistration = regStatus === 'Pending'
         && latestPaymentStatus === 'Pending'
         && profileComplete
@@ -5284,17 +5808,17 @@ function renderStudentRegistrationModal(student, portal) {
             || student?.registration_receipt_number
         );
 
-    if (hasSubmittedPendingRegistration) {
+    if (registrationSettled) {
         body.innerHTML = `
             <div class="space-y-5">
-                <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 sm:px-5">
-                    <div class="text-sm font-bold text-amber-800">Registration pending admin review</div>
-                    <div class="text-sm text-amber-700 mt-1">Your registration has already been submitted. These details stay locked while admin reviews your request.</div>
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 sm:px-5">
+                    <div class="text-sm font-bold text-emerald-800">Registration approved</div>
+                    <div class="text-sm text-emerald-700 mt-1">Your membership registration is complete. You can now continue to the enrollment module and request your class package.</div>
                 </div>
 
                 <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
                     <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">Student Details</div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Name:</span> ${escapeHtml(`${student?.first_name || ''} ${student?.last_name || ''}`.trim() || '—')}</div>
                         <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Email:</span> ${escapeHtml(student?.email || '—')}</div>
                         <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Phone:</span> ${escapeHtml(student?.phone || '—')}</div>
@@ -5306,7 +5830,66 @@ function renderStudentRegistrationModal(student, portal) {
 
                 <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
                     <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">Registration Payment</div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Registration Fee:</span> ₱1,000.00</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Status:</span> ${escapeHtml(regStatus || latestPaymentStatus || 'Approved')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Payment Method:</span> ${escapeHtml(student?.registration_payment_method || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Reference Number:</span> ${escapeHtml(student?.registration_reference_number || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Receipt Number:</span> ${escapeHtml(student?.registration_receipt_number || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Payment Proof:</span> ${student?.registration_proof_path ? `<a href="${buildPublicFileUrl(student.registration_proof_path)}" target="_blank" rel="noopener" class="text-blue-700 underline">View file</a>` : '—'}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Proof ID:</span> ${student?.age_verification_proof_path ? `<a href="${buildPublicFileUrl(student.age_verification_proof_path)}" target="_blank" rel="noopener" class="text-emerald-700 underline">View file</a>` : '—'}</div>
+                    </div>
+                </div>
+
+                ${guardian ? `
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
+                    <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">Guardian</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Name:</span> ${escapeHtml(`${guardian.first_name || ''} ${guardian.last_name || ''}`.trim() || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Relationship:</span> ${escapeHtml(guardian.relationship_type || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Email:</span> ${escapeHtml(guardian.email || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Phone:</span> ${escapeHtml(guardian.phone || '—')}</div>
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="rounded-2xl border border-gold-500/20 bg-amber-50 dark:bg-gold-500/10 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <div class="text-sm font-bold text-zinc-900 dark:text-white">Enrollment is now available</div>
+                        <div class="text-sm text-zinc-600 dark:text-zinc-300 mt-1">Open the enrollment module to choose a package, instruments, and class schedule.</div>
+                    </div>
+                    <button type="button" onclick="openStudentRequestModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition whitespace-nowrap">
+                        Open Enrollment Module
+                    </button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    if (hasSubmittedPendingRegistration) {
+        body.innerHTML = `
+            <div class="space-y-5">
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 sm:px-5">
+                    <div class="text-sm font-bold text-amber-800">Registration pending admin review</div>
+                    <div class="text-sm text-amber-700 mt-1">Your registration has already been submitted. These details stay locked while admin reviews your request.</div>
+                </div>
+
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
+                    <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">Student Details</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Name:</span> ${escapeHtml(`${student?.first_name || ''} ${student?.last_name || ''}`.trim() || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Email:</span> ${escapeHtml(student?.email || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Phone:</span> ${escapeHtml(student?.phone || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Branch:</span> ${escapeHtml(student?.branch_name || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Birthday:</span> ${escapeHtml(student?.date_of_birth || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Address:</span> ${escapeHtml(student?.address || '—')}</div>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
+                    <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">Registration Payment</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Registration Fee:</span> ₱1,000.00</div>
                         <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Payment Method:</span> ${escapeHtml(student?.registration_payment_method || '—')}</div>
                         <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Reference Number:</span> ${escapeHtml(student?.registration_reference_number || '—')}</div>
@@ -5315,163 +5898,270 @@ function renderStudentRegistrationModal(student, portal) {
                         <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Proof ID:</span> ${student?.age_verification_proof_path ? `<a href="${buildPublicFileUrl(student.age_verification_proof_path)}" target="_blank" rel="noopener" class="text-emerald-700 underline">View file</a>` : '—'}</div>
                     </div>
                 </div>
+
+                ${guardian ? `
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
+                    <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">Guardian</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Name:</span> ${escapeHtml(`${guardian.first_name || ''} ${guardian.last_name || ''}`.trim() || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Relationship:</span> ${escapeHtml(guardian.relationship_type || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Email:</span> ${escapeHtml(guardian.email || '—')}</div>
+                        <div><span class="font-semibold text-zinc-700 dark:text-zinc-200">Phone:</span> ${escapeHtml(guardian.phone || '—')}</div>
+                    </div>
+                </div>
+                ` : ''}
             </div>
         `;
         return;
     }
 
     body.innerHTML = `
-        <div class="space-y-5">
+        <div class="space-y-4">
             ${studentRegistrationRestartNotice ? `
-                <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 sm:px-5">
+                <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 sm:px-5">
                     <div class="text-sm font-bold text-red-700">Registration rejected</div>
-                    <div class="text-sm text-red-600 mt-1">Registration rejected. Please try again or contact admin.</div>
+                    <div class="text-sm text-red-600 mt-0.5">Please fill in the form again and resubmit.</div>
                 </div>
             ` : ''}
-            <div class="rounded-2xl border border-gold-500/20 bg-amber-50 dark:bg-gold-500/10 p-4 sm:p-5">
-                <div class="text-sm font-bold text-zinc-900 dark:text-white">Complete this one step at a time</div>
-                <div class="text-sm text-zinc-600 dark:text-zinc-300 mt-1">Fill in the student details, add guardian details if needed, then upload your registration payment.</div>
+
+            <!-- Intro hint -->
+            <div class="rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
+                Fill in the student details below. Guardian info is required for students 18 and under. Then upload your registration payment to submit.
             </div>
 
-            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
-                <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">1. Guardian</div>
-                <div id="guardianAutoStatus" class="rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                    Select the student's date of birth to check if guardian details are required.
+            <!-- Two-column: left = student + guardian, right = payment -->
+            <div class="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
+
+                <!-- LEFT -->
+                <div class="space-y-4">
+
+                    <!-- 1. Student Details -->
+                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
+                        <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                            <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">1</span></div>
+                            <p class="text-sm font-semibold text-zinc-900 dark:text-white">Student Details</p>
+                        </div>
+                        <form id="registrationDetailsForm" class="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">First Name *</label>
+                                <input id="regFirstName" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Last Name *</label>
+                                <input id="regLastName" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Middle Name</label>
+                                <input id="regMiddleName" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Phone *</label>
+                                <input id="regPhone" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="09x-xxx-xxxx" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Date of Birth *</label>
+                                <input id="regDob" type="date" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Age</label>
+                                <input id="regAge" readonly class="w-full px-3 py-2 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-500 cursor-not-allowed" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Email</label>
+                                <input id="regEmail" type="email" readonly class="w-full px-3 py-2 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-500 cursor-not-allowed" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Branch</label>
+                                <div id="regBranchDisplay" class="w-full px-3 py-2 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-600 dark:text-zinc-300 font-medium">
+                                    ${escapeHtml(student?.branch_name || 'Assigned branch')}
+                                </div>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Address *</label>
+                                <textarea id="regAddress" rows="2" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 resize-none"></textarea>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- 2. Guardian -->
+                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
+                        <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                            <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">2</span></div>
+                            <p class="text-sm font-semibold text-zinc-900 dark:text-white flex-1">Guardian</p>
+                            <span id="guardianRequiredBadge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Required</span>
+                        </div>
+                        <div class="px-4 py-3">
+                            <div id="guardianAutoStatus" class="text-sm text-zinc-500 dark:text-zinc-400">
+                                Enter the student's date of birth above — guardian fields appear automatically for students 18 and under.
+                            </div>
+                            <div id="guardianInputs" class="space-y-3 hidden">
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Guardian Email *</label>
+                                    <div class="flex gap-2">
+                                        <input id="guardianEmailInput" type="email" class="flex-1 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="guardian@email.com" />
+                                        <button type="button" id="guardianFindBtn" class="px-3 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">Find</button>
+                                    </div>
+                                    <div id="guardianInfoBox" class="hidden mt-1 text-xs text-zinc-500 dark:text-zinc-300"></div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">First Name *</label>
+                                        <input id="guardianFirstNameInput" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Last Name *</label>
+                                        <input id="guardianLastNameInput" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Phone *</label>
+                                        <input id="guardianPhoneInput" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="09x-xxx-xxxx" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Relationship *</label>
+                                        <select id="guardianRelationshipInput" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                                            <option value="">Select…</option>
+                                            <option value="Mother">Mother</option>
+                                            <option value="Father">Father</option>
+                                            <option value="Legal Guardian">Legal Guardian</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- end left col -->
+
+                <!-- RIGHT: Registration Payment -->
+                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden xl:self-start">
+                    <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                        <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">3</span></div>
+                        <p class="text-sm font-semibold text-zinc-900 dark:text-white">Registration Payment</p>
+                    </div>
+                    <form id="registrationPaymentForm" class="px-4 py-4 space-y-3">
+                        <div class="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/30 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-200">
+                            A <strong>₱1,000 lifetime registration fee</strong> is required before enrollment.
+                        </div>
+                        <div class="flex items-center justify-between px-3 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl">
+                            <span class="text-xs text-zinc-500 font-medium">Registration Fee</span>
+                            <span class="text-sm font-bold text-zinc-900 dark:text-white">₱1,000.00</span>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Payment Method *</label>
+                            <select id="regPayMethod" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                                <option value="GCash">GCash</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Cash">Cash</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Reference Number *</label>
+                            <input type="text" id="regPayReference" placeholder="Transaction / reference no." class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                            <div id="regPayReferenceHint" class="mt-1 text-[11px] text-zinc-400">Enter the reference or transaction number.</div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Proof of Payment *</label>
+                            <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
+                            <p class="mt-1 text-[11px] text-zinc-400">Screenshot or receipt · JPG, PNG, PDF</p>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Valid ID / Proof of Age *</label>
+                            <input type="file" id="regAgeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
+                            <p class="mt-1 text-[11px] text-zinc-400">For age verification · JPG, PNG, PDF</p>
+                        </div>
+                        <div id="regPayStatus" class="text-xs text-zinc-500 dark:text-zinc-300"></div>
+                    </form>
                 </div>
-                <div id="guardianInputs" class="mt-4 space-y-3 hidden">
-                    <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200">Guardian Email *</label>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <input id="guardianEmailInput" type="email" class="flex-1 px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="guardian@email.com">
-                        <button type="button" id="guardianFindBtn" class="px-4 py-3 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">
-                            Find
-                        </button>
-                    </div>
-                    <div id="guardianInfoBox" class="hidden text-xs text-zinc-500 dark:text-zinc-300"></div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">First Name *</label>
-                            <input id="guardianFirstNameInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Last Name *</label>
-                            <input id="guardianLastNameInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Phone *</label>
-                            <input id="guardianPhoneInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Relationship *</label>
-                            <input id="guardianRelationshipInput" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Relationship" />
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-                    Guardian details are required automatically for students aged 18 and below.
-                </div>
-            </div>
+            </div><!-- end grid -->
 
-            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
-                <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">2. Student Details</div>
-                <form id="registrationDetailsForm" class="space-y-3">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">First Name *</label>
-                            <input id="regFirstName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Last Name *</label>
-                            <input id="regLastName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Middle Name</label>
-                            <input id="regMiddleName" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Email *</label>
-                            <input id="regEmail" type="email" readonly class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-600 dark:text-zinc-300 cursor-not-allowed" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Phone *</label>
-                            <input id="regPhone" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Date of Birth *</label>
-                            <input id="regDob" type="date" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Age</label>
-                            <input id="regAge" readonly class="w-full px-4 py-3 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-600 dark:text-zinc-300 cursor-not-allowed" />
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Address *</label>
-                        <textarea id="regAddress" rows="3" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500"></textarea>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Branch *</label>
-                        <select id="regBranch" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
-                            <option value="">Choose branch...</option>
-                        </select>
-                    </div>
-                </form>
-            </div>
-
-            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 sm:p-5">
-                <div class="text-xs uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400 font-bold mb-4">3. Registration Payment</div>
-                <form id="registrationPaymentForm" class="space-y-3">
-                    <div class="rounded-xl border border-amber-300/70 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
-                        <div class="font-bold">Required before enrollment</div>
-                        <div class="mt-1">Father &amp; Sons Music requires a <strong>₱1,000 lifetime registration fee</strong> before a student can be enrolled for the first time.</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Lifetime Registration Fee</label>
-                        <div class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-bold">
-                            ₱1,000.00
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Payment Method *</label>
-                        <select id="regPayMethod" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
-                            <option value="GCash">GCash</option>
-                            <option value="Bank Transfer">Bank Transfer</option>
-                            <option value="Cash">Cash</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Reference Number *</label>
-                        <input type="text" id="regPayReference" placeholder="Enter GCash reference number" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                        <div id="regPayReferenceHint" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Enter the payment reference or transaction number from your receipt.</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof of Payment *</label>
-                        <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
-                        <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Upload your payment screenshot or receipt for admin review.</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-zinc-600 dark:text-zinc-200 mb-2">Proof ID *</label>
-                        <input type="file" id="regAgeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-200 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:font-semibold" />
-                    </div>
-                    <div id="regPayStatus" class="text-xs text-zinc-500 dark:text-zinc-300"></div>
-                </form>
-            </div>
-
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <!-- Submit row -->
+            <div class="sticky bottom-0 z-20 -mx-4 sm:mx-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-zinc-100 dark:border-white/10 bg-gradient-to-t from-white via-white/95 to-white/75 dark:from-obsidian dark:via-obsidian/95 dark:to-obsidian/75 backdrop-blur-sm px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
                 <div id="submitRegistrationStatus" class="text-sm text-zinc-500 dark:text-zinc-400"></div>
-                <button type="button" id="submitRegistrationRequestBtn" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                <button type="button" id="submitRegistrationRequestBtn"
+                    class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
                     Submit Registration Request
                 </button>
             </div>
         </div>
     `;
+    initStudentRegistrationPhonePickers();
+}
+
+function initStudentRegistrationPhonePickers() {
+    if (typeof window.intlTelInput !== 'function') return;
+
+    const getMaxLength = (countryCode) => {
+        switch (countryCode) {
+            case 'ph':
+            case 'us':
+            case 'gb':
+            case 'jp':
+                return 10;
+            default:
+                return 15;
+        }
+    };
+
+    const formatPhonePlaceholder = (exampleNumber, selectedCountry) => {
+        const countryCode = selectedCountry?.iso2 || '';
+        if (countryCode === 'ph') {
+            return '09x-xxx-xxxx';
+        }
+
+        const example = String(exampleNumber || '').trim();
+        if (!example) {
+            return '02x-xxx-xxxx';
+        }
+
+        let digitCount = 0;
+        const masked = example.replace(/\d/g, (digit) => {
+            digitCount += 1;
+            return digitCount <= 2 ? digit : 'x';
+        });
+
+        return masked.replace(/\s+/g, ' ').trim();
+    };
+
+    const phoneFields = [
+        { id: 'regPhone' },
+        { id: 'guardianPhoneInput' }
+    ];
+
+    phoneFields.forEach(({ id }) => {
+        const input = document.getElementById(id);
+        if (!input || input.dataset.intlTelReady === '1') return;
+
+        const iti = window.intlTelInput(input, {
+            initialCountry: 'ph',
+            preferredCountries: ['ph', 'us', 'gb', 'jp'],
+            separateDialCode: true,
+            autoPlaceholder: 'polite',
+            customPlaceholder: formatPhonePlaceholder,
+            formatOnDisplay: true,
+            utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/utils.js'
+        });
+
+        input.dataset.intlTelReady = '1';
+        input._iti = iti;
+
+        const normalizePhone = () => {
+            const countryCode = iti.getSelectedCountryData()?.iso2 || '';
+            const maxLength = getMaxLength(countryCode);
+            const digitsOnly = input.value.replace(/\D/g, '');
+            input.value = digitsOnly.slice(0, maxLength);
+        };
+
+        input.addEventListener('input', normalizePhone);
+        input.addEventListener('countrychange', () => {
+            input.value = '';
+            input.placeholder = formatPhonePlaceholder('', iti.getSelectedCountryData());
+        });
+
+        input.placeholder = formatPhonePlaceholder('', iti.getSelectedCountryData());
+    });
 }
 
 function renderStudentActionBanner(student, meta, portal) {
@@ -5610,14 +6300,14 @@ function renderStudentOnboardingSteps(student, meta, portal) {
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
                 <div class="flex items-center justify-between gap-2">
-                    <div>
-                        <div class="text-lg font-extrabold">Your details</div>
-                    </div>
+                <div>
+                    <div class="text-lg font-extrabold">Your details</div>
+                </div>
                     ${registrationBadge}
                 </div>
                 <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2 hidden" aria-hidden="true"></p>
                 <div class="mt-4 flex flex-wrap gap-3">
-                    <button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white/10 text-white text-sm font-semibold">Open Registration</button>
+                    <button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white/10 text-white text-sm font-semibold">${regPaid ? 'View Registration' : 'Open Registration'}</button>
                     <a href="student_profile.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">Open Profile</a>
                 </div>
             </div>
@@ -5635,7 +6325,7 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                         ? `<button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-white text-sm font-bold">Restart Registration</button>`
                         : registrationLocked
                         ? `<button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Open Payment Step</button>`
-                        : `<span class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 text-sm font-bold">Already approved</span>`}
+                        : `<button type="button" onclick="openStudentRequestModal()" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Open Enrollment</button>`}
                 </div>
             </div>
 
@@ -5672,7 +6362,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
     const guardianFindBtn = document.getElementById('guardianFindBtn');
     const guardianInfoBox = document.getElementById('guardianInfoBox');
     const regForm = document.getElementById('registrationDetailsForm');
-    const regBranch = document.getElementById('regBranch');
+    const regBranchDisplay = document.getElementById('regBranchDisplay');
     const paymentForm = document.getElementById('registrationPaymentForm');
     const regPayStatus = document.getElementById('regPayStatus');
     const regPayReference = document.getElementById('regPayReference');
@@ -5692,13 +6382,16 @@ function wireStudentOnboardingActions(student, meta, portal) {
         const mustHaveGuardian = isGuardianRequired();
         if (guardianInputs) guardianInputs.classList.toggle('hidden', !mustHaveGuardian);
         if (guardianInfoBox) guardianInfoBox.classList.toggle('hidden', !mustHaveGuardian);
+        const badge = document.getElementById('guardianRequiredBadge');
+        if (badge) badge.classList.toggle('hidden', !mustHaveGuardian);
         if (guardianAutoStatus) {
-            if (mustHaveGuardian) {
-                guardianAutoStatus.textContent = 'Guardian details are required because the student is 18 years old or below.';
-            } else if (getCurrentAge() === null) {
-                guardianAutoStatus.textContent = "Select the student's date of birth to check if guardian details are required.";
-            } else {
-                guardianAutoStatus.textContent = 'Guardian details are not required because the student is above 18 years old.';
+            guardianAutoStatus.classList.toggle('hidden', mustHaveGuardian);
+            if (!mustHaveGuardian) {
+                if (getCurrentAge() === null) {
+                    guardianAutoStatus.textContent = "Enter the student's date of birth above — guardian fields appear automatically for students 18 and under.";
+                } else {
+                    guardianAutoStatus.textContent = 'Guardian details are not required because the student is above 18 years old.';
+                }
             }
         }
         if (!mustHaveGuardian) {
@@ -5742,8 +6435,8 @@ function wireStudentOnboardingActions(student, meta, portal) {
         };
     }
 
-    if (regBranch) {
-        populateBranchSelect(regBranch, student?.branch_id || '');
+    if (regBranchDisplay) {
+        regBranchDisplay.textContent = student?.branch_name || 'Assigned branch';
     }
 
     // Prefill registration fields from current student record
@@ -5822,7 +6515,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 phone: document.getElementById('regPhone')?.value?.trim() || '',
                 address: document.getElementById('regAddress')?.value?.trim() || '',
                 date_of_birth: document.getElementById('regDob')?.value || null,
-                branch_id: Number(document.getElementById('regBranch')?.value || 0)
+                branch_id: Number(student?.branch_id || 0)
             };
             payload.age = computeAgeFromDob(payload.date_of_birth);
 
@@ -5863,9 +6556,129 @@ function wireStudentOnboardingActions(student, meta, portal) {
                         relationship: guardianRelationshipInput?.value?.trim() || ''
                     };
 
-                    const resGuardian = await setGuardianMode(student.student_id, 'With Guardian', guardianEmailInput?.value?.trim() || '', details);
+                    const guardianEmail = guardianEmailInput?.value?.trim() || '';
+                    const guardianConfirm = await Swal.fire({
+                        icon: 'question',
+                        title: 'Create guardian account',
+                        html: `
+                            <div class="text-left text-sm leading-6">
+                                <p>You are creating a new guardian account for this student.</p>
+                                <p class="mt-2">Guardian contact email: <strong>${escapeHtml(guardianEmail)}</strong></p>
+                                <p class="mt-2">After you continue, we will save the guardian details and show the login information on the next screen.</p>
+                                <p class="mt-2">The student and guardian will each have their own login details. Please write them down or keep them safe.</p>
+                                <p class="mt-2">The guardian will set their own password before continuing.</p>
+                            </div>
+                        `,
+                        showCancelButton: true,
+                        confirmButtonText: 'Yes, create it',
+                        cancelButtonText: 'Cancel',
+                        confirmButtonColor: '#b8860b',
+                        cancelButtonColor: '#6b7280'
+                    });
+
+                    if (!guardianConfirm.isConfirmed) {
+                        return;
+                    }
+
+                    const customPasswordResult = await Swal.fire({
+                        icon: 'question',
+                        title: 'Create guardian password',
+                        html: `
+                            <div class="text-left text-sm leading-6">
+                                <p>Enter a new password for the guardian account.</p>
+                                <p class="mt-2 text-xs text-zinc-500">Use at least 8 characters with uppercase, lowercase, a number, and a special character.</p>
+                            </div>
+                            <input id="guardian-custom-password" class="swal2-input" type="password" placeholder="New password">
+                            <input id="guardian-custom-password-confirm" class="swal2-input" type="password" placeholder="Confirm password">
+                        `,
+                        focusConfirm: false,
+                        showCancelButton: true,
+                        confirmButtonText: 'Create Password',
+                        cancelButtonText: 'Go Back',
+                        confirmButtonColor: '#b8860b',
+                        cancelButtonColor: '#6b7280',
+                        preConfirm: () => {
+                            const pass1 = document.getElementById('guardian-custom-password')?.value || '';
+                            const pass2 = document.getElementById('guardian-custom-password-confirm')?.value || '';
+                            if (!pass1 || !pass2) {
+                                Swal.showValidationMessage('Please fill in both password fields.');
+                                return false;
+                            }
+                            if (pass1 !== pass2) {
+                                Swal.showValidationMessage('Passwords do not match.');
+                                return false;
+                            }
+                            if (
+                                pass1.length < 8 ||
+                                !/[A-Z]/.test(pass1) ||
+                                !/[a-z]/.test(pass1) ||
+                                !/[0-9]/.test(pass1) ||
+                                !/[!@#$%^&*]/.test(pass1)
+                            ) {
+                                Swal.showValidationMessage('Password does not meet the requirements.');
+                                return false;
+                            }
+                            return pass1;
+                        }
+                    });
+
+                    if (!customPasswordResult.isConfirmed) {
+                        return;
+                    }
+
+                    const guardianPasswordMode = 'custom';
+                    const guardianPassword = String(customPasswordResult.value || '');
+
+                    const resGuardian = await setGuardianMode(student.student_id, 'With Guardian', guardianEmail, {
+                        ...details,
+                        password_mode: guardianPasswordMode,
+                        password: guardianPassword
+                    });
                     if (!resGuardian?.success) {
                         throw new Error(resGuardian?.error || 'Failed to save guardian details.');
+                    }
+                    if (resGuardian?.message) {
+                        const combinedMessage = resGuardian.mail_error
+                            ? `${resGuardian.message} Mail notice: ${resGuardian.mail_error}`
+                            : resGuardian.message;
+                        showMessage(combinedMessage, resGuardian.mail_error || resGuardian.guardian_login_generated ? 'info' : 'success');
+                    }
+                    if (resGuardian?.student_login_identifier || resGuardian?.guardian_username) {
+                        const studentLoginId = resGuardian.student_login_identifier || 'Not available';
+                        const guardianLogin = resGuardian.guardian_username || guardianEmail;
+                        const guardianPasswordText = resGuardian.guardian_temporary_password || 'Not available';
+                        await Swal.fire({
+                            icon: 'info',
+                            title: 'Please write these details down',
+                            width: 700,
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#b8860b',
+                            html: `
+                                <div class="text-left text-sm leading-6" style="color:#1f2937;">
+                                    <p class="mb-3">These are the login details for the student and the guardian. Keep them safe.</p>
+
+                                    <div style="background:#f8fafc;border:1px solid #dbe4f0;border-radius:16px;padding:16px 18px;margin-bottom:12px;">
+                                        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;font-weight:700;">Student ID</div>
+                                        <div style="font-size:26px;font-weight:800;color:#0f172a;margin-top:4px;">${escapeHtml(studentLoginId)}</div>
+                                        <div style="margin-top:6px;color:#475569;">Use this to sign in to the <strong>Student Dashboard</strong>.</div>
+                                    </div>
+
+                                    <div style="background:#f8fafc;border:1px solid #dbe4f0;border-radius:16px;padding:16px 18px;margin-bottom:12px;">
+                                        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;font-weight:700;">Guardian ID</div>
+                                        <div style="font-size:20px;font-weight:800;color:#0f172a;margin-top:4px;word-break:break-word;">${escapeHtml(guardianLogin)}</div>
+                                        <div style="margin-top:6px;color:#475569;">Use this to sign in to the <strong>Guardian Module</strong>.</div>
+                                    </div>
+
+                                    <div style="background:#f8fafc;border:1px solid #dbe4f0;border-radius:16px;padding:16px 18px;">
+                                        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;font-weight:700;">Guardian Password</div>
+                                        <div style="font-size:20px;font-weight:800;color:#0f172a;margin-top:4px;word-break:break-word;">${escapeHtml(guardianPasswordText)}</div>
+                                        <div style="margin-top:6px;color:#475569;">This is the password the guardian will use to sign in.</div>
+                                    </div>
+
+                                    <p class="mt-3" style="color:#475569;">Please keep these details safe. The guardian will use the login shown above together with the password shown here.</p>
+                                </div>
+                            `,
+                        });
                     }
                 } else if (hasGuardian) {
                     // Preserve existing guardian links for adult students unless staff changes them manually.
@@ -5904,7 +6717,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 showMessage(msg, 'success');
                 initStudentDashboardPage();
             } catch (err) {
-                const msg = err?.message || 'Failed to submit registration request.';
+                const msg = err?.response?.data?.error || err?.message || 'Failed to submit registration request.';
                 if (submitAllStatus) submitAllStatus.textContent = msg;
                 showMessage(msg, 'error');
             } finally {
@@ -7281,7 +8094,8 @@ function updateWalkinAgeAndGuardianRequired() {
     if (!dobInput || !ageDisplay) return;
 
     const age = calculateAgeFromBirthdate(dobInput.value);
-    const isMinor = age !== null && age < 18;
+    const isMinor = age !== null && age <= 18;
+    const allowRealEmail = age !== null && age > 18;
 
     if (age !== null) {
         ageDisplay.textContent = age + ' years old';
@@ -7291,6 +8105,7 @@ function updateWalkinAgeAndGuardianRequired() {
 
     if (guardianSection) guardianSection.classList.toggle('hidden', !isMinor);
     if (badge) badge.classList.toggle('hidden', !isMinor);
+    syncWalkinLoginModeUI(allowRealEmail);
 
     guardianFields.forEach(el => {
         if (isMinor) {
@@ -7456,7 +8271,7 @@ function setupWalkinEnrollmentForm() {
     calculateWalkinTotalFee();
 }
 
-function syncWalkinLoginModeUI() {
+function syncWalkinLoginModeUI(allowRealEmail = false) {
     const emailInput = document.getElementById('walkin_student_email');
     const emailLabel = document.getElementById('walkin_student_email_label');
     const emailHint = document.getElementById('walkin_student_email_hint');
@@ -7464,15 +8279,38 @@ function syncWalkinLoginModeUI() {
 
     emailInput.type = 'text';
     emailInput.autocomplete = 'off';
-    emailInput.placeholder = 'Login name';
+    emailInput.placeholder = allowRealEmail ? 'Real email or login name' : 'Login name';
     emailInput.required = true;
 
     if (emailLabel) {
-        emailLabel.textContent = 'Login Name (Becomes @fas.com)';
+        emailLabel.textContent = allowRealEmail
+            ? 'Student Email or Login Name'
+            : 'Login Name (Becomes @fas.com)';
     }
 
     if (emailHint) {
-        emailHint.innerHTML = 'Enter a simple name or username. The system will turn it into a <code>@fas.com</code> login automatically.';
+        emailHint.innerHTML = allowRealEmail
+            ? 'Adults can use a real email address for verification, or enter a simple login name and the system will turn it into a <code>@fas.com</code> login automatically.'
+            : 'Enter a simple name or username. The system will turn it into a <code>@fas.com</code> login automatically.';
+    }
+}
+
+function syncWalkinGuardianLoginModeUI() {
+    const emailInput = document.getElementById('walkin_guardian_email');
+    const emailLabel = document.getElementById('walkin_guardian_email_label');
+    const emailHint = document.getElementById('walkin_guardian_email_hint');
+    if (!emailInput) return;
+
+    emailInput.type = 'text';
+    emailInput.autocomplete = 'off';
+    emailInput.placeholder = 'Login name or real email';
+
+    if (emailLabel) {
+        emailLabel.textContent = 'Login Email (Becomes @fas.com)';
+    }
+
+    if (emailHint) {
+        emailHint.innerHTML = 'Use a real email address, or enter a simple login name and the system will turn it into a <code>@fas.com</code> account automatically.';
     }
 }
 
@@ -7484,6 +8322,7 @@ function initWalkinPage() {
     // Seed dropdowns
     loadWalkinBranches();
     syncWalkinLoginModeUI();
+    syncWalkinGuardianLoginModeUI();
 
     const branchSelect = document.getElementById('walkin_branch_id');
     const dobInput = document.getElementById('walkin_student_dob');
@@ -7555,11 +8394,12 @@ function initWalkinPage() {
 
             if (result.success) {
                 const guardianLabel = result.guardian_username
-                    ? `<strong>Guardian Username:</strong> ${escapeHtml(result.guardian_username)}<br><strong>Guardian Temporary Password:</strong> Generated automatically<br>`
+                    ? `<strong>Guardian ID:</strong> ${escapeHtml(result.guardian_username)}<br><strong>Guardian Password:</strong> Saved from registration<br>`
                     : '';
                 const loginLabel = 'Login Email';
                 const loginValue = result.login_email || result.username || data['student_email'] || '—';
                 const isWalkInAccount = Boolean(result.walkin_login_generated);
+                const needsVerification = Boolean(result.verification_required);
 
                 // Reset form and hide modal if present
                 form.reset();
@@ -7577,11 +8417,16 @@ function initWalkinPage() {
                            <strong>${loginLabel}:</strong> ${escapeHtml(loginValue)}<br>
                            <strong>Student Temporary Password:</strong> Generated automatically<br>
                            ${guardianLabel}
-                           ${isWalkInAccount
-                        ? '<br>The student can log in immediately using the login email above.'
-                        : '<br>Next step: confirm the walk-in registration payment method.'}`,
+                           ${needsVerification
+                         ? '<br>Next step: verify the email inbox before logging in.'
+                         : isWalkInAccount
+                         ? '<br>The student can log in immediately using the login email above.'
+                         : '<br>Next step: confirm the walk-in registration payment method.'}`,
                     confirmButtonColor: '#b8860b'
                 }).then(() => {
+                    if (needsVerification) {
+                        return;
+                    }
                     if (!isWalkInAccount) {
                         const redirectTemplate = String(form.dataset.paymentRedirectTemplate || '').trim();
                         const redirectUrl = redirectTemplate

@@ -30,6 +30,138 @@
         .portal-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); }
         html.dark .portal-nav { background: rgba(15,17,21,0.92); }
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
+        .guardian-register-popup {
+            border-radius: 1.5rem !important;
+            overflow: hidden;
+            box-shadow: 0 30px 90px rgba(15, 23, 42, 0.22) !important;
+        }
+        .guardian-register-popup .swal2-html-container {
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+        }
+        .guardian-register-shell {
+            padding: 1.5rem;
+            background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+        }
+        .guardian-register-hero {
+            padding-bottom: 1rem;
+        }
+        .guardian-register-kicker {
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            font-size: 10px;
+            font-weight: 800;
+            color: #b8860b;
+            margin-bottom: 0.5rem;
+        }
+        .guardian-register-title {
+            font-size: 1.875rem;
+            line-height: 1.1;
+            font-weight: 900;
+            color: #111827;
+            margin-bottom: 0.5rem;
+        }
+        .guardian-register-copy {
+            color: #52525b;
+            line-height: 1.65;
+            max-width: 52rem;
+        }
+        .guardian-register-section {
+            border: 1px solid #e4e4e7;
+            background: #fff;
+            border-radius: 1rem;
+            padding: 1rem;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+        }
+        .guardian-register-section + .guardian-register-section {
+            margin-top: 0.9rem;
+        }
+        .guardian-register-section-head {
+            display: flex;
+            gap: 0.9rem;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.85rem;
+        }
+        .guardian-register-section-title {
+            font-size: 0.95rem;
+            font-weight: 900;
+            color: #111827;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+        }
+        .guardian-register-section-subtitle {
+            margin-top: 0.25rem;
+            font-size: 0.78rem;
+            color: #71717a;
+        }
+        .guardian-register-branch-pill {
+            border: 1px solid #f1d88b;
+            background: #fef9e7;
+            color: #7c5a00;
+            border-radius: 999px;
+            padding: 0.55rem 0.8rem;
+            min-width: 10rem;
+            text-align: right;
+        }
+        .guardian-register-branch-label {
+            display: block;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            font-weight: 800;
+            opacity: 0.7;
+        }
+        .guardian-register-branch-name {
+            display: block;
+            font-size: 0.92rem;
+            font-weight: 700;
+            margin-top: 0.1rem;
+        }
+        .guardian-register-label {
+            display: block;
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: #52525b;
+            margin-bottom: 0.45rem;
+        }
+        .guardian-register-note {
+            border: 1px dashed #d4af37;
+            background: #fffaf0;
+            border-radius: 0.9rem;
+            padding: 0.9rem 1rem;
+        }
+        .guardian-register-helper {
+            margin-top: 0.45rem;
+            font-size: 0.72rem;
+            color: #71717a;
+        }
+        .guardian-swal-input {
+            width: 100% !important;
+            margin: 0 !important;
+            border-radius: 0.75rem !important;
+            border: 1px solid #e4e4e7 !important;
+            background: #fff !important;
+            padding: 0.95rem 1rem !important;
+            box-shadow: none !important;
+            color: #111827 !important;
+        }
+        .guardian-swal-input:focus {
+            border-color: #b8860b !important;
+            box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.15) !important;
+        }
+        .guardian-swal-file {
+            display: block;
+            width: 100%;
+            border: 1px solid #e4e4e7;
+            border-radius: 0.75rem;
+            background: #fff;
+            padding: 0.72rem 0.9rem;
+            color: #374151;
+        }
     </style>
 </head>
 <body class="portal-easy bg-gray-50 dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
@@ -147,6 +279,20 @@
                     <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2">
                         <span class="portal-stat-label">Paid</span>
                         <span id="guardianTotalPaid" class="ml-2 font-bold text-zinc-900 dark:text-white">₱0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-5 shadow-sm">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div>
+                        <div class="text-lg font-extrabold text-zinc-900 dark:text-white">Register a student</div>
+                        <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Use the button below to register another student from your guardian account.</div>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button type="button" onclick="guardianRegisterNewStudent()" class="px-4 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold transition">
+                            Register Another Student
+                        </button>
                     </div>
                 </div>
             </div>

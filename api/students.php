@@ -29,6 +29,8 @@ if (!isset($conn) || $conn === null) {
 class StudentsApi
 {
     private $conn;
+    private $phpMailerLoaded = false;
+    private $lastMailError = null;
 
     public function __construct($pdo)
     {
@@ -41,6 +43,203 @@ class StudentsApi
         $this->ensureStudentProgressTable();
         $this->ensureScheduleOperationLookupTable();
         $this->ensureSessionRescheduleWorkflow();
+    }
+
+    private function ensurePhpMailerLoaded()
+    {
+        if ($this->phpMailerLoaded) {
+            return;
+        }
+        require_once dirname(__DIR__) . '/phpmailer/src/Exception.php';
+        require_once dirname(__DIR__) . '/phpmailer/src/PHPMailer.php';
+        require_once dirname(__DIR__) . '/phpmailer/src/SMTP.php';
+        $this->phpMailerLoaded = true;
+    }
+
+    private function isValidEmailAddress($email)
+    {
+        return filter_var(trim((string)$email), FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    private function calculateAgeFromDateOfBirth($dateOfBirth)
+    {
+        $dateOfBirth = trim((string)$dateOfBirth);
+        if ($dateOfBirth === '') {
+            return null;
+        }
+
+        try {
+            $birthDate = new DateTime($dateOfBirth);
+            $today = new DateTime('today');
+            if ($birthDate > $today) {
+                return null;
+            }
+
+            return (int)$birthDate->diff($today)->y;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    private function isWalkInSystemEmail($email)
+    {
+        return preg_match('/@fas\.com$/i', trim((string)$email)) === 1;
+    }
+
+    private function ensureUserVerificationColumns()
+    {
+        try {
+            if (!$this->hasUserColumn('email_verified_at')) {
+                $this->conn->exec("ALTER TABLE tbl_users ADD COLUMN email_verified_at DATETIME NULL AFTER status");
+            }
+            if (!$this->hasUserColumn('email_verification_code_hash')) {
+                $this->conn->exec("ALTER TABLE tbl_users ADD COLUMN email_verification_code_hash VARCHAR(255) NULL AFTER email_verified_at");
+            }
+            if (!$this->hasUserColumn('email_verification_code_expires_at')) {
+                $this->conn->exec("ALTER TABLE tbl_users ADD COLUMN email_verification_code_expires_at DATETIME NULL AFTER email_verification_code_hash");
+            }
+            if (!$this->hasUserColumn('email_verification_sent_at')) {
+                $this->conn->exec("ALTER TABLE tbl_users ADD COLUMN email_verification_sent_at DATETIME NULL AFTER email_verification_code_expires_at");
+            }
+        } catch (PDOException $e) {
+            // Keep API working even if migration is incomplete.
+        }
+    }
+
+    private function generateEmailVerificationCode()
+    {
+        return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    }
+
+    private function getMailSettings()
+    {
+        $env = static function ($key, $default = '') {
+            $value = getenv($key);
+            if ($value === false || $value === null || $value === '') {
+                $value = $_ENV[$key] ?? $_SERVER[$key] ?? $default;
+            }
+            return is_string($value) ? trim($value) : $default;
+        };
+
+        $fileConfig = [];
+        $mailConfigPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'mail_config.php';
+        if (is_file($mailConfigPath)) {
+            $loadedConfig = include $mailConfigPath;
+            if (is_array($loadedConfig)) {
+                $fileConfig = $loadedConfig;
+            }
+        }
+
+        return [
+            'host' => $fileConfig['host'] ?? $env('MAIL_HOST', ''),
+            'username' => $fileConfig['username'] ?? $env('MAIL_USERNAME', ''),
+            'password' => $fileConfig['password'] ?? $env('MAIL_PASSWORD', ''),
+            'port' => (int)($fileConfig['port'] ?? $env('MAIL_PORT', 465)),
+            'from_address' => $fileConfig['from_address'] ?? $env('MAIL_FROM_ADDRESS', $env('MAIL_USERNAME', '')),
+            'from_name' => $fileConfig['from_name'] ?? $env('MAIL_FROM_NAME', 'Father & Sons Music School'),
+            'encryption' => strtolower((string)($fileConfig['encryption'] ?? $env('MAIL_ENCRYPTION', 'ssl'))),
+            'verify_peer' => filter_var($fileConfig['verify_peer'] ?? $env('MAIL_VERIFY_PEER', 'true'), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE),
+        ];
+    }
+
+    private function configurePhpMailer($mailer, array $mail)
+    {
+        $mailer->isSMTP();
+        $mailer->Host = $mail['host'];
+        $mailer->SMTPAuth = true;
+        $mailer->Username = $mail['username'];
+        $mailer->Password = $mail['password'];
+        $mailer->Port = (int)$mail['port'];
+        if (($mail['encryption'] ?? '') === 'ssl') {
+            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+        } elseif (($mail['encryption'] ?? '') === 'tls') {
+            $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        } else {
+            $mailer->SMTPSecure = '';
+        }
+        $mailer->SMTPOptions = [
+            'ssl' => [
+                'verify_peer' => $mail['verify_peer'] !== false,
+                'verify_peer_name' => $mail['verify_peer'] !== false,
+                'allow_self_signed' => $mail['verify_peer'] === false
+            ]
+        ];
+        $mailer->setFrom($mail['from_address'], $mail['from_name']);
+        $mailer->isHTML(true);
+    }
+
+    private function sendVerificationEmail($toEmail, $toName, $verificationCode)
+    {
+        $this->ensurePhpMailerLoaded();
+        $mail = $this->getMailSettings();
+        if (!$this->isValidEmailAddress($mail['from_address'])) {
+            throw new Exception('This email is invalid. Please check the address or choose No email account.');
+        }
+        if (empty($mail['host'])) {
+            throw new Exception('Mail service is not configured.');
+        }
+
+        $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+        $this->configurePhpMailer($mailer, $mail);
+        $mailer->addAddress($toEmail, $toName ?: $toEmail);
+
+        $safeName = htmlspecialchars($toName ?: 'User', ENT_QUOTES, 'UTF-8');
+        $safeCode = htmlspecialchars((string)$verificationCode, ENT_QUOTES, 'UTF-8');
+        $year = date('Y');
+
+        $mailer->Subject = 'Your Father & Sons Music verification code';
+        $mailer->Body = '
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+                <h2 style="margin: 0 0 12px;">Verify your email address</h2>
+                <p>Hello ' . $safeName . ',</p>
+                <p>Your verification code is:</p>
+                <p style="font-size: 24px; font-weight: 700; margin: 16px 0; color: #b8860b;">' . $safeCode . '</p>
+                <p>This code expires in 15 minutes.</p>
+                <p>Please enter it to activate your account.</p>
+                <p style="margin-top: 24px; color: #6b7280; font-size: 12px;">&copy; ' . $year . ' Father &amp; Sons Music School</p>
+            </div>
+        ';
+        $mailer->AltBody = "Your verification code is {$verificationCode}. It expires in 15 minutes.";
+        $mailer->send();
+        return true;
+    }
+
+    private function issueEmailVerificationCode($userId, $toEmail, $toName)
+    {
+        $this->ensureUserVerificationColumns();
+        $verificationCode = $this->generateEmailVerificationCode();
+        $verificationHash = password_hash($verificationCode, PASSWORD_DEFAULT);
+        $expiresAt = date('Y-m-d H:i:s', time() + (15 * 60));
+
+        $stmt = $this->conn->prepare("
+            UPDATE tbl_users
+            SET email_verification_code_hash = ?,
+                email_verification_code_expires_at = ?,
+                email_verification_sent_at = NOW(),
+                email_verified_at = NULL
+            WHERE user_id = ?
+        ");
+        $stmt->execute([
+            $verificationHash,
+            $expiresAt,
+            (int)$userId
+        ]);
+
+        $emailSent = false;
+        $mailError = null;
+        try {
+            $emailSent = $this->sendVerificationEmail($toEmail, $toName, $verificationCode);
+        } catch (Exception $e) {
+            $mailError = $e->getMessage();
+            error_log('issueEmailVerificationCode mail error: ' . $mailError);
+        }
+
+        return [
+            'verification_code' => $verificationCode,
+            'email_sent' => (bool)$emailSent,
+            'mail_configured' => true,
+            'mail_error' => $mailError ?: $this->lastMailError
+        ];
     }
 
     public function sendJSON($data, $status = 200)
@@ -73,10 +272,60 @@ class StudentsApi
         return stripos((string)$contentType, 'multipart/form-data') !== false;
     }
 
+    private function ensureStudentRegistrationProofColumn()
+    {
+        if ($this->hasStudentColumn('registration_proof_path')) return;
+        try {
+            if ($this->hasStudentColumn('registration_fee_paid')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL AFTER registration_fee_paid");
+            } else {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_proof_path VARCHAR(255) NULL");
+            }
+        } catch (PDOException $e) {
+            // Keep API working even if alter fails
+        }
+    }
+
+    private function ensureStudentRegistrationColumns()
+    {
+        // Registration fee state now comes from tbl_registration_payments.
+        return;
+    }
+
+    private function ensureStudentRegistrationSourceColumn()
+    {
+        if ($this->hasStudentColumn('registration_source')) {
+            return;
+        }
+
+        try {
+            if ($this->hasStudentColumn('registration_proof_path')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_source VARCHAR(30) NULL AFTER registration_proof_path");
+            } elseif ($this->hasStudentColumn('age_verification_proof_path')) {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_source VARCHAR(30) NULL AFTER age_verification_proof_path");
+            } else {
+                $this->conn->exec("ALTER TABLE tbl_students ADD COLUMN registration_source VARCHAR(30) NULL");
+            }
+        } catch (PDOException $e) {
+            // Keep API working even if the migration cannot be applied.
+        }
+    }
+
     private function hasStudentColumn($columnName)
     {
         try {
             $stmt = $this->conn->prepare("SHOW COLUMNS FROM tbl_students LIKE ?");
+            $stmt->execute([$columnName]);
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function hasUserColumn($columnName)
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW COLUMNS FROM tbl_users LIKE ?");
             $stmt->execute([$columnName]);
             return $stmt->rowCount() > 0;
         } catch (PDOException $e) {
@@ -143,6 +392,47 @@ class StudentsApi
         $targetPath = $baseDir . DIRECTORY_SEPARATOR . $safeName;
         if (!move_uploaded_file($tmpName, $targetPath)) {
             throw new Exception('Unable to save payment proof file.');
+        }
+
+        return 'uploads/payment_proofs/' . $scope . '/' . $safeName;
+    }
+
+    private function storeVerificationProofUpload($file, $scope = 'age_verification')
+    {
+        if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+            throw new Exception('Failed to upload verification proof file.');
+        }
+
+        $maxBytes = 5 * 1024 * 1024; // 5MB
+        $size = (int)($file['size'] ?? 0);
+        if ($size < 1 || $size > $maxBytes) {
+            throw new Exception('Verification proof file must be between 1 byte and 5MB.');
+        }
+
+        $tmpName = $file['tmp_name'] ?? '';
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+            throw new Exception('Invalid uploaded file.');
+        }
+
+        $allowedExt = ['jpg', 'jpeg', 'png', 'pdf', 'webp'];
+        $originalName = (string)($file['name'] ?? '');
+        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowedExt, true)) {
+            throw new Exception('Verification proof must be JPG, JPEG, PNG, WEBP, or PDF.');
+        }
+
+        $baseDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'payment_proofs' . DIRECTORY_SEPARATOR . $scope;
+        if (!is_dir($baseDir) && !mkdir($baseDir, 0777, true) && !is_dir($baseDir)) {
+            throw new Exception('Unable to create upload directory.');
+        }
+
+        $safeName = date('YmdHis') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+        $targetPath = $baseDir . DIRECTORY_SEPARATOR . $safeName;
+        if (!move_uploaded_file($tmpName, $targetPath)) {
+            throw new Exception('Unable to save verification proof file.');
         }
 
         return 'uploads/payment_proofs/' . $scope . '/' . $safeName;
@@ -2256,6 +2546,146 @@ class StudentsApi
         }
     }
 
+    private function buildTemporaryStudentNumber($studentId)
+    {
+        $studentId = (int) $studentId;
+        $base = null;
+
+        try {
+            if ($studentId > 0 && $this->tableHasColumn('tbl_students', 'student_code')) {
+                $stmt = $this->conn->prepare("
+                    SELECT student_code, created_at
+                    FROM tbl_students
+                    WHERE student_id = ?
+                    LIMIT 1
+                ");
+                $stmt->execute([$studentId]);
+                $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+                $studentCode = trim((string)($student['student_code'] ?? ''));
+                if ($studentCode !== '') {
+                    $base = $studentCode;
+                } else {
+                    $createdAt = trim((string)($student['created_at'] ?? ''));
+                    $year = $createdAt !== '' ? (int)date('Y', strtotime($createdAt)) : (int)date('Y');
+                    $base = sprintf('STU-%04d-%04d', $year, $studentId);
+                }
+
+                if ($studentCode === '') {
+                    $stmtUpdate = $this->conn->prepare("
+                        UPDATE tbl_students
+                        SET student_code = ?
+                        WHERE student_id = ?
+                          AND (student_code IS NULL OR TRIM(student_code) = '')
+                    ");
+                    $stmtUpdate->execute([$base, $studentId]);
+                }
+            }
+        } catch (PDOException $e) {
+            $base = null;
+        }
+
+        if ($base === null || trim((string)$base) === '') {
+            $base = sprintf('STU-%04d-%04d', (int)date('Y'), max(1, $studentId));
+        }
+
+        $candidate = $base;
+        $suffix = 2;
+        while ($this->loginIdentifierExists($candidate)) {
+            $candidate = $base . '-' . $suffix;
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function buildStudentLoginIdentifier($studentId)
+    {
+        $studentId = (int) $studentId;
+        if ($studentId < 1) {
+            return '';
+        }
+
+        try {
+            if ($this->tableHasColumn('tbl_students', 'student_code')) {
+                $stmt = $this->conn->prepare("
+                    SELECT student_code, created_at
+                    FROM tbl_students
+                    WHERE student_id = ?
+                    LIMIT 1
+                ");
+                $stmt->execute([$studentId]);
+                $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+                $studentCode = trim((string)($student['student_code'] ?? ''));
+                if ($studentCode !== '') {
+                    return $studentCode;
+                }
+
+                $createdAt = trim((string)($student['created_at'] ?? ''));
+                $year = $createdAt !== '' ? (int)date('Y', strtotime($createdAt)) : (int)date('Y');
+                $studentCode = sprintf('STU-%04d-%04d', $year, $studentId);
+
+                $stmtUpdate = $this->conn->prepare("
+                    UPDATE tbl_students
+                    SET student_code = ?
+                    WHERE student_id = ?
+                      AND (student_code IS NULL OR TRIM(student_code) = '')
+                ");
+                $stmtUpdate->execute([$studentCode, $studentId]);
+
+                return $studentCode;
+            }
+        } catch (PDOException $e) {
+            // Fall through to the formatted identifier below.
+        }
+
+        return sprintf('STU-%04d-%04d', (int)date('Y'), $studentId);
+    }
+
+    private function buildGuardianUsername($studentId, $guardianEmail)
+    {
+        $studentId = (int)$studentId;
+        $guardianEmail = trim((string)$guardianEmail);
+        if ($guardianEmail !== '' && strpos($guardianEmail, '@') !== false) {
+            return strtolower($guardianEmail);
+        }
+
+        return sprintf('GUA-%04d-%04d', (int)date('Y'), max(1, $studentId));
+    }
+
+    private function loginIdentifierExists($identifier)
+    {
+        $identifier = trim((string)$identifier);
+        if ($identifier === '') {
+            return true;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT 1
+                FROM tbl_users
+                WHERE username = ? OR email = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$identifier, $identifier]);
+            if ($stmt->fetchColumn()) {
+                return true;
+            }
+
+            $stmtGuardian = $this->conn->prepare("
+                SELECT 1
+                FROM tbl_guardians
+                WHERE email = ?
+                LIMIT 1
+            ");
+            $stmtGuardian->execute([$identifier]);
+            return (bool)$stmtGuardian->fetchColumn();
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     // Get all students for admin_students page
     public function getAllStudents()
     {
@@ -3178,6 +3608,8 @@ class StudentsApi
         $guardianLastName = trim((string)($data['guardian_last_name'] ?? ''));
         $guardianPhone = trim((string)($data['guardian_phone'] ?? ''));
         $guardianRelationship = trim((string)($data['guardian_relationship'] ?? ''));
+        $guardianPasswordMode = strtolower(trim((string)($data['guardian_password_mode'] ?? 'default')));
+        $guardianCustomPassword = (string)($data['guardian_password'] ?? '');
 
         if ($studentId < 1) {
             $this->sendJSON(['error' => 'student_id is required'], 400);
@@ -3211,6 +3643,7 @@ class StudentsApi
 
             $guardianUserId = null;
             $guardianRoleId = null;
+            $guardianNeedsVerification = false;
             $roleStmt = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = 'Guardians' LIMIT 1");
             $roleStmt->execute();
             $role = $roleStmt->fetch(PDO::FETCH_ASSOC);
@@ -3221,26 +3654,45 @@ class StudentsApi
                 $this->sendJSON(['error' => 'Guardian role not found. Please contact admin.'], 500);
             }
 
+            if ($guardianPasswordMode === 'custom') {
+                if (strlen($guardianCustomPassword) < 8) {
+                    $this->sendJSON(['error' => 'Custom guardian password must be at least 8 characters long'], 400);
+                }
+                if (!preg_match('/[A-Z]/', $guardianCustomPassword)) {
+                    $this->sendJSON(['error' => 'Custom guardian password must contain at least one uppercase letter'], 400);
+                }
+                if (!preg_match('/[a-z]/', $guardianCustomPassword)) {
+                    $this->sendJSON(['error' => 'Custom guardian password must contain at least one lowercase letter'], 400);
+                }
+                if (!preg_match('/[0-9]/', $guardianCustomPassword)) {
+                    $this->sendJSON(['error' => 'Custom guardian password must contain at least one number'], 400);
+                }
+                if (!preg_match('/[!@#$%^&*]/', $guardianCustomPassword)) {
+                    $this->sendJSON(['error' => 'Custom guardian password must contain at least one special character (!@#$%^&*)'], 400);
+                }
+            }
+
             $stmtUser = $this->conn->prepare("
-                SELECT u.user_id, r.role_name
+                SELECT u.user_id, u.status, u.email_verified_at, r.role_name
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON r.role_id = u.role_id
-                WHERE u.email = ? OR u.username = ?
+                WHERE (LOWER(TRIM(u.email)) = LOWER(TRIM(?))
+                    OR LOWER(TRIM(u.username)) = LOWER(TRIM(?)))
+                  AND LOWER(TRIM(r.role_name)) IN ('guardian', 'guardians')
                 LIMIT 1
             ");
             $stmtUser->execute([$guardianEmail, $guardianEmail]);
             $guardianUser = $stmtUser->fetch(PDO::FETCH_ASSOC);
-            if ($guardianUser && strcasecmp((string)$guardianUser['role_name'], 'Guardians') !== 0) {
-                $this->sendJSON([
-                    'error' => 'This email is already used by a non-guardian account. Please use a different guardian email.'
-                ], 400);
-            }
+            $guardianLoginIdentifier = $this->buildGuardianUsername($studentId, $guardianEmail);
+            $guardianDbUsername = $guardianLoginIdentifier;
             if ($guardianUser) {
                 $guardianUserId = (int)$guardianUser['user_id'];
             }
 
             $createdGuardianAccount = false;
-            $defaultGuardianPassword = 'fasmusic@2020';
+            $guardianPasswordToUse = trim($guardianCustomPassword);
+            $mailError = null;
+            $this->conn->beginTransaction();
 
             if (!$guardian) {
                 if ($guardianFirstName === '' || $guardianLastName === '' || $guardianPhone === '' || $guardianRelationship === '') {
@@ -3274,26 +3726,77 @@ class StudentsApi
             }
 
             if (!$guardianUserId) {
-                $hashedPassword = password_hash($defaultGuardianPassword, PASSWORD_DEFAULT);
+                if ($guardianPasswordToUse === '') {
+                    $this->sendJSON(['error' => 'guardian_password is required'], 400);
+                }
+                $hashedPassword = password_hash($guardianPasswordToUse, PASSWORD_DEFAULT);
+                $guardianUserStatus = $guardianNeedsVerification ? 'Inactive' : 'Active';
                 $stmtCreateUser = $this->conn->prepare("
                     INSERT INTO tbl_users (
                         username, password, role_id, first_name, last_name, email, phone, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Inactive')
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmtCreateUser->execute([
-                    $guardianEmail,
+                    $guardianDbUsername,
                     $hashedPassword,
                     $guardianRoleId,
                     $guardian['first_name'] ?? $guardianFirstName,
                     $guardian['last_name'] ?? $guardianLastName,
                     $guardianEmail,
-                    $guardian['phone'] ?? $guardianPhone
+                    $guardian['phone'] ?? $guardianPhone,
+                    $guardianUserStatus
                 ]);
                 $guardianUserId = (int)$this->conn->lastInsertId();
                 $createdGuardianAccount = true;
+            } else {
+                $stmtUpdateUser = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET username = ?,
+                        email = ?,
+                        first_name = ?,
+                        last_name = ?,
+                        phone = ?,
+                        status = 'Active'
+                    WHERE user_id = ?
+                ");
+                $stmtUpdateUser->execute([
+                    $guardianDbUsername,
+                    $guardianEmail,
+                    $guardian['first_name'] ?? $guardianFirstName,
+                    $guardian['last_name'] ?? $guardianLastName,
+                    $guardian['phone'] ?? $guardianPhone,
+                    $guardianUserId
+                ]);
             }
 
-            $this->conn->beginTransaction();
+            if ($guardianNeedsVerification) {
+                $stmtDeactivateGuardian = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET status = 'Inactive'
+                    WHERE user_id = ?
+                ");
+                $stmtDeactivateGuardian->execute([$guardianUserId]);
+
+                $verificationResult = $this->issueEmailVerificationCode(
+                    $guardianUserId,
+                    $guardianEmail,
+                    trim(($guardian['first_name'] ?? $guardianFirstName) . ' ' . ($guardian['last_name'] ?? $guardianLastName))
+                );
+                if (!(bool)($verificationResult['email_sent'] ?? false)) {
+                    $mailError = $verificationResult['mail_error'] ?? 'Verification email could not be sent.';
+                }
+            } elseif ($this->hasUserColumn('email_verified_at')) {
+                $stmtActivateGuardian = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET status = 'Active',
+                        email_verified_at = COALESCE(email_verified_at, NOW()),
+                        email_verification_code_hash = NULL,
+                        email_verification_code_expires_at = NULL,
+                        email_verification_sent_at = NULL
+                    WHERE user_id = ?
+                ");
+                $stmtActivateGuardian->execute([$guardianUserId]);
+            }
 
             $stmtUnset = $this->conn->prepare("
                 UPDATE tbl_student_guardians
@@ -3331,20 +3834,278 @@ class StudentsApi
 
             $message = 'Guardian linked successfully.';
             if ($createdGuardianAccount) {
-                $message = 'Guardian account created and linked. Default password is ' . $defaultGuardianPassword . ' (must change on first login).';
+                $message = $guardianPasswordMode === 'custom'
+                    ? 'Guardian account created and linked with the password you provided.'
+                    : 'Guardian account created and linked with the same password used during registration.';
             }
 
             $this->sendJSON([
                 'success' => true,
                 'message' => $message,
                 'guardian' => $guardian,
-                'guardian_created' => $createdGuardianAccount
+                'guardian_created' => $createdGuardianAccount,
+                'guardian_login_generated' => true,
+                'guardian_username' => $guardianLoginIdentifier,
+                'guardian_temporary_password' => $guardianPasswordToUse,
+                'student_login_identifier' => $this->buildStudentLoginIdentifier($studentId),
+                'mail_error' => $mailError,
+                'guardian_password_mode' => $guardianPasswordMode
             ]);
         } catch (PDOException $e) {
             if ($this->conn && $this->conn->inTransaction()) {
                 $this->conn->rollBack();
             }
+            error_log('setGuardianMode PDOException: ' . $e->getMessage());
+            $this->sendJSON([
+                'error' => 'Database error: ' . $e->getMessage(),
+                'sqlstate' => $e->getCode()
+            ], 500);
+        }
+    }
+
+    public function guardianRegisterChild()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $isMultipart = $this->isMultipartRequest();
+        $data = $isMultipart ? ($_POST ?: []) : (json_decode(file_get_contents('php://input'), true) ?: []);
+
+        foreach (['guardian_email', 'student_first_name', 'student_last_name', 'student_date_of_birth', 'branch_id', 'password', 'payment_method', 'reference_number'] as $key) {
+            if (isset($data[$key]) && is_string($data[$key])) {
+                $data[$key] = trim($data[$key]);
+            }
+        }
+
+        $guardianEmail = trim((string)($data['guardian_email'] ?? ''));
+        $studentFirstName = trim((string)($data['student_first_name'] ?? ''));
+        $studentLastName = trim((string)($data['student_last_name'] ?? ''));
+        $studentDob = trim((string)($data['student_date_of_birth'] ?? ''));
+        $branchId = (int)($data['branch_id'] ?? 0);
+        $password = (string)($data['password'] ?? '');
+        $paymentMethod = trim((string)($data['payment_method'] ?? ''));
+        $referenceNumber = trim((string)($data['reference_number'] ?? ''));
+
+        if ($guardianEmail === '') {
+            $this->sendJSON(['error' => 'guardian_email is required'], 400);
+        }
+        if ($studentFirstName === '' || $studentLastName === '' || $studentDob === '' || $branchId < 1 || $password === '' || $paymentMethod === '' || $referenceNumber === '') {
+            $this->sendJSON(['error' => 'All required child details and payment information must be filled in'], 400);
+        }
+
+        $age = $this->calculateAgeFromDateOfBirth($studentDob);
+        if ($age === null || $age < 3) {
+            $this->sendJSON(['error' => 'Student date of birth is invalid or too young'], 400);
+        }
+        if (strlen($password) < 8 || !preg_match('/[A-Z]/', $password) || !preg_match('/[a-z]/', $password) || !preg_match('/[0-9]/', $password) || !preg_match('/[!@#$%^&*]/', $password)) {
+            $this->sendJSON(['error' => 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character'], 400);
+        }
+
+        $registrationFeeAmount = 1000.00;
+        $registrationProofPath = null;
+        $ageVerificationProofPath = null;
+        if ($isMultipart && isset($_FILES['registration_proof_file'])) {
+            try {
+                $registrationProofPath = $this->storePaymentProofUpload($_FILES['registration_proof_file'], 'registration');
+            } catch (Exception $e) {
+                $this->sendJSON(['error' => $e->getMessage()], 400);
+            }
+        }
+        if ($isMultipart && isset($_FILES['age_verification_proof_file'])) {
+            try {
+                $ageVerificationProofPath = $this->storeVerificationProofUpload($_FILES['age_verification_proof_file'], 'age_verification');
+            } catch (Exception $e) {
+                $this->sendJSON(['error' => $e->getMessage()], 400);
+            }
+        }
+        if (empty($registrationProofPath)) {
+            $this->sendJSON(['error' => 'Registration payment proof is required'], 400);
+        }
+        if (empty($ageVerificationProofPath)) {
+            $this->sendJSON(['error' => 'ID proof is required'], 400);
+        }
+
+        try {
+            $this->ensureUserVerificationColumns();
+            $this->ensureStudentRegistrationColumns();
+            $this->ensureStudentRegistrationSourceColumn();
+            $this->ensureStudentRegistrationProofColumn();
+            $this->ensureStudentAgeVerificationProofColumn();
+
+            $studentPhone = trim((string)($data['student_phone'] ?? ''));
+            $studentAddress = trim((string)($data['student_address'] ?? ''));
+
+            $stmtGuardian = $this->conn->prepare("
+                SELECT g.guardian_id, g.first_name, g.last_name, g.email, g.phone, r.role_name, u.user_id AS guardian_user_id
+                FROM tbl_guardians g
+                LEFT JOIN tbl_users u ON LOWER(TRIM(u.email)) = LOWER(TRIM(g.email)) OR LOWER(TRIM(u.username)) = LOWER(TRIM(g.email))
+                LEFT JOIN tbl_roles r ON r.role_id = u.role_id
+                WHERE LOWER(TRIM(g.email)) = LOWER(TRIM(?))
+                LIMIT 1
+            ");
+            $stmtGuardian->execute([$guardianEmail]);
+            $guardian = $stmtGuardian->fetch(PDO::FETCH_ASSOC);
+            if (!$guardian) {
+                $this->sendJSON(['error' => 'Guardian not found for this email'], 404);
+            }
+
+            $this->conn->beginTransaction();
+
+            $studentColumns = ['branch_id', 'first_name', 'last_name', 'phone', 'email', 'status'];
+            $studentValues = [
+                $branchId,
+                $studentFirstName,
+                $studentLastName,
+                $studentPhone !== '' ? $studentPhone : '',
+                $studentEmail,
+                'Inactive'
+            ];
+            if ($this->hasStudentColumn('date_of_birth')) {
+                $studentColumns[] = 'date_of_birth';
+                $studentValues[] = $studentDob;
+            }
+            if ($this->hasStudentColumn('age')) {
+                $studentColumns[] = 'age';
+                $studentValues[] = $age;
+            }
+            if ($this->hasStudentColumn('address')) {
+                $studentColumns[] = 'address';
+                $studentValues[] = $studentAddress !== '' ? $studentAddress : '';
+            }
+            if ($this->hasStudentColumn('registration_source')) {
+                $studentColumns[] = 'registration_source';
+                $studentValues[] = 'guardian-portal';
+            }
+
+            $studentPlaceholders = implode(', ', array_fill(0, count($studentColumns), '?'));
+            $stmtStudent = $this->conn->prepare("
+                INSERT INTO tbl_students (" . implode(', ', $studentColumns) . ")
+                VALUES ({$studentPlaceholders})
+            ");
+            $stmtStudent->execute($studentValues);
+            $studentId = (int)$this->conn->lastInsertId();
+            $studentLoginIdentifier = $this->buildStudentLoginIdentifier($studentId);
+            $studentEmail = $studentLoginIdentifier;
+            if ($this->hasStudentColumn('email')) {
+                $stmtUpdateStudentEmail = $this->conn->prepare("
+                    UPDATE tbl_students
+                    SET email = ?
+                    WHERE student_id = ?
+                ");
+                $stmtUpdateStudentEmail->execute([$studentEmail, $studentId]);
+            }
+
+            if ($this->hasStudentColumn('registration_proof_path')) {
+                $stmtProof = $this->conn->prepare("
+                    UPDATE tbl_students
+                    SET registration_proof_path = ?
+                    WHERE student_id = ?
+                ");
+                $stmtProof->execute([$registrationProofPath, $studentId]);
+            }
+            if ($this->hasStudentColumn('age_verification_proof_path')) {
+                $stmtAgeProof = $this->conn->prepare("
+                    UPDATE tbl_students
+                    SET age_verification_proof_path = ?
+                    WHERE student_id = ?
+                ");
+                $stmtAgeProof->execute([$ageVerificationProofPath, $studentId]);
+            }
+
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            $studentRoleId = null;
+            $stmtRole = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = 'Student' LIMIT 1");
+            $stmtRole->execute();
+            $studentRoleId = (int)($stmtRole->fetchColumn() ?: 0);
+            if ($studentRoleId < 1) {
+                throw new Exception('Student role not found');
+            }
+
+            $stmtUser = $this->conn->prepare("
+                INSERT INTO tbl_users (
+                    username, password, role_id, first_name, last_name, email, phone, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Inactive')
+            ");
+            $stmtUser->execute([
+                $studentLoginIdentifier,
+                $hashedPassword,
+                $studentRoleId,
+                $studentFirstName,
+                $studentLastName,
+                $studentEmail,
+                $studentPhone
+            ]);
+            $studentUserId = (int)$this->conn->lastInsertId();
+            if ($this->hasUserColumn('email_verified_at')) {
+                $stmtMarkUnverified = $this->conn->prepare("
+                    UPDATE tbl_users
+                    SET status = 'Inactive',
+                        email_verified_at = NULL,
+                        email_verification_code_hash = NULL,
+                        email_verification_code_expires_at = NULL,
+                        email_verification_sent_at = NULL
+                    WHERE user_id = ?
+                ");
+                $stmtMarkUnverified->execute([$studentUserId]);
+            }
+
+            $paymentColumns = ['student_id', 'payment_date', 'amount', 'payment_method', 'status', 'receipt_number'];
+            $paymentPlaceholders = ['?', 'CURRENT_DATE', '?', '?', "'Pending'", '?'];
+            $paymentValues = [
+                $studentId,
+                $registrationFeeAmount,
+                $paymentMethod,
+                'REG-GUARDIAN-' . time()
+            ];
+            if ($this->tableHasColumn('tbl_registration_payments', 'reference_number')) {
+                $paymentColumns[] = 'reference_number';
+                $paymentPlaceholders[] = '?';
+                $paymentValues[] = $referenceNumber;
+            }
+
+            $stmtPayment = $this->conn->prepare(sprintf(
+                "INSERT INTO tbl_registration_payments (%s) VALUES (%s)",
+                implode(', ', $paymentColumns),
+                implode(', ', $paymentPlaceholders)
+            ));
+            $stmtPayment->execute($paymentValues);
+
+            $stmtLink = $this->conn->prepare("
+                INSERT INTO tbl_student_guardians (
+                    student_id, guardian_id, is_primary_guardian, can_enroll, can_pay, emergency_contact
+                ) VALUES (?, ?, 'Y', 'Y', 'Y', 'Y')
+            ");
+            $stmtLink->execute([$studentId, (int)$guardian['guardian_id']]);
+
+            $this->conn->commit();
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Child registration submitted successfully and is now pending review.',
+                'student_id' => $studentId,
+                'student_user_id' => $studentUserId,
+                'student_login_identifier' => null,
+                'verification_required' => false,
+                'verification_email' => $studentEmail,
+                'guardian_id' => (int)$guardian['guardian_id'],
+                'guardian_email' => $guardianEmail,
+                'registration_status' => 'Pending',
+                'registration_fee_amount' => $registrationFeeAmount,
+                'payment_method' => $paymentMethod,
+                'reference_number' => $referenceNumber
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            error_log('guardianRegisterChild PDOException: ' . $e->getMessage());
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        } catch (Exception $e) {
+            if ($this->conn && $this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['error' => $e->getMessage()], 400);
         }
     }
 
@@ -3466,10 +4227,18 @@ class StudentsApi
                 $this->sendJSON(['error' => 'Email is already used by another guardian record'], 400);
             }
 
-            $dupUser = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE email = ? AND user_id <> ? LIMIT 1");
+            $dupUser = $this->conn->prepare("
+                SELECT u.user_id
+                FROM tbl_users u
+                INNER JOIN tbl_roles r ON r.role_id = u.role_id
+                WHERE u.email = ?
+                  AND u.user_id <> ?
+                  AND LOWER(TRIM(r.role_name)) IN ('guardian', 'guardians')
+                LIMIT 1
+            ");
             $dupUser->execute([$email, $userId]);
             if ($dupUser->fetch(PDO::FETCH_ASSOC)) {
-                $this->sendJSON(['error' => 'Email is already used by another account'], 400);
+                $this->sendJSON(['error' => 'Email is already used by another guardian account'], 400);
             }
 
             $this->conn->beginTransaction();
@@ -6190,6 +6959,9 @@ switch ($action) {
         break;
     case 'set-guardian-mode':
         $studentsApi->setGuardianMode();
+        break;
+    case 'guardian-register-child':
+        $studentsApi->guardianRegisterChild();
         break;
     case 'get-guardian-portal':
         $studentsApi->getGuardianPortal();
