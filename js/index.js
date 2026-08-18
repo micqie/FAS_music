@@ -57,8 +57,44 @@ let appBaseUrl;
         try {
             if (!window.__fasAxiosInterceptorInstalled) {
                 window.__fasAxiosInterceptorInstalled = true;
+                axios.interceptors.request.use((config) => {
+                    try {
+                        const storedUser = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+                        if (storedUser && storedUser.user_id) {
+                            config.headers = config.headers || {};
+                            config.headers['X-FAS-Client-User-Id'] = String(storedUser.user_id);
+                            config.headers['X-FAS-Client-Role'] = String(storedUser.role_name || '');
+                        }
+                    } catch (e) {
+                        // Ignore header injection failures.
+                    }
+                    return config;
+                });
                 axios.interceptors.response.use(
                     (response) => {
+                        try {
+                            const authCode = String(response?.data?.auth_code || '').toUpperCase();
+                            const handledAuthCodes = [
+                                'AUTH_REQUIRED',
+                                'SESSION_INVALID',
+                                'CLIENT_SESSION_MISMATCH',
+                                'ACCOUNT_INACTIVE'
+                            ];
+                            const isAuthFailure = [401, 409, 440].includes(Number(response?.status || 0))
+                                && (
+                                    handledAuthCodes.includes(authCode)
+                                    || response?.data?.authentication_required
+                                    || response?.data?.session_invalidated
+                                );
+                            const isOnLoginPage = /\/(fas_music\/?)?(index\.html)?$/i.test(window.location.pathname);
+                            if (isAuthFailure && !isOnLoginPage && typeof Auth !== 'undefined' && Auth.handleSessionInvalidation) {
+                                Auth.handleSessionInvalidation(
+                                    response?.data?.error || 'Your session is no longer active. Please log in again.'
+                                );
+                            }
+                        } catch (e) {
+                            // Ignore auth redirect failures and still return the response.
+                        }
                         if (response && typeof response.status === 'number' && response.status >= 400) {
                             const method = (response.config?.method || '').toUpperCase();
                             const url = response.config?.url || '';
@@ -158,86 +194,126 @@ function getRoleCategory(role) {
 
 // Authentication Utility (integrated) - with storage access protection
 const Auth = {
-    readStoredUser() {
-        const storages = [];
-        try {
-            storages.push(sessionStorage);
-        } catch (e) {
-            // Ignore blocked sessionStorage
-        }
-        try {
-            storages.push(localStorage);
-        } catch (e) {
-            // Ignore blocked localStorage
-        }
+    _sessionValidationPromise: null,
+    _sessionInvalidationHandled: false,
 
-        for (const storage of storages) {
-            try {
-                const userStr = storage.getItem('user');
-                if (!userStr) continue;
-                const parsedUser = JSON.parse(userStr);
-                if (parsedUser && typeof parsedUser === 'object') {
-                    return parsedUser;
-                }
-            } catch (e) {
-                // Ignore invalid data and keep checking other storage
-            }
+    // ── BroadcastChannel for instant cross-tab logout / login sync ──────────
+    // Falls back gracefully in browsers that don't support BroadcastChannel.
+    _channel: (() => {
+        try {
+            return typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('fas_auth') : null;
+        } catch (e) {
+            return null;
         }
+    })(),
+
+    _initChannel() {
+        if (!this._channel) return;
+        this._channel.onmessage = (event) => {
+            const msg = event.data || {};
+            if (msg.type === 'logout') {
+                // Another tab logged out — silently clear local data and redirect.
+                this._sessionInvalidationHandled = true;
+                this.clearStoredUser();
+                this.redirectToLogin();
+            } else if (msg.type === 'login' && msg.user) {
+                // Another tab logged in — adopt that user so this tab is also authenticated.
+                this._sessionInvalidationHandled = false;
+                this._writeLocalUser(msg.user);
+            }
+        };
+    },
+
+    _broadcastLogout() {
+        try { if (this._channel) this._channel.postMessage({ type: 'logout' }); } catch (e) { /* ignore */ }
+        // localStorage fallback for Safari / older browsers that lack BroadcastChannel.
+        try { localStorage.setItem('fas_session_logout', '1'); } catch (e) { /* ignore */ }
+        try { localStorage.removeItem('fas_session_logout'); }   catch (e) { /* ignore */ }
+    },
+
+    _broadcastLogin(user) {
+        try { if (this._channel) this._channel.postMessage({ type: 'login', user }); } catch (e) { /* ignore */ }
+    },
+
+    // ── Low-level localStorage read/write (shared across all same-browser tabs) ──
+    _readLocalUser() {
+        try {
+            const str = localStorage.getItem('fas_user');
+            if (!str) return null;
+            const parsed = JSON.parse(str);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    _writeLocalUser(user) {
+        try {
+            localStorage.setItem('fas_user', JSON.stringify(user));
+        } catch (e) {
+            console.warn('Unable to save user to localStorage. Storage access may be blocked.');
+        }
+    },
+
+    _clearLocalUser() {
+        try { localStorage.removeItem('fas_user'); }                         catch (e) { /* ignore */ }
+        try { localStorage.removeItem('user'); }                             catch (e) { /* ignore */ }
+        try { localStorage.removeItem('student_registration_password'); }    catch (e) { /* ignore */ }
+        try { sessionStorage.removeItem('user'); }                           catch (e) { /* ignore */ }
+        try { sessionStorage.removeItem('student_registration_password'); }  catch (e) { /* ignore */ }
+    },
+
+    // ── Public API ───────────────────────────────────────────────────────────
+
+    // Returns the currently logged-in user from shared localStorage (synchronous,
+    // works across all tabs in the same browser).
+    getUser() {
+        // Primary key written by this system.
+        const user = this._readLocalUser();
+        if (user) return user;
+
+        // Legacy fallback: previous implementation stored under 'user'.
+        try {
+            const legacy = localStorage.getItem('user');
+            if (legacy) {
+                const parsed = JSON.parse(legacy);
+                if (parsed && typeof parsed === 'object') {
+                    // Migrate to the new key so future reads are fast.
+                    this._writeLocalUser(parsed);
+                    localStorage.removeItem('user');
+                    return parsed;
+                }
+            }
+        } catch (e) { /* ignore */ }
+
+        // sessionStorage fallback (e.g. storage partitioning edge-cases).
+        try {
+            const ss = sessionStorage.getItem('user');
+            if (ss) {
+                const parsed = JSON.parse(ss);
+                if (parsed && typeof parsed === 'object') {
+                    this._writeLocalUser(parsed);
+                    return parsed;
+                }
+            }
+        } catch (e) { /* ignore */ }
 
         return null;
     },
 
-    // Get current user from sessionStorage
-    getUser() {
-        const user = this.readStoredUser();
-        if (!user) {
-            return null;
-        }
-
-        // Rehydrate the session store when possible so current-tab reads stay fast.
-        try {
-            sessionStorage.setItem('user', JSON.stringify(user));
-        } catch (e) {
-            // Ignore storage sync failures
-        }
-        return user;
-    },
-
-    // Set user in browser storage
+    // Persists the logged-in user and notifies all other tabs.
     setUser(user) {
-        let saved = false;
-        try {
-            sessionStorage.setItem('user', JSON.stringify(user));
-            saved = true;
-        } catch (e) {
-            // Ignore and try localStorage
-        }
-        try {
-            localStorage.setItem('user', JSON.stringify(user));
-            saved = true;
-        } catch (e) {
-            // Ignore and fall back to whatever store worked
-        }
-        if (!saved) {
-            console.warn('Unable to save user to browser storage. Storage access may be blocked.');
-        }
+        this._sessionInvalidationHandled = false;
+        this._writeLocalUser(user);
+        this._broadcastLogin(user);
     },
 
-    // Remove user from browser storage
-    logout() {
-        try {
-            sessionStorage.removeItem('user');
-            sessionStorage.removeItem('student_registration_password');
-        } catch (e) {
-            // Ignore
-        }
-        try {
-            localStorage.removeItem('user');
-            localStorage.removeItem('student_registration_password');
-        } catch (e) {
-            // Ignore
-        }
-        // Redirect to app root index from any nested page
+    // Wipes stored user data from all storage mechanisms.
+    clearStoredUser() {
+        this._clearLocalUser();
+    },
+
+    redirectToLogin() {
         const appBase = (typeof appBaseUrl === 'string' && appBaseUrl)
             ? appBaseUrl
             : ((typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
@@ -246,12 +322,92 @@ const Auth = {
         window.location.href = `${appBase}/index.html`;
     },
 
-    // Check if user is authenticated
+    handleSessionInvalidation(message) {
+        if (this._sessionInvalidationHandled) {
+            return;
+        }
+        this._sessionInvalidationHandled = true;
+        this.clearStoredUser();
+
+        const redirect = () => this.redirectToLogin();
+        if (typeof Swal !== 'undefined' && !/\/(fas_music\/?)?(index\.html)?$/i.test(window.location.pathname)) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Session Ended',
+                text: message || 'Your session is no longer active. Please log in again.',
+                confirmButtonColor: '#b8860b',
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            }).then(redirect);
+        } else {
+            redirect();
+        }
+    },
+
+    // Contacts the server to verify the PHP session is still valid.
+    // If the server returns a user record, that becomes the authoritative copy
+    // and is pushed to localStorage (and broadcast to other tabs via setUser).
+    async validateServerSession(options = {}) {
+        if (this._sessionValidationPromise) {
+            return this._sessionValidationPromise;
+        }
+
+        const { silent = false } = options;
+        this._sessionValidationPromise = (async () => {
+            try {
+                const response = await axios.get(`${baseApiUrl}/users.php?action=session`, {
+                    validateStatus: () => true
+                });
+                const data = response.data || {};
+                if (response.status === 200 && data.success && data.user) {
+                    this.setUser(data.user);
+                    return { valid: true, user: data.user };
+                }
+
+                if (!silent) {
+                    this.handleSessionInvalidation(
+                        data.error || 'Your session is no longer active. Please log in again.'
+                    );
+                }
+                return { valid: false, reason: data.auth_code || 'session_invalid' };
+            } catch (error) {
+                if (!silent) {
+                    this.handleSessionInvalidation('Unable to verify your session. Please log in again.');
+                }
+                return { valid: false, reason: 'session_validation_failed', error };
+            } finally {
+                this._sessionValidationPromise = null;
+            }
+        })();
+
+        return this._sessionValidationPromise;
+    },
+
+    // Logs out the current user: notifies the server, clears local storage,
+    // broadcasts to all other tabs, then redirects to login.
+    logout() {
+        this._sessionInvalidationHandled = true;
+        this._broadcastLogout();
+
+        const redirect = () => {
+            this.clearStoredUser();
+            this.redirectToLogin();
+        };
+
+        if (typeof axios !== 'undefined') {
+            axios.post(`${baseApiUrl}/users.php?action=logout`, {}, { validateStatus: () => true })
+                .catch(() => {})
+                .finally(redirect);
+            return;
+        }
+
+        redirect();
+    },
+
     isAuthenticated() {
         return this.getUser() !== null;
     },
 
-    // Check if user has specific role
     hasRole(role) {
         const user = this.getUser();
         if (!user) return false;
@@ -260,6 +416,67 @@ const Auth = {
         return actualRole === targetRole || actualRole === 'admin';
     }
 };
+
+// Initialise the cross-tab broadcast channel listener immediately.
+Auth._initChannel();
+
+// ── localStorage storage-event fallback for browsers without BroadcastChannel ──
+// (BroadcastChannel does NOT fire for the tab that wrote the key, so this is safe.)
+window.addEventListener('storage', (e) => {
+    if (e.key === 'fas_session_logout' && e.newValue === '1') {
+        Auth._sessionInvalidationHandled = true;
+        Auth.clearStoredUser();
+        Auth.redirectToLogin();
+    }
+    // When another tab logs in and writes fas_user, adopt that user here too.
+    if (e.key === 'fas_user' && e.newValue) {
+        try {
+            const user = JSON.parse(e.newValue);
+            if (user && typeof user === 'object') {
+                Auth._sessionInvalidationHandled = false;
+                // No need to call setUser (would re-broadcast); just update local state.
+                // The page will use the updated localStorage on its next getUser() call.
+            }
+        } catch (_) { /* ignore */ }
+    }
+});
+
+function isProtectedPortalPage() {
+    return /\/pages\//i.test(window.location.pathname);
+}
+
+// On protected pages:
+//  1. If localStorage already has the user (e.g. existing tab or after login) → validate with server.
+//  2. If localStorage is empty (e.g. freshly opened Tab 2) → ask the server; it will return the
+//     active session because the browser's PHP session cookie is shared across all tabs.
+async function ensureProtectedPageSession() {
+    if (!isProtectedPortalPage()) {
+        return;
+    }
+
+    const localUser = Auth.getUser();
+
+    if (localUser) {
+        // User found in localStorage — verify that the PHP session is still valid.
+        await Auth.validateServerSession();
+    } else {
+        // No local user (new tab, incognito carry-over, etc.) — try to hydrate from
+        // the PHP session.  The cookie is automatically sent by the browser.
+        const result = await Auth.validateServerSession({ silent: true });
+        if (!result.valid) {
+            // PHP session is also gone — redirect to login.
+            Auth.redirectToLogin();
+        }
+        // If valid, validateServerSession already called setUser() with the server user,
+        // so the page can continue normally.
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureProtectedPageSession, { once: true });
+} else {
+    ensureProtectedPageSession();
+}
 
 // ========== INDEX.HTML FUNCTIONS ==========
 
@@ -9915,7 +10132,50 @@ document.addEventListener('DOMContentLoaded', () => {
     enforceAdminFixedPageSizes();
 
     if (loginForm) {
-        initIndexPage();
+        // ── Already-logged-in redirect ─────────────────────────────────────────
+        // If localStorage already has a user (shared with all tabs in the same
+        // browser), skip the login page and go straight to their dashboard.
+        // If localStorage is empty, try the PHP session cookie (shared across
+        // all tabs in the same browser).  Only redirect if we get a confirmed
+        // user — never redirect back to index.html to avoid loops.
+        (async () => {
+            const localUser = Auth.getUser();
+            if (localUser && _getDashboardUrl(localUser.role_name)) {
+                window.location.href = _getDashboardUrl(localUser.role_name);
+                return;
+            }
+
+            try {
+                const response = await axios.get(`${baseApiUrl}/users.php?action=session`, {
+                    validateStatus: () => true
+                });
+                const data = response.data || {};
+                if (response.status === 200 && data.success && data.user) {
+                    const url = _getDashboardUrl(data.user.role_name);
+                    if (url) {
+                        Auth.setUser(data.user);
+                        window.location.href = url;
+                        return;
+                    }
+                }
+            } catch (_) { /* network error — show login normally */ }
+
+            initIndexPage();
+        })();
+
+        function _getDashboardUrl(roleName) {
+            const roleCategory = getRoleCategory(roleName);
+            const base = (typeof appBaseUrl === 'string' && appBaseUrl) ? appBaseUrl : '';
+            const routes = {
+                admin:      `${base}/pages/admin/admin_dashboard.html`,
+                manager:    `${base}/pages/manager/manager_dashboard.html`,
+                staff:      `${base}/pages/desk/desk_attendance.html`,
+                instructor: `${base}/pages/instructor/instructor_dashboard.html`,
+                student:    `${base}/pages/student/student_dashboard.html`,
+                guardian:   `${base}/pages/guardian/guardian_dashboard.html`,
+            };
+            return routes[roleCategory] || null;
+        }
     } else if (walkinForm) {
         const user = Auth.getUser();
         const role = String(user?.role_name || '').toLowerCase();

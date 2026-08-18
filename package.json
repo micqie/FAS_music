@@ -1,0 +1,28 @@
+{
+  "name": "fas_music",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/micqie/FAS_music.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/micqie/FAS_music/issues"
+  },
+  "homepage": "https://github.com/micqie/FAS_music#readme",
+  "description": "",
+  "devDependencies": {
+    "autoprefixer": "^10.5.4",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^3.4.19"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3"
+  }
+}

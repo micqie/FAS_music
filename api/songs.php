@@ -4,6 +4,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
+require_once 'auth_session.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
@@ -1134,6 +1135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $input['action'] ?? $action;
     }
 }
+
+fas_require_authenticated_user($conn);
 
 switch ($action) {
     case 'get-song-categories':

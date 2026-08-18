@@ -6,6 +6,7 @@ ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
 require_once 'audit_logs.php'; // ← Audit logging
+require_once 'auth_session.php';
 
 header("Content-Type: application/json");
 
@@ -1708,6 +1709,8 @@ class Admin
 // Router
 $admin = new Admin($conn);
 $action = $_GET['action'] ?? '';
+
+fas_require_authenticated_user($conn);
 
 switch ($action) {
     case 'get-pending-students':

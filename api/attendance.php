@@ -1,5 +1,6 @@
 <?php
 require_once 'db_connect.php';
+require_once 'auth_session.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
@@ -2355,6 +2356,8 @@ class AttendanceApi
 
 $api = new AttendanceApi($conn);
 $action = $_GET['action'] ?? '';
+
+fas_require_authenticated_user($conn);
 
 switch ($action) {
     case 'get-summary':

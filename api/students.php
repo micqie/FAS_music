@@ -11,6 +11,7 @@ if (!ini_get('date.timezone') || ini_get('date.timezone') === 'UTC') {
 
 require_once 'db_connect.php';
 require_once 'instrument_specialization_sync.php';
+require_once 'auth_session.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
@@ -6928,6 +6929,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true) ?: [];
     $action = $_POST['action'] ?? $input['action'] ?? $_GET['action'] ?? '';
 }
+
+fas_require_authenticated_user($conn);
 
 switch ($action) {
     case 'get-all-students':

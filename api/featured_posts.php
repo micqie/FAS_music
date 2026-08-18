@@ -4,6 +4,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
+require_once 'auth_session.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
@@ -601,4 +602,9 @@ class FeaturedPosts
 }
 
 $featuredPosts = new FeaturedPosts($conn);
-$featuredPosts->handle($_GET['action'] ?? 'list-public');
+$action = $_GET['action'] ?? 'list-public';
+$publicActions = ['list-public', ''];
+if (!in_array($action, $publicActions, true)) {
+    fas_require_authenticated_user($conn);
+}
+$featuredPosts->handle($action);

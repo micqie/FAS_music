@@ -6,6 +6,7 @@ ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
 require_once 'audit_logs.php';
+require_once 'auth_session.php';
 
 if (!defined('FAS_USERS_CLASS_ONLY')) {
     header("Content-Type: application/json");
@@ -1208,6 +1209,15 @@ class User
                 $mustChangePassword = true;
             }
 
+            $sessionLogin = fas_login_user($this->conn, $user);
+            if (empty($sessionLogin['success'])) {
+                $this->sendJSON([
+                    'error' => $sessionLogin['error'] ?? 'Unable to start session.',
+                    'auth_code' => $sessionLogin['auth_code'] ?? 'SESSION_START_FAILED',
+                    'session_invalidated' => !empty($sessionLogin['session_invalidated']),
+                ], (int)($sessionLogin['status'] ?? 500));
+            }
+
             unset($user['password']);
 
             $loginUserName  = trim((string)(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')));
@@ -1238,6 +1248,28 @@ class User
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
+    }
+
+    public function getCurrentSession()
+    {
+        $resolved = fas_require_authenticated_user($this->conn);
+        unset($resolved['password'], $resolved['active_session_token'], $resolved['active_session_updated_at']);
+
+        $this->sendJSON([
+            'success' => true,
+            'authenticated' => true,
+            'user' => $resolved,
+        ]);
+    }
+
+    public function logout()
+    {
+        fas_logout_current_user($this->conn);
+
+        $this->sendJSON([
+            'success' => true,
+            'message' => 'Logged out successfully.',
+        ]);
     }
 
     public function verifyEmail($json)
@@ -2651,9 +2683,30 @@ if (defined('FAS_USERS_CLASS_ONLY')) {
 $user = new User($conn);
 $action = $_GET['action'] ?? '';
 
+$publicActions = [
+    'login',
+    'register',
+    'register-basic',
+    'verify-email',
+    'resend-email-verification',
+    'check-registration-status',
+    'pay-registration-fee',
+    'reset-rejected-registration',
+];
+
+if (!in_array($action, $publicActions, true)) {
+    fas_require_authenticated_user($conn);
+}
+
 switch ($action) {
     case 'login':
         $user->login(file_get_contents('php://input'));
+        break;
+    case 'session':
+        $user->getCurrentSession();
+        break;
+    case 'logout':
+        $user->logout();
         break;
     case 'register':
         $user->register(file_get_contents('php://input'));

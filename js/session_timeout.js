@@ -183,21 +183,19 @@
 
     EVENTS.forEach(e => window.addEventListener(e, _onActivity, { passive: true, capture: true }));
 
-    /* ── Cross-tab sync via localStorage ───────────────────────── */
-    // If the user logs out or times out in another tab, mirror it here
-    window.addEventListener('storage', e => {
-        if (e.key === 'fas_session_logout' && e.newValue === '1') {
-            _clearAll();
-            window.location.href = `${getAppBase()}/index.html`;
-        }
-    });
-
-    // Broadcast logout to other tabs when this tab logs out
+    /* ── Cross-tab sync ────────────────────────────────────────── */
+    // Auth._initChannel() in index.js already sets up BroadcastChannel and
+    // the localStorage 'storage' event listener that redirect all tabs on
+    // logout.  session_timeout.js only needs to stop its own timers when
+    // another tab has already handled the redirect.
+    //
+    // We patch Auth.logout once so the inactivity timer is also cleared
+    // before Auth.logout performs the server call and redirect.
     const _origLogout = typeof Auth !== 'undefined' ? Auth.logout : null;
-    if (_origLogout) {
+    if (_origLogout && !Auth.__sessionTimeoutPatched) {
+        Auth.__sessionTimeoutPatched = true;
         Auth.logout = function () {
-            try { localStorage.setItem('fas_session_logout', '1'); } catch (_) {}
-            try { localStorage.removeItem('fas_session_logout'); }   catch (_) {}
+            _clearAll();
             _origLogout.call(Auth);
         };
     }

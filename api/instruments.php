@@ -6,6 +6,7 @@ ini_set('log_errors', 1);
 
 require_once 'db_connect.php';
 require_once 'instrument_specialization_sync.php';
+require_once 'auth_session.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
@@ -616,6 +617,11 @@ class Instruments
 // Initialize Instruments class
 $instruments = new Instruments($conn);
 $action = $_GET['action'] ?? '';
+
+$publicActions = ['get-types', 'get-type', 'get-instruments', 'get-instrument'];
+if (!in_array($action, $publicActions, true)) {
+    fas_require_authenticated_user($conn);
+}
 
 switch ($action) {
     // Instrument Types

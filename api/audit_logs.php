@@ -5,7 +5,8 @@ ini_set('log_errors', 1);
 
 // Only require db_connect when running standalone (not included by another API)
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
-    require_once 'db_connect.php';
+require_once 'db_connect.php';
+require_once 'auth_session.php';
 }
 
 class AuditLogs
@@ -491,6 +492,8 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
 
     $api    = new AuditLogs($conn);
     $action = strtolower(trim((string)($_GET['action'] ?? '')));
+
+    fas_require_authenticated_user($conn);
 
     switch ($action) {
         case 'get-logs':
