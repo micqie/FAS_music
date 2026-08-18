@@ -3936,6 +3936,7 @@ class StudentsApi
 
             $studentPhone = trim((string)($data['student_phone'] ?? ''));
             $studentAddress = trim((string)($data['student_address'] ?? ''));
+            $studentEmail = '';
 
             $stmtGuardian = $this->conn->prepare("
                 SELECT g.guardian_id, g.first_name, g.last_name, g.email, g.phone, r.role_name, u.user_id AS guardian_user_id

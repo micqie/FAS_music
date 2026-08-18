@@ -291,6 +291,64 @@ class User
         }
     }
 
+    private function getStudentAccountMetaForUser(array $user): ?array
+    {
+        $hasSourceCol = $this->hasStudentColumn('registration_source');
+        $lookupEmail = trim((string)($user['email'] ?? ''));
+        $lookupUsername = trim((string)($user['username'] ?? ''));
+        if ($lookupEmail === '' && $lookupUsername === '') {
+            return null;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    s.student_id,
+                    s.email,
+                    " . ($hasSourceCol ? "COALESCE(s.registration_source, 'online')" : "'online'") . " AS registration_source,
+                    g.email AS guardian_email,
+                    CONCAT_WS(' ', g.first_name, g.last_name) AS guardian_name
+                FROM tbl_students s
+                LEFT JOIN tbl_student_guardians sg
+                    ON sg.student_id = s.student_id
+                   AND sg.is_primary_guardian = 'Y'
+                LEFT JOIN tbl_guardians g
+                    ON g.guardian_id = sg.guardian_id
+                WHERE s.email = ?
+                   OR s.email = ?
+                ORDER BY s.student_id DESC
+                LIMIT 1
+            ");
+            $stmt->execute([$lookupEmail, $lookupUsername]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+
+    private function markUserEmailVerified($userId)
+    {
+        $userId = (int)$userId;
+        if ($userId < 1 || !$this->hasUserColumn('email_verified_at')) {
+            return;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                UPDATE tbl_users
+                SET email_verified_at = NOW(),
+                    email_verification_code_hash = NULL,
+                    email_verification_code_expires_at = NULL,
+                    email_verification_sent_at = NULL
+                WHERE user_id = ?
+            ");
+            $stmt->execute([$userId]);
+        } catch (PDOException $e) {
+            // Keep login flow working even if verification cleanup fails.
+        }
+    }
+
     private function walkInEmailExists($email)
     {
         $stmt = $this->conn->prepare("SELECT 1 FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
@@ -1175,12 +1233,21 @@ class User
                 $this->sendJSON(['error' => 'Invalid username or password'], 401);
             }
 
+            $studentAccountMeta = $this->getStudentAccountMetaForUser($user);
+            $isGuardianPortalStudent = $studentAccountMeta
+                && strcasecmp((string)($studentAccountMeta['registration_source'] ?? ''), 'guardian-portal') === 0;
+            if ($isGuardianPortalStudent && empty($user['email_verified_at'])) {
+                $this->markUserEmailVerified((int)($user['user_id'] ?? 0));
+                $user['email_verified_at'] = date('Y-m-d H:i:s');
+            }
+
             $isWalkInAccount = $this->isWalkInSystemEmail($user['email'] ?? '')
                 || $this->isWalkInSystemEmail($user['username'] ?? '');
             if (
                 empty($user['email_verified_at'])
                 && strcasecmp((string)($user['role_name'] ?? ''), 'Admin') !== 0
                 && !$isWalkInAccount
+                && !$isGuardianPortalStudent
             ) {
                 $this->sendJSON([
                     'error' => 'Please verify your email address before logging in. Check your inbox for the verification code.',

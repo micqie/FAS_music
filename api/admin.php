@@ -379,6 +379,132 @@ class Admin
         }
     }
 
+    private function getStudentGuardianRecipients($studentId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT DISTINCT
+                g.first_name,
+                g.last_name,
+                g.email
+            FROM tbl_guardians g
+            INNER JOIN tbl_student_guardians sg ON g.guardian_id = sg.guardian_id
+            WHERE sg.student_id = ?
+              AND g.email IS NOT NULL
+              AND TRIM(g.email) <> ''
+            ORDER BY g.guardian_id ASC
+        ");
+        $stmt->execute([(int)$studentId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    private function getStudentApprovalNotificationData($studentId): ?array
+    {
+        $hasSourceCol = $this->hasStudentColumn('registration_source');
+        $stmt = $this->conn->prepare("
+            SELECT
+                s.student_id,
+                s.first_name,
+                s.last_name,
+                s.email,
+                s.status,
+                " . ($hasSourceCol ? "COALESCE(s.registration_source, 'online')" : "'online'") . " AS registration_source,
+                b.branch_name,
+                COALESCE(u.username, s.email) AS login_identifier
+            FROM tbl_students s
+            LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
+            LEFT JOIN tbl_users u ON u.email = s.email
+            WHERE s.student_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([(int)$studentId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    private function sendGuardianStudentApprovalEmail($toEmail, $guardianName, $studentName, $studentLoginId, $branchName = '')
+    {
+        $this->ensurePhpMailerLoaded();
+        $this->lastMailError = null;
+        if (!$this->isMailConfigured() || !$this->isValidEmailAddress($toEmail)) {
+            $this->lastMailError = 'SMTP is not configured on the server.';
+            return false;
+        }
+
+        $mail = $this->getMailSettings();
+
+        try {
+            $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $this->configurePhpMailer($mailer, $mail);
+            $mailer->addAddress($toEmail, $guardianName ?: $toEmail);
+
+            $safeGuardianName = htmlspecialchars($guardianName ?: 'Guardian', ENT_QUOTES, 'UTF-8');
+            $safeStudentName = htmlspecialchars($studentName ?: 'Student', ENT_QUOTES, 'UTF-8');
+            $safeLoginId = htmlspecialchars($studentLoginId, ENT_QUOTES, 'UTF-8');
+            $safeBranch = htmlspecialchars($branchName, ENT_QUOTES, 'UTF-8');
+
+            $mailer->Subject = 'Student registration approved for ' . $safeStudentName;
+            $mailer->Body = '
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 560px;">
+                    <h2 style="margin: 0 0 12px; color: #0f172a;">Registration approved</h2>
+                    <p>Hello ' . $safeGuardianName . ',</p>
+                    <p>The academy has approved the registration for <strong>' . $safeStudentName . '</strong>' . ($safeBranch !== '' ? ' at <strong>' . $safeBranch . '</strong>' : '') . '.</p>
+                    <div style="background:#fdfaf1;border:1px solid #f9f1d5;border-radius:12px;padding:16px 18px;margin:18px 0;">
+                        <p style="margin:0 0 8px;"><strong>Student:</strong> ' . $safeStudentName . '</p>
+                        <p style="margin:0;"><strong>Student ID / Username:</strong> ' . $safeLoginId . '</p>
+                    </div>
+                    <p>You can use this Student ID together with the password created during registration when signing in for this student.</p>
+                    <p>Please keep this email for reference, especially if you manage more than one child in your guardian account.</p>
+                </div>
+            ';
+            $mailer->AltBody = "Registration approved for {$studentName}. Student ID / Username: {$studentLoginId}. Use the password created during registration.";
+            $mailer->send();
+            return true;
+        } catch (\PHPMailer\PHPMailer\Exception $e) {
+            $this->lastMailError = trim($e->getMessage() . ' ' . $mailer->ErrorInfo);
+            error_log('Guardian approval email failed: ' . $this->lastMailError);
+            return false;
+        } catch (Exception $e) {
+            $this->lastMailError = $e->getMessage();
+            error_log('Guardian approval email failed: ' . $this->lastMailError);
+            return false;
+        }
+    }
+
+    private function notifyGuardiansOfApprovedStudent($studentId): int
+    {
+        $student = $this->getStudentApprovalNotificationData((int)$studentId);
+        if (!$student) {
+            return 0;
+        }
+
+        if (strcasecmp((string)($student['registration_source'] ?? ''), 'guardian-portal') !== 0) {
+            return 0;
+        }
+
+        $studentName = trim((string)($student['first_name'] ?? '') . ' ' . (string)($student['last_name'] ?? ''));
+        $studentLoginId = trim((string)($student['login_identifier'] ?? ''));
+        if ($studentLoginId === '') {
+            $studentLoginId = trim((string)($student['email'] ?? ''));
+        }
+        if ($studentLoginId === '') {
+            return 0;
+        }
+
+        $sent = 0;
+        foreach ($this->getStudentGuardianRecipients((int)$studentId) as $guardian) {
+            $email = trim((string)($guardian['email'] ?? ''));
+            if (!$this->isValidEmailAddress($email)) {
+                continue;
+            }
+            $guardianName = trim((string)($guardian['first_name'] ?? '') . ' ' . (string)($guardian['last_name'] ?? ''));
+            if ($this->sendGuardianStudentApprovalEmail($email, $guardianName, $studentName, $studentLoginId, (string)($student['branch_name'] ?? ''))) {
+                $sent++;
+            }
+        }
+
+        return $sent;
+    }
+
     private function getRegistrationPaymentPrimaryKeyColumn()
     {
         try {
@@ -807,8 +933,14 @@ class Admin
             $this->conn->beginTransaction();
 
             // Get student email to find associated user account
+            $hasSourceCol = $this->hasStudentColumn('registration_source');
+            $selectSource = $hasSourceCol ? "COALESCE(registration_source, 'online') AS registration_source," : "'online' AS registration_source,";
             $stmtStudent = $this->conn->prepare("
-                SELECT email FROM tbl_students WHERE student_id = ?
+                SELECT student_id, email, first_name, last_name, status,
+                       {$selectSource}
+                       branch_id
+                FROM tbl_students
+                WHERE student_id = ?
             ");
             $stmtStudent->execute([$data['student_id']]);
             $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
@@ -817,6 +949,9 @@ class Admin
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Student not found'], 404);
             }
+
+            $shouldNotifyGuardians = strcasecmp((string)($student['status'] ?? ''), 'Active') !== 0
+                && strcasecmp((string)($student['registration_source'] ?? ''), 'guardian-portal') === 0;
 
             $paid = $this->getRegistrationPaidAmount((int)$data['student_id']);
             if ($paid < 1000.0) {
@@ -843,7 +978,13 @@ class Admin
             if (!empty($student['email'])) {
                 $stmtUser = $this->conn->prepare("
                     UPDATE tbl_users
-                    SET status = 'Active'
+                    SET status = 'Active'" . ($shouldNotifyGuardians && $this->hasUserColumn('email_verified_at')
+                        ? ",
+                        email_verified_at = NOW(),
+                        email_verification_code_hash = NULL,
+                        email_verification_code_expires_at = NULL,
+                        email_verification_sent_at = NULL"
+                        : "") . "
                     WHERE email = ? AND status = 'Inactive'
                 ");
                 $stmtUser->execute([$student['email']]);
@@ -872,6 +1013,11 @@ class Admin
 
             $this->conn->commit();
 
+            $guardianEmailsSent = 0;
+            if ($shouldNotifyGuardians) {
+                $guardianEmailsSent = $this->notifyGuardiansOfApprovedStudent((int)$data['student_id']);
+            }
+
             [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);
             AuditLogs::record(
                 $this->conn,
@@ -885,7 +1031,8 @@ class Admin
 
             $this->sendJSON([
                 'success' => true,
-                'message' => 'Student approved successfully. User account has been activated.'
+                'message' => 'Student approved successfully. User account has been activated.',
+                'guardian_email_notifications_sent' => $guardianEmailsSent
             ]);
         } catch (Exception $e) {
             $this->conn->rollBack();
@@ -991,7 +1138,16 @@ class Admin
 
         try {
             $this->conn->beginTransaction();
-            $stmtStudent = $this->conn->prepare("SELECT student_id, email, branch_id FROM tbl_students WHERE student_id = ? LIMIT 1");
+            $hasSourceCol = $this->hasStudentColumn('registration_source');
+            $selectSource = $hasSourceCol ? "COALESCE(registration_source, 'online') AS registration_source," : "'online' AS registration_source,";
+            $stmtStudent = $this->conn->prepare("
+                SELECT student_id, email, branch_id, first_name, last_name, status,
+                       {$selectSource}
+                       email AS login_email
+                FROM tbl_students
+                WHERE student_id = ?
+                LIMIT 1
+            ");
             $stmtStudent->execute([(int)$data['student_id']]);
             $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
             if (!$student) {
@@ -1094,6 +1250,10 @@ class Admin
             $newStatus = ($remaining <= 0) ? 'Approved' : 'Pending';
 
             // When approved, activate both student profile and login account.
+            $shouldNotifyGuardians = $newStatus === 'Approved'
+                && strcasecmp((string)($student['status'] ?? ''), 'Active') !== 0
+                && strcasecmp((string)($student['registration_source'] ?? ''), 'guardian-portal') === 0;
+
             if ($newStatus === 'Approved') {
                 $stmtActivateStudent = $this->conn->prepare("
                     UPDATE tbl_students
@@ -1105,7 +1265,13 @@ class Admin
                 if (!empty($student['email'])) {
                     $stmtActivateUser = $this->conn->prepare("
                         UPDATE tbl_users
-                        SET status = 'Active'
+                        SET status = 'Active'" . ($shouldNotifyGuardians && $this->hasUserColumn('email_verified_at')
+                            ? ",
+                            email_verified_at = NOW(),
+                            email_verification_code_hash = NULL,
+                            email_verification_code_expires_at = NULL,
+                            email_verification_sent_at = NULL"
+                            : "") . "
                         WHERE email = ?
                     ");
                     $stmtActivateUser->execute([$student['email']]);
@@ -1135,6 +1301,11 @@ class Admin
 
             $this->conn->commit();
 
+            $guardianEmailsSent = 0;
+            if ($shouldNotifyGuardians) {
+                $guardianEmailsSent = $this->notifyGuardiansOfApprovedStudent((int)$data['student_id']);
+            }
+
             [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);
             AuditLogs::record(
                 $this->conn,
@@ -1151,7 +1322,8 @@ class Admin
                 'message' => 'Payment recorded successfully',
                 'paid_amount' => $newPaid,
                 'remaining_amount' => max(0, $remaining),
-                'registration_status' => $newStatus
+                'registration_status' => $newStatus,
+                'guardian_email_notifications_sent' => $guardianEmailsSent
             ]);
         } catch (Exception $e) {
             if ($this->conn && $this->conn->inTransaction()) {

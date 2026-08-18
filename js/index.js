@@ -4869,7 +4869,8 @@ async function guardianRegisterNewStudent() {
                 <div class="text-left text-sm leading-6">
                     <p>The student registration is now pending review.</p>
                     <p class="mt-2">The guardian will be notified once the academy accepts the registration.</p>
-                    <p class="mt-2 text-xs text-zinc-500">The Student ID will be issued after approval.</p>
+                    <p class="mt-2">After approval, the school will email you the Student ID / login for <strong>${escapeHtml(`${result.value.student_first_name || ''} ${result.value.student_last_name || ''}`.trim())}</strong>.</p>
+                    <p class="mt-2 text-xs text-zinc-500">That email will include the student name as a reference so it is easier to distinguish if you manage more than one child.</p>
                 </div>
             `,
             confirmButtonColor: '#b8860b'
@@ -9182,6 +9183,25 @@ function getWalkInRegistrationRemainingAmount(registration) {
     return Math.max(0, total - paid);
 }
 
+function getRegistrationStudentLoginId(registration) {
+    const explicitCode = String(registration?.student_code || registration?.student_login_identifier || '').trim();
+    if (explicitCode !== '') {
+        return explicitCode;
+    }
+
+    const studentId = Number(registration?.student_id || 0);
+    if (studentId < 1) {
+        return '';
+    }
+
+    const createdAt = registration?.created_at ? new Date(registration.created_at) : null;
+    const year = createdAt && !Number.isNaN(createdAt.getTime())
+        ? createdAt.getFullYear()
+        : new Date().getFullYear();
+
+    return `STU-${year}-${String(studentId).padStart(4, '0')}`;
+}
+
 function getRegistrationsModeFromHash() {
     const hash = (window.location.hash || '').replace('#', '').toLowerCase();
     return hash === 'pending' ? 'pending' : 'all';
@@ -9288,6 +9308,7 @@ function renderRegistrationsTable() {
             ? 'bg-purple-100 text-purple-700'
             : 'bg-sky-100 text-sky-700';
         const sourceLabel = registrationSource === 'walkin' ? 'Walk-In' : 'Online';
+        const studentLoginId = getRegistrationStudentLoginId(reg);
         const registrationProofLink = reg.registration_proof_path
             ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 underline mt-1"><i class="fas fa-file-alt"></i>Payment proof</a>`
             : (registrationSource === 'walkin'
@@ -9303,7 +9324,7 @@ function renderRegistrationsTable() {
             <tr class="hover:bg-gold-500/5 transition">
                 <td class="px-6 py-4">
                     <div class="font-medium text-slate-900" style="color:#0f172a;">${reg.first_name} ${reg.last_name}</div>
-                    <div class="text-sm text-slate-500" style="color:#64748b;">${reg.email || ''}</div>
+                    <div class="text-sm text-slate-500" style="color:#64748b;">Student ID: ${escapeHtml(studentLoginId || 'Not assigned')}</div>
                     <div class="mt-2"><span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold ${sourceBadgeClass}">${sourceLabel}</span></div>
                 </td>
                 <td class="px-6 py-4">
