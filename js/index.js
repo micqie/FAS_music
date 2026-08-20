@@ -1299,7 +1299,7 @@ function initRegisterForm() {
                 student_first_name: registerForm.student_first_name?.value.trim() || '',
                 student_last_name: registerForm.student_last_name?.value.trim() || '',
                 student_email: registerForm.student_email?.value.trim() || '',
-                student_phone: registerForm.student_phone?.value.trim() || '',
+                student_phone: window.FasIntlPhone?.getValue(registerForm.student_phone) || registerForm.student_phone?.value.trim() || '',
                 branch_id: registerForm.branch_id?.value || '',
                 password: registerForm.password?.value || ''
             };
@@ -1758,9 +1758,7 @@ function calculateTotalFee() {
     const basePrice = parseFloat(selectedOption.getAttribute('data-price') || '0');
 
     // Check if saxophone is selected (from dropdowns)
-    const selectedInstruments = Array.from(document.querySelectorAll('select[name="instruments[]"]'))
-        .map(sel => sel.value ? parseInt(sel.value, 10) : 0)
-        .filter(id => id > 0);
+    const selectedInstruments = getStudentRequestSelectedInstrumentIds();
     const hasSaxophone = selectedInstruments.some(id => {
         const instrument = availableInstruments.find(inst => inst.instrument_id === id);
         return instrument && (instrument.instrument_name.toLowerCase().includes('saxophone') ||
@@ -5313,6 +5311,60 @@ function _syncStudentRequestTypeDisabledStates() {
     });
 }
 
+function getResolvedInstrumentIdsFromSelectors(rootSelector, typeSelector, instrumentSelector, availableInstruments) {
+    const root = rootSelector ? document.querySelector(rootSelector) : document;
+    if (!root) return [];
+
+    const instrumentList = Array.isArray(availableInstruments) ? availableInstruments : [];
+    const resolvedIds = [];
+    const usedIds = new Set();
+    const typeSelects = Array.from(root.querySelectorAll(typeSelector));
+
+    typeSelects.forEach(typeSelect => {
+        const slot = typeSelect.dataset.slot;
+        const instrumentSelect = slot != null
+            ? root.querySelector(`${instrumentSelector}[data-slot="${slot}"]`)
+            : null;
+
+        let instrumentId = Number.parseInt(instrumentSelect?.value || '', 10) || 0;
+        if (instrumentId < 1) {
+            const typeId = String(typeSelect.value || '').trim();
+            if (typeId) {
+                const fallback = instrumentList.find(inst =>
+                    String(inst.type_id) === String(typeId) &&
+                    !usedIds.has(String(inst.instrument_id))
+                );
+                instrumentId = Number.parseInt(fallback?.instrument_id || '', 10) || 0;
+            }
+        }
+
+        if (instrumentId > 0 && !usedIds.has(String(instrumentId))) {
+            usedIds.add(String(instrumentId));
+            resolvedIds.push(instrumentId);
+        }
+    });
+
+    return resolvedIds;
+}
+
+function getStudentRequestSelectedInstrumentIds() {
+    return getResolvedInstrumentIdsFromSelectors(
+        '#studentRequestInstrumentContainer',
+        'select.student-request-instrument-type',
+        'select.student-request-instrument',
+        studentRequestAvailableInstruments
+    );
+}
+
+function getWalkinSelectedInstrumentIds() {
+    return getResolvedInstrumentIdsFromSelectors(
+        '#walkinInstrumentsContainer',
+        'select.walkin-instrument-type-select',
+        'select.walkin-instrument-select',
+        walkinAvailableInstruments
+    );
+}
+
 function onStudentRequestInstrumentDropdownChange(changedSlot = null) {
     const selects = document.querySelectorAll('select.student-request-instrument');
     const changedSelect = changedSlot != null
@@ -5623,9 +5675,7 @@ function initStudentRequestSection(student, requestMeta) {
         const packageId = parseInt(packageSelect.value, 10);
         const paymentType = String(paymentModeEl.value || '').trim();
         const paymentMethod = String(paymentMethodEl.value || '').trim();
-        const instrumentIds = Array.from(document.querySelectorAll('.student-request-instrument'))
-            .map(el => parseInt(el.value, 10))
-            .filter(v => !Number.isNaN(v) && v > 0);
+        const instrumentIds = getStudentRequestSelectedInstrumentIds();
         const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
 
         if (!packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
@@ -6174,7 +6224,7 @@ function renderStudentRegistrationModal(student, portal) {
                             </div>
                             <div>
                                 <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Phone *</label>
-                                <input id="regPhone" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="09x-xxx-xxxx" />
+                                <input id="regPhone" type="tel" autocomplete="off" class="intl-phone-input w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Phone number" />
                             </div>
                             <div>
                                 <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Date of Birth *</label>
@@ -6232,7 +6282,7 @@ function renderStudentRegistrationModal(student, portal) {
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Phone *</label>
-                                        <input id="guardianPhoneInput" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="09x-xxx-xxxx" />
+                                        <input id="guardianPhoneInput" type="tel" autocomplete="off" class="intl-phone-input w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Phone number" />
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Relationship *</label>
@@ -6309,77 +6359,9 @@ function renderStudentRegistrationModal(student, portal) {
 }
 
 function initStudentRegistrationPhonePickers() {
-    if (typeof window.intlTelInput !== 'function') return;
-
-    const getMaxLength = (countryCode) => {
-        switch (countryCode) {
-            case 'ph':
-            case 'us':
-            case 'gb':
-            case 'jp':
-                return 10;
-            default:
-                return 15;
-        }
-    };
-
-    const formatPhonePlaceholder = (exampleNumber, selectedCountry) => {
-        const countryCode = selectedCountry?.iso2 || '';
-        if (countryCode === 'ph') {
-            return '09x-xxx-xxxx';
-        }
-
-        const example = String(exampleNumber || '').trim();
-        if (!example) {
-            return '02x-xxx-xxxx';
-        }
-
-        let digitCount = 0;
-        const masked = example.replace(/\d/g, (digit) => {
-            digitCount += 1;
-            return digitCount <= 2 ? digit : 'x';
-        });
-
-        return masked.replace(/\s+/g, ' ').trim();
-    };
-
-    const phoneFields = [
-        { id: 'regPhone' },
-        { id: 'guardianPhoneInput' }
-    ];
-
-    phoneFields.forEach(({ id }) => {
-        const input = document.getElementById(id);
-        if (!input || input.dataset.intlTelReady === '1') return;
-
-        const iti = window.intlTelInput(input, {
-            initialCountry: 'ph',
-            preferredCountries: ['ph', 'us', 'gb', 'jp'],
-            separateDialCode: true,
-            autoPlaceholder: 'polite',
-            customPlaceholder: formatPhonePlaceholder,
-            formatOnDisplay: true,
-            utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/utils.js'
-        });
-
-        input.dataset.intlTelReady = '1';
-        input._iti = iti;
-
-        const normalizePhone = () => {
-            const countryCode = iti.getSelectedCountryData()?.iso2 || '';
-            const maxLength = getMaxLength(countryCode);
-            const digitsOnly = input.value.replace(/\D/g, '');
-            input.value = digitsOnly.slice(0, maxLength);
-        };
-
-        input.addEventListener('input', normalizePhone);
-        input.addEventListener('countrychange', () => {
-            input.value = '';
-            input.placeholder = formatPhonePlaceholder('', iti.getSelectedCountryData());
-        });
-
-        input.placeholder = formatPhonePlaceholder('', iti.getSelectedCountryData());
-    });
+    if (window.FasIntlPhone) {
+        window.FasIntlPhone.init(document.getElementById('studentRegistrationPanel') || document);
+    }
 }
 
 function renderStudentActionBanner(student, meta, portal) {
@@ -6616,7 +6598,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
             if (guardianEmailInput) guardianEmailInput.value = '';
             if (guardianFirstNameInput) guardianFirstNameInput.value = '';
             if (guardianLastNameInput) guardianLastNameInput.value = '';
-            if (guardianPhoneInput) guardianPhoneInput.value = '';
+            if (guardianPhoneInput) window.FasIntlPhone?.reset(guardianPhoneInput);
             if (guardianRelationshipInput) guardianRelationshipInput.value = '';
             if (guardianInfoBox) guardianInfoBox.textContent = '';
         }
@@ -6627,7 +6609,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
         guardianEmailInput.value = g.email || '';
         if (guardianFirstNameInput) guardianFirstNameInput.value = g.first_name || '';
         if (guardianLastNameInput) guardianLastNameInput.value = g.last_name || '';
-        if (guardianPhoneInput) guardianPhoneInput.value = g.phone || '';
+        if (guardianPhoneInput) window.FasIntlPhone?.setValue(guardianPhoneInput, g.phone || '');
         if (guardianRelationshipInput) guardianRelationshipInput.value = g.relationship_type || '';
     }
 
@@ -6645,7 +6627,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 guardianInfoBox.innerHTML = `Found: <span class="font-semibold">${escapeHtml(g.first_name || '')} ${escapeHtml(g.last_name || '')}</span> • ${escapeHtml(g.relationship_type || '')} • ${escapeHtml(g.phone || '')}`;
                 if (guardianFirstNameInput) guardianFirstNameInput.value = g.first_name || '';
                 if (guardianLastNameInput) guardianLastNameInput.value = g.last_name || '';
-                if (guardianPhoneInput) guardianPhoneInput.value = g.phone || '';
+                if (guardianPhoneInput) window.FasIntlPhone?.setValue(guardianPhoneInput, g.phone || '');
                 if (guardianRelationshipInput) guardianRelationshipInput.value = g.relationship_type || '';
             } else {
                 guardianInfoBox.textContent = res.error || 'Guardian not found.';
@@ -6669,7 +6651,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
     if (regLastName && !regLastName.value) regLastName.value = student?.last_name || '';
     if (regMiddleName && !regMiddleName.value) regMiddleName.value = student?.middle_name || '';
     if (regEmail && !regEmail.value) regEmail.value = student?.email || '';
-    if (regPhone && !regPhone.value) regPhone.value = student?.phone || '';
+    if (regPhone && !regPhone.value) window.FasIntlPhone?.setValue(regPhone, student?.phone || '');
     if (regDob && !regDob.value) regDob.value = student?.date_of_birth || '';
     if (regAddress && !regAddress.value) regAddress.value = student?.address || '';
 
@@ -6717,7 +6699,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                     showMessage('Guardian email is required.', 'error');
                     return;
                 }
-                if (!guardianFirstNameInput?.value?.trim() || !guardianLastNameInput?.value?.trim() || !guardianPhoneInput?.value?.trim() || !guardianRelationshipInput?.value?.trim()) {
+                if (!guardianFirstNameInput?.value?.trim() || !guardianLastNameInput?.value?.trim() || !(window.FasIntlPhone?.getValue(guardianPhoneInput) || guardianPhoneInput?.value?.trim()) || !guardianRelationshipInput?.value?.trim()) {
                     showMessage('Guardian name, phone, and relationship are required.', 'error');
                     return;
                 }
@@ -6730,7 +6712,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 last_name: document.getElementById('regLastName')?.value?.trim() || '',
                 middle_name: document.getElementById('regMiddleName')?.value?.trim() || '',
                 email: document.getElementById('regEmail')?.value?.trim() || '',
-                phone: document.getElementById('regPhone')?.value?.trim() || '',
+                phone: window.FasIntlPhone?.getValue(document.getElementById('regPhone')) || document.getElementById('regPhone')?.value?.trim() || '',
                 address: document.getElementById('regAddress')?.value?.trim() || '',
                 date_of_birth: document.getElementById('regDob')?.value || null,
                 branch_id: Number(student?.branch_id || 0)
@@ -6770,7 +6752,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                     const details = {
                         first_name: guardianFirstNameInput?.value?.trim() || '',
                         last_name: guardianLastNameInput?.value?.trim() || '',
-                        phone: guardianPhoneInput?.value?.trim() || '',
+                        phone: window.FasIntlPhone?.getValue(guardianPhoneInput) || guardianPhoneInput?.value?.trim() || '',
                         relationship: guardianRelationshipInput?.value?.trim() || ''
                     };
 
@@ -8199,9 +8181,7 @@ function calculateWalkinTotalFee() {
     const basePrice = parseFloat(selectedOption.getAttribute('data-price') || '0');
 
     // Check if saxophone selected
-    const selectedInstruments = Array.from(document.querySelectorAll('#walkin_instrumentsContainer select[name="instruments[]"]'))
-        .map(sel => sel.value ? parseInt(sel.value, 10) : 0)
-        .filter(id => id > 0);
+    const selectedInstruments = getWalkinSelectedInstrumentIds();
     const hasSaxophone = selectedInstruments.some(id => {
         const instrument = walkinAvailableInstruments.find(inst => inst.instrument_id === id);
         return instrument && (instrument.instrument_name.toLowerCase().includes('saxophone') ||
@@ -8389,10 +8369,12 @@ function updateWalkinPackageDetails() {
 }
 
 function getWalkinSelectedInstrumentIds() {
-    return Array.from(document.querySelectorAll('#walkin_instrumentsContainer select[name="instruments[]"]'))
-        .map(select => parseInt(select.value, 10))
-        .filter(value => !Number.isNaN(value) && value > 0)
-        .filter((value, index, source) => source.indexOf(value) === index);
+    return getResolvedInstrumentIdsFromSelectors(
+        '#walkinInstrumentsContainer',
+        'select.walkin-instrument-type-select',
+        'select.walkin-instrument-select',
+        walkinAvailableInstruments
+    );
 }
 
 function getWalkinEnrollmentPayload() {
@@ -8536,6 +8518,10 @@ function syncWalkinGuardianLoginModeUI() {
 function initWalkinPage() {
     const form = document.getElementById('walkinForm');
     if (!form) return;
+
+    if (window.FasIntlPhone) {
+        window.FasIntlPhone.init(form);
+    }
 
     // Seed dropdowns
     loadWalkinBranches();
@@ -9347,21 +9333,44 @@ function renderRegistrationsTable() {
                     ${new Date(reg.created_at).toLocaleDateString()}
                 </td>
                 <td class="px-6 py-4">
-                    <div class="flex gap-2">
-                        <button onclick="viewDetails(${reg.student_id})"
-                            class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-sm transition">
-                            <i class="fas fa-eye"></i>
-                        </button>
+                   <div class="flex items-center gap-2">
 
-                        ${reg.registration_status === 'Pending' ? `
-                            <button onclick="openPaymentModal(${reg.student_id})"
-                                class="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-sm transition">
-                                <i class="fas fa-money-bill-wave"></i>
-                            </button>
-                            <button onclick="rejectRegistration(${reg.student_id})"
-                                class="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm transition">
-                                <i class="fas fa-times"></i>
-                            </button>
+    <!-- VIEW -->
+    <button onclick="viewDetails(${reg.student_id})"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5
+               bg-blue-50 text-blue-600 border border-blue-100
+               hover:bg-blue-600 hover:text-white
+               rounded-lg text-xs font-semibold
+               transition-all duration-200 shadow-sm hover:shadow">
+        <i class="fas fa-eye text-xs"></i>
+        <span>View</span>
+    </button>
+
+    ${reg.registration_status === 'Pending' ? `
+
+        <!-- PAY -->
+        <button onclick="openPaymentModal(${reg.student_id})"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5
+                   bg-amber-50 text-amber-600 border border-amber-100
+                   hover:bg-amber-500 hover:text-white
+                   rounded-lg text-xs font-semibold
+                   transition-all duration-200 shadow-sm hover:shadow">
+            <i class="fas fa-money-bill-wave text-xs"></i>
+            <span>Pay</span>
+        </button>
+
+        <!-- REJECT -->
+        <button onclick="rejectRegistration(${reg.student_id})"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5
+                   bg-red-50 text-red-600 border border-red-100
+                   hover:bg-red-600 hover:text-white
+                   rounded-lg text-xs font-semibold
+                   transition-all duration-200 shadow-sm hover:shadow">
+            <i class="fas fa-times text-xs"></i>
+            <span>Reject</span>
+        </button>
+
+
                         ` : ''}
                     </div>
                 </td>
@@ -10252,4 +10261,3 @@ document.addEventListener('DOMContentLoaded', () => {
         initGuardianAbsencePage();
     }
 });
-

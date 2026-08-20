@@ -10,11 +10,15 @@ if (!ini_get('date.timezone') || ini_get('date.timezone') === 'UTC') {
 require_once 'db_connect.php';
 require_once 'instrument_specialization_sync.php';
 require_once 'auth_session.php';
+require_once 'xss_protection.php';  // XSS Protection utilities
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Send security headers
+XSSProtection::sendSecurityHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);

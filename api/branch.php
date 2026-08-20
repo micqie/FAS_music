@@ -1,11 +1,15 @@
 <?php
 require_once 'db_connect.php';
 require_once 'auth_session.php';
+require_once 'xss_protection.php';  // XSS Protection utilities
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Send security headers
+XSSProtection::sendSecurityHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0);
 
@@ -16,6 +20,11 @@ class Branch
     public function __construct($pdo)
     {
         $this->conn = $pdo;
+    }
+
+    private function sanitizeTextField($value): string
+    {
+        return trim(strip_tags((string)($value ?? '')));
     }
 
     public function sendJSON($data, $statusCode = 200)
@@ -116,14 +125,18 @@ class Branch
         }
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
-        $name = trim($data['branch_name'] ?? '');
-        $address = trim($data['address'] ?? '');
-        $phone = trim($data['phone'] ?? '');
-        $email = trim($data['email'] ?? '');
+        $name = $this->sanitizeTextField($data['branch_name'] ?? '');
+        $address = $this->sanitizeTextField($data['address'] ?? '');
+        $phone = $this->sanitizeTextField($data['phone'] ?? '');
+        $email = trim((string)($data['email'] ?? ''));
         $status = 'Active';
 
         if ($name === '') {
             $this->sendJSON(['error' => 'Branch name is required'], 400);
+        }
+
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->sendJSON(['error' => 'Invalid email address'], 400);
         }
 
         try {
@@ -147,16 +160,20 @@ class Branch
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $id = (int) ($data['branch_id'] ?? 0);
-        $name = trim($data['branch_name'] ?? '');
-        $address = trim($data['address'] ?? '');
-        $phone = trim($data['phone'] ?? '');
-        $email = trim($data['email'] ?? '');
+        $name = $this->sanitizeTextField($data['branch_name'] ?? '');
+        $address = $this->sanitizeTextField($data['address'] ?? '');
+        $phone = $this->sanitizeTextField($data['phone'] ?? '');
+        $email = trim((string)($data['email'] ?? ''));
 
         if ($id < 1) {
             $this->sendJSON(['error' => 'Branch ID is required'], 400);
         }
         if ($name === '') {
             $this->sendJSON(['error' => 'Branch name is required'], 400);
+        }
+
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->sendJSON(['error' => 'Invalid email address'], 400);
         }
 
         try {

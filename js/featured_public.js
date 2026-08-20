@@ -68,10 +68,15 @@ function initFeaturedPublicFeed() {
         statusBox.classList.add('hidden');
 
         grid.innerHTML = sorted.map((post) => {
-            const branchLabel = post.branch_name || 'Father & Sons Music Academy';
+            const branchLabel = escapeHtml(post.branch_name || 'Father & Sons Music Academy');
+            const categoryLabel = escapeHtml(post.category || 'Update');
+            const titleLabel = escapeHtml(post.title || 'Featured post');
+            const contentLabel = escapeHtml(post.content || '');
+            const authorLabel = escapeHtml(post.created_by_name ? post.created_by_name.trim() : '');
             const categoryStyles = getCategoryStyles(post.category);
             const isHighPriority = getCategoryPriority(post.category) <= 1;
             const mediaUrl = post.media_path ? buildPublicFileUrl(post.media_path) : '';
+            const safeMediaUrl = escapeHtml(mediaUrl);
 
             let mediaMarkup = '';
             if (isHighPriority) {
@@ -80,13 +85,13 @@ function initFeaturedPublicFeed() {
                     mediaMarkup = '<div class="flex aspect-square items-center justify-center bg-zinc-100 text-zinc-400"><i class="fas fa-photo-film text-2xl"></i></div>';
                 } else if (String(post.media_type || '').toLowerCase() === 'video') {
                     mediaMarkup = `
-                        <video class="aspect-square w-full bg-black object-cover cursor-pointer" data-media-url="${mediaUrl}" data-media-type="video" preload="metadata">
-                            <source src="${mediaUrl}" type="video/mp4">
+                        <video class="aspect-square w-full bg-black object-cover cursor-pointer" data-media-url="${safeMediaUrl}" data-media-type="video" preload="metadata">
+                            <source src="${safeMediaUrl}" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
                     `;
                 } else {
-                    mediaMarkup = `<img src="${mediaUrl}" alt="${post.title || 'Featured post'}" class="aspect-square w-full object-cover bg-zinc-100 cursor-pointer" data-media-url="${mediaUrl}" data-media-type="image">`;
+                    mediaMarkup = `<img src="${safeMediaUrl}" alt="${titleLabel}" class="aspect-square w-full object-cover bg-zinc-100 cursor-pointer" data-media-url="${safeMediaUrl}" data-media-type="image">`;
                 }
             } else {
                 // Regular size media
@@ -94,13 +99,13 @@ function initFeaturedPublicFeed() {
                     mediaMarkup = '<div class="flex aspect-square items-center justify-center bg-zinc-100 text-zinc-400"><i class="fas fa-photo-film text-3xl"></i></div>';
                 } else if (String(post.media_type || '').toLowerCase() === 'video') {
                     mediaMarkup = `
-                        <video class="aspect-square w-full bg-black object-cover cursor-pointer" data-media-url="${mediaUrl}" data-media-type="video" preload="metadata">
-                            <source src="${mediaUrl}" type="video/mp4">
+                        <video class="aspect-square w-full bg-black object-cover cursor-pointer" data-media-url="${safeMediaUrl}" data-media-type="video" preload="metadata">
+                            <source src="${safeMediaUrl}" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
                     `;
                 } else {
-                    mediaMarkup = `<img src="${mediaUrl}" alt="${post.title || 'Featured post'}" class="aspect-square w-full object-cover bg-zinc-100 cursor-pointer" data-media-url="${mediaUrl}" data-media-type="image">`;
+                    mediaMarkup = `<img src="${safeMediaUrl}" alt="${titleLabel}" class="aspect-square w-full object-cover bg-zinc-100 cursor-pointer" data-media-url="${safeMediaUrl}" data-media-type="image">`;
                 }
             }
 
@@ -111,14 +116,14 @@ function initFeaturedPublicFeed() {
                     </div>
                     <div class="p-4">
                         <div class="flex flex-wrap items-center gap-2 mb-3">
-                            <span class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.25em] ${categoryStyles.badge}">${post.category || 'Update'}</span>
+                            <span class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.25em] ${categoryStyles.badge}">${categoryLabel}</span>
                             <span class="text-[11px] uppercase tracking-[0.22em] text-zinc-400 font-bold">${branchLabel}</span>
                         </div>
-                        <h3 class="text-lg font-serif text-zinc-900 dark:text-white mb-2">${post.title || 'Featured post'}</h3>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed line-clamp-2 mb-3">${post.content || ''}</p>
+                        <h3 class="text-lg font-serif text-zinc-900 dark:text-white mb-2">${titleLabel}</h3>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed line-clamp-2 mb-3">${contentLabel}</p>
                         <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-                            ${post.published_at ? `<span><i class="fas fa-calendar-day mr-1 text-gold-500"></i>${formatDate(post.published_at)}</span>` : ''}
-                            ${post.created_by_name ? `<span><i class="fas fa-user mr-1 text-gold-500"></i>${post.created_by_name.trim()}</span>` : ''}
+                            ${post.published_at ? `<span><i class="fas fa-calendar-day mr-1 text-gold-500"></i>${escapeHtml(formatDate(post.published_at))}</span>` : ''}
+                            ${authorLabel ? `<span><i class="fas fa-user mr-1 text-gold-500"></i>${authorLabel}</span>` : ''}
                         </div>
                     </div>
                 </article>

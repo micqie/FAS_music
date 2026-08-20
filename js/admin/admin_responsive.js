@@ -14,17 +14,27 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebar.dataset.mobileMenuEnhanced = '1';
     document.body.classList.add('admin-responsive-ready');
     sidebar.setAttribute('data-admin-sidebar', 'true');
+    nav.classList.add('inset-x-0', 'top-0', 'left-0', 'right-0');
+    nav.style.left = '0';
+    nav.style.right = '0';
+    nav.style.top = '0';
+    nav.style.width = 'auto';
 
-    const existingBackdrop = document.getElementById('adminSidebarBackdrop') || document.querySelector('.admin-sidebar-backdrop');
-    if (existingBackdrop) {
-        return;
+    let backdrop = document.getElementById('adminSidebarBackdrop') || document.querySelector('.admin-sidebar-backdrop');
+    if (!backdrop) {
+        backdrop = document.createElement('button');
+        backdrop.type = 'button';
+        backdrop.className = 'admin-sidebar-backdrop lg:hidden';
+        backdrop.setAttribute('aria-label', 'Close admin navigation');
+        document.body.insertBefore(backdrop, sidebar);
+    } else {
+        backdrop.classList.add('admin-sidebar-backdrop', 'lg:hidden');
+        if (backdrop.tagName !== 'BUTTON') {
+            backdrop.setAttribute('role', 'button');
+            backdrop.setAttribute('tabindex', '0');
+            backdrop.setAttribute('aria-label', 'Close admin navigation');
+        }
     }
-
-    const backdrop = document.createElement('button');
-    backdrop.type = 'button';
-    backdrop.className = 'admin-sidebar-backdrop lg:hidden';
-    backdrop.setAttribute('aria-label', 'Close admin navigation');
-    document.body.insertBefore(backdrop, sidebar);
 
     const menuButton = document.createElement('button');
     menuButton.type = 'button';
@@ -56,12 +66,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('admin-sidebar-open');
         menuButton.setAttribute('aria-expanded', 'false');
         menuButton.innerHTML = '<i class="fas fa-bars text-sm"></i>';
+        document.body.style.overflow = '';
     };
 
     const openSidebar = () => {
         document.body.classList.add('admin-sidebar-open');
         menuButton.setAttribute('aria-expanded', 'true');
         menuButton.innerHTML = '<i class="fas fa-times text-sm"></i>';
+        document.body.style.overflow = 'hidden';
     };
 
     menuButton.addEventListener('click', () => {
@@ -74,6 +86,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     backdrop.addEventListener('click', closeSidebar);
+    backdrop.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            closeSidebar();
+        }
+    });
 
     const syncCompactLayout = () => {
         const isMobile = window.innerWidth < 1024;

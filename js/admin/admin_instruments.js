@@ -24,19 +24,19 @@
 
                 if (data.success && data.branches) {
                     allBranches = data.branches;
-                    const options = data.branches.map(branch =>
-                        `<option value="${branch.branch_id}">${branch.branch_name}</option>`
+                    const buildBranchOptions = (branches) => branches.map(branch =>
+                        `<option value="${Number(branch.branch_id)}">${escapeHtml(branch.branch_name)}</option>`
                     ).join('');
 
                     if (branchFilter) {
-                        branchFilter.innerHTML = '<option value="">All Branches</option>' + options;
+                        branchFilter.innerHTML = '<option value="">All Branches</option>' + buildBranchOptions(data.branches);
                     }
                     if (instrumentBranchId) {
-                        instrumentBranchId.innerHTML = '<option value="">Select Branch</option>' + options;
+                        instrumentBranchId.innerHTML = '<option value="">Select Branch</option>' + buildBranchOptions(data.branches);
                     }
                     const editBranchId = document.getElementById('editInstrumentBranchId');
                     if (editBranchId) {
-                        editBranchId.innerHTML = '<option value="">Select Branch</option>' + options;
+                        editBranchId.innerHTML = '<option value="">Select Branch</option>' + buildBranchOptions(data.branches);
                     }
                 }
             } catch (error) {
@@ -207,7 +207,7 @@
                             <div class="font-medium text-slate-900">${instrument.instrument_name || 'N/A'}</div>
                         </td>
                         <td class="px-6 py-4 text-slate-900">${instrument.type_name || 'N/A'}</td>
-                        <td class="px-6 py-4 text-slate-900">${instrument.branch_name || 'N/A'}</td>
+                        <td class="px-6 py-4 text-slate-900">${escapeHtml(instrument.branch_name || 'N/A')}</td>
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
                                 ${instrument.status || 'N/A'}

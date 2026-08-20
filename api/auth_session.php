@@ -108,6 +108,9 @@ if (!function_exists('fas_fetch_user_auth_record')) {
     function fas_fetch_user_auth_record(PDO $conn, int $userId): ?array
     {
         fas_ensure_session_columns($conn);
+        $hasUserBranch = fas_has_user_column($conn, 'branch_id');
+        $branchSelect = $hasUserBranch ? ", u.branch_id, b.branch_name" : "";
+        $branchJoin = $hasUserBranch ? " LEFT JOIN tbl_branches b ON b.branch_id = u.branch_id " : "";
 
         $stmt = $conn->prepare("
             SELECT
@@ -120,9 +123,10 @@ if (!function_exists('fas_fetch_user_auth_record')) {
                 u.status,
                 u.active_session_token,
                 u.active_session_updated_at,
-                r.role_name
+                r.role_name{$branchSelect}
             FROM tbl_users u
             INNER JOIN tbl_roles r ON u.role_id = r.role_id
+            {$branchJoin}
             WHERE u.user_id = ?
             LIMIT 1
         ");

@@ -12,11 +12,15 @@ if (!ini_get('date.timezone') || ini_get('date.timezone') === 'UTC') {
 require_once 'db_connect.php';
 require_once 'instrument_specialization_sync.php';
 require_once 'auth_session.php';
+require_once 'xss_protection.php';  // XSS Protection utilities
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Send security headers
+XSSProtection::sendSecurityHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0);
 
@@ -1749,6 +1753,10 @@ class StudentsApi
                 return ((int)($a['sort_order'] ?? 0)) <=> ((int)($b['sort_order'] ?? 0));
             });
             $slot = $slotQueue[0];
+            $slotTeacherId = (int)($slot['teacher_id'] ?? $teacherId);
+            if ($slotTeacherId < 1) {
+                $slotTeacherId = $teacherId;
+            }
             $sessionDate = (string)($slot['next_date'] ?? '');
             $startTime = (string)($slot['start_time'] ?? '');
             $endTime = (string)($slot['end_time'] ?? '');
@@ -1762,15 +1770,15 @@ class StudentsApi
             $existingSessionId = (int)($stmtExisting->fetchColumn() ?: 0);
 
             $excludeIds = $existingSessionId > 0 ? [$existingSessionId] : [];
-            $isValid = $this->teacherHasAvailabilityForSlot($teacherId, $sessionDate, $startTime, $endTime)
-                && !$this->hasTeacherScheduleConflict($teacherId, $sessionDate, $startTime, $endTime, $excludeIds)
+            $isValid = $this->teacherHasAvailabilityForSlot($slotTeacherId, $sessionDate, $startTime, $endTime)
+                && !$this->hasTeacherScheduleConflict($slotTeacherId, $sessionDate, $startTime, $endTime, $excludeIds)
                 && !$this->hasStudentScheduleConflict($studentId, $sessionDate, $startTime, $endTime, $excludeIds)
                 && !($roomId !== null && $roomId > 0 && $this->hasRoomScheduleConflict($roomId, $sessionDate, $startTime, $endTime, $excludeIds));
 
             if ($isValid) {
                 if ($existingSessionId > 0) {
                     $stmtUpdate->execute([
-                        $teacherId,
+                        $slotTeacherId,
                         $sessionDate,
                         $startTime,
                         $endTime,
@@ -1784,7 +1792,7 @@ class StudentsApi
                 } else {
                     $stmtInsert->execute([
                         $enrollmentId,
-                        $teacherId,
+                        $slotTeacherId,
                         $sessionNumber,
                         $sessionDate,
                         $startTime,
@@ -1826,6 +1834,78 @@ class StudentsApi
             'required' => $totalSessions,
             'complete' => (($created + $updated) >= $totalSessions)
         ];
+    }
+
+    public function repairFixedScheduleSessions()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $singleEnrollmentId = (int)($data['enrollment_id'] ?? 0);
+        $branchId = (int)($data['branch_id'] ?? 0);
+
+        if (!$this->tableExists('tbl_enrollments') || !$this->tableExists('tbl_sessions')) {
+            $this->sendJSON(['error' => 'Required tables are missing'], 500);
+        }
+
+        try {
+            $sql = "
+                SELECT e.enrollment_id
+                FROM tbl_enrollments e
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                WHERE e.status = 'Active'
+                  AND e.schedule_status = 'Active'
+            ";
+            $params = [];
+            if ($singleEnrollmentId > 0) {
+                $sql .= " AND e.enrollment_id = ? ";
+                $params[] = $singleEnrollmentId;
+            }
+            if ($branchId > 0) {
+                $sql .= " AND s.branch_id = ? ";
+                $params[] = $branchId;
+            }
+            $sql .= " ORDER BY e.enrollment_id ASC ";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            $enrollmentIds = $stmt->fetchAll(PDO::FETCH_COLUMN, 0) ?: [];
+
+            $results = [];
+            $totalCreated = 0;
+            $totalUpdated = 0;
+
+            foreach ($enrollmentIds as $enrollmentId) {
+                $enrollmentId = (int)$enrollmentId;
+                if ($enrollmentId < 1) {
+                    continue;
+                }
+                $result = $this->generateFixedScheduleSessions($enrollmentId);
+                $created = (int)($result['created'] ?? 0);
+                $updated = (int)($result['updated'] ?? 0);
+                $totalCreated += $created;
+                $totalUpdated += $updated;
+                $results[] = [
+                    'enrollment_id' => $enrollmentId,
+                    'created' => $created,
+                    'updated' => $updated,
+                    'complete' => !empty($result['complete'])
+                ];
+            }
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Fixed schedules repaired successfully.',
+                'processed' => count($results),
+                'created' => $totalCreated,
+                'updated' => $totalUpdated,
+                'results' => $results
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
     }
 
     private function canEditEnrollmentScheduleBeforeFirstWeek($enrollmentId)
@@ -2797,6 +2877,74 @@ class StudentsApi
         }
         if ($branchId < 1) {
             $this->sendJSON(['error' => 'Branch is required'], 400);
+        }
+
+        // ═══ XSS PROTECTION: Validate name fields ═══
+        $firstNameValidation = XSSProtection::validateName($firstName);
+        if (!$firstNameValidation['valid']) {
+            XSSProtection::logSecurityEvent('XSS_ATTEMPT', 'Invalid first name in updateStudent', ['value' => substr($firstName, 0, 50)]);
+            $this->sendJSON(['error' => $firstNameValidation['error']], 400);
+        }
+
+        $lastNameValidation = XSSProtection::validateName($lastName);
+        if (!$lastNameValidation['valid']) {
+            XSSProtection::logSecurityEvent('XSS_ATTEMPT', 'Invalid last name in updateStudent', ['value' => substr($lastName, 0, 50)]);
+            $this->sendJSON(['error' => $lastNameValidation['error']], 400);
+        }
+
+        if ($middleName !== '') {
+            $middleNameValidation = XSSProtection::validateName($middleName);
+            if (!$middleNameValidation['valid']) {
+                XSSProtection::logSecurityEvent('XSS_ATTEMPT', 'Invalid middle name in updateStudent', ['value' => substr($middleName, 0, 50)]);
+                $this->sendJSON(['error' => $middleNameValidation['error']], 400);
+            }
+        }
+
+        // ═══ XSS PROTECTION: Validate email ═══
+        if ($email !== '') {
+            $emailValidation = XSSProtection::validateEmail($email);
+            if (!$emailValidation['valid']) {
+                XSSProtection::logSecurityEvent('XSS_ATTEMPT', 'Invalid email in updateStudent', ['value' => substr($email, 0, 50)]);
+                $this->sendJSON(['error' => $emailValidation['error']], 400);
+            }
+        }
+
+        // ═══ XSS PROTECTION: Validate phone ═══
+        if ($phone !== '') {
+            $phoneValidation = XSSProtection::validatePhone($phone);
+            if (!$phoneValidation['valid']) {
+                XSSProtection::logSecurityEvent('XSS_ATTEMPT', 'Invalid phone in updateStudent', ['value' => substr($phone, 0, 50)]);
+                $this->sendJSON(['error' => $phoneValidation['error']], 400);
+            }
+        }
+
+        // ═══ XSS PROTECTION: Validate address ═══
+        if ($address !== '') {
+            $addressValidation = XSSProtection::sanitizeAddress($address);
+            if (!$addressValidation['valid']) {
+                XSSProtection::logSecurityEvent('XSS_ATTEMPT', 'Invalid address in updateStudent', ['value' => substr($address, 0, 50)]);
+                $this->sendJSON(['error' => $addressValidation['error']], 400);
+            }
+            $address = $addressValidation['value'];
+        }
+
+        // ═══ XSS PROTECTION: Validate school and grade/year ═══
+        if ($school !== '') {
+            $schoolValidation = XSSProtection::sanitizeText($school, 200);
+            if (!$schoolValidation['valid']) {
+                XSSProtection::logSecurityEvent('XSS_ATTEMPT', 'Invalid school in updateStudent', ['value' => substr($school, 0, 50)]);
+                $this->sendJSON(['error' => $schoolValidation['error']], 400);
+            }
+            $school = $schoolValidation['value'];
+        }
+
+        if ($gradeYear !== '') {
+            $gradeYearValidation = XSSProtection::sanitizeText($gradeYear, 50);
+            if (!$gradeYearValidation['valid']) {
+                XSSProtection::logSecurityEvent('XSS_ATTEMPT', 'Invalid grade/year in updateStudent', ['value' => substr($gradeYear, 0, 50)]);
+                $this->sendJSON(['error' => $gradeYearValidation['error']], 400);
+            }
+            $gradeYear = $gradeYearValidation['value'];
         }
 
         try {
@@ -6999,6 +7147,9 @@ switch ($action) {
         break;
     case 'approve-package-request':
         $studentsApi->approvePackageRequest();
+        break;
+    case 'repair-fixed-schedule-sessions':
+        $studentsApi->repairFixedScheduleSessions();
         break;
     case 'reject-package-request':
         $studentsApi->rejectPackageRequest();

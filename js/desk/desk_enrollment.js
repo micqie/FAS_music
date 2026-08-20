@@ -792,9 +792,11 @@
             const packageId = parseInt(packageSelect.value, 10);
             const paymentType = String(paymentTypeEl.value || '').trim();
             const paymentMethod = String(paymentMethodEl.value || '').trim();
-            const instrumentIds = Array.from(document.querySelectorAll('#walkinInstrumentsContainer .student-request-instrument'))
-                .map(el => parseInt(el.value, 10))
-                .filter(value => !Number.isNaN(value) && value > 0);
+            const instrumentIds = typeof getWalkinSelectedInstrumentIds === 'function'
+                ? getWalkinSelectedInstrumentIds()
+                : Array.from(document.querySelectorAll('#walkinInstrumentsContainer .student-request-instrument'))
+                    .map(el => parseInt(el.value, 10))
+                    .filter(value => !Number.isNaN(value) && value > 0);
             const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
 
             console.log('[Walk-in Enrollment Debug]', {

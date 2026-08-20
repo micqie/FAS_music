@@ -14,6 +14,64 @@
         return full || user.username || user.email || 'Instructor';
     }
 
+    function getTopNav() {
+        return document.querySelector('body > nav');
+    }
+
+    function getMobileMenu() {
+        return document.getElementById('instructorMobileMenu');
+    }
+
+    function getMenuIcon() {
+        return document.getElementById('instructorMenuIcon');
+    }
+
+    function setMobileMenuState(open) {
+        const menu = getMobileMenu();
+        const icon = getMenuIcon();
+        const button = icon?.closest('button');
+        if (!menu || !icon) return;
+
+        menu.classList.toggle('hidden', !open);
+        icon.classList.toggle('fa-bars', !open);
+        icon.classList.toggle('fa-times', open);
+        button?.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.classList.toggle('instructor-menu-open', open);
+        document.body.style.overflow = open ? 'hidden' : '';
+    }
+
+    function syncTopNavLayout() {
+        const nav = getTopNav();
+        if (!nav) return;
+
+        const isMobile = window.innerWidth < 1024;
+        nav.style.padding = isMobile ? '0.65rem 1rem' : '';
+        nav.style.gap = isMobile ? '0.75rem' : '';
+        nav.style.minHeight = isMobile ? '4.5rem' : '';
+
+        const leftGroup = nav.firstElementChild;
+        const rightGroup = nav.lastElementChild;
+        leftGroup?.classList.add('min-w-0');
+        rightGroup?.classList.add('min-w-0');
+
+        const logo = nav.querySelector('img');
+        if (logo) logo.classList.add('shrink-0');
+
+        const profileMount = document.getElementById('instructorProfileIconMount');
+        if (profileMount) profileMount.classList.add('shrink-0');
+    }
+
+    function closeMobileMenu() {
+        setMobileMenuState(false);
+    }
+
+    function toggleMobileMenu() {
+        const menu = getMobileMenu();
+        if (!menu) return;
+        const shouldOpen = menu.classList.contains('hidden');
+        setMobileMenuState(shouldOpen);
+    }
+
     /** Inject the dropdown HTML in place of the static icon */
     function mountDropdown() {
         const anchor = document.getElementById('instructorProfileIconMount');
@@ -153,7 +211,27 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        syncTopNavLayout();
+        window.toggleInstructorMenu = toggleMobileMenu;
         mountDropdown();
         syncNav();
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') closeMobileMenu();
+        });
+
+        window.addEventListener('resize', function () {
+            if (window.innerWidth >= 1024) closeMobileMenu();
+            syncTopNavLayout();
+        });
+
+        document.querySelectorAll('#instructorMobileMenu a').forEach(function (link) {
+            link.addEventListener('click', function () {
+                if (window.innerWidth < 1024) closeMobileMenu();
+            });
+        });
+
+        const overlay = document.querySelector('#instructorMobileMenu > div.absolute.inset-0');
+        overlay?.addEventListener('click', closeMobileMenu);
     });
 })();

@@ -86,7 +86,7 @@
 
                 if (data.success && data.branches) {
                     const options = data.branches.map(branch =>
-                        `<option value="${branch.branch_id}">${branch.branch_name}</option>`
+                        `<option value="${Number(branch.branch_id)}">${escapeHtml(branch.branch_name)}</option>`
                     ).join('');
                     branchFilter.innerHTML = '<option value="">All Branches</option>' + options;
                 }

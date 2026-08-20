@@ -153,7 +153,7 @@
                 <div>
                     <h1 class="text-3xl font-black text-slate-900 tracking-tight mt-8">Users &amp; Staff</h1>
                     <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
-                    <p class="text-slate-500 mt-2">Manage all user accounts, with quick tools for adding staff and branch managers.</p>
+                    <p class="text-slate-500 mt-2">Manage all user accounts, with quick tools for adding staff, branch managers, and admins.</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <button id="openAddStaffModalBtn" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow hover:bg-black transition">
@@ -163,6 +163,10 @@
                     <button id="openAddManagerModalBtn" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gold-500 text-slate-900 text-xs font-semibold shadow hover:bg-gold-600 transition">
                         <i class="fas fa-user-tie"></i>
                         <span>Add Branch Manager</span>
+                    </button>
+                    <button id="openAddAdminModalBtn" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold shadow hover:bg-emerald-700 transition">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>Add Admin</span>
                     </button>
                 </div>
             </div>
@@ -445,6 +449,118 @@
                     <button type="submit" id="adminAddManagerSubmit" class="px-6 py-2 text-xs font-semibold rounded-xl bg-gold-500 text-slate-900 hover:bg-gold-600 flex items-center gap-2">
                         <span id="adminAddManagerSubmitText">Create Manager</span>
                         <i id="adminAddManagerSubmitIcon" class="fas fa-user-tie text-[11px]"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Admin Modal -->
+    <div id="adminAddAdminModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 relative">
+            <button type="button" data-close-modal="adminAddAdminModal" class="absolute top-3 right-3 text-slate-400 hover:text-slate-700">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-slate-900 flex items-center gap-2">
+                    <i class="fas fa-shield-halved text-emerald-600"></i>
+                    Add Admin Account
+                </h2>
+                <p class="text-xs text-slate-500 mt-1">Create a new admin account. You can deactivate it later from the user table.</p>
+            </div>
+            <form id="adminAddAdminForm" class="space-y-6">
+                <input type="hidden" name="role" value="Admin">
+                <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 md:p-5 space-y-4">
+                    <div class="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+                        <i class="fas fa-circle-info mt-0.5 text-emerald-600"></i>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">Admin access</p>
+                            <p class="text-xs text-slate-600 mt-1">Use a real email or a school login. Admin accounts do not need a branch.</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <label class="account-mode-card block" id="adminAddAdminRealCard">
+                            <input type="radio" name="account_mode" value="real_email" class="sr-only">
+                            <div class="flex items-start gap-3">
+                                <div class="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                    <i class="fas fa-envelope"></i>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-slate-900">Use real email</p>
+                                    <p class="text-xs text-slate-500 mt-1">Best if the new admin already has their own email address.</p>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="account-mode-card is-selected block" id="adminAddAdminSystemCard">
+                            <input type="radio" name="account_mode" value="system_account" class="sr-only" checked>
+                            <div class="flex items-start gap-3">
+                                <div class="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                                    <i class="fas fa-id-badge"></i>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-slate-900">Use school login</p>
+                                    <p class="text-xs text-slate-500 mt-1">Type a name and we’ll turn it into a school account like <span class="font-mono">admin.name@fas.com</span>.</p>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                    <div data-account-panel="real_email" class="space-y-3 hidden">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Admin email *</label>
+                            <input type="email" name="email" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20" placeholder="admin@example.com">
+                        </div>
+                        <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+                            We will send the login details to this email address.
+                        </div>
+                    </div>
+                    <div data-account-panel="system_account" class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Login name</label>
+                            <input type="text" name="system_login_name" id="adminAddAdminSystemLogin" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20" placeholder="username">
+                            <p class="text-xs text-slate-500 mt-2">Leave blank and we’ll use the admin’s name.</p>
+                        </div>
+                        <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+                            <p><span class="font-semibold">Login:</span> <span id="adminAddAdminSystemPreview" class="font-mono">admin.name@fas.com</span></p>
+                            <p class="mt-1"><span class="font-semibold">Password:</span> the password you set below</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-[0.15em]">First Name *</label>
+                        <input type="text" name="first_name" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500/30 focus:border-gold-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-[0.15em]">Last Name *</label>
+                        <input type="text" name="last_name" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500/30 focus:border-gold-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-[0.15em]">Phone</label>
+                        <input type="tel" name="phone" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500/30 focus:border-gold-500">
+                    </div>
+                    <div class="md:col-span-2">
+                        <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
+                            Admin accounts do not require a branch assignment.
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-[0.15em]">Initial Password *</label>
+                        <input type="password" name="password" id="adminAddAdminPassword" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500/30 focus:border-gold-500" placeholder="Create a password">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-[0.15em]">Confirm Password *</label>
+                        <input type="password" name="password_confirm" id="adminAddAdminPasswordConfirm" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500/30 focus:border-gold-500">
+                        <p id="adminAddAdminPasswordMatch" class="text-[11px] mt-1"></p>
+                    </div>
+                </div>
+                <div id="adminAddAdminMessage" class="hidden text-sm rounded-xl px-4 py-3"></div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" data-close-modal="adminAddAdminModal" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-xl border border-slate-200 bg-white">Cancel</button>
+                    <button type="submit" id="adminAddAdminSubmit" class="px-6 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2">
+                        <span id="adminAddAdminSubmitText">Create Admin</span>
+                        <i id="adminAddAdminSubmitIcon" class="fas fa-shield-halved text-[11px]"></i>
                     </button>
                 </div>
             </form>

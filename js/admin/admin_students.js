@@ -87,18 +87,18 @@
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-6 py-4">
-                            <div class="font-medium text-slate-900">${student.first_name} ${student.last_name}</div>
-                            <div class="text-sm text-slate-500">${student.email || ''}</div>
+                            <div class="font-medium text-slate-900">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
+                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-slate-800">${student.phone || ''}</td>
-                        <td class="px-6 py-4 text-slate-800">${student.branch_name || 'N/A'}</td>
+                        <td class="px-6 py-4 text-slate-800">${escapeHtml(student.phone || '')}</td>
+                        <td class="px-6 py-4 text-slate-800">${escapeHtml(student.branch_name || 'N/A')}</td>
                         <td class="px-6 py-4">
                             <div class="text-slate-800 font-medium">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</div>
                             ${student.registration_fee_paid ? `<div class="text-xs text-slate-500">Paid: ₱${parseFloat(student.registration_fee_paid).toFixed(2)}</div>` : ''}
                         </td>
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
-                                ${student.status || 'N/A'}
+                                ${escapeHtml(student.status || 'N/A')}
                             </span>
                         </td>
                         <td class="px-6 py-4 text-slate-500 text-sm">

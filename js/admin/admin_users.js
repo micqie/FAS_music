@@ -108,7 +108,9 @@
         }
 
         function getAdminCreationFormRolePrefix(formId) {
-            return formId === 'adminAddManagerForm' ? 'manager' : 'staff';
+            if (formId === 'adminAddManagerForm') return 'manager';
+            if (formId === 'adminAddAdminForm') return 'admin';
+            return 'staff';
         }
 
         function getAdminCreationFormCardIds(formId) {
@@ -116,6 +118,12 @@
                 return {
                     real: 'adminAddManagerRealCard',
                     system: 'adminAddManagerSystemCard'
+                };
+            }
+            if (formId === 'adminAddAdminForm') {
+                return {
+                    real: 'adminAddAdminRealCard',
+                    system: 'adminAddAdminSystemCard'
                 };
             }
 
@@ -147,7 +155,10 @@
         }
 
         function updateAdminCreationLoginPreview(formId) {
-            const preview = document.getElementById(formId === 'adminAddManagerForm' ? 'adminAddManagerSystemPreview' : 'adminAddStaffSystemPreview');
+            let previewId = 'adminAddStaffSystemPreview';
+            if (formId === 'adminAddManagerForm') previewId = 'adminAddManagerSystemPreview';
+            if (formId === 'adminAddAdminForm') previewId = 'adminAddAdminSystemPreview';
+            const preview = document.getElementById(previewId);
             if (preview) {
                 preview.textContent = getAdminCreationLoginPreview(formId);
             }
@@ -248,7 +259,7 @@
                 const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
                 const data = response.data;
                 if (data.success && Array.isArray(data.branches)) {
-                    select.innerHTML = '<option value=\"\">Select branch</option>' + data.branches.map(b => `<option value=\"${b.branch_id}\">${b.branch_name}</option>`).join('');
+                    select.innerHTML = '<option value=\"\">Select branch</option>' + data.branches.map(b => `<option value=\"${Number(b.branch_id)}\">${escapeHtml(b.branch_name)}</option>`).join('');
                 }
             } catch (e) {
                 console.error('Failed to load branches for users page', e);
@@ -315,12 +326,18 @@
             form.reset();
             setAdminCreationFormMode(formId, 'system_account');
 
-            const message = document.getElementById(formId === 'adminAddStaffForm' ? 'adminAddStaffMessage' : 'adminAddManagerMessage');
+            let messageId = 'adminAddStaffMessage';
+            if (formId === 'adminAddManagerForm') messageId = 'adminAddManagerMessage';
+            if (formId === 'adminAddAdminForm') messageId = 'adminAddAdminMessage';
+            const message = document.getElementById(messageId);
             if (message) {
                 message.textContent = '';
                 message.classList.add('hidden');
             }
-            const matchLabel = document.getElementById(formId === 'adminAddStaffForm' ? 'adminAddStaffPasswordMatch' : 'adminAddManagerPasswordMatch');
+            let matchLabelId = 'adminAddStaffPasswordMatch';
+            if (formId === 'adminAddManagerForm') matchLabelId = 'adminAddManagerPasswordMatch';
+            if (formId === 'adminAddAdminForm') matchLabelId = 'adminAddAdminPasswordMatch';
+            const matchLabel = document.getElementById(matchLabelId);
             if (matchLabel) {
                 matchLabel.textContent = '';
                 matchLabel.className = 'text-[11px] mt-1';
@@ -336,6 +353,7 @@
             const nextBtn = document.getElementById('adminUsersNextBtn');
             const openStaffBtn = document.getElementById('openAddStaffModalBtn');
             const openManagerBtn = document.getElementById('openAddManagerModalBtn');
+            const openAdminBtn = document.getElementById('openAddAdminModalBtn');
 
             if (openStaffBtn) {
                 openStaffBtn.addEventListener('click', () => {
@@ -349,6 +367,12 @@
                     resetAdminCreationForm('adminAddManagerForm');
                     openModal('adminAddManagerModal');
                     loadAdminUserBranchesInto('adminAddManagerBranch');
+                });
+            }
+            if (openAdminBtn) {
+                openAdminBtn.addEventListener('click', () => {
+                    resetAdminCreationForm('adminAddAdminForm');
+                    openModal('adminAddAdminModal');
                 });
             }
             document.querySelectorAll('[data-close-modal]').forEach(btn => {
@@ -585,7 +609,7 @@
             const select = document.getElementById(selectId);
             if (!select) return;
             const setOptions = (branches) => {
-                select.innerHTML = '<option value=\"\">Select branch</option>' + branches.map(b => `<option value=\"${b.branch_id}\">${b.branch_name}</option>`).join('');
+                select.innerHTML = '<option value=\"\">Select branch</option>' + branches.map(b => `<option value=\"${Number(b.branch_id)}\">${escapeHtml(b.branch_name)}</option>`).join('');
                 if (selectedValue !== undefined && selectedValue !== null && selectedValue !== '') {
                     select.value = String(selectedValue);
                 }
@@ -727,6 +751,77 @@
             }
         }
 
+        async function confirmAdminUserSessionReset(userId) {
+            const user = getAdminUserById(userId);
+            if (!user) return;
+
+            const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || (user.email || 'this user');
+            let confirmed = false;
+            if (typeof Swal !== 'undefined') {
+                const result = await Swal.fire({
+                    title: 'Clear active session?',
+                    text: `${name} will be signed out on all devices and browsers.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, clear session',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#b8860b'
+                });
+                confirmed = result.isConfirmed;
+            } else {
+                confirmed = window.confirm(`Clear the active session for ${name}?`);
+            }
+
+            if (!confirmed) return;
+
+            try {
+                const actor = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+                const payload = { user_id: userId };
+                if (actor) {
+                    const fn = String(actor.first_name || '').trim();
+                    const ln = String(actor.last_name || '').trim();
+                    payload.performed_by_id = actor.user_id || null;
+                    payload.performed_by_name = [fn, ln].filter(Boolean).join(' ') || actor.username || null;
+                    payload.performed_by_role = actor.role_name || null;
+                    payload.performed_by_email = actor.email || actor.username || null;
+                }
+
+                const res = await axios.post(`${baseApiUrl}/admin.php?action=clear-user-session`, payload);
+                const data = res.data;
+                if (!data || !data.success) {
+                    const errText = (data && data.error) || 'Failed to clear session.';
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({ icon: 'error', title: 'Error', text: errText });
+                    } else {
+                        alert(errText);
+                    }
+                    return;
+                }
+
+                if (typeof loadAdminUsers === 'function') {
+                    await loadAdminUsers();
+                }
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: data.message || 'Session cleared.',
+                        showConfirmButton: false,
+                        timer: 2200
+                    });
+                }
+            } catch (error) {
+                console.error('Clear session failed', error);
+                const text = error.response && error.response.data && error.response.data.error
+                    ? error.response.data.error
+                    : (error.message || 'Request failed.');
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'error', title: 'Error', text });
+                }
+            }
+        }
+
         function setAdminUsersRows(rows) {
             adminUsersTableState.rows = sortNewestUsersFirst((Array.isArray(rows) ? rows : []).map(normalizeAdminUserRow));
             if (!adminUsersTableState.roles.length) {
@@ -837,6 +932,11 @@
                                     <i class="fas fa-key"></i>
                                     <span>Password</span>
                                 </button>
+                                <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border border-amber-200 text-[11px] text-amber-800 hover:bg-amber-50"
+                                    onclick="confirmAdminUserSessionReset(${Number(user.user_id) || 0})">
+                                    <i class="fas fa-right-from-bracket"></i>
+                                    <span>Reset Session</span>
+                                </button>
                                 <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border text-[11px] ${toggleClass}"
                                     onclick="confirmAdminUserStatus(${Number(user.user_id) || 0}, '${isActive ? 'Inactive' : 'Active'}')">
                                     <i class="fas ${toggleIcon}"></i>
@@ -903,7 +1003,7 @@
                 if (btn && btnText && btnIcon) {
                     btn.disabled = true;
                     btnText.textContent = 'Saving...';
-                    btnIcon.classList.remove('fa-user-plus', 'fa-user-tie');
+                    btnIcon.classList.remove('fa-user-plus', 'fa-user-tie', 'fa-shield-halved');
                     btnIcon.classList.add('fa-spinner', 'fa-spin');
                 }
 
@@ -938,9 +1038,15 @@
             } finally {
                 if (btn && btnText && btnIcon) {
                     btn.disabled = false;
-                    btnText.textContent = formId === 'adminAddStaffForm' ? 'Create Staff' : 'Create Manager';
+                    btnText.textContent = formId === 'adminAddStaffForm'
+                        ? 'Create Staff'
+                        : (formId === 'adminAddManagerForm' ? 'Create Manager' : 'Create Admin');
                     btnIcon.classList.remove('fa-spinner', 'fa-spin');
-                    btnIcon.classList.add(formId === 'adminAddStaffForm' ? 'fa-user-plus' : 'fa-user-tie');
+                    btnIcon.classList.add(
+                        formId === 'adminAddStaffForm'
+                            ? 'fa-user-plus'
+                            : (formId === 'adminAddManagerForm' ? 'fa-user-tie' : 'fa-shield-halved')
+                    );
                 }
             }
         }
@@ -1005,6 +1111,44 @@
                 const p1 = document.getElementById('adminAddManagerPassword');
                 const p2 = document.getElementById('adminAddManagerPasswordConfirm');
                 const lbl = document.getElementById('adminAddManagerPasswordMatch');
+                const update = () => {
+                    if (!p1 || !p2 || !lbl) return;
+                    if (!p1.value && !p2.value) {
+                        lbl.textContent = '';
+                        lbl.className = 'text-[11px] mt-1';
+                    } else if (p1.value === p2.value) {
+                        lbl.textContent = 'Passwords match.';
+                        lbl.className = 'text-[11px] mt-1 text-emerald-600';
+                    } else {
+                        lbl.textContent = 'Passwords do not match.';
+                        lbl.className = 'text-[11px] mt-1 text-red-600';
+                    }
+                };
+                if (p1) p1.addEventListener('input', update);
+                if (p2) p2.addEventListener('input', update);
+            }
+
+            const adminForm = document.getElementById('adminAddAdminForm');
+            if (adminForm) {
+                setAdminCreationFormMode('adminAddAdminForm', 'system_account');
+                adminForm.querySelectorAll('input[name="account_mode"]').forEach((radio) => {
+                    radio.addEventListener('change', () => {
+                        setAdminCreationFormMode('adminAddAdminForm', getAdminCreationFormMode(adminForm));
+                    });
+                });
+                ['first_name', 'last_name', 'system_login_name'].forEach((fieldName) => {
+                    const field = adminForm.querySelector(`input[name="${fieldName}"]`);
+                    if (field) field.addEventListener('input', () => updateAdminCreationLoginPreview('adminAddAdminForm'));
+                });
+
+                adminForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    submitAdminUserForm('adminAddAdminForm', 'adminAddAdminMessage', 'adminAddAdminSubmit', 'adminAddAdminSubmitText', 'adminAddAdminSubmitIcon');
+                });
+
+                const p1 = document.getElementById('adminAddAdminPassword');
+                const p2 = document.getElementById('adminAddAdminPasswordConfirm');
+                const lbl = document.getElementById('adminAddAdminPasswordMatch');
                 const update = () => {
                     if (!p1 || !p2 || !lbl) return;
                     if (!p1.value && !p2.value) {

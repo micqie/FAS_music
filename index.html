@@ -555,7 +555,7 @@ Experience Prestige
     </label>
 
     <input id="phone" type="tel" name="student_phone" required autocomplete="off"
-    class="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+    class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500"
     placeholder="Phone number">
 </div>
                         <div>
@@ -655,52 +655,8 @@ Experience Prestige
     <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
+    <script src="js/intl-phone-input.js"></script>
     <script src="js/index.js"></script>
-
-    <script>
-const input = document.querySelector("#phone");
-
-const iti = window.intlTelInput(input, {
-    initialCountry: "ph",
-    preferredCountries: ["ph", "us", "gb", "jp"],
-    separateDialCode: true,
-    autoPlaceholder: "polite",
-    formatOnDisplay: true,
-    utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/utils.js"
-});
-
-function getMaxLength(countryCode) {
-    switch (countryCode) {
-        case "ph":
-            return 10; // 9123456789
-        case "us":
-            return 10;
-        case "gb":
-            return 10;
-        case "jp":
-            return 10;
-        default:
-            return 15;
-    }
-}
-
-input.addEventListener("input", function () {
-    const countryCode = iti.getSelectedCountryData().iso2;
-    const maxLength = getMaxLength(countryCode);
-
-    let value = this.value.replace(/\D/g, "");
-
-    if (value.length > maxLength) {
-        value = value.substring(0, maxLength);
-    }
-
-    this.value = value;
-});
-
-input.addEventListener("countrychange", function () {
-    input.value = "";
-});
-    </script>
 
 </body>
 </html>

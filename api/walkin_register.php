@@ -12,11 +12,15 @@ ini_set('log_errors', 1);
 define('FAS_USERS_CLASS_ONLY', true);
 
 require_once __DIR__ . '/db_connect.php';
+require_once __DIR__ . '/xss_protection.php';  // XSS Protection utilities
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Send security headers
+XSSProtection::sendSecurityHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);

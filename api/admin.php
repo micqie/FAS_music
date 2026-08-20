@@ -7,8 +7,12 @@ ini_set('log_errors', 1);
 require_once 'db_connect.php';
 require_once 'audit_logs.php'; // ← Audit logging
 require_once 'auth_session.php';
+require_once 'xss_protection.php';  // XSS Protection utilities
 
 header("Content-Type: application/json");
+
+// Send security headers
+XSSProtection::sendSecurityHeaders();
 
 // Check if database connection exists
 if (!isset($conn) || $conn === null) {
@@ -1876,6 +1880,66 @@ class Admin
             $this->sendJSON(['error' => 'Failed to update status: ' . $e->getMessage()], 500);
         }
     }
+
+    // 🧹 Clear a user's active login session token
+    public function clearUserSession($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid payload'], 400);
+        }
+
+        $userId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
+        if ($userId <= 0) {
+            $this->sendJSON(['error' => 'user_id is required'], 400);
+        }
+
+        try {
+            $stmtUserInfo = $this->conn->prepare("SELECT username, email, first_name, last_name, active_session_token FROM tbl_users WHERE user_id = ? LIMIT 1");
+            $stmtUserInfo->execute([$userId]);
+            $targetUser = $stmtUserInfo->fetch(PDO::FETCH_ASSOC) ?: [];
+            if (empty($targetUser)) {
+                $this->sendJSON(['error' => 'User not found'], 404);
+            }
+
+            $targetLabel = trim((string)(($targetUser['first_name'] ?? '') . ' ' . ($targetUser['last_name'] ?? '')));
+            if ($targetLabel === '') {
+                $targetLabel = $targetUser['email'] ?? ($targetUser['username'] ?? "User #{$userId}");
+            }
+
+            $stmt = $this->conn->prepare("UPDATE tbl_users SET active_session_token = NULL, active_session_updated_at = NULL WHERE user_id = ?");
+            $stmt->execute([$userId]);
+
+            [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);
+            AuditLogs::record(
+                $this->conn,
+                'User Session Cleared',
+                'Users',
+                "Active session cleared for {$targetLabel}.",
+                'user',
+                $userId,
+                $targetLabel,
+                'warning',
+                ['active_session_token' => !empty($targetUser['active_session_token']) ? '[set]' : '[empty]'],
+                ['active_session_token' => null],
+                $pById,
+                $pByName,
+                $pByRole,
+                $pByEmail
+            );
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'User session cleared successfully.'
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Failed to clear user session: ' . $e->getMessage()], 500);
+        }
+    }
 }
 
 // Router
@@ -1924,6 +1988,9 @@ switch ($action) {
         break;
     case 'set-user-status':
         $admin->setUserStatus(file_get_contents('php://input'));
+        break;
+    case 'clear-user-session':
+        $admin->clearUserSession(file_get_contents('php://input'));
         break;
     default:
         $admin->sendJSON(['error' => 'Invalid action'], 400);
