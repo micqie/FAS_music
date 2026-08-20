@@ -83,28 +83,32 @@
                 const actionClass = isActive
                     ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                     : 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100';
+                
+                // Full name and email for tooltip
+                const fullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+                const fullEmail = student.email || '';
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-6 py-4">
-                            <div class="font-medium text-slate-900">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
-                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                        <td class="px-6 py-4 table-name-cell">
+                            <div class="font-medium text-slate-900 truncate-text" title="${escapeHtml(fullName)}">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
+                            <div class="text-sm text-slate-500 truncate-text" title="${escapeHtml(fullEmail)}">${escapeHtml(student.email || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-slate-800">${escapeHtml(student.phone || '')}</td>
-                        <td class="px-6 py-4 text-slate-800">${escapeHtml(student.branch_name || 'N/A')}</td>
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-4 text-slate-800 table-phone-cell truncate-text" title="${escapeHtml(student.phone || '')}">${escapeHtml(student.phone || '')}</td>
+                        <td class="px-6 py-4 text-slate-800 table-text-cell truncate-text" title="${escapeHtml(student.branch_name || 'N/A')}">${escapeHtml(student.branch_name || 'N/A')}</td>
+                        <td class="px-6 py-4 table-money-cell">
                             <div class="text-slate-800 font-medium">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</div>
                             ${student.registration_fee_paid ? `<div class="text-xs text-slate-500">Paid: ₱${parseFloat(student.registration_fee_paid).toFixed(2)}</div>` : ''}
                         </td>
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-4 table-status-cell">
                             <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
                                 ${escapeHtml(student.status || 'N/A')}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-slate-500 text-sm">
+                        <td class="px-6 py-4 text-slate-500 text-sm table-date-cell">
                             ${new Date(student.created_at).toLocaleDateString()}
                         </td>
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-4 table-actions-cell">
                             <button class="px-3 py-1.5 text-xs font-semibold rounded border ${actionClass} transition"
                                 onclick="toggleStudentStatus(${Number(student.student_id)}, '${isActive ? 'Inactive' : 'Active'}')">
                                 ${actionLabel}

@@ -449,6 +449,7 @@ function renderEnrollmentTable(enrollments) {
         const balance      = Number(row.balance_amount  || 0);
         const paid         = Number(row.paid_amount     || 0);
         const totalCharges = Number(row.total_charges   || row.charge_amount || (paid + balance) || 0);
+        const branchName   = row.branch_name || '\u2014';
 
         const statusLabel  = balance <= 0 ? 'Paid' : (paid > 0 ? 'Partial' : 'Unpaid');
         const statusCls    = statusLabel === 'Paid'
@@ -465,18 +466,18 @@ function renderEnrollmentTable(enrollments) {
 
         return `
         <tr class="hover:bg-slate-50 transition-colors">
-            <td class="px-5 py-4">
-                <div class="text-sm font-semibold text-slate-900 leading-tight">${escapeHtml(studentName)}</div>
-                ${subLine ? `<div class="text-xs text-slate-400 mt-0.5">${escapeHtml(subLine)}</div>` : ''}
+            <td class="px-5 py-4 table-name-cell">
+                <div class="text-sm font-semibold text-slate-900 leading-tight truncate-text" title="${escapeHtml(studentName)}">${escapeHtml(studentName)}</div>
+                ${subLine ? `<div class="text-xs text-slate-400 mt-0.5 truncate-text" title="${escapeHtml(subLine)}">${escapeHtml(subLine)}</div>` : ''}
             </td>
-            <td class="px-5 py-4 text-sm text-slate-600">${escapeHtml(row.branch_name || '\u2014')}</td>
-            <td class="px-5 py-4 text-right text-sm text-slate-700">${formatCurrencyPHP(totalCharges)}</td>
-            <td class="px-5 py-4 text-right text-sm font-medium text-emerald-600">${formatCurrencyPHP(paid)}</td>
-            <td class="px-5 py-4 text-right">${balanceDisplay}</td>
-            <td class="px-5 py-4 text-center">
+            <td class="px-5 py-4 text-sm text-slate-600 table-text-cell truncate-text" title="${escapeHtml(branchName)}">${escapeHtml(branchName)}</td>
+            <td class="px-5 py-4 text-right text-sm text-slate-700 table-money-cell">${formatCurrencyPHP(totalCharges)}</td>
+            <td class="px-5 py-4 text-right text-sm font-medium text-emerald-600 table-money-cell">${formatCurrencyPHP(paid)}</td>
+            <td class="px-5 py-4 text-right table-money-cell">${balanceDisplay}</td>
+            <td class="px-5 py-4 text-center table-status-cell">
                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCls}">${statusLabel}</span>
             </td>
-            <td class="px-5 py-4 text-right">
+            <td class="px-5 py-4 text-right table-actions-cell">
                 ${ledgerUrl
                     ? `<a href="${ledgerUrl}" class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition">
                            <i class="fas fa-eye text-slate-400 text-[10px]"></i> View Ledger

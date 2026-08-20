@@ -906,22 +906,23 @@
                     branch = 'Not assigned';
                 }
                 const statusLabel = user.status || 'Inactive';
+                const email = user.email || '';
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-6 py-4">
-                            <div class="font-semibold text-slate-900">${escapeHtml(name)}</div>
-                            <div class="text-xs text-slate-500">${escapeHtml(user.email || '')}</div>
+                        <td class="px-6 py-4 table-name-cell">
+                            <div class="font-semibold text-slate-900 truncate-text" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+                            <div class="text-xs text-slate-500 truncate-text" title="${escapeHtml(email)}">${escapeHtml(email)}</div>
                         </td>
-                        <td class="px-6 py-4 text-slate-700">${escapeHtml(role)}</td>
-                        <td class="px-6 py-4 text-slate-700 whitespace-nowrap">${escapeHtml(branch)}</td>
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${escapeHtml(role)}">${escapeHtml(role)}</td>
+                        <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${escapeHtml(branch)}">${escapeHtml(branch)}</td>
+                        <td class="px-6 py-4 table-status-cell">
                             <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold border ${statusClass}">
                                 ${escapeHtml(statusLabel)}
                             </span>
                         </td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-2 whitespace-nowrap">
+                        <td class="px-6 py-4 table-actions-cell-wide">
+                            <div class="table-button-group">
                                 <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-700 hover:bg-slate-100"
                                     onclick="openAdminUserEditModal(${Number(user.user_id) || 0})">
                                     <i class="fas fa-pen"></i>
@@ -935,7 +936,7 @@
                                 <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border border-amber-200 text-[11px] text-amber-800 hover:bg-amber-50"
                                     onclick="confirmAdminUserSessionReset(${Number(user.user_id) || 0})">
                                     <i class="fas fa-right-from-bracket"></i>
-                                    <span>Reset Session</span>
+                                    <span>Reset</span>
                                 </button>
                                 <button class="inline-flex items-center gap-1 px-3 py-1 rounded-lg border text-[11px] ${toggleClass}"
                                     onclick="confirmAdminUserStatus(${Number(user.user_id) || 0}, '${isActive ? 'Inactive' : 'Active'}')">

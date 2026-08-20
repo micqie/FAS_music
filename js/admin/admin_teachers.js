@@ -119,20 +119,22 @@
             }
             tbody.innerHTML = filteredTeachers.map(t => {
                 const fullName = `${t.first_name || ''} ${t.last_name || ''}`.trim();
+                const email = t.email || '';
+                const phone = t.phone || '';
                 return `
                 <tr class="hover:bg-slate-50/80 transition">
-                    <td class="px-6 py-4">
-                        <div class="font-medium text-slate-900">${esc(fullName || 'N/A')}</div>
-                        <div class="text-sm text-slate-500">${esc(t.email || '')}${t.phone ? ' • ' + esc(t.phone) : ''}</div>
+                    <td class="px-6 py-4 table-name-cell">
+                        <div class="font-medium text-slate-900 truncate-text" title="${esc(fullName || 'N/A')}">${esc(fullName || 'N/A')}</div>
+                        <div class="text-sm text-slate-500 truncate-text" title="${esc(email)}${phone ? ' • ' + esc(phone) : ''}">${esc(email)}${phone ? ' • ' + esc(phone) : ''}</div>
                     </td>
-                    <td class="px-6 py-4 text-slate-700">${esc(t.specialization || 'General')}</td>
-                    <td class="px-6 py-4 text-slate-700">${esc(t.branch_name || 'N/A')}</td>
-                    <td class="px-6 py-4 text-slate-700">${esc(t.employment_type || 'Full-time')}</td>
-                    <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs font-semibold border ${statusBadge(t.status)}">${esc(t.status || 'Inactive')}</span></td>
-                    <td class="px-6 py-4">
-                        <div class="flex items-center gap-2">
+                    <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${esc(t.specialization || 'General')}">${esc(t.specialization || 'General')}</td>
+                    <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${esc(t.branch_name || 'N/A')}">${esc(t.branch_name || 'N/A')}</td>
+                    <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text">${esc(t.employment_type || 'Full-time')}</td>
+                    <td class="px-6 py-4 table-status-cell"><span class="px-2 py-1 rounded text-xs font-semibold border ${statusBadge(t.status)}">${esc(t.status || 'Inactive')}</span></td>
+                    <td class="px-6 py-4 table-actions-cell-wide">
+                        <div class="table-button-group">
                             <button onclick="openEditTeacher(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold">Edit</button>
-                            <button onclick="openTeacherPasswordModal(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-bold">Change Password</button>
+                            <button onclick="openTeacherPasswordModal(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-bold">Password</button>
                             <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" class="px-3 py-1.5 rounded-lg ${t.status === 'Active' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'} text-xs font-bold">${t.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
                         </div>
                     </td>

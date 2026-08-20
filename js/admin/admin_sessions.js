@@ -311,6 +311,8 @@
                 tableBody.innerHTML = requests.map(r => {
                     pendingRequestsById[String(r.request_id)] = r;
                     const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
+                    const email = escapeHtml(r.email || '');
+                    const branchName = escapeHtml(r.branch_name || '');
                     const pkg = escapeHtml(r.package_name || '—');
                     const instruments = Array.isArray(r.instruments) && r.instruments.length
                         ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
@@ -323,27 +325,27 @@
                     const payableNow = Number(r.payable_now || 0);
                     return `
                         <tr class="hover:bg-slate-50/80 transition">
-                            <td class="px-6 py-4">
-                                <div class="font-medium text-slate-900">${studentName || 'Student'}</div>
-                                <div class="text-sm text-slate-500">${escapeHtml(r.email || '')}</div>
-                                <div class="text-xs text-slate-400">${escapeHtml(r.branch_name || '')}</div>
+                            <td class="px-6 py-4 table-name-cell">
+                                <div class="font-medium text-slate-900 truncate-text" title="${studentName || 'Student'}">${studentName || 'Student'}</div>
+                                <div class="text-sm text-slate-500 truncate-text" title="${email}">${email}</div>
+                                <div class="text-xs text-slate-400 truncate-text" title="${branchName}">${branchName}</div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${pkg}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${instruments}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">
-                                <div>${schedule}</div>
-                                <div class="text-xs text-slate-500 mt-1">Date: ${prefDate}</div>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${pkg}">${pkg}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${instruments}">${instruments}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-date-cell">
+                                <div class="truncate-text" title="${schedule}">${schedule}</div>
+                                <div class="text-xs text-slate-500 mt-1 truncate-text" title="Date: ${prefDate}">Date: ${prefDate}</div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-700">
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell">
                                 <div class="space-y-2">
-                                    <div class="font-semibold text-slate-800">${paymentType}</div>
+                                    <div class="font-semibold text-slate-800 truncate-text" title="${paymentType}">${paymentType}</div>
                                     <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition">
                                         Payment Info
                                     </button>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-sm font-semibold text-gold-600">${formatCurrencyPHP(payableNow)}</td>
-                            <td class="px-6 py-4">
+                            <td class="px-6 py-4 text-sm font-semibold text-gold-600 table-money-cell">${formatCurrencyPHP(payableNow)}</td>
+                            <td class="px-6 py-4 table-actions-cell">
                                 <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold">
                                     View
                                 </button>

@@ -9308,31 +9308,31 @@ function renderRegistrationsTable() {
 
         return `
             <tr class="hover:bg-gold-500/5 transition">
-                <td class="px-6 py-4">
-                    <div class="font-medium text-slate-900" style="color:#0f172a;">${reg.first_name} ${reg.last_name}</div>
-                    <div class="text-sm text-slate-500" style="color:#64748b;">Student ID: ${escapeHtml(studentLoginId || 'Not assigned')}</div>
+                <td class="px-6 py-4 table-name-cell">
+                    <div class="font-medium text-slate-900 wrap-text" style="color:#0f172a;" title="${escapeHtml(reg.first_name + ' ' + reg.last_name)}">${escapeHtml(reg.first_name || '')} ${escapeHtml(reg.last_name || '')}</div>
+                    <div class="text-sm text-slate-500 truncate-text" style="color:#64748b;" title="Student ID: ${escapeHtml(studentLoginId || 'Not assigned')}">Student ID: ${escapeHtml(studentLoginId || 'Not assigned')}</div>
                     <div class="mt-2"><span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold ${sourceBadgeClass}">${sourceLabel}</span></div>
                 </td>
-                <td class="px-6 py-4">
-                    <div class="text-slate-900" style="color:#0f172a;">${reg.guardian_first_name || ''} ${reg.guardian_last_name || ''}</div>
-                    <div class="text-sm text-slate-500" style="color:#64748b;">${reg.guardian_phone || ''}</div>
+                <td class="px-6 py-4 table-text-cell">
+                    <div class="text-slate-900 wrap-text" style="color:#0f172a;" title="${escapeHtml((reg.guardian_first_name || '') + ' ' + (reg.guardian_last_name || ''))}">${escapeHtml(reg.guardian_first_name || '')} ${escapeHtml(reg.guardian_last_name || '')}</div>
+                    <div class="text-sm text-slate-500 truncate-text" style="color:#64748b;" title="${escapeHtml(reg.guardian_phone || '')}">${escapeHtml(reg.guardian_phone || '')}</div>
                 </td>
-                <td class="px-6 py-4 text-slate-700" style="color:#334155;">${reg.branch_name || ''}</td>
-                <td class="px-6 py-4">
+                <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" style="color:#334155;" title="${escapeHtml(reg.branch_name || '')}">${escapeHtml(reg.branch_name || '')}</td>
+                <td class="px-6 py-4 table-money-cell">
                     <div class="text-slate-900 font-medium" style="color:#0f172a;">₱${parseFloat(reg.registration_fee_amount || 0).toFixed(2)}</div>
                     ${remaining > 0 ? `<div class="text-sm text-red-600">Remaining: ₱${remaining.toFixed(2)}</div>` : ''}
                     ${registrationProofLink}
                     ${ageProofLink}
                 </td>
-                <td class="px-6 py-4">
+                <td class="px-6 py-4 table-status-cell">
                     <span class="px-2 py-1 rounded text-xs font-semibold ${statusClass}">
-                        ${displayStatus}
+                        ${escapeHtml(displayStatus)}
                     </span>
                 </td>
-                <td class="px-6 py-4 text-slate-600 text-sm" style="color:#475569;">
+                <td class="px-6 py-4 text-slate-600 text-sm table-date-cell" style="color:#475569;">
                     ${new Date(reg.created_at).toLocaleDateString()}
                 </td>
-                <td class="px-6 py-4">
+                <td class="px-6 py-4 table-actions-cell-wide">
                    <div class="flex items-center gap-2">
 
     <!-- VIEW -->

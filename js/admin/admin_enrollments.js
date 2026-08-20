@@ -133,9 +133,11 @@
 
                 tableBody.innerHTML = enrollments.map(r => {
                     const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
+                    const email = escapeHtml(r.email || '');
                     const packageName = escapeHtml(r.package_name || '—');
                     const teacherName = `${escapeHtml(r.teacher_first_name || '')} ${escapeHtml(r.teacher_last_name || '')}`.trim() || '—';
                     const roomName = escapeHtml(r.assigned_room || '—');
+                    const branchName = escapeHtml(r.branch_name || '—');
                     const sessionDate = r.first_session_date ? new Date(r.first_session_date).toLocaleDateString() : '—';
                     const startTime = formatTime12Hour(r.first_start_time);
                     const endTime = formatTime12Hour(r.first_end_time);
@@ -148,19 +150,19 @@
                     const statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-700">Active</span>';
                     return `
                         <tr class="hover:bg-slate-50/80 transition">
-                            <td class="px-6 py-4">
-                                <div class="font-medium text-slate-900">${studentName || 'Student'}</div>
-                                <div class="text-sm text-slate-500">${escapeHtml(r.email || '')}</div>
+                            <td class="px-6 py-4 table-name-cell">
+                                <div class="font-medium text-slate-900 truncate-text" title="${studentName || 'Student'}">${studentName || 'Student'}</div>
+                                <div class="text-sm text-slate-500 truncate-text" title="${email}">${email}</div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${escapeHtml(r.branch_name || '—')}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${packageName}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${sessionTime}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${teacherName}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${roomName}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${paymentType}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${amountText}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${balanceText}</td>
-                            <td class="px-6 py-4">${statusBadge}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${branchName}">${branchName}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${packageName}">${packageName}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-date-cell truncate-text" title="${sessionTime}">${sessionTime}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${teacherName}">${teacherName}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${roomName}">${roomName}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell">${paymentType}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-money-cell">${amountText}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-money-cell">${balanceText}</td>
+                            <td class="px-6 py-4 table-status-cell">${statusBadge}</td>
                         </tr>`;
                 }).join('');
             } catch (error) {
