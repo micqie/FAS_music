@@ -156,17 +156,9 @@
                     <p class="text-slate-500 mt-2">Manage all user accounts, with quick tools for adding staff, branch managers, and admins.</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button id="openAddStaffModalBtn" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow hover:bg-black transition">
+                    <button id="openAddUserRoleSelectModalBtn" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold-500 text-slate-900 text-sm font-semibold shadow hover:bg-gold-600 transition">
                         <i class="fas fa-user-plus"></i>
-                        <span>Add Staff</span>
-                    </button>
-                    <button id="openAddManagerModalBtn" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gold-500 text-slate-900 text-xs font-semibold shadow hover:bg-gold-600 transition">
-                        <i class="fas fa-user-tie"></i>
-                        <span>Add Branch Manager</span>
-                    </button>
-                    <button id="openAddAdminModalBtn" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold shadow hover:bg-emerald-700 transition">
-                        <i class="fas fa-shield-halved"></i>
-                        <span>Add Admin</span>
+                        <span>Add User</span>
                     </button>
                 </div>
             </div>
@@ -228,6 +220,72 @@
             </section>
         </div>
     </main>
+
+    <!-- Role Selection Modal -->
+    <div id="addUserRoleSelectModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full p-6 md:p-8 relative">
+            <button type="button" onclick="closeAddUserRoleSelectModal()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-700">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fas fa-user-plus text-gold-500"></i>
+                    Add New User
+                </h2>
+                <p class="text-sm text-slate-500 mt-2">Choose the type of user account you want to create</p>
+            </div>
+            
+            <div class="grid grid-cols-1 gap-4">
+                <!-- Staff Card -->
+                <button onclick="selectUserRole('staff')" class="role-select-card group text-left p-5 rounded-2xl border-2 border-slate-200 hover:border-gold-500 hover:bg-gold-50/30 transition-all duration-200">
+                    <div class="flex items-center gap-4">
+                        <div class="h-14 w-14 rounded-xl bg-slate-100 group-hover:bg-slate-900 text-slate-700 group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
+                            <i class="fas fa-user text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-slate-900">Staff</h3>
+                            <p class="text-sm text-slate-500 mt-1">Front desk staff with basic access permissions</p>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-400 group-hover:text-gold-500"></i>
+                    </div>
+                </button>
+
+                <!-- Branch Manager Card -->
+                <button onclick="selectUserRole('manager')" class="role-select-card group text-left p-5 rounded-2xl border-2 border-slate-200 hover:border-gold-500 hover:bg-gold-50/30 transition-all duration-200">
+                    <div class="flex items-center gap-4">
+                        <div class="h-14 w-14 rounded-xl bg-gold-100 group-hover:bg-gold-500 text-gold-700 group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
+                            <i class="fas fa-user-tie text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-slate-900">Branch Manager</h3>
+                            <p class="text-sm text-slate-500 mt-1">Manages a specific branch with elevated permissions</p>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-400 group-hover:text-gold-500"></i>
+                    </div>
+                </button>
+
+                <!-- Admin Card -->
+                <button onclick="selectUserRole('admin')" class="role-select-card group text-left p-5 rounded-2xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all duration-200">
+                    <div class="flex items-center gap-4">
+                        <div class="h-14 w-14 rounded-xl bg-emerald-100 group-hover:bg-emerald-600 text-emerald-700 group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
+                            <i class="fas fa-shield-halved text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-slate-900">Administrator</h3>
+                            <p class="text-sm text-slate-500 mt-1">Full system access with all administrative privileges</p>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-400 group-hover:text-emerald-500"></i>
+                    </div>
+                </button>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button type="button" onclick="closeAddUserRoleSelectModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 rounded-xl border border-slate-200 bg-white transition">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Add Staff Modal -->
     <div id="adminAddStaffModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

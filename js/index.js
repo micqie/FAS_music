@@ -9295,16 +9295,29 @@ function renderRegistrationsTable() {
             : 'bg-sky-100 text-sky-700';
         const sourceLabel = registrationSource === 'walkin' ? 'Walk-In' : 'Online';
         const studentLoginId = getRegistrationStudentLoginId(reg);
+        
+        // Create button-style proof links
         const registrationProofLink = reg.registration_proof_path
-            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 underline mt-1"><i class="fas fa-file-alt"></i>Payment proof</a>`
+            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" 
+                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 
+                         hover:bg-blue-100 border border-blue-200 text-[10px] font-semibold transition-colors mt-1">
+                  <i class="fas fa-receipt"></i>
+                  <span>Payment proof</span>
+               </a>`
             : (registrationSource === 'walkin'
-                ? '<div class="text-xs text-slate-500 mt-1">Walk-in payment handled at the branch</div>'
-                : '<div class="text-xs text-slate-500 mt-1">No proof uploaded</div>');
+                ? '<div class="text-[10px] text-slate-400 mt-1 italic">Walk-in payment handled at branch</div>'
+                : '<div class="text-[10px] text-slate-400 mt-1 italic">No proof uploaded</div>');
+                
         const ageProofLink = reg.age_verification_proof_path
-            ? `<a href="${buildPublicFileUrl(reg.age_verification_proof_path)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-800 underline mt-1"><i class="fas fa-id-card"></i>Proof ID</a>`
+            ? `<a href="${buildPublicFileUrl(reg.age_verification_proof_path)}" target="_blank" rel="noopener" 
+                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 
+                         hover:bg-emerald-100 border border-emerald-200 text-[10px] font-semibold transition-colors mt-1">
+                  <i class="fas fa-id-card"></i>
+                  <span>Proof ID</span>
+               </a>`
             : (registrationSource === 'walkin'
-                ? '<div class="text-xs text-slate-500 mt-1">Proof ID not required for walk-in</div>'
-                : '<div class="text-xs text-slate-500 mt-1">No proof ID uploaded</div>');
+                ? '<div class="text-[10px] text-slate-400 mt-1 italic">Proof ID not required for walk-in</div>'
+                : '<div class="text-[10px] text-slate-400 mt-1 italic">No proof ID uploaded</div>');
 
         return `
             <tr class="hover:bg-gold-500/5 transition">

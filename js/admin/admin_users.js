@@ -1,4 +1,45 @@
 
+        // ========== ROLE SELECTION MODAL ==========
+        function openAddUserRoleSelectModal() {
+            const modal = document.getElementById('addUserRoleSelectModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeAddUserRoleSelectModal() {
+            const modal = document.getElementById('addUserRoleSelectModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function selectUserRole(role) {
+            closeAddUserRoleSelectModal();
+            
+            if (role === 'staff') {
+                resetAdminCreationForm('adminAddStaffForm');
+                openModal('adminAddStaffModal');
+                loadAdminUserBranchesInto('adminAddStaffBranch');
+            } else if (role === 'manager') {
+                resetAdminCreationForm('adminAddManagerForm');
+                openModal('adminAddManagerModal');
+                loadAdminUserBranchesInto('adminAddManagerBranch');
+            } else if (role === 'admin') {
+                resetAdminCreationForm('adminAddAdminForm');
+                openModal('adminAddAdminModal');
+            }
+        }
+
+        // Make functions globally available
+        window.openAddUserRoleSelectModal = openAddUserRoleSelectModal;
+        window.closeAddUserRoleSelectModal = closeAddUserRoleSelectModal;
+        window.selectUserRole = selectUserRole;
+
+        // ========== END ROLE SELECTION MODAL ==========
+
         const adminUsersTableState = {
             rows: [],
             filtered: [],
@@ -351,29 +392,10 @@
             const pageSizeEl = document.getElementById('adminUsersPageSize');
             const prevBtn = document.getElementById('adminUsersPrevBtn');
             const nextBtn = document.getElementById('adminUsersNextBtn');
-            const openStaffBtn = document.getElementById('openAddStaffModalBtn');
-            const openManagerBtn = document.getElementById('openAddManagerModalBtn');
-            const openAdminBtn = document.getElementById('openAddAdminModalBtn');
+            const openAddUserBtn = document.getElementById('openAddUserRoleSelectModalBtn');
 
-            if (openStaffBtn) {
-                openStaffBtn.addEventListener('click', () => {
-                    resetAdminCreationForm('adminAddStaffForm');
-                    openModal('adminAddStaffModal');
-                    loadAdminUserBranchesInto('adminAddStaffBranch');
-                });
-            }
-            if (openManagerBtn) {
-                openManagerBtn.addEventListener('click', () => {
-                    resetAdminCreationForm('adminAddManagerForm');
-                    openModal('adminAddManagerModal');
-                    loadAdminUserBranchesInto('adminAddManagerBranch');
-                });
-            }
-            if (openAdminBtn) {
-                openAdminBtn.addEventListener('click', () => {
-                    resetAdminCreationForm('adminAddAdminForm');
-                    openModal('adminAddAdminModal');
-                });
+            if (openAddUserBtn) {
+                openAddUserBtn.addEventListener('click', openAddUserRoleSelectModal);
             }
             document.querySelectorAll('[data-close-modal]').forEach(btn => {
                 btn.addEventListener('click', () => {
