@@ -7,7 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../css/admin-responsive.css">`n    <link rel="stylesheet" href="../../css/table-responsive.css">
+    <link rel="stylesheet" href="../../css/admin-responsive.css">
+     <link rel="stylesheet" href="../../css/table-responsive.css">
     <script>
         tailwind.config = {
             theme: {
@@ -250,12 +251,12 @@
 
     <!-- Add Instrument Type Modal -->
     <div id="addTypeModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+        <div class="bg-white border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
             <button id="closeAddTypeModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2">Add Instrument Type</h3>
+            <h3 class="text-2xl font-bold text-black mb-2">Add Instrument Type</h3>
             <p class="text-zinc-400 text-xs mb-4">Create a new instrument type category</p>
 
             <div id="typeMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
@@ -288,14 +289,14 @@
     </div>
 
     <!-- Edit Instrument Modal -->
-    <div id="editInstrumentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
+    <div id="editInstrumentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-whitw backdrop-blur-sm">
+        <div class="bg-white border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
             <button id="closeEditInstrumentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
 
             <h3 class="text-2xl font-bold text-white mb-2">Edit Instrument</h3>
-            <p class="text-zinc-400 text-xs mb-4">Update instrument details or status</p>
+            <p class="text-zinc-400 text-xs mb-4">Update instrument details</p>
 
             <form id="editInstrumentForm" class="space-y-4">
                 <input type="hidden" id="editInstrumentId">
@@ -319,16 +320,7 @@
                         <input type="text" id="editInstrumentName" required
                             class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
                     </div>
-                    <div class="md:col-span-3">
-                        <label class="block text-sm font-medium text-zinc-300 mb-1">Status *</label>
-                        <select id="editInstrumentStatus" required
-                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                            <option value="Available">Available</option>
-                            <option value="In Use">In Use</option>
-                            <option value="Under Repair">Under Repair</option>
-                            <option value="Inactive">Inactive</option>
-                        </select>
-                    </div>
+
                 </div>
                 <div class="flex items-center justify-end gap-3 pt-4">
                     <button type="button" id="cancelEditInstrumentBtn"
@@ -346,7 +338,7 @@
 
     <!-- Edit Instrument Type Modal -->
     <div id="editTypeModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+        <div class="bg-white border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
             <button id="closeEditTypeModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
@@ -382,12 +374,12 @@
 
     <!-- Add Instrument Modal -->
     <div id="addInstrumentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
+        <div class="bg-white border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
             <button id="closeAddInstrumentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2">Add Instrument</h3>
+            <h3 class="text-2xl font-bold text-black mb-2">Add Instrument</h3>
             <p class="text-zinc-400 text-xs mb-4">Add a new instrument to the inventory</p>
 
             <div id="instrumentMessage" class="hidden mb-4 p-3 rounded text-sm"></div>

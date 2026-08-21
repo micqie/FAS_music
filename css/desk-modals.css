@@ -177,35 +177,35 @@
 .assign-request-summary-item {
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
-    padding: 0.85rem 0.95rem;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
     border: 1px solid #e2e8f0;
-    border-radius: 0.9rem;
+    border-radius: 0.5rem;
     background: rgba(255, 255, 255, 0.82);
     box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset;
 }
 
 .assign-request-summary-item i {
-    margin-top: 0.1rem;
-    font-size: 1rem;
-    width: 1.25rem;
+    margin-top: 0.05rem;
+    font-size: 0.875rem;
+    width: 1rem;
     text-align: center;
 }
 
 .assign-request-summary-label {
-    font-size: 0.7rem;
+    font-size: 0.625rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     color: #94a3b8;
 }
 
 .assign-request-summary-value {
-    margin-top: 0.2rem;
-    font-size: 0.96rem;
+    margin-top: 0.125rem;
+    font-size: 0.8125rem;
     font-weight: 700;
     color: #0f172a;
-    line-height: 1.25;
+    line-height: 1.2;
 }
 
 .assign-request-form-pane {
@@ -215,7 +215,7 @@
 }
 
 .assign-request-form-pane .desk-modal-body {
-    padding: 0.75rem 0.85rem 0.85rem;
+    padding: 0.5rem 0.625rem 0.625rem;
 }
 
 .assign-request-availability-pane {
@@ -264,12 +264,11 @@
 .desk-modal-slot {
     display: flex;
     flex-direction: column;
-    gap: 0.65rem;
-    padding: 0.8rem;
-    border: 1px solid #d9e3ef;
-    border-radius: 1rem;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
     background: #fff;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.92) inset, 0 10px 24px rgba(15, 23, 42, 0.03);
 }
 
 .desk-modal-slot > div,
@@ -280,66 +279,42 @@
 
 .assign-request-slot-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.5rem;
 }
 
 .assign-request-slot-title {
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: #0f172a;
-    line-height: 1.25;
-}
-
-.assign-request-field-caption {
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #94a3b8;
-    margin-bottom: 0.3rem;
-}
-
-.assign-request-fixed-badge {
-    display: inline-flex;
-    align-items: center;
-    margin-top: 0.35rem;
-    padding: 0.18rem 0.48rem;
-    border-radius: 999px;
-    border: 1px solid #facc15;
-    background: #fffbeb;
-    color: #a16207;
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    line-height: 1.2;
 }
 
 .assign-request-slot-trash {
     flex-shrink: 0;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 999px;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.25rem;
     border: 1px solid #e2e8f0;
     background: #fff;
     color: #64748b;
     display: grid;
     place-items: center;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    font-size: 0.75rem;
+    transition: background 0.1s ease, color 0.1s ease;
 }
 
 .assign-request-slot-trash:hover {
     background: #fef2f2;
-    color: #b91c1c;
+    color: #dc2626;
     border-color: #fecaca;
-    transform: translateY(-1px);
 }
 
 .assign-request-slot-fields {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 0.55rem;
+    gap: 0.5rem;
 }
 
 @media (min-width: 640px) {
@@ -348,77 +323,59 @@
     }
 }
 
-@media (min-width: 1024px) {
-    .assign-request-slot-fields {
-        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-        align-items: start;
-    }
-}
-
-.assign-request-slot-field {
-    min-width: 0;
-}
-
 .assign-request-slot .desk-modal-input,
 .assign-request-slot select {
-    border-radius: 0.75rem !important;
-    min-height: 2.6rem;
-    padding: 0.48rem 0.72rem !important;
-    font-size: 0.88rem !important;
+    border-radius: 0.25rem !important;
+    min-height: 2rem;
+    padding: 0.375rem 0.5rem !important;
+    font-size: 0.75rem !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #fff !important;
 }
 
 .assign-request-slot .desk-modal-label {
-    font-size: 0.62rem;
-    text-transform: uppercase;
-    letter-spacing: 0.13em;
-    color: #94a3b8;
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: #64748b;
     margin-bottom: 0.25rem;
-}
-
-.assign-request-slot .desk-modal-input {
-    background: #fff;
-}
-
-.assign-request-slot .desk-modal-input,
-.assign-request-slot select {
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
 }
 
 .assign-request-availability-list {
     max-height: 100%;
     overflow-y: auto;
     border: 1px solid #e2e8f0;
-    border-radius: 1rem;
-    padding: 1rem;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
     background: #fff;
 }
 
 .assign-request-availability-list .text-sm.font-semibold.text-slate-900 {
-    font-size: 1.05rem;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 
 .assign-request-availability-list .grid.grid-cols-7.gap-2 > button {
-    border-radius: 0.8rem;
+    border-radius: 0.25rem;
+    font-size: 0.6875rem;
+    padding: 0.25rem;
+    min-height: 2rem;
 }
 
 .assign-request-availability-list .border {
-    border-color: #dbe4f0;
+    border-color: #e2e8f0;
 }
 
-.assign-request-availability-list .rounded-sm.border {
-    border-radius: 0.9rem;
-}
-
+.assign-request-availability-list .rounded-sm.border,
 .assign-request-availability-list .rounded-lg.border {
-    border-radius: 0.9rem;
+    border-radius: 0.25rem;
 }
 
 .assign-request-availability-list button {
-    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    transition: background 0.1s ease, border-color 0.1s ease;
 }
 
 .assign-request-availability-list button:hover {
-    transform: translateY(-1px);
+    transform: none;
 }
 
 .desk-modal-list-item {
@@ -434,16 +391,16 @@
 }
 
 .desk-modal-panel .assign-request-slot {
-    border-radius: 1rem !important;
-    padding: 0.8rem !important;
+    border-radius: 0.375rem !important;
+    padding: 0.5rem !important;
     background: #fff !important;
 }
 
 .assign-request-slot-schedule {
-    min-height: 2.6rem;
-    padding: 0.48rem 0.72rem;
-    border: 1px solid #dbe4f0;
-    border-radius: 0.75rem;
+    min-height: 2rem;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
     background: #f8fafc;
     display: flex;
     flex-direction: column;
@@ -451,15 +408,15 @@
 }
 
 .assign-request-slot-schedule-title {
-    font-size: 0.88rem;
-    font-weight: 700;
+    font-size: 0.75rem;
+    font-weight: 600;
     color: #0f172a;
     line-height: 1.2;
 }
 
 .assign-request-slot-schedule-subtitle {
-    margin-top: 0.15rem;
-    font-size: 0.72rem;
+    margin-top: 0.125rem;
+    font-size: 0.625rem;
     color: #64748b;
     line-height: 1.2;
 }
@@ -467,14 +424,14 @@
 .desk-modal-panel .assign-request-slot .desk-modal-input.bg-slate-50 {
     display: flex;
     align-items: center;
-    min-height: 3rem;
+    min-height: 2rem;
 }
 
 .desk-modal-panel .assign-request-slot select,
 .desk-modal-panel .assign-request-slot input {
-    border-radius: 0.75rem !important;
-    padding: 0.7rem 0.85rem !important;
-    font-size: 0.875rem !important;
+    border-radius: 0.25rem !important;
+    padding: 0.375rem 0.5rem !important;
+    font-size: 0.75rem !important;
 }
 
 /* SweetAlert enrollment details — match desk modal compact style */
@@ -562,106 +519,107 @@
     border-color: #e2e8f0 !important;
 }
 
-/* ── Readable / senior-friendly sizing (enrollment page) ── */
+/* ── Compact / minimal sizing (enrollment page) ── */
 .desk-modal-readable .desk-modal-header {
-    padding: 1.125rem 1.5rem;
-    gap: 1rem;
+    padding: 0.75rem 1rem;
+    gap: 0.5rem;
 }
 
 .desk-modal-readable .desk-modal-header h3 {
-    font-size: 1.5rem;
+    font-size: 1.125rem;
+    font-weight: 700;
 }
 
 .desk-modal-readable .desk-modal-header p {
-    font-size: 1rem;
-    margin-top: 0.375rem;
-    line-height: 1.5;
+    font-size: 0.8125rem;
+    margin-top: 0.125rem;
+    line-height: 1.4;
 }
 
 .desk-modal-readable .desk-modal-close {
-    width: 2.75rem;
-    height: 2.75rem;
-    font-size: 1.125rem;
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.875rem;
 }
 
 .desk-modal-readable .desk-modal-summary {
-    padding: 0.875rem 1.5rem;
-    font-size: 1rem;
-    gap: 0.625rem 1.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+    gap: 0.375rem 1rem;
 }
 
 .desk-modal-readable .desk-modal-summary b {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
 }
 
 .desk-modal-readable .desk-modal-body {
-    padding: 1.25rem 1.5rem 1.5rem;
+    padding: 0.75rem 1rem;
 }
 
 .desk-modal-readable .desk-modal-label {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
 }
 
 .desk-modal-readable .desk-modal-hint {
-    font-size: 0.9375rem;
-    line-height: 1.5;
+    font-size: 0.75rem;
+    line-height: 1.4;
 }
 
 .desk-modal-readable .desk-modal-input,
 .desk-modal-readable .desk-modal-panel select {
-    padding: 0.75rem 0.875rem;
-    font-size: 1.0625rem;
-    min-height: 3rem;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.875rem;
+    min-height: 2.25rem;
 }
 
 .desk-modal-readable .desk-modal-note {
-    padding: 0.75rem 0.875rem;
-    font-size: 0.9375rem;
-    line-height: 1.5;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
 }
 
 .desk-modal-readable .desk-modal-btn {
-    padding: 0.75rem 1.375rem;
-    font-size: 1rem;
-    min-height: 3rem;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+    min-height: 2.25rem;
 }
 
 .desk-modal-readable .desk-modal-footer {
-    gap: 0.75rem;
-    padding-top: 1rem;
-    margin-top: 1rem;
+    gap: 0.5rem;
+    padding-top: 0.625rem;
+    margin-top: 0.625rem;
 }
 
 .desk-modal-readable .desk-modal-section {
-    padding-top: 1rem;
-    margin-top: 1rem;
+    padding-top: 0.625rem;
+    margin-top: 0.625rem;
 }
 
 .desk-modal-readable .desk-modal-slot {
-    gap: 0.75rem;
-    padding: 0.875rem;
+    gap: 0.5rem;
+    padding: 0.625rem;
 }
 
 .desk-modal-readable .desk-modal-list {
-    padding: 0.75rem;
+    padding: 0.5rem;
 }
 
 .desk-modal-readable .desk-modal-list-item {
-    padding: 0.875rem 1rem;
-    font-size: 1rem;
-    line-height: 1.45;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
 }
 
 .desk-modal-readable .desk-modal-list-item + .desk-modal-list-item {
-    margin-top: 0.5rem;
+    margin-top: 0.375rem;
 }
 
 .desk-modal-readable .assign-request-slot select,
 .desk-modal-readable .assign-request-slot input {
-    padding: 0.75rem 0.75rem !important;
-    font-size: 1rem !important;
-    min-height: 3rem !important;
+    padding: 0.5rem 0.625rem !important;
+    font-size: 0.875rem !important;
+    min-height: 2.25rem !important;
 }
 
 /* Walk-in enrollment forms: compact, friendly, low-noise */
@@ -1150,9 +1108,24 @@
 .desk-enrollment-page tbody a.inline-flex {
     font-size: 0.9375rem !important;
     padding: 0.5rem 0.875rem !important;
+    cursor: pointer !important;
+    position: relative !important;
+    z-index: 1 !important;
 }
 
 /* ── SweetAlert2 toast — always above modals ── */
 .swal2-container {
     z-index: 999999 !important;
+}
+
+/* Ensure modal doesn't block clicks when hidden */
+#assignRequestModal.hidden,
+#assignPackageModal.hidden {
+    pointer-events: none !important;
+    display: none !important;
+}
+
+#assignRequestModal:not(.hidden),
+#assignPackageModal:not(.hidden) {
+    pointer-events: auto !important;
 }

@@ -7,12 +7,8 @@ ini_set('log_errors', 1);
 require_once 'db_connect.php';
 require_once 'audit_logs.php'; // ← Audit logging
 require_once 'auth_session.php';
-require_once 'xss_protection.php';  // XSS Protection utilities
 
 header("Content-Type: application/json");
-
-// Send security headers
-XSSProtection::sendSecurityHeaders();
 
 // Check if database connection exists
 if (!isset($conn) || $conn === null) {

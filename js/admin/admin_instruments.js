@@ -499,7 +499,6 @@
             document.getElementById('editInstrumentBranchId').value = String(instrument.branch_id || '');
             document.getElementById('editInstrumentTypeId').value = String(instrument.type_id || '');
             document.getElementById('editInstrumentName').value = instrument.instrument_name || '';
-            document.getElementById('editInstrumentStatus').value = instrument.status || 'Available';
             modal.classList.remove('hidden');
             modal.classList.add('flex');
         }
@@ -520,8 +519,7 @@
                 instrument_id: instrumentId,
                 branch_id: Number(document.getElementById('editInstrumentBranchId')?.value || 0),
                 type_id: Number(document.getElementById('editInstrumentTypeId')?.value || 0),
-                instrument_name: document.getElementById('editInstrumentName')?.value?.trim() || '',
-                status: document.getElementById('editInstrumentStatus')?.value || 'Available'
+                instrument_name: document.getElementById('editInstrumentName')?.value?.trim() || ''
             };
             if (!payload.instrument_id || !payload.branch_id || !payload.type_id || !payload.instrument_name) {
                 showMessage('Please complete all required fields.', 'error');

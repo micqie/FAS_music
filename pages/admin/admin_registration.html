@@ -8,7 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../css/admin-responsive.css">`n    <link rel="stylesheet" href="../../css/table-responsive.css">
+    <link rel="stylesheet" href="../../css/admin-responsive.css"><link rel="stylesheet" href="../../css/table-responsive.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/css/intlTelInput.css">
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/intlTelInput.min.js"></script>
+        <link rel="stylesheet" href="css/auth-premium.css">
     <script>
         tailwind.config = {
             theme: {
@@ -369,15 +372,18 @@
                                     - Select date of birth -
                                 </div>
                                 <p class="mt-1.5 text-xs text-amber-600">Minimum age to register or enroll is 3 years old.</p>
+                                <p id="walkin_student_dob_error" class="mt-1.5 text-xs text-red-600 font-semibold hidden"></p>
                             </div>
                             <div class="md:col-span-2">
                                 <label id="walkin_student_email_label" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Login Name (Becomes @fas.com)</label>
                                 <input type="text" id="walkin_student_email" name="student_email" placeholder="Login name" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                                 <p id="walkin_student_email_hint" class="mt-1.5 text-xs text-slate-500">Enter a simple name or username. The system will turn it into a <code>@fas.com</code> login automatically.</p>
                             </div>
-                            <div>
+                            <div class="w-full">
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Phone *</label>
-                                <input type="text" name="student_phone" required placeholder="09x-xxx-xxxx" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                   <input id="phone" type="tel" name="student_phone" required autocomplete="off"
+    class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50  border border-zinc-200 d rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+    placeholder="Phone number">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Branch *</label>
@@ -417,7 +423,9 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em] guardian-label">Phone</label>
-                                <input type="text" name="guardian_phone" placeholder="09x-xxx-xxxx" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 guardian-field">
+                            <input id="phone" type="tel" name="guardian_phone" required autocomplete="off"
+    class="intl-phone-input w-full max-w-full box-border px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+    placeholder="Phone number">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Email</label>
@@ -449,10 +457,11 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../../js/birthdate-validation.js"></script>
     <script src="../../js/admin/admin_responsive.js"></script>
     <script src="../../js/index.js"></script>
     <script src="../../js/admin/admin_registration.js"></script>
-
+     <script src="../../js/intl-phone-input.js"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>
 </html>

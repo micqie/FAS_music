@@ -3,6 +3,17 @@
     display: block;
     position: relative;
 }
+.intl-tel-input,
+.iti {
+    width: 100%;
+    max-width: 100%;
+}
+
+.iti input {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
 
 .iti__flag-container,
 .iti__country-container {
