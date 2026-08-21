@@ -994,7 +994,7 @@
                                     <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-bold">
                                         View
                                     </button>
-                                    <button onclick="(window.onPendingRequestAssignClick || openAssignRequestModal)(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-sm font-bold">
+                                    <button onclick="handleScheduleClick(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-sm font-bold">
                                         ${window.pendingRequestActionLabel || 'Assign & Approve'}
                                     </button>
                                     <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-sm font-bold">
@@ -1016,6 +1016,22 @@
                     </tr>`;
             }
         }
+
+        // Global handler for Schedule Sessions button
+        window.handleScheduleClick = function(requestId) {
+            console.log('handleScheduleClick called with requestId:', requestId);
+            try {
+                if (window.onPendingRequestAssignClick) {
+                    console.log('Calling window.onPendingRequestAssignClick');
+                    window.onPendingRequestAssignClick(requestId);
+                } else {
+                    console.log('Calling openAssignRequestModal directly');
+                    openAssignRequestModal(requestId);
+                }
+            } catch (error) {
+                console.error('Error in handleScheduleClick:', error);
+            }
+        };
 
         function openPendingRequestViewModal(requestId) {
             const req = pendingRequestsById[String(requestId)];
@@ -1795,24 +1811,20 @@
 
         async function loadAssignRequestAvailability() {
             const listEl = document.getElementById('assignRequestAvailabilityList');
-            const hintEl = document.getElementById('assignRequestAvailabilityHint');
             const slotSelect = document.getElementById('assignRequestAvailableSlotSelect');
             const startDate = document.getElementById('assignRequestDate')?.value || '';
             const activeRow = getAssignableAssignRequestSlotRow();
             const activeSlotData = getAssignRequestRowData(activeRow);
             const teacherId = Number(activeSlotData?.teacher_id || 0);
             const activeRowTeacherLabel = activeRow ? getAssignRequestRowTeacherName(activeRow) : '';
-            if (!listEl || !hintEl) return;
+            if (!listEl) return;
 
             if (!activeAssignRequest || !teacherId) {
                 assignRequestAvailabilitySlots = [];
                 assignRequestBookedSessions = [];
                 assignRequestAvailabilityMonth = '';
                 assignRequestAvailabilitySelectedDate = '';
-                hintEl.textContent = activeAssignRequest
-                    ? 'Choose a teacher in the selected instrument row to see available one-hour slots.'
-                    : 'Open a student request first.';
-                listEl.innerHTML = '<div class="text-sm text-slate-500">No teacher selected yet.</div>';
+                listEl.innerHTML = '<div class="text-xs text-slate-400 text-center py-12">No instructor selected.</div>';
                 if (slotSelect) {
                     slotSelect.innerHTML = '<option value="">Choose a date first</option>';
                     slotSelect.disabled = true;
@@ -1825,17 +1837,18 @@
             if (cachedSlots) {
                 assignRequestAvailabilitySlots = Array.isArray(cachedSlots.slots) ? cachedSlots.slots : [];
                 assignRequestBookedSessions = Array.isArray(cachedSlots.booked_sessions) ? cachedSlots.booked_sessions : [];
-                hintEl.textContent = activeRowTeacherLabel
-                    ? `Showing available one-hour slots for ${activeRowTeacherLabel}.`
-                    : 'Showing available one-hour slots for the selected teacher.';
                 renderAssignRequestAvailability(assignRequestAvailabilitySlots, startDate);
                 return;
             }
 
-            listEl.innerHTML = '<div class="text-sm text-slate-500">Loading available slots...</div>';
-            hintEl.textContent = activeRowTeacherLabel
-                ? `Loading available one-hour slots for ${activeRowTeacherLabel}.`
-                : 'Loading available one-hour slots for the selected teacher.';
+           listEl.innerHTML = `
+    <div class="text-xs text-slate-400 text-center py-12">
+        ${activeRowTeacherLabel
+            ? `Loading available one-hour slots for ${activeRowTeacherLabel}.`
+            : 'Loading available one-hour slots for the selected teacher.'
+        }
+    </div>
+`;
 
             const requestToken = ++assignRequestAvailabilityRequestToken;
             try {
@@ -1865,6 +1878,7 @@
         }
 
         async function openAssignRequestModal(requestId) {
+            console.log('openAssignRequestModal called with:', requestId);
             const req = pendingRequestsById[String(requestId)];
             if (!req) {
                 showMessage('Request not found.', 'error');
@@ -1872,7 +1886,6 @@
             }
 
             const modal = document.getElementById('assignRequestModal');
-            const info = document.getElementById('assignRequestStudentInfo');
             const requestIdEl = document.getElementById('assignRequestId');
             const studentNameEl = document.getElementById('assignRequestStudentName');
             const studentBranchEl = document.getElementById('assignRequestStudentBranch');
@@ -1882,7 +1895,10 @@
             const slotsContainer = document.getElementById('assignRequestSlotsContainer');
             const notesEl = document.getElementById('assignRequestNotes');
 
-            if (!modal || !info || !requestIdEl || !dateEl || !slotsContainer || !notesEl) return;
+            if (!modal || !requestIdEl || !dateEl || !slotsContainer || !notesEl) {
+                console.error('Missing required modal elements');
+                return;
+            }
 
             const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
             const instrumentSummary = Array.isArray(req.instruments) && req.instruments.length
@@ -1892,7 +1908,6 @@
                     return typeName ? `${instrumentName} (${typeName})` : instrumentName;
                 }).join(', ')
                 : '—';
-            info.textContent = 'Assign a schedule based on instructor availability.';
             if (studentNameEl) studentNameEl.textContent = studentName || 'Student';
             if (studentBranchEl) studentBranchEl.textContent = req.branch_name || 'No branch';
             if (studentPackageEl) studentPackageEl.textContent = req.package_name || 'Package';
@@ -1940,10 +1955,15 @@
             notesEl.value = '';
             updateAssignRequestRecurringSummary();
 
+            console.log('Opening modal, removing hidden class');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+            console.log('Modal classes after open:', modal.className);
             void loadAssignRequestAvailability();
         }
+
+        // Expose globally
+        window.openAssignRequestModal = openAssignRequestModal;
 
         function closeAssignRequestModal() {
             const modal = document.getElementById('assignRequestModal');
@@ -2454,7 +2474,10 @@
             document.getElementById('assignPackageForm')?.addEventListener('submit', assignPackage);
             document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', closeAssignRequestModal);
             document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', closeAssignRequestModal);
-            document.getElementById('assignRequestForm')?.addEventListener('submit', submitAssignRequestForm);
+            document.getElementById('submitAssignRequestBtn')?.addEventListener('click', function(e) {
+                e.preventDefault();
+                submitAssignRequestForm(e);
+            });
             document.getElementById('viewNavPending')?.addEventListener('click', () => {
                 const viewUrl = new URL(window.location.href);
                 viewUrl.searchParams.set('view', 'pending');

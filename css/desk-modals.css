@@ -343,22 +343,22 @@
 .assign-request-availability-list {
     max-height: 100%;
     overflow-y: auto;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.375rem;
-    padding: 0.5rem;
-    background: #fff;
 }
 
 .assign-request-availability-list .text-sm.font-semibold.text-slate-900 {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
 }
 
 .assign-request-availability-list .grid.grid-cols-7.gap-2 > button {
-    border-radius: 0.25rem;
-    font-size: 0.6875rem;
-    padding: 0.25rem;
-    min-height: 2rem;
+    border-radius: 0;
+    font-size: 0.625rem;
+    padding: 0.375rem 0.25rem;
+    min-height: 2.5rem;
+    border: 1px solid #e2e8f0;
 }
 
 .assign-request-availability-list .border {
@@ -367,7 +367,7 @@
 
 .assign-request-availability-list .rounded-sm.border,
 .assign-request-availability-list .rounded-lg.border {
-    border-radius: 0.25rem;
+    border-radius: 0;
 }
 
 .assign-request-availability-list button {
@@ -376,6 +376,66 @@
 
 .assign-request-availability-list button:hover {
     transform: none;
+}
+
+/* Instrument tabs with colored dots */
+.instrument-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 2px solid transparent;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.instrument-tab.active {
+    color: #0f172a;
+    border-bottom-color: currentColor;
+}
+
+.instrument-tab-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.instrument-tab-count {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+/* Weekly slot items with colored dots */
+.weekly-slot-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    background: #fff;
+    font-size: 0.75rem;
+}
+
+.weekly-slot-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.weekly-slot-text {
+    flex: 1;
+    color: #475569;
+}
+
+.weekly-slot-empty {
+    color: #94a3b8;
+    font-style: italic;
 }
 
 .desk-modal-list-item {
@@ -1120,12 +1180,45 @@
 
 /* Ensure modal doesn't block clicks when hidden */
 #assignRequestModal.hidden,
-#assignPackageModal.hidden {
+#assignPackageModal.hidden,
+#paymentModal.hidden,
+#registerStudentModal.hidden,
+#walkinEnrollmentModal.hidden {
     pointer-events: none !important;
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    z-index: -1 !important;
 }
 
 #assignRequestModal:not(.hidden),
 #assignPackageModal:not(.hidden) {
     pointer-events: auto !important;
+}
+
+/* Ensure table buttons are always clickable */
+.desk-enrollment-page table button,
+table button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+
+/* Force all table buttons to be interactive */
+tbody button,
+tbody .inline-flex,
+.desk-panel tbody button,
+#pendingRequestsTable button,
+#studentsTable button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    position: relative !important;
+    z-index: 10 !important;
+}
+
+/* Prevent any hidden overlays */
+.desk-modal.hidden {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
 }
