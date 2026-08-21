@@ -465,6 +465,91 @@ class StudentsApi
         }
     }
 
+    /** Determine whether a student is still in their initial enrollment stage. */
+    private function getStudentEnrollmentContext($studentId)
+    {
+        $context = [
+            'student_id' => (int) $studentId,
+            'session_package_id' => null,
+            'has_existing_enrollment' => false,
+            'is_initial_enrollment' => true
+        ];
+
+        $studentId = (int) $studentId;
+        if ($studentId < 1 || !$this->tableExists('tbl_students')) {
+            return $context;
+        }
+
+        try {
+            $hasSessionPackageCol = $this->hasStudentColumn('session_package_id');
+            $sessionPackageExpr = $hasSessionPackageCol ? 's.session_package_id' : 'NULL AS session_package_id';
+
+            $stmt = $this->conn->prepare("
+                SELECT
+                    {$sessionPackageExpr},
+                    CASE WHEN EXISTS (
+                        SELECT 1
+                        FROM tbl_enrollments e
+                        WHERE e.student_id = s.student_id
+                          AND e.status IN ('Pending', 'Active', 'Frozen', 'Completed')
+                    ) THEN 1 ELSE 0 END AS has_existing_enrollment
+                FROM tbl_students s
+                WHERE s.student_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$studentId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                return $context;
+            }
+
+            $sessionPackageId = (int)($row['session_package_id'] ?? 0);
+            $hasExistingEnrollment = (int)($row['has_existing_enrollment'] ?? 0) === 1;
+
+            $context['session_package_id'] = $sessionPackageId > 0 ? $sessionPackageId : null;
+            $context['has_existing_enrollment'] = $hasExistingEnrollment;
+            // A student is considered "initial" until they have an actual enrollment history.
+            // session_package_id may already be populated during registration and should not
+            // move a brand-new student into the extension flow by itself.
+            $context['is_initial_enrollment'] = !$hasExistingEnrollment;
+        } catch (PDOException $e) {
+            // Default to initial enrollment behavior on lookup failures.
+        }
+
+        return $context;
+    }
+
+    /** Keep only the 12-session package(s) for initial enrollment. */
+    private function filterInitialEnrollmentPackages(array $packages)
+    {
+        $initialPackages = array_values(array_filter($packages, function ($package) {
+            return (int)($package['sessions'] ?? 0) === 12;
+        }));
+
+        return !empty($initialPackages) ? $initialPackages : array_values($packages);
+    }
+
+    /** Pick the package to preselect in the enrollment UI. */
+    private function getDefaultEnrollmentPackageId(array $packages, $preferInitial = true)
+    {
+        if (!$preferInitial) {
+            foreach ($packages as $package) {
+                if ((int)($package['sessions'] ?? 0) > 12) {
+                    return (int)($package['package_id'] ?? 0);
+                }
+            }
+        }
+
+        foreach ($packages as $package) {
+            if ((int)($package['sessions'] ?? 0) === 12) {
+                return (int)($package['package_id'] ?? 0);
+            }
+        }
+
+        $firstPackage = $packages[0] ?? null;
+        return $firstPackage ? (int)($firstPackage['package_id'] ?? 0) : 0;
+    }
+
     /** Ensure tbl_student_instruments exists (created during registration) */
     private function ensureStudentInstrumentsTable()
     {
@@ -4478,6 +4563,7 @@ class StudentsApi
                 SELECT
                     s.student_id,
                     s.branch_id,
+                    s.session_package_id,
                     b.branch_name,
                     s.status,
                     s.first_name,
@@ -4493,10 +4579,10 @@ class StudentsApi
                         rp.student_id,
                         1000.00 AS registration_fee_amount,
                         COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
-                        CASE
-                            WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
-                            ELSE 'Pending'
-                        END AS registration_status
+                    CASE
+                        WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
+                        ELSE 'Pending'
+                    END AS registration_status
                     FROM tbl_registration_payments rp
                     GROUP BY rp.student_id
                 ) rf ON rf.student_id = s.student_id
@@ -4511,6 +4597,8 @@ class StudentsApi
 
             $studentBranchId = (int) ($student['branch_id'] ?? 0);
             $studentBranchName = trim((string) ($student['branch_name'] ?? ''));
+            $enrollmentContext = $this->getStudentEnrollmentContext((int)($student['student_id'] ?? 0));
+            $isInitialEnrollment = !empty($enrollmentContext['is_initial_enrollment']);
             $packages = [];
             $instruments = [];
             $availabilities = [];
@@ -4621,6 +4709,11 @@ class StudentsApi
                 $packages = [];
             }
 
+            if ($isInitialEnrollment) {
+                $packages = $this->filterInitialEnrollmentPackages($packages);
+            }
+            $defaultPackageId = $this->getDefaultEnrollmentPackageId($packages, $isInitialEnrollment);
+
             // Instruments for student's branch
             try {
                 $stmtInstruments = $this->conn->prepare("
@@ -4710,6 +4803,9 @@ class StudentsApi
                 'success' => true,
                 'student' => $student,
                 'packages' => $packages,
+                'package_scope' => $isInitialEnrollment ? 'initial' : 'extension',
+                'is_initial_enrollment' => $isInitialEnrollment,
+                'default_package_id' => $defaultPackageId,
                 'instruments' => $instruments,
                 'availabilities' => $availabilities,
                 'latest_request' => $latestRequest
@@ -4775,6 +4871,7 @@ class StudentsApi
                 SELECT
                     s.student_id,
                     s.branch_id,
+                    s.session_package_id,
                     s.status,
                     COALESCE(rf.registration_status, 'Pending') AS registration_status
                 FROM tbl_students s
@@ -4801,6 +4898,9 @@ class StudentsApi
             if ($student['status'] !== 'Active') {
                 $this->sendJSON(['error' => 'Student account is not active yet'], 400);
             }
+
+            $enrollmentContext = $this->getStudentEnrollmentContext($studentId);
+            $isInitialEnrollment = !empty($enrollmentContext['is_initial_enrollment']);
 
             $stmtExisting = $this->conn->prepare("
                 SELECT enrollment_id
@@ -4839,6 +4939,15 @@ class StudentsApi
             }
 
             $maxInstruments = (int) ($package['max_instruments'] ?? 1);
+            $packageSessions = max(1, (int)($package['sessions'] ?? 1));
+            if ($isInitialEnrollment) {
+                if ($packageSessions !== 12) {
+                    $this->sendJSON(['error' => 'Initial enrollment must use the 12-session package.'], 400);
+                }
+                if (count($instrumentIds) !== 1) {
+                    $this->sendJSON(['error' => 'Initial enrollment must start with one selected instrument.'], 400);
+                }
+            }
             if (count($instrumentIds) < 1) {
                 $this->sendJSON(['error' => 'Select at least one instrument'], 400);
             }
@@ -4865,7 +4974,6 @@ class StudentsApi
                 $this->sendJSON(['error' => 'tbl_enrollments table not found'], 500);
             }
             $primaryInstrumentId = !empty($instrumentIds) ? (int)$instrumentIds[0] : null;
-            $packageSessions = max(1, (int)($package['sessions'] ?? 1));
             $packagePrice = (float)($package['price'] ?? 0);
             $payableNow = $this->computeEnrollmentPayableNow($packagePrice, $packageSessions, $paymentType);
             if ($payableNow <= 0) {
@@ -4885,7 +4993,8 @@ class StudentsApi
                 'package_total_amount' => $packagePrice,
                 'instrument_ids' => array_values($instrumentIds),
                 'payment_proof_path' => $paymentProofPath,
-                'is_walkin_request' => $isWalkinRequest ? 1 : 0
+                'is_walkin_request' => $isWalkinRequest ? 1 : 0,
+                'enrollment_mode' => $isInitialEnrollment ? 'initial' : 'extension'
             ]);
             $stmtPendingEnrollment = $this->conn->prepare("
                 INSERT INTO tbl_enrollments (
@@ -6198,6 +6307,8 @@ class StudentsApi
                 $decoded = json_decode((string)$req['request_notes'], true);
                 if (is_array($decoded)) $requestMeta = $decoded;
             }
+            $enrollmentMode = strtolower(trim((string)($requestMeta['enrollment_mode'] ?? 'extension')));
+            $isInitialEnrollment = $enrollmentMode === 'initial';
             $paymentType = $this->normalizeEnrollmentPaymentType($requestMeta['payment_type'] ?? 'Partial Payment');
             if ($paymentType === '') {
                 $paymentType = 'Partial Payment';
@@ -6216,6 +6327,16 @@ class StudentsApi
             if ($payableNow <= 0) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'The enrollment payment amount is invalid.'], 400);
+            }
+            if ($isInitialEnrollment) {
+                if ($packageSessions !== 12) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'Initial enrollment must use the 12-session package.'], 400);
+                }
+                if (count($instrumentIds) !== 1) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'Initial enrollment must start with one selected instrument.'], 400);
+                }
             }
             if (!$isWalkinRequest && $paymentMethod !== 'Cash' && $paymentProofPath === '') {
                 $this->conn->rollBack();

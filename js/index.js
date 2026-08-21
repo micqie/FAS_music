@@ -1667,25 +1667,18 @@ function updateInstrumentSelection() {
 
     let html = '';
     for (let i = 1; i <= maxInstruments; i++) {
-        const slotLabel = maxInstruments === 1 ? 'Instrument' : `Instrument ${i}`;
+        const slotLabel = maxInstruments === 1 ? 'Instrument Type' : `Instrument Type ${i}`;
         html += `
             <div class="p-3 bg-zinc-900/50 rounded-lg border border-zinc-700 space-y-2">
                 <label class="block text-sm font-medium text-zinc-300">${slotLabel} *</label>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs text-zinc-500 mb-1">Type</label>
-                        <select class="instrument-type-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onInstrumentTypeChange(${i})">
-                            <option value="">Select type...</option>
-                            ${typeOptionsHtml}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-zinc-500 mb-1">Instrument</label>
-                        <select name="instruments[]" class="instrument-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onInstrumentDropdownChange()">
-                            <option value="">Select instrument...</option>
-                        </select>
-                    </div>
+                <div>
+                    <label class="block text-xs text-zinc-500 mb-1">Type</label>
+                    <select class="instrument-type-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onInstrumentTypeChange(${i})">
+                        <option value="">Select type...</option>
+                        ${typeOptionsHtml}
+                    </select>
                 </div>
+                <p class="text-xs text-zinc-400">An available instrument from this type will be assigned automatically.</p>
             </div>
         `;
     }
@@ -1694,27 +1687,15 @@ function updateInstrumentSelection() {
 
 function onInstrumentTypeChange(slot) {
     const typeSelect = document.querySelector(`select.instrument-type-select[data-slot="${slot}"]`);
-    const instrumentSelect = document.querySelector(`select.instrument-select[data-slot="${slot}"]`);
-    if (!typeSelect || !instrumentSelect) return;
+    if (!typeSelect) return;
 
     const typeId = typeSelect.value;
-    instrumentSelect.innerHTML = '<option value="">Select instrument...</option>';
-    instrumentSelect.value = '';
-
-    if (typeId) {
-        const instruments = getInstrumentsByType(typeId);
-        instruments.forEach(inst => {
-            const opt = document.createElement('option');
-            opt.value = inst.instrument_id;
-            opt.textContent = inst.instrument_name || 'Instrument';
-            instrumentSelect.appendChild(opt);
-        });
-    }
     onInstrumentDropdownChange();
 }
 
 function onInstrumentDropdownChange() {
     const selects = document.querySelectorAll('select.instrument-select');
+    if (!selects.length) return;
     const used = new Set();
     selects.forEach(select => {
         const val = select.value;
@@ -2103,7 +2084,7 @@ async function loadPendingRequests() {
             const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
             const pkg = escapeHtml(r.package_name || '—');
             const instruments = Array.isArray(r.instruments) && r.instruments.length
-                ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
+                ? r.instruments.map(i => escapeHtml(i.type_name || i.instrument_name || 'Instrument')).join(', ')
                 : '—';
             const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
             const payableNow = Number(r.payable_now || 0);
@@ -2159,21 +2140,17 @@ async function loadPendingRequests() {
     }
 }
 
-function openPendingRequestViewModal(requestId) {
-    const req = pendingRequestsById[String(requestId)];
-    if (!req) {
-        showMessage('Request not found.', 'error');
-        return;
-    }
+        function openPendingRequestViewModal(requestId) {
+            const req = pendingRequestsById[String(requestId)];
+            if (!req) {
+                showMessage('Request not found.', 'error');
+                return;
+            }
 
-    const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
-    const instruments = Array.isArray(req.instruments) && req.instruments.length
-        ? req.instruments.map(i => {
-            const instrumentName = escapeHtml(i.instrument_name || 'Instrument');
-            const typeName = escapeHtml(i.type_name || '');
-            return typeName ? `${instrumentName} (${typeName})` : instrumentName;
-        }).join(', ')
-        : '—';
+            const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
+            const instruments = Array.isArray(req.instruments) && req.instruments.length
+                ? req.instruments.map(i => escapeHtml(i.type_name || i.instrument_name || 'Instrument')).join(', ')
+                : '—';
     const paymentType = escapeHtml(req.payment_type || 'Partial Payment');
     const paymentMethod = escapeHtml(req.payment_method || '—');
     const payableNow = Number(req.payable_now || 0);
@@ -2192,7 +2169,7 @@ function openPendingRequestViewModal(requestId) {
                     <div><span class="font-semibold text-slate-900">Student:</span> ${studentName}</div>
                     <div><span class="font-semibold text-slate-900">Branch:</span> ${escapeHtml(req.branch_name || '—')}</div>
                     <div><span class="font-semibold text-slate-900">Package:</span> ${escapeHtml(req.package_name || '—')}</div>
-                    <div><span class="font-semibold text-slate-900">Selected Instrument:</span> ${instruments}</div>
+                            <div><span class="font-semibold text-slate-900">Selected Instrument Type:</span> ${instruments}</div>
                     <div><span class="font-semibold text-slate-900">Schedule Basis:</span> Instructor availability</div>
                     <div><span class="font-semibold text-slate-900">Payment Type:</span> ${paymentType}</div>
                     <div><span class="font-semibold text-slate-900">Payment Method:</span> ${paymentMethod}</div>
@@ -3453,7 +3430,7 @@ function renderCurrentEnrollmentSummary(enrollment, student, instruments) {
     const room = enrollment.first_room || 'Not set';
     const branchName = student?.branch_name || 'Branch not set';
     const instrumentNames = (Array.isArray(instruments) ? instruments : [])
-        .map(i => String(i.instrument_name || '').trim())
+        .map(i => String(i.type_name || i.instrument_name || '').trim())
         .filter(Boolean);
     const instrumentsLabel = instrumentNames.length ? instrumentNames.join(', ') : 'Not set';
     const totalAmount = Number(enrollment.total_amount || 0);
@@ -3475,7 +3452,7 @@ function renderCurrentEnrollmentSummary(enrollment, student, instruments) {
                 </div>
             ` : ''}
             <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div><span class="text-zinc-400">Instruments to learn:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(instrumentsLabel)}</span></div>
+                <div><span class="text-zinc-400">Instrument type:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(instrumentsLabel)}</span></div>
                 <div><span class="text-zinc-400">Payment:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(paymentState)} (${escapeHtml(enrollment.payment_type || 'Partial Payment')})</span></div>
                 <div><span class="text-zinc-400">Current Balance:</span> <span class="text-zinc-100 font-semibold">${formatCurrencyPHP(balance)}</span></div>
                 <div><span class="text-zinc-400">Where:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(`${room} (${branchName})`)}</span></div>
@@ -5231,25 +5208,18 @@ function renderStudentRequestInstrumentSelectors(maxInstruments, instruments) {
 
     let html = '';
     for (let i = 1; i <= maxCount; i++) {
-        const slotLabel = maxCount === 1 ? 'Instrument' : `Instrument ${i}`;
+        const slotLabel = maxCount === 1 ? 'Instrument Type' : `Instrument Type ${i}`;
         html += `
             <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3 shadow-sm">
                 <label class="block text-sm font-semibold text-slate-700">${slotLabel} *</label>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Type</label>
-                        <select class="student-request-instrument-type w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentTypeChange(${i})">
-                            <option value="">Select type...</option>
-                            ${typeOptionsHtml}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Instrument</label>
-                        <select class="student-request-instrument w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentDropdownChange(${i})">
-                            <option value="">Select instrument...</option>
-                        </select>
-                    </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Type</label>
+                    <select class="student-request-instrument-type w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentTypeChange(${i})">
+                        <option value="">Select type...</option>
+                        ${typeOptionsHtml}
+                    </select>
                 </div>
+                <p class="text-xs text-slate-500">We’ll assign an available instrument from the selected type behind the scenes.</p>
             </div>
         `;
     }
@@ -5258,8 +5228,7 @@ function renderStudentRequestInstrumentSelectors(maxInstruments, instruments) {
 
 function onStudentRequestInstrumentTypeChange(slot) {
     const typeSelect = document.querySelector(`select.student-request-instrument-type[data-slot="${slot}"]`);
-    const instrumentSelect = document.querySelector(`select.student-request-instrument[data-slot="${slot}"]`);
-    if (!typeSelect || !instrumentSelect) return;
+    if (!typeSelect) return;
 
     const typeId = typeSelect.value;
 
@@ -5271,8 +5240,6 @@ function onStudentRequestInstrumentTypeChange(slot) {
         );
         if (duplicateType) {
             typeSelect.value = '';
-            instrumentSelect.innerHTML = '<option value="">Select instrument...</option>';
-            instrumentSelect.value = '';
             if (typeof showMessage === 'function') {
                 showMessage('That instrument type has already been selected in another slot. Please choose a different type.', 'error');
             }
@@ -5280,19 +5247,6 @@ function onStudentRequestInstrumentTypeChange(slot) {
             _syncStudentRequestTypeDisabledStates();
             return;
         }
-    }
-
-    instrumentSelect.innerHTML = '<option value="">Select instrument...</option>';
-    instrumentSelect.value = '';
-
-    if (typeId) {
-        const items = getStudentRequestInstrumentsByType(typeId);
-        items.forEach(inst => {
-            const opt = document.createElement('option');
-            opt.value = inst.instrument_id;
-            opt.textContent = inst.instrument_name || 'Instrument';
-            instrumentSelect.appendChild(opt);
-        });
     }
     onStudentRequestInstrumentDropdownChange(slot);
 }
@@ -5322,7 +5276,7 @@ function getResolvedInstrumentIdsFromSelectors(rootSelector, typeSelector, instr
 
     typeSelects.forEach(typeSelect => {
         const slot = typeSelect.dataset.slot;
-        const instrumentSelect = slot != null
+        const instrumentSelect = instrumentSelector && slot != null
             ? root.querySelector(`${instrumentSelector}[data-slot="${slot}"]`)
             : null;
 
@@ -5367,6 +5321,7 @@ function getWalkinSelectedInstrumentIds() {
 
 function onStudentRequestInstrumentDropdownChange(changedSlot = null) {
     const selects = document.querySelectorAll('select.student-request-instrument');
+    if (!selects.length) return;
     const changedSelect = changedSlot != null
         ? document.querySelector(`select.student-request-instrument[data-slot="${changedSlot}"]`)
         : null;
@@ -5448,7 +5403,16 @@ function initStudentAdditionalSessionAction(student, portal, requestMeta, attend
             return;
         }
 
-        showMessage('Contact the front desk to add more sessions.', 'success');
+        const requestModal = document.getElementById('studentRequestModal');
+        if (requestModal) {
+            openStudentRequestModal();
+            showMessage('Use the request form to select a 20-session or 50-session package for extension.', 'success');
+            return;
+        }
+
+        const dashboardUrl = new URL('student_dashboard.html', window.location.href);
+        dashboardUrl.searchParams.set('open_request', '1');
+        window.location.href = dashboardUrl.toString();
     };
 }
 
@@ -5475,18 +5439,33 @@ function initStudentRequestSection(student, requestMeta) {
     const availabilities = Array.isArray(requestMeta?.availabilities) ? requestMeta.availabilities : [];
     const latest = requestMeta?.latest_request || null;
     const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
-    let selectedPackageId = '';
+    const packageScope = String(requestMeta?.package_scope || '').toLowerCase();
+    
+    // Filter packages - only show 12 Session Package for all students
+    // The 20 and 50 session packages were promotional and are no longer offered
+    // Students can only select 12 sessions initially
+    const filteredPackages = packages.filter(pkg => Number(pkg.sessions || 0) === 12);
+    const defaultPackageId = String(requestMeta?.default_package_id || '');
+    let selectedPackageId = defaultPackageId;
 
     statusEl.innerHTML = renderStudentRequestStatus(latest);
     availabilityCalendar.innerHTML = '';
 
-    packageSelect.innerHTML = '<option value="">Select package...</option>' + packages.map(pkg => {
+    packageSelect.innerHTML = '<option value="">Select package...</option>' + filteredPackages.map(pkg => {
         const sessions = Number(pkg.sessions || 0);
         const maxInst = Number(pkg.max_instruments || 1);
         const price = formatCurrencyPHP(pkg.price || 0);
         const instLabel = maxInst > 1 ? `up to ${maxInst} instruments` : '1 instrument';
         return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} — ${sessions} sessions, ${instLabel} · ${price}</option>`;
     }).join('');
+
+    const packageExists = selectedPackageId && filteredPackages.some(pkg => String(pkg.package_id) === String(selectedPackageId));
+    if (!packageExists && (packageScope === 'initial' || filteredPackages.length === 1)) {
+        selectedPackageId = String(filteredPackages[0]?.package_id || '');
+    }
+    if (selectedPackageId) {
+        packageSelect.value = selectedPackageId;
+    }
 
     const getSelectedPackageData = () => {
         const selected = packageSelect.options[packageSelect.selectedIndex];
@@ -5499,7 +5478,7 @@ function initStudentRequestSection(student, requestMeta) {
     };
 
     const renderPackageCards = () => {
-        if (!packages.length) {
+        if (!filteredPackages.length) {
             packageCardsContainer.innerHTML = `
                 <div class="rounded-2xl border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-5 text-center text-sm text-zinc-500 dark:text-zinc-400">
                     No session packages are available right now.
@@ -5508,7 +5487,7 @@ function initStudentRequestSection(student, requestMeta) {
             return;
         }
 
-        packageCardsContainer.innerHTML = packages.map((pkg) => {
+        packageCardsContainer.innerHTML = filteredPackages.map((pkg) => {
             const packageId = String(pkg.package_id || '');
             const sessions = Number(pkg.sessions || 0);
             const maxInst = Number(pkg.max_instruments || 1);
@@ -5549,7 +5528,7 @@ function initStudentRequestSection(student, requestMeta) {
         });
     };
 
-    if (packages.length === 0) {
+    if (filteredPackages.length === 0) {
         statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">No session package is available for enrollment request right now. Please contact desk/admin.</div>';
     }
 
@@ -5659,7 +5638,7 @@ function initStudentRequestSection(student, requestMeta) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
         statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Registration payment must be completed before enrollment.</div>';
-    } else if (packages.length === 0) {
+    } else if (filteredPackages.length === 0) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
     } else if (hasPendingRequest) {
@@ -7069,6 +7048,15 @@ async function initStudentDashboardPage() {
         setHtml('studentAvailabilityCalendar', '<div class="text-zinc-500">Unable to load teacher availability right now.</div>');
     }
 
+    const dashboardParams = new URLSearchParams(window.location.search);
+    if (dashboardParams.get('open_request') === '1' && document.getElementById('studentRequestModal')) {
+        openStudentRequestModal();
+        dashboardParams.delete('open_request');
+        const nextUrl = new URL(window.location.href);
+        nextUrl.search = dashboardParams.toString();
+        window.history.replaceState({}, '', nextUrl.toString());
+    }
+
     // Fetch current freeze payment status so the banner shows the right state
     const freezeNotice = getScheduleFreezeReservationNotice(portal?.current_enrollment || null);
     if (freezeNotice && portal?.current_enrollment?.enrollment_id) {
@@ -8076,25 +8064,18 @@ function updateWalkinInstrumentSelection() {
 
     let html = '';
     for (let i = 1; i <= maxInstruments; i++) {
-        const slotLabel = maxInstruments === 1 ? 'Instrument' : `Instrument ${i}`;
+        const slotLabel = maxInstruments === 1 ? 'Instrument Type' : `Instrument Type ${i}`;
         html += `
             <div class="p-3 bg-zinc-900/60 rounded-lg border border-zinc-700 space-y-2">
                 <label class="block text-sm font-medium text-zinc-200">${slotLabel} *</label>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs text-zinc-400 mb-1">Type</label>
-                        <select class="walkin-instrument-type-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onWalkinInstrumentTypeChange(${i})">
-                            <option value="">Select type...</option>
-                            ${typeOptionsHtml}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-zinc-400 mb-1">Instrument</label>
-                        <select name="instruments[]" class="walkin-instrument-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onWalkinInstrumentDropdownChange()">
-                            <option value="">Select instrument...</option>
-                        </select>
-                    </div>
+                <div>
+                    <label class="block text-xs text-zinc-400 mb-1">Type</label>
+                    <select class="walkin-instrument-type-select w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onWalkinInstrumentTypeChange(${i})">
+                        <option value="">Select type...</option>
+                        ${typeOptionsHtml}
+                    </select>
                 </div>
+                <p class="text-xs text-zinc-400">An available instrument from this type will be assigned automatically.</p>
             </div>
         `;
     }
@@ -8104,27 +8085,18 @@ function updateWalkinInstrumentSelection() {
 // Global handlers for instrument dropdowns (used in HTML onchange attributes)
 function onWalkinInstrumentTypeChange(slot) {
     const typeSelect = document.querySelector(`select.walkin-instrument-type-select[data-slot="${slot}"]`);
-    const instrumentSelect = document.querySelector(`select.walkin-instrument-select[data-slot="${slot}"]`);
-    if (!typeSelect || !instrumentSelect) return;
+    if (!typeSelect) return;
 
     const typeId = typeSelect.value;
-    instrumentSelect.innerHTML = '<option value="">Select instrument...</option>';
-    instrumentSelect.value = '';
-
-    if (typeId) {
-        const instruments = walkinGetInstrumentsByType(typeId);
-        instruments.forEach(inst => {
-            const opt = document.createElement('option');
-            opt.value = inst.instrument_id;
-            opt.textContent = inst.instrument_name || 'Instrument';
-            instrumentSelect.appendChild(opt);
-        });
-    }
     onWalkinInstrumentDropdownChange();
 }
 
 function onWalkinInstrumentDropdownChange() {
     const selects = document.querySelectorAll('select.walkin-instrument-select');
+    if (!selects.length) {
+        calculateWalkinTotalFee();
+        return;
+    }
     const used = new Set();
     selects.forEach(select => {
         const val = select.value;

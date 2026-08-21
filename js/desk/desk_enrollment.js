@@ -638,6 +638,8 @@
 
             walkinMeta = meta;
             const packages = Array.isArray(meta.packages) ? meta.packages : [];
+            const packageScope = String(meta.package_scope || '').toLowerCase();
+            const defaultPackageId = String(meta.default_package_id || '');
             const previousValue = String(packageSelect.value || '');
             packageSelect.innerHTML = '<option value="">Select package...</option>' + packages.map(pkg => {
                 const sessions = Number(pkg.sessions || 0);
@@ -647,6 +649,10 @@
             }).join('');
             if (previousValue && packages.some(pkg => String(pkg.package_id) === previousValue)) {
                 packageSelect.value = previousValue;
+            } else if (defaultPackageId && packages.some(pkg => String(pkg.package_id) === defaultPackageId)) {
+                packageSelect.value = defaultPackageId;
+            } else if (packageScope === 'initial' || packages.length === 1) {
+                packageSelect.value = String(packages[0]?.package_id || '');
             }
             renderWalkinPackageCards();
             renderWalkinPaymentTypeCards();
@@ -967,7 +973,7 @@
                     const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
                     const pkg = escapeHtml(r.package_name || '—');
                     const instruments = Array.isArray(r.instruments) && r.instruments.length
-                        ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
+                        ? r.instruments.map(i => escapeHtml(i.type_name || i.instrument_name || 'Instrument')).join(', ')
                         : '—';
                     const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
                     const payableNow = Number(r.payable_now || 0);
@@ -1043,9 +1049,7 @@
             const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
             const instruments = Array.isArray(req.instruments) && req.instruments.length
                 ? req.instruments.map(i => {
-                    const instrumentName = escapeHtml(i.instrument_name || 'Instrument');
-                    const typeName = escapeHtml(i.type_name || '');
-                    return typeName ? `${instrumentName} (${typeName})` : instrumentName;
+                    return escapeHtml(i.type_name || i.instrument_name || 'Instrument');
                 }).join(', ')
                 : '—';
             const paymentType = escapeHtml(req.payment_type || 'Partial Payment');
@@ -1066,7 +1070,7 @@
                             <div><span class="font-semibold text-slate-900">Student:</span> ${studentName}</div>
                             <div><span class="font-semibold text-slate-900">Branch:</span> ${escapeHtml(req.branch_name || '—')}</div>
                             <div><span class="font-semibold text-slate-900">Package:</span> ${escapeHtml(req.package_name || '—')}</div>
-                            <div><span class="font-semibold text-slate-900">Selected Instrument:</span> ${instruments}</div>
+                            <div><span class="font-semibold text-slate-900">Selected Instrument Type:</span> ${instruments}</div>
                             <div><span class="font-semibold text-slate-900">Schedule Basis:</span> Instructor availability</div>
                             <div><span class="font-semibold text-slate-900">Payment Type:</span> ${paymentType}</div>
                             <div><span class="font-semibold text-slate-900">Payment Method:</span> ${paymentMethod}</div>
@@ -1903,9 +1907,7 @@
             const studentName = `${req.first_name || ''} ${req.last_name || ''}`.trim();
             const instrumentSummary = Array.isArray(req.instruments) && req.instruments.length
                 ? req.instruments.map(i => {
-                    const instrumentName = escapeHtml(i.instrument_name || 'Instrument');
-                    const typeName = escapeHtml(i.type_name || '');
-                    return typeName ? `${instrumentName} (${typeName})` : instrumentName;
+                    return escapeHtml(i.type_name || i.instrument_name || 'Instrument');
                 }).join(', ')
                 : '—';
             if (studentNameEl) studentNameEl.textContent = studentName || 'Student';
