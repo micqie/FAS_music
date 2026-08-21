@@ -75,6 +75,123 @@ if (!function_exists('fas_ensure_session_columns')) {
     }
 }
 
+if (!function_exists('fas_ensure_user_security_columns')) {
+    function fas_ensure_user_security_columns(PDO $conn): void
+    {
+        static $checked = [];
+        $key = function_exists('spl_object_id') ? spl_object_id($conn) : spl_object_hash($conn);
+        if (!empty($checked[$key])) {
+            return;
+        }
+        $checked[$key] = true;
+
+        $hasColumn = static function (PDO $conn, string $columnName): bool {
+            try {
+                $stmt = $conn->prepare("SHOW COLUMNS FROM tbl_users LIKE ?");
+                $stmt->execute([$columnName]);
+                return $stmt->rowCount() > 0;
+            } catch (PDOException $e) {
+                return false;
+            }
+        };
+
+        try {
+            if (!$hasColumn($conn, 'failed_login_attempts')) {
+                $conn->exec("ALTER TABLE tbl_users ADD COLUMN failed_login_attempts INT NOT NULL DEFAULT 0 AFTER status");
+            }
+            if (!$hasColumn($conn, 'account_locked_at')) {
+                $conn->exec("ALTER TABLE tbl_users ADD COLUMN account_locked_at DATETIME NULL AFTER failed_login_attempts");
+            }
+            if (!$hasColumn($conn, 'account_locked_reason')) {
+                $conn->exec("ALTER TABLE tbl_users ADD COLUMN account_locked_reason VARCHAR(255) NULL AFTER account_locked_at");
+            }
+            if (!$hasColumn($conn, 'failed_login_last_at')) {
+                $conn->exec("ALTER TABLE tbl_users ADD COLUMN failed_login_last_at DATETIME NULL AFTER account_locked_reason");
+            }
+        } catch (PDOException $e) {
+            // Keep auth working even if a schema migration cannot be applied.
+        }
+    }
+}
+
+if (!function_exists('fas_reset_user_security_state')) {
+    function fas_reset_user_security_state(PDO $conn, int $userId): void
+    {
+        if ($userId < 1) {
+            return;
+        }
+
+        fas_ensure_user_security_columns($conn);
+
+        try {
+            $stmt = $conn->prepare("
+                UPDATE tbl_users
+                SET failed_login_attempts = 0,
+                    account_locked_at = NULL,
+                    account_locked_reason = NULL,
+                    failed_login_last_at = NULL
+                WHERE user_id = ?
+            ");
+            $stmt->execute([$userId]);
+        } catch (PDOException $e) {
+            // Non-fatal.
+        }
+    }
+}
+
+if (!function_exists('fas_register_failed_user_login')) {
+    function fas_register_failed_user_login(PDO $conn, int $userId, int $lockThreshold = 5): array
+    {
+        if ($userId < 1) {
+            return ['attempts' => 0, 'locked' => false];
+        }
+
+        fas_ensure_user_security_columns($conn);
+
+        try {
+            $stmt = $conn->prepare("
+                UPDATE tbl_users
+                SET failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1,
+                    failed_login_last_at = NOW(),
+                    account_locked_at = CASE
+                        WHEN COALESCE(failed_login_attempts, 0) + 1 >= ? THEN NOW()
+                        ELSE account_locked_at
+                    END,
+                    account_locked_reason = CASE
+                        WHEN COALESCE(failed_login_attempts, 0) + 1 >= ? THEN 'Too many failed login attempts'
+                        ELSE account_locked_reason
+                    END,
+                    status = CASE
+                        WHEN COALESCE(failed_login_attempts, 0) + 1 >= ? THEN 'Inactive'
+                        ELSE status
+                    END
+                WHERE user_id = ?
+            ");
+            $stmt->execute([$lockThreshold, $lockThreshold, $lockThreshold, $userId]);
+
+            $stmtState = $conn->prepare("
+                SELECT failed_login_attempts, account_locked_at, account_locked_reason, status
+                FROM tbl_users
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+            $stmtState->execute([$userId]);
+            $state = $stmtState->fetch(PDO::FETCH_ASSOC) ?: [];
+
+            $attempts = (int)($state['failed_login_attempts'] ?? 0);
+            return [
+                'attempts' => $attempts,
+                'locked' => strcasecmp((string)($state['status'] ?? ''), 'Inactive') === 0 && $attempts >= $lockThreshold,
+                'status' => $state['status'] ?? null,
+                'account_locked_reason' => $state['account_locked_reason'] ?? null,
+                'account_locked_at' => $state['account_locked_at'] ?? null,
+            ];
+        } catch (PDOException $e) {
+            return ['attempts' => 0, 'locked' => false];
+        }
+    }
+}
+
 if (!function_exists('fas_normalize_role_category')) {
     function fas_normalize_role_category(?string $roleName): string
     {

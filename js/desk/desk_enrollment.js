@@ -113,9 +113,9 @@
         }
 
         function getInstrumentRowLabel(instrument, index) {
-            if (!instrument) return `Additional Slot ${index + 1}`;
-            const name = `${instrument.instrument_name || 'Instrument'}${instrument.type_name ? ` (${instrument.type_name})` : ''}`;
-            return name;
+            if (!instrument) return `Slot ${index + 1}`;
+            // Return only the instrument name, without brand/type
+            return `${instrument.instrument_name || 'Instrument'}`;
         }
 
         function getAssignRequestInstrumentForIndex(index) {
@@ -1272,9 +1272,8 @@
                 <div class="assign-request-slot transition ${fixedRow ? 'border-gold-200 bg-amber-50/40' : (teacherLocked ? 'border-emerald-200 bg-emerald-50/30' : '')}" data-instrument-id="${instrument?.instrument_id || ''}" data-teacher-id="${teacherId || ''}" data-remove-locked="${removeLocked ? '1' : '0'}" data-teacher-locked="${teacherLocked ? '1' : '0'}">
                     <div class="assign-request-slot-header">
                         <div>
-                            <div class="assign-request-field-caption">Instrument</div>
-                            <div class="assign-request-slot-title">${escapeHtml(label)}</div>
-                            ${fixedRow ? '<div class="assign-request-fixed-badge">Fixed instrument row</div>' : ''}
+                            <div class="text-sm font-semibold text-slate-800">${escapeHtml(label)}</div>
+                            ${fixedRow ? '<div class="text-xs text-amber-600 mt-0.5">Fixed slot</div>' : ''}
                         </div>
                         ${removeLocked ? '' : '<button type="button" class="assign-request-slot-remove assign-request-slot-trash" aria-label="Remove slot"><i class="fas fa-trash-can"></i></button>'}
                     </div>
@@ -1282,13 +1281,13 @@
                     <input type="hidden" class="assign-request-slot-day" value="${escapeHtml(day)}">
                     <input type="hidden" class="assign-request-slot-start" value="${escapeHtml(start)}">
                     <input type="hidden" class="assign-request-slot-end" value="${escapeHtml(end)}">
-                    <div class="assign-request-slot-fields">
-                        <div class="assign-request-slot-field">
-                            <label class="desk-modal-label">Teacher</label>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1.5">Teacher</label>
                             ${renderTeacherControlForInstrument(instrument, teacherId, teacherLocked, index)}
                         </div>
-                        <div class="assign-request-slot-field">
-                            <label class="desk-modal-label">Schedule</label>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1.5">Schedule</label>
                             <div class="assign-request-slot-schedule">
                                 <div class="assign-request-slot-schedule-title">${escapeHtml(schedule.title)}</div>
                                 <div class="assign-request-slot-schedule-subtitle">${escapeHtml(schedule.subtitle)}</div>
@@ -1845,14 +1844,7 @@
                 return;
             }
 
-           listEl.innerHTML = `
-    <div class="text-xs text-slate-400 text-center py-12">
-        ${activeRowTeacherLabel
-            ? `Loading available one-hour slots for ${activeRowTeacherLabel}.`
-            : 'Loading available one-hour slots for the selected teacher.'
-        }
-    </div>
-`;
+            listEl.innerHTML = '<div class="flex items-center justify-center h-64"><div class="text-center"><div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600 mb-3 animate-pulse"><i class="fas fa-spinner fa-spin text-xl"></i></div><p class="text-sm text-slate-600 font-medium">Loading available time slots...</p><p class="text-xs text-slate-500 mt-1">' + (activeRowTeacherLabel || 'Please wait') + '</p></div></div>';
 
             const requestToken = ++assignRequestAvailabilityRequestToken;
             try {
@@ -1861,9 +1853,6 @@
                 const response = await axios.get(url);
                 if (requestToken !== assignRequestAvailabilityRequestToken) return;
                 const data = response.data || {};
-                if (activeRowTeacherLabel) {
-                    hintEl.textContent = `Showing available one-hour slots for ${activeRowTeacherLabel}.`;
-                }
                 const slots = Array.isArray(data.slots) ? data.slots : [];
                 const bookedSessions = Array.isArray(data.booked_sessions) ? data.booked_sessions : [];
                 assignRequestAvailabilitySlots = slots;
@@ -1872,8 +1861,7 @@
                 renderAssignRequestAvailability(slots, startDate);
             } catch (error) {
                 if (requestToken !== assignRequestAvailabilityRequestToken) return;
-                hintEl.textContent = 'Unable to load instructor availability right now.';
-                listEl.innerHTML = '<div class="text-sm text-red-500">Failed to load available slots.</div>';
+                listEl.innerHTML = '<div class="flex items-center justify-center h-64"><div class="text-center"><div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 text-red-600 mb-3"><i class="fas fa-exclamation-circle text-xl"></i></div><p class="text-sm text-red-600 font-medium">Unable to load schedule</p><p class="text-xs text-slate-500 mt-1">Please try again or contact support</p></div></div>';
                 if (slotSelect) {
                     slotSelect.innerHTML = '<option value="">Failed to load slots</option>';
                     slotSelect.disabled = true;

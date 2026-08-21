@@ -1174,17 +1174,24 @@ function initLoginForm() {
                     }
                     return;
                 }
-                const message = apiMessage
-                    ? apiMessage
-                    : status === 401
-                        ? 'Invalid username or password.'
-                        : status === 403
-                            ? 'Your account was deactivated. Please contact the administrator.'
-                            : 'An error occurred. Please try again.';
+                const message = (data && data.warning_message)
+                    ? data.warning_message
+                    : apiMessage
+                        ? apiMessage
+                        : status === 401
+                            ? 'Invalid username or password.'
+                            : status === 423
+                                ? 'Your account is locked. Please contact the administrator.'
+                                : status === 403
+                                    ? 'Your account was deactivated. Please contact the administrator.'
+                                    : 'An error occurred. Please try again.';
 
-                const isPending = status === 403 || /pending|deactivated/i.test(message);
-                const title = isPending ? '' : status === 401 ? 'Login Failed' : 'Error';
-                const icon = isPending ? 'info' : 'error';
+                const isNotice = status === 403
+                    || status === 423
+                    || data?.warning
+                    || /pending|deactivated|locked/i.test(message);
+                const title = isNotice ? 'Account Notice' : status === 401 ? 'Login Failed' : 'Error';
+                const icon = isNotice ? 'info' : 'error';
 
                 showLoginMessage(message, icon === 'info' ? 'info' : 'error', title || 'Account Notice');
                 if (loginBtn) loginBtn.disabled = false;
@@ -1207,17 +1214,24 @@ function initLoginForm() {
                 }
                 return;
             }
-            const message = apiMessage
-                ? apiMessage
-                : status === 401
-                    ? 'Invalid username or password.'
-                    : status === 403
-                        ? 'Your account was deactivated. Please contact the administrator.'
-                        : 'An error occurred. Please try again.';
+            const message = error?.response?.data?.warning_message
+                ? error.response.data.warning_message
+                : apiMessage
+                    ? apiMessage
+                    : status === 401
+                        ? 'Invalid username or password.'
+                        : status === 423
+                            ? 'Your account is locked. Please contact the administrator.'
+                            : status === 403
+                                ? 'Your account was deactivated. Please contact the administrator.'
+                                : 'An error occurred. Please try again.';
             console.error('Login error:', error);
-            const isPending = status === 403 || /pending|deactivated/i.test(message);
-            const title = isPending ? '' : status === 401 ? 'Login Failed' : 'Error';
-            const icon = isPending ? 'info' : 'error';
+            const isNotice = status === 403
+                || status === 423
+                || error?.response?.data?.warning
+                || /pending|deactivated|locked/i.test(message);
+            const title = isNotice ? 'Account Notice' : status === 401 ? 'Login Failed' : 'Error';
+            const icon = isNotice ? 'info' : 'error';
             showLoginMessage(message, icon === 'info' ? 'info' : 'error', title || 'Account Notice');
             if (loginBtn) loginBtn.disabled = false;
             if (loginBtnText) loginBtnText.textContent = 'Sign In';

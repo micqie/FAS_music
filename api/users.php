@@ -150,6 +150,13 @@ class User
         }
     }
 
+    private function ensureUserSecurityColumns()
+    {
+        if (function_exists('fas_ensure_user_security_columns')) {
+            fas_ensure_user_security_columns($this->conn);
+        }
+    }
+
     private function tableHasColumn($tableName, $columnName)
     {
         try {
@@ -1195,6 +1202,7 @@ class User
         try {
             $this->ensureUserVerificationColumns();
             $this->ensureWalkInAccountsSynced();
+            $this->ensureUserSecurityColumns();
             $studentLoginEmail = $this->resolveStudentLoginEmail($username);
             $resolvedUsername = $studentLoginEmail ?: $this->resolveWalkInLoginIdentifier($username);
             $loginCandidates = array_values(array_unique(array_filter([
@@ -1206,13 +1214,17 @@ class User
             })));
             $hasUserBranch = $this->hasUserColumn('branch_id');
             $hasVerificationColumns = $this->hasUserColumn('email_verified_at');
+            $hasSecurityColumns = $this->hasUserColumn('failed_login_attempts');
             $selectBranch = $hasUserBranch ? ", u.branch_id, b.branch_name" : "";
             $selectVerification = $hasVerificationColumns ? ", u.email_verified_at" : ", NULL AS email_verified_at";
+            $selectSecurity = $hasSecurityColumns
+                ? ", u.failed_login_attempts, u.account_locked_at, u.account_locked_reason, u.failed_login_last_at"
+                : ", 0 AS failed_login_attempts, NULL AS account_locked_at, NULL AS account_locked_reason, NULL AS failed_login_last_at";
             $joinBranch = $hasUserBranch ? " LEFT JOIN tbl_branches b ON b.branch_id = u.branch_id " : "";
             // First check if user exists and get status
             $stmt = $this->conn->prepare("
                 SELECT u.user_id, u.username, u.password, u.first_name, u.last_name,
-                       u.email, u.phone, u.status, r.role_name{$selectBranch}{$selectVerification}
+                       u.email, u.phone, u.status, r.role_name{$selectBranch}{$selectVerification}{$selectSecurity}
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 {$joinBranch}
@@ -1228,13 +1240,58 @@ class User
                 $this->sendJSON(['error' => 'Invalid username or password'], 401);
             }
 
+            $storedStatus = (string)($user['status'] ?? '');
+            $failedAttempts = (int)($user['failed_login_attempts'] ?? 0);
+            $lockThreshold = 5;
+            $isLockedAccount = strcasecmp($storedStatus, 'Inactive') === 0
+                && ($failedAttempts >= $lockThreshold || trim((string)($user['account_locked_reason'] ?? '')) !== '' || trim((string)($user['account_locked_at'] ?? '')) !== '');
+            if ($isLockedAccount) {
+                $this->sendJSON([
+                    'error' => 'Your account is locked after too many failed login attempts. Please contact the administrator to reactivate it.',
+                    'account_locked' => true,
+                    'failed_login_attempts' => $failedAttempts,
+                    'warning' => false
+                ], 423);
+            }
+
+            if (strcasecmp($storedStatus, 'Active') !== 0) {
+                $this->sendJSON([
+                    'error' => 'Your account was deactivated. Please contact the administrator.',
+                    'account_locked' => false,
+                    'warning' => false
+                ], 403);
+            }
+
             // Accept modern hashes and legacy plaintext records.
             $storedPassword = (string) ($user['password'] ?? '');
             $isPasswordValid = password_verify($password, $storedPassword)
                 || hash_equals($storedPassword, $password);
 
             if (!$isPasswordValid) {
-                $this->sendJSON(['error' => 'Invalid username or password'], 401);
+                $securityState = fas_register_failed_user_login($this->conn, (int)($user['user_id'] ?? 0), $lockThreshold);
+                if (!empty($securityState['locked'])) {
+                    $this->sendJSON([
+                        'error' => 'Your account has been locked after 5 failed login attempts. Please contact the administrator to reactivate it.',
+                        'account_locked' => true,
+                        'failed_login_attempts' => (int)($securityState['attempts'] ?? $lockThreshold),
+                        'warning' => false
+                    ], 423);
+                }
+
+                $attemptsLeft = max(0, $lockThreshold - (int)($securityState['attempts'] ?? 0));
+                $payload = [
+                    'error' => 'Invalid username or password',
+                    'failed_login_attempts' => (int)($securityState['attempts'] ?? 0),
+                    'attempts_remaining' => $attemptsLeft,
+                    'warning' => $attemptsLeft <= 3,
+                ];
+                if ($attemptsLeft <= 3) {
+                    $attemptsUsed = (int)($securityState['attempts'] ?? 0);
+                    $attemptsUsed = max(0, min($lockThreshold, $attemptsUsed));
+                    $attemptsRemainingLabel = $attemptsLeft === 1 ? '1 attempt' : "{$attemptsLeft} attempts";
+                    $payload['warning_message'] = "Warning: {$attemptsRemainingLabel} remaining before your account is locked. You have used {$attemptsUsed} of {$lockThreshold} attempts.";
+                }
+                $this->sendJSON($payload, 401);
             }
 
             $studentAccountMeta = $this->getStudentAccountMetaForUser($user);
@@ -1279,6 +1336,8 @@ class User
             if ($isDefaultPassword && strcasecmp($roleName, 'Admin') !== 0) {
                 $mustChangePassword = true;
             }
+
+            fas_reset_user_security_state($this->conn, (int)($user['user_id'] ?? 0));
 
             $sessionLogin = fas_login_user($this->conn, $user);
             if (empty($sessionLogin['success'])) {

@@ -985,6 +985,7 @@ class Admin
                         email_verification_code_expires_at = NULL,
                         email_verification_sent_at = NULL"
                         : "") . "
+                        " . (function_exists('fas_ensure_user_security_columns') ? ", failed_login_attempts = 0, account_locked_at = NULL, account_locked_reason = NULL, failed_login_last_at = NULL" : "") . "
                     WHERE email = ? AND status = 'Inactive'
                 ");
                 $stmtUser->execute([$student['email']]);
@@ -1006,6 +1007,7 @@ class Admin
                 $stmtGuardianUsers = $this->conn->prepare("
                     UPDATE tbl_users
                     SET status = 'Active'
+                        " . (function_exists('fas_ensure_user_security_columns') ? ", failed_login_attempts = 0, account_locked_at = NULL, account_locked_reason = NULL, failed_login_last_at = NULL" : "") . "
                     WHERE email IN ({$placeholders}) AND status = 'Inactive'
                 ");
                 $stmtGuardianUsers->execute($guardianEmails);
@@ -1095,6 +1097,7 @@ class Admin
                 $stmtUser = $this->conn->prepare("
                     UPDATE tbl_users
                     SET status = 'Active'
+                        " . (function_exists('fas_ensure_user_security_columns') ? ", failed_login_attempts = 0, account_locked_at = NULL, account_locked_reason = NULL, failed_login_last_at = NULL" : "") . "
                     WHERE email = ?
                 ");
                 $stmtUser->execute([$email]);
@@ -1469,10 +1472,17 @@ class Admin
     public function getUsers()
     {
         try {
+            if (function_exists('fas_ensure_user_security_columns')) {
+                fas_ensure_user_security_columns($this->conn);
+            }
             $hasUserBranch = $this->hasUserColumn('branch_id');
+            $hasSecurityColumns = $this->hasUserColumn('failed_login_attempts');
             $userBranchIdSql = $hasUserBranch ? "u.branch_id" : "NULL";
             $userBranchJoinSql = $hasUserBranch ? "LEFT JOIN tbl_branches bu ON u.branch_id = bu.branch_id" : "";
             $userBranchNameSql = $hasUserBranch ? "bu.branch_name," : "";
+            $securitySelect = $hasSecurityColumns
+                ? ", u.failed_login_attempts, u.account_locked_at, u.account_locked_reason, u.failed_login_last_at"
+                : ", 0 AS failed_login_attempts, NULL AS account_locked_at, NULL AS account_locked_reason, NULL AS failed_login_last_at";
 
             $sql = "
                 SELECT
@@ -1491,6 +1501,7 @@ class Admin
                         ELSE r.role_name
                     END AS role_name,
                     COALESCE({$userBranchNameSql} bt.branch_name, bs.branch_name, gb.branch_name, '') AS branch_name
+                    {$securitySelect}
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 LEFT JOIN tbl_teachers t ON t.user_id = u.user_id
@@ -1852,7 +1863,17 @@ class Admin
             $targetLabel = trim((string)(($targetUser['first_name'] ?? '') . ' ' . ($targetUser['last_name'] ?? '')));
             if ($targetLabel === '') $targetLabel = $targetUser['email'] ?? ($targetUser['username'] ?? "User #{$userId}");
 
-            $stmt = $this->conn->prepare("UPDATE tbl_users SET status = ? WHERE user_id = ?");
+            if ($normalized === 'Active' && function_exists('fas_reset_user_security_state')) {
+                fas_reset_user_security_state($this->conn, $userId);
+            }
+
+            $stmt = $this->conn->prepare("
+                UPDATE tbl_users
+                SET status = ?" . ($normalized === 'Active' && function_exists('fas_ensure_user_security_columns')
+                    ? ", failed_login_attempts = 0, account_locked_at = NULL, account_locked_reason = NULL, failed_login_last_at = NULL"
+                    : "") . "
+                WHERE user_id = ?
+            ");
             $stmt->execute([$normalized, $userId]);
 
             [$pById, $pByName, $pByRole, $pByEmail] = $this->getPerformer($data);

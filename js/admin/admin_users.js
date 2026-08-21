@@ -913,9 +913,13 @@
             }
 
             tbody.innerHTML = pageRows.map(user => {
+                const failedAttempts = Number(user.failed_login_attempts || 0);
+                const lockReason = String(user.account_locked_reason || '').trim();
+                const lockAt = String(user.account_locked_at || '').trim();
+                const isLockedAccount = (user.status || '').toLowerCase() !== 'active' && (failedAttempts >= 5 || lockReason !== '' || lockAt !== '');
                 const statusClass = (user.status || '').toLowerCase() === 'active'
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                    : 'bg-amber-50 text-amber-700 border-amber-100';
+                    : (isLockedAccount ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-amber-50 text-amber-700 border-amber-100');
                 const isActive = (user.status || '').toLowerCase() === 'active';
                 const toggleLabel = isActive ? 'Deactivate' : 'Activate';
                 const toggleClass = isActive ? 'text-amber-700 border-amber-200 hover:bg-amber-50' : 'text-emerald-700 border-emerald-200 hover:bg-emerald-50';
@@ -927,8 +931,11 @@
                 if (!branchName && ['staff', 'branch manager', 'manager'].includes(role.toLowerCase())) {
                     branch = 'Not assigned';
                 }
-                const statusLabel = user.status || 'Inactive';
+                const statusLabel = isLockedAccount ? 'Locked' : (user.status || 'Inactive');
                 const email = user.email || '';
+                const statusNote = isLockedAccount
+                    ? `Locked after ${failedAttempts || 5} failed login attempts.`
+                    : ((failedAttempts > 0 && !isActive) ? `${failedAttempts} failed login attempt${failedAttempts === 1 ? '' : 's'} recorded.` : '');
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
@@ -939,9 +946,12 @@
                         <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${escapeHtml(role)}">${escapeHtml(role)}</td>
                         <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${escapeHtml(branch)}">${escapeHtml(branch)}</td>
                         <td class="px-6 py-4 table-status-cell">
-                            <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold border ${statusClass}">
-                                ${escapeHtml(statusLabel)}
-                            </span>
+                            <div class="flex flex-col gap-1">
+                                <span class="inline-flex items-center self-start px-2 py-1 rounded-full text-[10px] font-semibold border ${statusClass}">
+                                    ${escapeHtml(statusLabel)}
+                                </span>
+                                ${statusNote ? `<span class="text-[11px] text-slate-500">${escapeHtml(statusNote)}</span>` : ''}
+                            </div>
                         </td>
                         <td class="px-6 py-4 table-actions-cell-wide">
                             <div class="table-button-group">
