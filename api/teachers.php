@@ -1058,7 +1058,7 @@ class TeachersApi
                 }
 
                 $requesterRole = $this->normalizeRoleName($requester['role_name'] ?? '');
-                if ($this->isManagerRole($requesterRole)) {
+                if ($this->isStaffSchedulerRole($requesterRole)) {
                     $requesterBranchId = (int)($requester['branch_id'] ?? 0);
                     $teacherBranchId = (int)($teacher['branch_id'] ?? 0);
                     if ($requesterBranchId > 0 && $teacherBranchId > 0 && $requesterBranchId !== $teacherBranchId) {
