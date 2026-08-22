@@ -472,6 +472,9 @@ async function loadStudentSongs() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    if (window.__fasAuthReady) {
+        await window.__fasAuthReady;
+    }
     if (typeof checkStudentAuth === 'function') {
         checkStudentAuth();
     }

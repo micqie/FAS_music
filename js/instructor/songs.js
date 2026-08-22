@@ -1110,6 +1110,9 @@ function attachSongEvents() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    if (window.__fasAuthReady) {
+        await window.__fasAuthReady;
+    }
     if (typeof checkInstructorAuth === 'function' && !checkInstructorAuth()) {
         return;
     }

@@ -445,6 +445,36 @@ function isProtectedPortalPage() {
     return /\/pages\//i.test(window.location.pathname);
 }
 
+function getProtectedPortalPolicy() {
+    const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
+    if (pathname.includes('/pages/admin/')) {
+        return { role: 'admin', label: 'Admin' };
+    }
+    if (pathname.includes('/pages/manager/')) {
+        return { role: 'branch', label: 'Manager' };
+    }
+    if (pathname.includes('/pages/desk/')) {
+        return { role: 'branch', label: 'Desk/Manager' };
+    }
+    if (pathname.includes('/pages/instructor/')) {
+        return { role: 'instructor', label: 'Instructor' };
+    }
+    if (pathname.includes('/pages/student/')) {
+        return { role: 'student', label: 'Student' };
+    }
+    if (pathname.includes('/pages/guardian/')) {
+        return { role: 'guardian', label: 'Guardian' };
+    }
+    return null;
+}
+
+function isRoleAllowedForPolicy(roleCategory, policyRole) {
+    if (policyRole === 'branch') {
+        return roleCategory === 'manager' || roleCategory === 'staff';
+    }
+    return roleCategory === policyRole;
+}
+
 // On protected pages:
 //  1. If localStorage already has the user (e.g. existing tab or after login) → validate with server.
 //  2. If localStorage is empty (e.g. freshly opened Tab 2) → ask the server; it will return the
@@ -454,29 +484,47 @@ async function ensureProtectedPageSession() {
         return;
     }
 
+    const policy = getProtectedPortalPolicy();
+    const root = document.body || document.documentElement;
+    if (root) {
+        root.style.visibility = 'hidden';
+    }
+
     const localUser = Auth.getUser();
+    let result = null;
 
     if (localUser) {
         // User found in localStorage — verify that the PHP session is still valid.
-        await Auth.validateServerSession();
+        result = await Auth.validateServerSession({ silent: true });
     } else {
         // No local user (new tab, incognito carry-over, etc.) — try to hydrate from
         // the PHP session.  The cookie is automatically sent by the browser.
-        const result = await Auth.validateServerSession({ silent: true });
-        if (!result.valid) {
-            // PHP session is also gone — redirect to login.
+        result = await Auth.validateServerSession({ silent: true });
+    }
+
+    const user = result?.user || Auth.getUser();
+    const roleCategory = getRoleCategory(user?.role_name);
+    const allowed = !policy || isRoleAllowedForPolicy(roleCategory, policy.role);
+
+    if (!result?.valid || !allowed) {
+        if (root) {
+            root.style.visibility = '';
+        }
+        if (policy && !allowed && result?.valid) {
+            Auth.handleSessionInvalidation(`You must be logged in as ${policy.label} to access this page.`);
+        } else {
+            // PHP session is also gone or invalid — redirect to login.
             Auth.redirectToLogin();
         }
-        // If valid, validateServerSession already called setUser() with the server user,
-        // so the page can continue normally.
+        return;
+    }
+
+    if (root) {
+        root.style.visibility = '';
     }
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ensureProtectedPageSession, { once: true });
-} else {
-    ensureProtectedPageSession();
-}
+window.__fasAuthReady = ensureProtectedPageSession();
 
 // ========== INDEX.HTML FUNCTIONS ==========
 
@@ -8619,9 +8667,11 @@ function initWalkinPage() {
                     }
                     if (!isWalkInAccount) {
                         const redirectTemplate = String(form.dataset.paymentRedirectTemplate || '').trim();
-                        const redirectUrl = redirectTemplate
-                            ? redirectTemplate.replace('{student_id}', encodeURIComponent(String(result.student_id)))
-                            : String(form.dataset.paymentRedirectUrl || '').trim();
+                        const redirectUrl = sanitizeInternalRedirectUrl(
+                            redirectTemplate
+                                ? redirectTemplate.replace('{student_id}', encodeURIComponent(String(result.student_id)))
+                                : String(form.dataset.paymentRedirectUrl || '').trim()
+                        );
                         openPaymentModal(result.student_id, { forceSource: 'walkin', redirectUrl });
                     }
                 });
@@ -9582,10 +9632,42 @@ function closeDetailsModal() {
     document.body.classList.remove('overflow-hidden');
 }
 
+function sanitizeInternalRedirectUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    try {
+        const resolved = new URL(raw, window.location.href);
+        if (resolved.origin !== window.location.origin) {
+            return '';
+        }
+
+        const appBasePath = (() => {
+            try {
+                const base = (typeof appBaseUrl === 'string' && appBaseUrl)
+                    ? appBaseUrl
+                    : `${window.location.origin}/FAS_music`;
+                return new URL(base, window.location.origin).pathname.replace(/\/+$/, '');
+            } catch (e) {
+                return '/FAS_music';
+            }
+        })();
+
+        const normalizedPath = resolved.pathname.replace(/\/+$/, '');
+        if (appBasePath && normalizedPath && !normalizedPath.startsWith(appBasePath)) {
+            return '';
+        }
+
+        return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+    } catch (e) {
+        return '';
+    }
+}
+
 // Open Payment Modal
 async function openPaymentModal(studentId, options = {}) {
     currentStudentId = studentId;
-    currentPaymentRedirectUrl = String(options.redirectUrl || '');
+    currentPaymentRedirectUrl = sanitizeInternalRedirectUrl(options.redirectUrl || '');
 
     try {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
@@ -10139,7 +10221,10 @@ function enforceAdminFixedPageSizes() {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    if (window.__fasAuthReady) {
+        await window.__fasAuthReady;
+    }
     // Check if we're on index.html or admin page
     const loginForm = document.getElementById('loginForm');
     const adminTable = document.getElementById('registrationsTable');

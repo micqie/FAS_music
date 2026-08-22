@@ -491,7 +491,10 @@ async function loadDashboardData() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    if (window.__fasAuthReady) {
+        await window.__fasAuthReady;
+    }
     if (typeof checkAuth === 'function') {
         checkAuth();
     }

@@ -1286,10 +1286,7 @@ class User
                     'warning' => $attemptsLeft <= 3,
                 ];
                 if ($attemptsLeft <= 3) {
-                    $attemptsUsed = (int)($securityState['attempts'] ?? 0);
-                    $attemptsUsed = max(0, min($lockThreshold, $attemptsUsed));
-                    $attemptsRemainingLabel = $attemptsLeft === 1 ? '1 attempt' : "{$attemptsLeft} attempts";
-                    $payload['warning_message'] = "Warning: {$attemptsRemainingLabel} remaining before your account is locked. You have used {$attemptsUsed} of {$lockThreshold} attempts.";
+                    $payload['warning_message'] = 'Warning: please double-check your credentials. Too many failed attempts will lock your account.';
                 }
                 $this->sendJSON($payload, 401);
             }

@@ -38,6 +38,10 @@ class TeachersApi
     public function __construct($pdo)
     {
         $this->conn = $pdo;
+    }
+
+    private function ensureTeacherSchema()
+    {
         ensure_specialization_instrument_link($this->conn);
         $this->ensureSessionRescheduleWorkflow();
         $this->ensureStudentProgressTable();
@@ -240,6 +244,18 @@ class TeachersApi
     private function isManagerRole($roleName)
     {
         return in_array($this->normalizeRoleName($roleName), ['manager', 'branch manager'], true);
+    }
+
+    private function isStaffSchedulerRole($roleName)
+    {
+        return in_array($this->normalizeRoleName($roleName), [
+            'admin',
+            'staff',
+            'desk',
+            'front desk',
+            'manager',
+            'branch manager'
+        ], true);
     }
 
     private function ensureStudentProgressTable()

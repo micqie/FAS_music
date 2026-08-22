@@ -30,6 +30,90 @@ if (!function_exists('fas_session_start')) {
     }
 }
 
+if (!function_exists('fas_browser_binding_cookie_name')) {
+    function fas_browser_binding_cookie_name(): string
+    {
+        return 'FASBROWSERID';
+    }
+}
+
+if (!function_exists('fas_generate_browser_binding_token')) {
+    function fas_generate_browser_binding_token(): string
+    {
+        return bin2hex(random_bytes(32));
+    }
+}
+
+if (!function_exists('fas_is_https_request')) {
+    function fas_is_https_request(): bool
+    {
+        return (
+            (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443
+        );
+    }
+}
+
+if (!function_exists('fas_set_browser_binding_cookie')) {
+    function fas_set_browser_binding_cookie(string $token): void
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return;
+        }
+
+        $isSecure = fas_is_https_request();
+        if (PHP_VERSION_ID >= 70300) {
+            setcookie(fas_browser_binding_cookie_name(), $token, [
+                'expires' => 0,
+                'path' => '/',
+                'domain' => '',
+                'secure' => $isSecure,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+        } else {
+            setcookie(fas_browser_binding_cookie_name(), $token, 0, '/; samesite=Lax', '', $isSecure, true);
+        }
+        $_COOKIE[fas_browser_binding_cookie_name()] = $token;
+    }
+}
+
+if (!function_exists('fas_clear_browser_binding_cookie')) {
+    function fas_clear_browser_binding_cookie(): void
+    {
+        $name = fas_browser_binding_cookie_name();
+        if (ini_get('session.use_cookies')) {
+            $isSecure = fas_is_https_request();
+            $params = session_get_cookie_params();
+            setcookie(
+                $name,
+                '',
+                time() - 42000,
+                $params['path'] ?? '/',
+                $params['domain'] ?? '',
+                $isSecure,
+                true
+            );
+        }
+        unset($_COOKIE[$name]);
+    }
+}
+
+if (!function_exists('fas_get_browser_binding_token')) {
+    function fas_get_browser_binding_token(): string
+    {
+        return trim((string)($_COOKIE[fas_browser_binding_cookie_name()] ?? ''));
+    }
+}
+
+if (!function_exists('fas_browser_binding_hash')) {
+    function fas_browser_binding_hash(string $token): string
+    {
+        return hash('sha256', trim($token));
+    }
+}
+
 if (!function_exists('fas_send_auth_json')) {
     function fas_send_auth_json(array $payload, int $statusCode = 401): void
     {
@@ -68,6 +152,12 @@ if (!function_exists('fas_ensure_session_columns')) {
             }
             if (!fas_has_user_column($conn, 'active_session_updated_at')) {
                 $conn->exec("ALTER TABLE tbl_users ADD COLUMN active_session_updated_at DATETIME NULL AFTER active_session_token");
+            }
+            if (!fas_has_user_column($conn, 'active_browser_token_hash')) {
+                $conn->exec("ALTER TABLE tbl_users ADD COLUMN active_browser_token_hash VARCHAR(255) NULL AFTER active_session_updated_at");
+            }
+            if (!fas_has_user_column($conn, 'active_browser_token_updated_at')) {
+                $conn->exec("ALTER TABLE tbl_users ADD COLUMN active_browser_token_updated_at DATETIME NULL AFTER active_browser_token_hash");
             }
         } catch (PDOException $e) {
             // Keep the API working even if schema changes fail.
@@ -240,6 +330,8 @@ if (!function_exists('fas_fetch_user_auth_record')) {
                 u.status,
                 u.active_session_token,
                 u.active_session_updated_at,
+                u.active_browser_token_hash,
+                u.active_browser_token_updated_at,
                 r.role_name{$branchSelect}
             FROM tbl_users u
             INNER JOIN tbl_roles r ON u.role_id = r.role_id
@@ -297,7 +389,9 @@ if (!function_exists('fas_release_user_session_if_matches')) {
             $stmt = $conn->prepare("
                 UPDATE tbl_users
                 SET active_session_token = NULL,
-                    active_session_updated_at = NULL
+                    active_session_updated_at = NULL,
+                    active_browser_token_hash = NULL,
+                    active_browser_token_updated_at = NULL
                 WHERE user_id = ?
                   AND active_session_token = ?
             ");
@@ -333,6 +427,12 @@ if (!function_exists('fas_login_user')) {
             ];
         }
 
+        $browserToken = fas_get_browser_binding_token();
+        if ($browserToken === '') {
+            $browserToken = fas_generate_browser_binding_token();
+            fas_set_browser_binding_cookie($browserToken);
+        }
+
         $currentContext = fas_get_session_context();
         if ($currentContext && (int)($currentContext['user_id'] ?? 0) !== $userId) {
             fas_release_user_session_if_matches(
@@ -354,11 +454,21 @@ if (!function_exists('fas_login_user')) {
 
         $currentToken = (string)($currentContext['session_token'] ?? '');
         $activeToken = trim((string)($dbUser['active_session_token'] ?? ''));
+        $activeBrowserHash = trim((string)($dbUser['active_browser_token_hash'] ?? ''));
+        $browserHash = fas_browser_binding_hash($browserToken);
         if ($activeToken !== '' && fas_is_session_timestamp_stale($dbUser['active_session_updated_at'] ?? null)) {
             fas_release_user_session_if_matches($conn, $userId, $activeToken);
             $activeToken = '';
+            $activeBrowserHash = '';
         }
-        if ($activeToken !== '' && ($currentToken === '' || !hash_equals($activeToken, $currentToken))) {
+        if (
+            $activeToken !== ''
+            && (
+                $currentToken === ''
+                || !hash_equals($activeToken, $currentToken)
+                || ($activeBrowserHash !== '' && !hash_equals($activeBrowserHash, $browserHash))
+            )
+        ) {
             return [
                 'success' => false,
                 'status' => 409,
@@ -374,10 +484,12 @@ if (!function_exists('fas_login_user')) {
         $update = $conn->prepare("
             UPDATE tbl_users
             SET active_session_token = ?,
-                active_session_updated_at = NOW()
+                active_session_updated_at = NOW(),
+                active_browser_token_hash = ?,
+                active_browser_token_updated_at = NOW()
             WHERE user_id = ?
         ");
-        $update->execute([$newToken, $userId]);
+        $update->execute([$newToken, $browserHash, $userId]);
 
         fas_store_authenticated_user_session($dbUser, $newToken);
 
@@ -392,6 +504,7 @@ if (!function_exists('fas_login_user')) {
 if (!function_exists('fas_resolve_authenticated_user')) {
     function fas_resolve_authenticated_user(PDO $conn): array
     {
+        fas_ensure_session_columns($conn);
         $context = fas_get_session_context();
         if (!$context) {
             return [
@@ -427,7 +540,14 @@ if (!function_exists('fas_resolve_authenticated_user')) {
         }
 
         $activeToken = trim((string)($dbUser['active_session_token'] ?? ''));
-        if ($activeToken === '' || !hash_equals($activeToken, $sessionToken)) {
+        $activeBrowserHash = trim((string)($dbUser['active_browser_token_hash'] ?? ''));
+        $browserToken = fas_get_browser_binding_token();
+        $browserHash = $browserToken !== '' ? fas_browser_binding_hash($browserToken) : '';
+        if (
+            $activeToken === ''
+            || !hash_equals($activeToken, $sessionToken)
+            || ($activeBrowserHash !== '' && ($browserHash === '' || !hash_equals($activeBrowserHash, $browserHash)))
+        ) {
             return [
                 'ok' => false,
                 'status' => 401,
@@ -513,6 +633,7 @@ if (!function_exists('fas_logout_current_user')) {
             );
         }
 
+        fas_clear_browser_binding_cookie();
         $_SESSION = [];
 
         if (ini_get('session.use_cookies')) {

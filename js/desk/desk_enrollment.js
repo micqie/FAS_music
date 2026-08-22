@@ -1579,97 +1579,108 @@
                 assignRequestAvailabilitySelectedDate = selectedDate;
             }
 
-            const bookedGrouped = {};
-            (Array.isArray(assignRequestBookedSessions) ? assignRequestBookedSessions : []).forEach((session) => {
-                const dateKey = String(session.session_date || '').trim();
-                if (!dateKey) return;
-                if (!bookedGrouped[dateKey]) bookedGrouped[dateKey] = [];
-                bookedGrouped[dateKey].push(session);
+            const groupedByDay = {};
+            assignRequestAvailabilitySlots.forEach((row) => {
+                const dayKey = String(row.day_of_week || '').trim();
+                if (!dayKey) return;
+                if (!groupedByDay[dayKey]) groupedByDay[dayKey] = [];
+                groupedByDay[dayKey].push(row);
             });
 
-            const hasAnyBookedSessions = Object.keys(bookedGrouped).length > 0;
-            if ((!Array.isArray(slots) || !slots.length) && !hasAnyBookedSessions) {
+            const hasAvailability = Object.keys(groupedByDay).length > 0;
+            if (!hasAvailability) {
                 assignRequestAvailabilityMonth = '';
                 assignRequestAvailabilitySelectedDate = '';
-                hintEl.textContent = 'No conflict-free recurring one-hour slots were found for the selected instructor and date range.';
-                listEl.innerHTML = '<div class="text-sm text-slate-500">No available slots found.</div>';
+                hintEl.textContent = 'No instructor availability was found for this teacher.';
+                listEl.innerHTML = '<div class="text-sm text-slate-500">No availability found.</div>';
                 if (slotSelect) {
-                    slotSelect.innerHTML = '<option value="">No available slots found</option>';
+                    slotSelect.innerHTML = '<option value="">No availability found</option>';
                     slotSelect.disabled = true;
                 }
                 if (slotHint) {
-                    slotHint.textContent = 'The selected instructor has no valid one-hour slots for this date range.';
+                    slotHint.textContent = 'This instructor does not have any saved availability yet.';
                 }
                 return;
             }
 
-            const grouped = {};
-            slots.forEach((slot) => {
-                const dateKey = String(slot.session_date || '').trim();
-                if (!dateKey) return;
-                if (!grouped[dateKey]) grouped[dateKey] = [];
-                grouped[dateKey].push(slot);
-            });
-
-            const availableDates = Object.keys(grouped).sort();
-            const bookedDates = Object.keys(bookedGrouped).sort();
-            const resolvedSelectedDate = grouped[assignRequestAvailabilitySelectedDate]
-                ? assignRequestAvailabilitySelectedDate
-                : (availableDates.includes(selectedDate) ? selectedDate : availableDates[0] || bookedDates[0] || selectedDate);
-            assignRequestAvailabilitySelectedDate = resolvedSelectedDate;
-
-            const monthSource = assignRequestAvailabilityMonth || resolvedSelectedDate || availableDates[0] || bookedDates[0];
-            const monthParts = String(monthSource).slice(0, 7).split('-');
-            const monthDate = new Date(Number(monthParts[0]), Number(monthParts[1]) - 1, 1);
+            const initialDate = selectedDate || assignRequestAvailabilitySelectedDate || new Date().toISOString().slice(0, 10);
+            const dateParts = String(initialDate).slice(0, 10).split('-');
+            const monthDate = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, 1);
             if (Number.isNaN(monthDate.getTime())) {
-                listEl.innerHTML = '<div class="text-sm text-slate-500">No sessions found.</div>';
+                listEl.innerHTML = '<div class="text-sm text-slate-500">No availability found.</div>';
                 return;
             }
+
             const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
             assignRequestAvailabilityMonth = monthKey;
+            assignRequestAvailabilitySelectedDate = initialDate;
+            hintEl.textContent = 'Pick a highlighted day, then choose one of the available one-hour windows.';
 
-            hintEl.textContent = 'Pick a highlighted date, then choose a recurring one-hour slot to fill the weekly assignment.';
-
-            const firstWeekday = monthDate.getDay();
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const weekdayIndex = monthDate.getDay();
             const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
             const cells = [];
-            for (let i = 0; i < firstWeekday; i += 1) {
+            for (let i = 0; i < weekdayIndex; i += 1) {
                 cells.push('<div class="h-16 rounded-sm border border-transparent bg-transparent"></div>');
             }
             for (let day = 1; day <= daysInMonth; day += 1) {
                 const dateKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const daySlots = grouped[dateKey] || [];
-                const dayBooked = bookedGrouped[dateKey] || [];
-                const isSelected = dateKey === resolvedSelectedDate;
-                const hasSlots = daySlots.length > 0;
-                const hasBooked = dayBooked.length > 0;
-                const baseClass = hasSlots
+                const weekdayName = dayNames[(new Date(monthDate.getFullYear(), monthDate.getMonth(), day)).getDay()];
+                const dayRows = groupedByDay[weekdayName] || [];
+                const isSelected = dateKey === assignRequestAvailabilitySelectedDate;
+                const hasAvailabilityForDay = dayRows.length > 0;
+                const baseClass = hasAvailabilityForDay
                     ? (isSelected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-200 bg-white hover:border-emerald-300 hover:bg-emerald-50')
-                    : (hasBooked
-                        ? (isSelected ? 'border-amber-400 bg-amber-50 shadow-sm' : 'border-amber-200 bg-white hover:border-amber-300 hover:bg-amber-50')
-                        : 'border-slate-200 bg-slate-50 text-slate-300');
+                    : 'border-slate-200 bg-slate-50 text-slate-300';
                 cells.push(`
                     <button
                         type="button"
-                        ${hasSlots || hasBooked ? `onclick="selectAssignRequestAvailabilityDate('${dateKey}')"` : 'disabled'}
-                        class="h-16 rounded-sm border p-1.5 text-left text-xs transition ${baseClass} ${(hasSlots || hasBooked) ? '' : 'cursor-not-allowed'}"
+                        ${hasAvailabilityForDay ? `onclick="selectAssignRequestAvailabilityDate('${dateKey}')"` : 'disabled'}
+                        class="h-16 rounded-sm border p-1.5 text-left text-xs transition ${baseClass} ${hasAvailabilityForDay ? '' : 'cursor-not-allowed'}"
                     >
                         <div class="flex items-start justify-between gap-2">
-                            <span class="text-sm font-semibold ${hasSlots || hasBooked ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
+                            <span class="text-sm font-semibold ${hasAvailabilityForDay ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
                             <div class="flex flex-col items-end gap-1">
-                                ${hasSlots ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${daySlots.length} slot${daySlots.length > 1 ? 's' : ''}</span>` : ''}
-                                ${hasBooked ? `<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">${dayBooked.length} booked</span>` : ''}
+                                ${hasAvailabilityForDay ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${dayRows.length} avail</span>` : ''}
                             </div>
                         </div>
-                        <div class="mt-2 text-[11px] ${hasSlots || hasBooked ? 'text-slate-500' : 'text-slate-400'}">${hasSlots ? `${escapeHtml(daySlots[0].day_of_week || '')} recurring` : (hasBooked ? 'Already enrolled' : 'Unavailable')}</div>
+                        <div class="mt-2 text-[11px] ${hasAvailabilityForDay ? 'text-slate-500' : 'text-slate-400'}">${hasAvailabilityForDay ? `${escapeHtml(dayRows[0].day_of_week || '')} schedule` : 'Unavailable'}</div>
                     </button>
                 `);
             }
 
-            const selectedSlots = grouped[resolvedSelectedDate] || [];
-            const selectedBookedSessions = bookedGrouped[resolvedSelectedDate] || [];
-            const lockedDays = getLockedAssignRequestDays();
+            const selectedWeekday = dayNames[(new Date(initialDate).getDay())] || '';
+            const selectedRows = groupedByDay[selectedWeekday] || [];
+            const selectedSlots = [];
+            const minutesToTime = (minutes) => {
+                const safe = Math.max(0, Math.min(24 * 60, Number(minutes) || 0));
+                const hours = Math.floor(safe / 60);
+                const mins = safe % 60;
+                return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
+            };
+            selectedRows.forEach((row) => {
+                const start = getTimeMinutes(row.start_time);
+                const end = getTimeMinutes(row.end_time);
+                if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
+                let cursor = start;
+                while ((cursor + 60) <= end) {
+                    const slotStart = minutesToTime(cursor);
+                    const slotEnd = minutesToTime(cursor + 60);
+                    selectedSlots.push({
+                        session_date: initialDate,
+                        day_of_week: selectedWeekday,
+                        start_time: slotStart,
+                        end_time: slotEnd
+                    });
+                    cursor += 60;
+                }
+            });
+            const dedupedSelectedSlots = selectedSlots.filter((slot, index, array) => {
+                return array.findIndex(item => item.session_date === slot.session_date && item.day_of_week === slot.day_of_week && item.start_time === slot.start_time && item.end_time === slot.end_time) === index;
+            });
+            dedupedSelectedSlots.sort((a, b) => String(a.start_time || '').localeCompare(String(b.start_time || '')));
             const activeSlot = getActiveAssignRequestSlotData();
+            const lockedDays = getLockedAssignRequestDays();
             listEl.innerHTML = `
                 <div class="space-y-4">
                     <div class="flex items-center justify-between gap-3">
@@ -1690,27 +1701,12 @@
                     <div class="border border-slate-200 rounded-sm bg-white p-2">
                         <div class="flex items-center justify-between gap-3">
                             <div>
-                                <div class="text-sm font-semibold text-slate-900">${escapeHtml(formatDateLong(resolvedSelectedDate) || resolvedSelectedDate)}</div>
-                                <div class="text-xs text-slate-500 mt-1">${selectedSlots.length ? `${selectedSlots.length} recurring slot${selectedSlots.length > 1 ? 's' : ''}` : 'No available slots on this date.'}</div>
+                                <div class="text-sm font-semibold text-slate-900">${escapeHtml(formatDateLong(initialDate) || initialDate)}</div>
+                                <div class="text-xs text-slate-500 mt-1">${dedupedSelectedSlots.length ? `${dedupedSelectedSlots.length} available slot${dedupedSelectedSlots.length > 1 ? 's' : ''}` : 'No available slots on this date.'}</div>
                             </div>
                         </div>
-                        ${selectedBookedSessions.length ? `
-                            <div class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2">
-                                <div class="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-700">Already Enrolled</div>
-                                <div class="mt-2 space-y-2">
-                                    ${selectedBookedSessions.map(session => `
-                                        <div class="rounded-xl border border-amber-100 bg-white px-3 py-2">
-                                            <div class="text-sm font-semibold text-slate-900">${escapeHtml(formatAssignRequestSessionLabel(session))}</div>
-                                            <div class="mt-1 text-xs text-slate-500">
-                                                ${escapeHtml(session.package_name || '')}${session.teacher_name ? ` • ${escapeHtml(session.teacher_name)}` : ''}
-                                            </div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        ` : ''}
                         <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            ${selectedSlots.map(slot => {
+                            ${dedupedSelectedSlots.map(slot => {
                                 const slotDay = String(slot.day_of_week || '');
                                 const slotStart = String(slot.start_time || '').slice(0, 5);
                                 const slotEnd = String(slot.end_time || '').slice(0, 5);
@@ -1739,25 +1735,25 @@
                 const currentValue = String(slotSelect.value || '');
                 const activeValue = activeSlot
                     ? buildAssignRequestSlotValue({
-                        session_date: resolvedSelectedDate,
+                        session_date: initialDate,
                         day_of_week: activeSlot.day_of_week,
                         start_time: activeSlot.start_time,
                         end_time: activeSlot.end_time
                     })
                     : '';
-                slotSelect.disabled = !selectedSlots.length;
-                slotSelect.innerHTML = selectedSlots.length
-                    ? '<option value="">Select a slot for the selected day...</option>' + selectedSlots.map(slot => {
+                slotSelect.disabled = !dedupedSelectedSlots.length;
+                slotSelect.innerHTML = dedupedSelectedSlots.length
+                    ? '<option value="">Select a slot for the selected day...</option>' + dedupedSelectedSlots.map(slot => {
                         const value = buildAssignRequestSlotValue(slot);
                         const label = `${formatDateLong(slot.session_date) || slot.session_date} • ${slot.day_of_week || 'Day'} • ${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`;
                         return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
                     }).join('')
                     : '<option value="">No available slots on this date</option>';
-                slotSelect.value = activeValue && selectedSlots.some(slot => buildAssignRequestSlotValue(slot) === activeValue)
+                slotSelect.value = activeValue && dedupedSelectedSlots.some(slot => buildAssignRequestSlotValue(slot) === activeValue)
                     ? activeValue
-                    : (selectedSlots.some(slot => buildAssignRequestSlotValue(slot) === currentValue) ? currentValue : '');
+                    : (dedupedSelectedSlots.some(slot => buildAssignRequestSlotValue(slot) === currentValue) ? currentValue : '');
                 if (slotHint) {
-                    slotHint.textContent = selectedSlots.length
+                    slotHint.textContent = dedupedSelectedSlots.length
                         ? 'Pick a date, then choose one valid one-hour slot from the dropdown to populate the active weekly slot row.'
                         : 'No valid slots are available on the selected date.';
                 }
@@ -1797,8 +1793,7 @@
                 Number(teacherId || 0),
                 Number(activeAssignRequest?.branch_id || managerBranchId || 0),
                 Number(activeAssignRequest?.student_id || 0),
-                String(startDate || ''),
-                '180'
+                'teacher-availability'
             ].join('|');
         }
 
@@ -1809,13 +1804,13 @@
             assignRequestAvailabilityLoadTimer = setTimeout(() => {
                 assignRequestAvailabilityLoadTimer = null;
                 loadAssignRequestAvailability();
-            }, 180);
+            }, 50);
         }
 
         async function loadAssignRequestAvailability() {
             const listEl = document.getElementById('assignRequestAvailabilityList');
             const slotSelect = document.getElementById('assignRequestAvailableSlotSelect');
-            const startDate = document.getElementById('assignRequestDate')?.value || '';
+            const selectedDate = document.getElementById('assignRequestDate')?.value || assignRequestAvailabilitySelectedDate || '';
             const activeRow = getAssignableAssignRequestSlotRow();
             const activeSlotData = getAssignRequestRowData(activeRow);
             const teacherId = Number(activeSlotData?.teacher_id || 0);
@@ -1824,10 +1819,19 @@
 
             if (!activeAssignRequest || !teacherId) {
                 assignRequestAvailabilitySlots = [];
-                assignRequestBookedSessions = [];
                 assignRequestAvailabilityMonth = '';
                 assignRequestAvailabilitySelectedDate = '';
-                listEl.innerHTML = '<div class="text-xs text-slate-400 text-center py-12">No instructor selected.</div>';
+                listEl.innerHTML = `
+                    <div class="flex items-center justify-center h-64">
+                        <div class="text-center">
+                            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 text-slate-400 mb-3">
+                                <i class="fas fa-user-tie text-2xl"></i>
+                            </div>
+                            <p class="text-sm font-medium text-slate-600">No teacher selected</p>
+                            <p class="text-xs text-slate-500 mt-1">Select a teacher from the slot to view their schedule</p>
+                        </div>
+                    </div>
+                `;
                 if (slotSelect) {
                     slotSelect.innerHTML = '<option value="">Choose a date first</option>';
                     slotSelect.disabled = true;
@@ -1835,33 +1839,64 @@
                 return;
             }
 
-            const cacheKey = getAssignRequestAvailabilityCacheKey(teacherId, startDate);
+            const cacheKey = getAssignRequestAvailabilityCacheKey(teacherId, selectedDate);
             const cachedSlots = assignRequestAvailabilityCache.get(cacheKey);
             if (cachedSlots) {
-                assignRequestAvailabilitySlots = Array.isArray(cachedSlots.slots) ? cachedSlots.slots : [];
-                assignRequestBookedSessions = Array.isArray(cachedSlots.booked_sessions) ? cachedSlots.booked_sessions : [];
-                renderAssignRequestAvailability(assignRequestAvailabilitySlots, startDate);
+                assignRequestAvailabilitySlots = Array.isArray(cachedSlots.availability_rows) ? cachedSlots.availability_rows : [];
+                renderAssignRequestAvailability(assignRequestAvailabilitySlots, selectedDate);
                 return;
             }
 
-            listEl.innerHTML = '<div class="flex items-center justify-center h-64"><div class="text-center"><div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600 mb-3 animate-pulse"><i class="fas fa-spinner fa-spin text-xl"></i></div><p class="text-sm text-slate-600 font-medium">Loading available time slots...</p><p class="text-xs text-slate-500 mt-1">' + (activeRowTeacherLabel || 'Please wait') + '</p></div></div>';
+            listEl.innerHTML = `
+                <div class="flex items-center justify-center h-64">
+                    <div class="text-center">
+                        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-50 text-blue-600 mb-2">
+                            <i class="fas fa-spinner fa-spin text-xl"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700">Loading schedule...</p>
+                        <p class="text-xs text-slate-500 mt-1">${escapeHtml(activeRowTeacherLabel || 'Please wait')}</p>
+                    </div>
+                </div>
+            `;
 
             const requestToken = ++assignRequestAvailabilityRequestToken;
             try {
-                let url = `${baseApiUrl}/students.php?action=get-teacher-available-slots&teacher_id=${encodeURIComponent(teacherId)}&branch_id=${encodeURIComponent(activeAssignRequest.branch_id || managerBranchId || 0)}&student_id=${encodeURIComponent(activeAssignRequest.student_id || 0)}&days_ahead=60`;
-                if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
-                const response = await axios.get(url);
+                const authUserId = (typeof Auth !== 'undefined' && Auth.getUser) ? Number(Auth.getUser()?.user_id || 0) : 0;
+                const params = new URLSearchParams({
+                    action: 'get-teacher-availability',
+                    teacher_id: teacherId
+                });
+                if (authUserId > 0) params.append('user_id', authUserId);
+                
+                const response = await axios.get(`${baseApiUrl}/teachers.php?${params.toString()}`, {
+                    timeout: 8000
+                });
                 if (requestToken !== assignRequestAvailabilityRequestToken) return;
                 const data = response.data || {};
-                const slots = Array.isArray(data.slots) ? data.slots : [];
-                const bookedSessions = Array.isArray(data.booked_sessions) ? data.booked_sessions : [];
-                assignRequestAvailabilitySlots = slots;
-                assignRequestBookedSessions = bookedSessions;
-                assignRequestAvailabilityCache.set(cacheKey, { slots, booked_sessions: bookedSessions });
-                renderAssignRequestAvailability(slots, startDate);
+                const availabilityRows = data.success && Array.isArray(data.availability) ? data.availability : [];
+                assignRequestAvailabilitySlots = availabilityRows;
+                assignRequestAvailabilityCache.set(cacheKey, { availability_rows: availabilityRows });
+                renderAssignRequestAvailability(availabilityRows, selectedDate);
             } catch (error) {
                 if (requestToken !== assignRequestAvailabilityRequestToken) return;
-                listEl.innerHTML = '<div class="flex items-center justify-center h-64"><div class="text-center"><div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 text-red-600 mb-3"><i class="fas fa-exclamation-circle text-xl"></i></div><p class="text-sm text-red-600 font-medium">Unable to load schedule</p><p class="text-xs text-slate-500 mt-1">Please try again or contact support</p></div></div>';
+                
+                console.error('Failed to load availability:', error);
+                
+                listEl.innerHTML = `
+                    <div class="flex items-center justify-center h-64">
+                        <div class="text-center">
+                            <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-50 text-red-600 mb-2">
+                                <i class="fas fa-exclamation-triangle text-xl"></i>
+                            </div>
+                            <p class="text-sm font-semibold text-red-600">Unable to load schedule</p>
+                            <p class="text-xs text-slate-500 mt-1">Check connection and try again</p>
+                            <button onclick="loadAssignRequestAvailability()" class="mt-3 px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition">
+                                Retry
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
                 if (slotSelect) {
                     slotSelect.innerHTML = '<option value="">Failed to load slots</option>';
                     slotSelect.disabled = true;
@@ -1910,7 +1945,6 @@
 
             assignRequestTeacherCandidates = Array.isArray(req.teacher_candidates) ? req.teacher_candidates : [];
             assignRequestInstruments = Array.isArray(req.instruments) ? req.instruments.slice() : [];
-            assignRequestAvailabilityCache.clear();
             assignRequestAvailabilityRequestToken += 1;
             if (assignRequestAvailabilityLoadTimer) {
                 clearTimeout(assignRequestAvailabilityLoadTimer);
@@ -1919,7 +1953,7 @@
 
             const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
             dateEl.min = todayYmd;
-            dateEl.value = '';
+            dateEl.value = todayYmd;
             slotsContainer.innerHTML = '';
             activeAssignRequestSlotRow = null;
             const initialSlotCount = Math.max(1, assignRequestInstruments.length || 0);
@@ -1949,7 +1983,7 @@
             modal.classList.remove('hidden');
             modal.classList.add('flex');
             console.log('Modal classes after open:', modal.className);
-            void loadAssignRequestAvailability();
+            queueLoadAssignRequestAvailability();
         }
 
         // Expose globally
@@ -1964,7 +1998,6 @@
             assignRequestBookedSessions = [];
             assignRequestAvailabilityMonth = '';
             assignRequestAvailabilitySelectedDate = '';
-            assignRequestAvailabilityCache.clear();
             modal.classList.add('hidden');
             modal.classList.remove('flex');
         }
@@ -2545,5 +2578,6 @@
         });
 
         window.applyAssignRequestAvailabilitySlot = applyAssignRequestAvailabilitySlot;
+        window.loadAssignRequestAvailability = loadAssignRequestAvailability;
         window.selectAssignRequestAvailabilityDate = selectAssignRequestAvailabilityDate;
         window.setAssignRequestAvailabilityMonth = setAssignRequestAvailabilityMonth;
