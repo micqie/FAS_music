@@ -39,7 +39,7 @@
         .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
     </style>
     <script src="manager_shared.js" defer></script>
-    <link rel="stylesheet" href="../../css/table-responsive.css">`n</head>
+    <link rel="stylesheet" href="../../css/table-responsive.css"></head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
 
     <nav class="fixed w-full z-50 dark-glass border-b border-white/10 pl-20 pr-10 py-4 flex justify-between items-center shadow-2xl">
@@ -135,7 +135,7 @@
 
 
 
-  
+
 
         <!-- Pending Student Requests -->
         <div id="pendingSessionsSection" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden mb-6">
@@ -1254,7 +1254,7 @@
             // Validate that no two instrument slots share the same type
             const typeSelects = Array.from(document.querySelectorAll('#walkinInstrumentsContainer .student-request-instrument-type'));
             const selectedTypeIds = typeSelects.map(el => String(el.value || '').trim()).filter(Boolean);
-            
+
             // Only check for duplicate types if there are multiple types selected
             if (selectedTypeIds.length > 1 && selectedTypeIds.length !== new Set(selectedTypeIds).size) {
                 showToast('Each instrument slot must have a different instrument type. Please change the duplicate type selection.', 'error');
@@ -2380,4 +2380,3 @@
     <script src="../../js/session_timeout.js"></script>
 </body>
 </html>
-
