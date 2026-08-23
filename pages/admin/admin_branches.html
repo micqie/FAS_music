@@ -205,12 +205,12 @@
 
     <!-- Add/Edit Branch Modal -->
     <div id="branchModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+        <div class="bg-white border border-gold-400/30 rounded-xl shadow-2xl w-full max-w-2xl p-6 sm:p-8 relative">
             <button id="closeBranchModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2" id="branchModalTitle">Add Branch</h3>
+            <h3 class="text-2xl font-bold text-zinc-900 mb-2" id="branchModalTitle">Add Branch</h3>
             <p class="text-zinc-400 text-xs mb-4">Add a new academy branch location.</p>
 
             <div id="branchMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
@@ -218,27 +218,27 @@
             <form id="branchForm" class="space-y-4">
                 <input type="hidden" id="branchId" value="">
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Branch Name *</label>
+                    <label class="block text-sm font-medium text-zinc-400 mb-1">Branch Name *</label>
                     <input type="text" id="branchName" required
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        class="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg text-white focus:outline-none focus:border-gold-400"
                         placeholder="Branch name">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Address</label>
+                    <label class="block text-sm font-medium text-zinc-400 mb-1">Address</label>
                     <textarea id="branchAddress" rows="2"
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        class="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg text-white focus:outline-none focus:border-gold-400"
                         placeholder="Street address, city, province"></textarea>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Phone</label>
+                    <label class="block text-sm font-medium text-zinc-400 mb-1">Phone</label>
                     <input type="text" id="branchPhone"
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        class="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg text-white focus:outline-none focus:border-gold-400"
                         placeholder="02 xxxx xxxx">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Email</label>
+                    <label class="block text-sm font-medium text-zinc-400 mb-1">Email</label>
                     <input type="email" id="branchEmail"
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        class="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg text-white focus:outline-none focus:border-gold-400"
                         placeholder="branch@academy.com">
                 </div>
                 <div class="flex items-center justify-end gap-3 pt-4">
@@ -247,7 +247,7 @@
                         Cancel
                     </button>
                     <button type="submit" id="submitBranchBtn"
-                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                        class="inline-flex items-center px-6 py-2 bg-amber-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
                         <span id="submitBranchBtnText">Save Branch</span>
                     </button>
                 </div>

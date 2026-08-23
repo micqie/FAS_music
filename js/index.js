@@ -5502,7 +5502,7 @@ function initStudentRequestSection(student, requestMeta) {
     const latest = requestMeta?.latest_request || null;
     const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
     const packageScope = String(requestMeta?.package_scope || '').toLowerCase();
-    
+
     // Filter packages - only show 12 Session Package for all students
     // The 20 and 50 session packages were promotional and are no longer offered
     // Students can only select 12 sessions initially
@@ -9331,11 +9331,11 @@ function renderRegistrationsTable() {
             : 'bg-sky-100 text-sky-700';
         const sourceLabel = registrationSource === 'walkin' ? 'Walk-In' : 'Online';
         const studentLoginId = getRegistrationStudentLoginId(reg);
-        
+
         // Create button-style proof links
         const registrationProofLink = reg.registration_proof_path
-            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener" 
-                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 
+            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener"
+                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700
                          hover:bg-blue-100 border border-blue-200 text-[10px] font-semibold transition-colors mt-1">
                   <i class="fas fa-receipt"></i>
                   <span>Payment proof</span>
@@ -9343,10 +9343,10 @@ function renderRegistrationsTable() {
             : (registrationSource === 'walkin'
                 ? '<div class="text-[10px] text-slate-400 mt-1 italic">Walk-in payment handled at branch</div>'
                 : '<div class="text-[10px] text-slate-400 mt-1 italic">No proof uploaded</div>');
-                
+
         const ageProofLink = reg.age_verification_proof_path
-            ? `<a href="${buildPublicFileUrl(reg.age_verification_proof_path)}" target="_blank" rel="noopener" 
-                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 
+            ? `<a href="${buildPublicFileUrl(reg.age_verification_proof_path)}" target="_blank" rel="noopener"
+                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700
                          hover:bg-emerald-100 border border-emerald-200 text-[10px] font-semibold transition-colors mt-1">
                   <i class="fas fa-id-card"></i>
                   <span>Proof ID</span>
@@ -9359,7 +9359,7 @@ function renderRegistrationsTable() {
             <tr class="hover:bg-gold-500/5 transition">
                 <td class="px-6 py-4 table-name-cell">
                     <div class="font-medium text-slate-900 wrap-text" style="color:#0f172a;" title="${escapeHtml(reg.first_name + ' ' + reg.last_name)}">${escapeHtml(reg.first_name || '')} ${escapeHtml(reg.last_name || '')}</div>
-                    <div class="text-sm text-slate-500 truncate-text" style="color:#64748b;" title="Student ID: ${escapeHtml(studentLoginId || 'Not assigned')}">Student ID: ${escapeHtml(studentLoginId || 'Not assigned')}</div>
+                    <div class="text-sm text-slate-500 truncate-text" style="color:#64748b;" title="Student ID: ${escapeHtml(studentLoginId || 'Not assigned')}"> ${escapeHtml(studentLoginId || 'Not assigned')}</div>
                     <div class="mt-2"><span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold ${sourceBadgeClass}">${sourceLabel}</span></div>
                 </td>
                 <td class="px-6 py-4 table-text-cell">

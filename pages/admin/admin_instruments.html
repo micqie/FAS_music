@@ -154,7 +154,7 @@
                 </div>
                 <div class="flex gap-3">
                     <button id="openAddTypeModalBtn"
-                        class="inline-flex items-center px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold rounded-xl shadow transition">
+                        class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/25 transition-all duration-200">
                         <i class="fas fa-plus mr-2"></i>
                         Add Type
                     </button>
@@ -250,75 +250,92 @@
     </main>
 
     <!-- Add Instrument Type Modal -->
-    <div id="addTypeModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-white border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
-            <button id="closeAddTypeModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
-                <i class="fas fa-times text-xl"></i>
-            </button>
+    <div id="addTypeModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-md">
+    <div class="bg-white border border-gold-400/30 rounded-xl shadow-2xl w-full max-w-2xl p-6 sm:p-8 relative">
 
-            <h3 class="text-2xl font-bold text-black mb-2">Add Instrument Type</h3>
-            <p class="text-zinc-400 text-xs mb-4">Create a new instrument type category</p>
+        <!-- Close Button -->
+        <button id="closeAddTypeModalBtn" type="button" aria-label="Close modal" class="absolute top-5 right-5 text-zinc-400 hover:text-zinc-700 transition-colors p-1 rounded-md hover:bg-zinc-100">
+            <i class="fas fa-times text-lg"></i>
+        </button>
 
-            <div id="typeMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
-
-            <form id="addTypeForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Type Name *</label>
-                    <input type="text" id="typeName" required
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
-                        placeholder="Instrument name">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
-                    <textarea id="typeDescription" rows="3"
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
-                        placeholder="Optional description"></textarea>
-                </div>
-                <div class="flex items-center justify-end gap-3 pt-4">
-                    <button type="button" id="cancelAddTypeBtn"
-                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
-                        Cancel
-                    </button>
-                    <button type="submit" id="submitTypeBtn"
-                        class="inline-flex items-center px-6 py-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold rounded-lg shadow transition">
-                        <span id="submitTypeBtnText">Add Type</span>
-                    </button>
-                </div>
-            </form>
+        <!-- Header -->
+        <div class="mb-6">
+            <h3 class="text-2xl font-bold text-zinc-900 tracking-tight">Add Instrument Type</h3>
+            <p class="text-zinc-500 text-sm mt-1">Create a new instrument type category.</p>
         </div>
+
+        <!-- Alert Message Container -->
+        <div id="typeMessage" class="hidden mb-5 p-3 rounded-lg text-sm border"></div>
+
+        <!-- Form -->
+        <form id="addTypeForm" class="space-y-5">
+
+            <!-- Type Name Field -->
+            <div>
+                <label for="typeName" class="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-2">
+                    Type Name <span class="text-gold-500">*</span>
+                </label>
+                <input type="text" id="typeName" required
+                    class="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm placeholder-zinc-400 rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all"
+                    placeholder="e.g., Brass, Woodwind, Percussion">
+            </div>
+
+            <!-- Description Field -->
+            <div>
+                <label for="typeDescription" class="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-2">
+                    Description
+                </label>
+                <textarea id="typeDescription" rows="3"
+                    class="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm placeholder-zinc-400 rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all resize-none"
+                    placeholder="Optional details about this category..."></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-zinc-100 mt-6">
+                <button type="button" id="cancelAddTypeBtn"
+                    class="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-300">
+                    Cancel
+                </button>
+                <button type="submit" id="submitTypeBtn"
+                    class="inline-flex items-center justify-center px-6 py-2.5 bg-amber-500 hover:bg-gold-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all focus:outline-none focus:ring-2 focus:ring-gold-500/50">
+                    <span id="submitTypeBtnText">Add Type</span>
+                </button>
+            </div>
+        </form>
     </div>
+</div>
 
     <!-- Edit Instrument Modal -->
     <div id="editInstrumentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-whitw backdrop-blur-sm">
-        <div class="bg-white border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
+        <div class="bg-white border border-gold-400/30 rounded-xl shadow-2xl w-full max-w-2xl p-6 sm:p-8 relative">
             <button id="closeEditInstrumentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2">Edit Instrument</h3>
+            <h3 class="text-2xl font-bold text-zinc-900 mb-2">Edit Instrument</h3>
             <p class="text-zinc-400 text-xs mb-4">Update instrument details</p>
 
             <form id="editInstrumentForm" class="space-y-4">
                 <input type="hidden" id="editInstrumentId">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-zinc-300 mb-1">Branch *</label>
+                        <label class="block text-sm font-medium text-zinc-400 mb-1">Branch *</label>
                         <select id="editInstrumentBranchId" required
-                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            class="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all">
                             <option value="">Select Branch</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-zinc-300 mb-1">Instrument Type *</label>
+                        <label class="block text-sm font-medium text-zinc-400 mb-1">Instrument Type *</label>
                         <select id="editInstrumentTypeId" required
-                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            class="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all">
                             <option value="">Select Type</option>
                         </select>
                     </div>
                     <div class="md:col-span-3">
-                        <label class="block text-sm font-medium text-zinc-300 mb-1">Instrument Name *</label>
+                        <label class="block text-sm font-medium text-zinc-400 mb-1">Instrument Name *</label>
                         <input type="text" id="editInstrumentName" required
-                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                            class="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all">
                     </div>
 
                 </div>
@@ -328,7 +345,7 @@
                         Cancel
                     </button>
                     <button type="submit" id="submitEditInstrumentBtn"
-                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                        class="inline-flex items-center px-6 py-2 bg-amber-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
                         <span id="submitEditInstrumentBtnText">Save Instrument</span>
                     </button>
                 </div>
@@ -338,25 +355,25 @@
 
     <!-- Edit Instrument Type Modal -->
     <div id="editTypeModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-white border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-md p-8 relative">
+        <div class="bg-white border border-gold-400/30 rounded-xl shadow-2xl w-full max-w-2xl p-6 sm:p-8 relative">
             <button id="closeEditTypeModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
                 <i class="fas fa-times text-xl"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2">Edit Instrument Type</h3>
+            <h3 class="text-2xl font-bold text-zinc-900 mb-2">Edit Instrument Type</h3>
             <p class="text-zinc-400 text-xs mb-4">Update type name and description</p>
 
             <form id="editTypeForm" class="space-y-4">
                 <input type="hidden" id="editTypeId">
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Type Name *</label>
+                    <label class="block text-sm font-medium text-zinc-500 mb-1">Type Name *</label>
                     <input type="text" id="editTypeName" required
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        class="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
+                    <label class="block text-sm font-medium text-zinc-500 mb-1">Description</label>
                     <textarea id="editTypeDescription" rows="3"
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"></textarea>
+                        class="w-full px-4 py-2  bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all"></textarea>
                 </div>
                 <div class="flex items-center justify-end gap-3 pt-4">
                     <button type="button" id="cancelEditTypeBtn"
@@ -364,7 +381,7 @@
                         Cancel
                     </button>
                     <button type="submit" id="submitEditTypeBtn"
-                        class="inline-flex items-center px-6 py-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold rounded-lg shadow transition">
+                        class="inline-flex items-center justify-center px-6 py-2.5 bg-amber-500 hover:bg-gold-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all focus:outline-none focus:ring-2 focus:ring-gold-500/50">
                         <span id="submitEditTypeBtnText">Save Changes</span>
                     </button>
                 </div>
@@ -373,53 +390,74 @@
     </div>
 
     <!-- Add Instrument Modal -->
-    <div id="addInstrumentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-white border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
-            <button id="closeAddInstrumentModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
-                <i class="fas fa-times text-xl"></i>
-            </button>
+ <div id="addInstrumentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-md">
+    <div class="bg-white border border-gold-400/30 rounded-xl shadow-2xl w-full max-w-2xl p-6 sm:p-8 relative">
 
-            <h3 class="text-2xl font-bold text-black mb-2">Add Instrument</h3>
-            <p class="text-zinc-400 text-xs mb-4">Add a new instrument to the inventory</p>
+        <!-- Close Button -->
+        <button id="closeAddInstrumentModalBtn" type="button" aria-label="Close modal" class="absolute top-5 right-5 text-zinc-400 hover:text-zinc-700 transition-colors p-1 rounded-md hover:bg-zinc-100">
+            <i class="fas fa-times text-lg"></i>
+        </button>
 
-            <div id="instrumentMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
-
-            <form id="addInstrumentForm" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-zinc-300 mb-1">Branch *</label>
-                        <select id="instrumentBranchId" required
-                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                            <option value="">Select Branch</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-zinc-300 mb-1">Instrument Type *</label>
-                        <select id="instrumentTypeId" required
-                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
-                            <option value="">Select Type</option>
-                        </select>
-                    </div>
-                    <div class="md:col-span-3">
-                        <label class="block text-sm font-medium text-zinc-300 mb-1">Instrument Name *</label>
-                        <input type="text" id="instrumentName" required
-                            class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
-                            placeholder="Instrument model">
-                    </div>
-                </div>
-                <div class="flex items-center justify-end gap-3 pt-4">
-                    <button type="button" id="cancelAddInstrumentBtn"
-                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
-                        Cancel
-                    </button>
-                    <button type="submit" id="submitInstrumentBtn"
-                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
-                        <span id="submitInstrumentBtnText">Add Instrument</span>
-                    </button>
-                </div>
-            </form>
+        <!-- Header -->
+        <div class="mb-6">
+            <h3 class="text-2xl font-bold text-zinc-900 tracking-tight">Add Instrument</h3>
+            <p class="text-zinc-500 text-sm mt-1">Add a new instrument to the inventory system.</p>
         </div>
+
+        <!-- Alert Message Container -->
+        <div id="instrumentMessage" class="hidden mb-5 p-3 rounded-lg text-sm border"></div>
+
+        <!-- Form -->
+        <form id="addInstrumentForm" class="space-y-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                <!-- Branch Dropdown -->
+                <div>
+                    <label for="instrumentBranchId" class="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-2">
+                        Branch <span class="text-gold-500">*</span>
+                    </label>
+                    <select id="instrumentBranchId" required
+                        class="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all">
+                        <option value="">Select Branch</option>
+                    </select>
+                </div>
+
+                <!-- Instrument Type Dropdown -->
+                <div>
+                    <label for="instrumentTypeId" class="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-2">
+                        Instrument Type <span class="text-gold-500">*</span>
+                    </label>
+                    <select id="instrumentTypeId" required
+                        class="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all">
+                        <option value="">Select Type</option>
+                    </select>
+                </div>
+
+                <!-- Instrument Name Input -->
+                <div class="md:col-span-2">
+                    <label for="instrumentName" class="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-2">
+                        Instrument Name <span class="text-gold-500">*</span>
+                    </label>
+                    <input type="text" id="instrumentName" required
+                        class="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm placeholder-zinc-400 rounded-lg focus:outline-none focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all"
+                        placeholder="e.g., Yamaha YAS-280 Saxophone">
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-zinc-100 mt-6">
+                <button type="button" id="cancelAddInstrumentBtn"
+                    class="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-300">
+                    Cancel
+                </button>
+                <button type="submit" id="submitInstrumentBtn"
+                    class="inline-flex items-center justify-center px-6 py-2.5 bg-amber-500 hover:bg-gold-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all focus:outline-none focus:ring-2 focus:ring-gold-500/50">
+                    <span id="submitInstrumentBtnText">Add Instrument</span>
+                </button>
+            </div>
+        </form>
     </div>
+</div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
