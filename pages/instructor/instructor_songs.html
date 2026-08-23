@@ -28,7 +28,9 @@
         .soft-shadow { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.10); }
         .song-modal[aria-hidden="true"] { display: none; }
     </style>
-    <link rel="stylesheet" href="../../css/table-responsive.css"></head>
+    <link rel="stylesheet" href="../../css/table-responsive.css">
+    <link rel="stylesheet" href="../../css/instructor.css">
+</head>
 <body class="bg-[#eef3f8] text-slate-900 antialiased">
     <nav class="fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b border-white/10 bg-[#0f1115]/95 px-6 py-3 shadow-2xl backdrop-blur-md">
         <div class="flex items-center gap-3">
@@ -88,7 +90,7 @@
         </div>
     </aside>
 
-    <main class="lg:ml-72 pt-20 px-4 sm:px-6 py-4 sm:py-6">
+    <main class="instructor-main lg:ml-72 pt-16 px-3 sm:px-5 py-4 sm:py-5">
         <div class="mx-auto max-w-5xl space-y-4 sm:space-y-5">
             <section class="rounded-[1.5rem] border border-slate-800/90 bg-gradient-to-br from-[#0d1324] via-[#101826] to-[#171d2d] px-4 py-5 text-white soft-shadow sm:px-6 sm:py-6">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -332,5 +334,14 @@
     <script src="../../js/instructor/songs.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/session_timeout.js"></script>
+
+    <!-- Mobile Bottom Nav -->
+    <nav class="instructor-bottom-nav">
+        <a href="instructor_dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="instructor_students.html"><i class="fas fa-user-graduate"></i><span>Students</span></a>
+        <a href="instructor_sessions.html"><i class="fas fa-calendar-alt"></i><span>Sessions</span></a>
+        <a href="instructor_grading.html"><i class="fas fa-star"></i><span>Grading</span></a>
+        <a href="instructor_profile.html"><i class="fas fa-id-badge"></i><span>Profile</span></a>
+    </nav>
 </body>
 </html>

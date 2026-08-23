@@ -977,6 +977,21 @@ class TeachersApi
 
         $teacherId = $this->resolveTeacherId((int)($_GET['teacher_id'] ?? 0), (int)($_GET['user_id'] ?? 0));
         $filter = strtolower(trim((string)($_GET['filter'] ?? 'all')));
+        // week_start: YYYY-MM-DD — if provided, fetch that specific Mon–Sun week
+        $weekStartRaw = trim((string)($_GET['week_start'] ?? ''));
+        $weekStart = null;
+        $weekEnd   = null;
+        if ($weekStartRaw !== '') {
+            $parsed = \DateTime::createFromFormat('Y-m-d', $weekStartRaw);
+            if ($parsed) {
+                // Snap to Monday of that week
+                $dow = (int)$parsed->format('N'); // 1=Mon … 7=Sun
+                $parsed->modify('-' . ($dow - 1) . ' days');
+                $weekStart = $parsed->format('Y-m-d');
+                $parsed->modify('+6 days');
+                $weekEnd   = $parsed->format('Y-m-d');
+            }
+        }
         if ($teacherId < 1) {
             $this->sendJSON(['error' => 'teacher_id or user_id is required'], 400);
         }
@@ -1003,26 +1018,42 @@ class TeachersApi
                     s.student_id,
                     s.first_name AS student_first_name,
                     s.last_name AS student_last_name,
-                    COALESCE(rm.room_name, NULLIF(TRIM(ts.notes), '')) AS room_name
+                    COALESCE(inst.instrument_name, CONCAT('Instrument #', COALESCE(ts.instrument_id, e.instrument_id))) AS instrument_name,
+                    COALESCE(it.type_name, '') AS instrument_type,
+                    COALESCE(rm.room_name, '') AS room_name
                 FROM tbl_sessions ts
                 INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
                 INNER JOIN tbl_students s ON s.student_id = e.student_id
+                LEFT JOIN tbl_instruments inst ON inst.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
+                LEFT JOIN tbl_instrument_types it ON it.type_id = inst.type_id
                 LEFT JOIN tbl_rooms rm ON rm.room_id = ts.room_id
                 WHERE ts.teacher_id = ?
             ";
             $params = [$teacherId];
 
-            if ($filter === 'today') {
+            if ($weekStart !== null && $weekEnd !== null) {
+                // Specific week range — ignore $filter
+                $sql .= " AND ts.session_date BETWEEN ? AND ? ";
+                $params[] = $weekStart;
+                $params[] = $weekEnd;
+            } elseif ($filter === 'today') {
                 $sql .= " AND ts.session_date = CURDATE() ";
             } elseif ($filter === 'week') {
-                $sql .= " AND ts.session_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) ";
+                // Current week Mon–Sun
+                $sql .= " AND ts.session_date BETWEEN DATE_SUB(CURDATE(), INTERVAL (WEEKDAY(CURDATE())) DAY) AND DATE_ADD(DATE_SUB(CURDATE(), INTERVAL (WEEKDAY(CURDATE())) DAY), INTERVAL 6 DAY) ";
             }
 
             $sql .= " ORDER BY ts.session_date ASC, ts.start_time ASC, ts.session_id ASC ";
 
             $stmt = $this->conn->prepare($sql);
             $stmt->execute($params);
-            $this->sendJSON(['success' => true, 'sessions' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+            $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $this->sendJSON([
+                'success'    => true,
+                'sessions'   => $sessions,
+                'week_start' => $weekStart,
+                'week_end'   => $weekEnd,
+            ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }

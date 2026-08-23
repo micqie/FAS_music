@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sessions | Father & Sons</title>
+    <title>Sessions | Father &amp; Sons</title>
     <script src="https://cdn.tailwindcss.com"></script>
- <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
+    <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/instructor.css">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 200: '#f0d97a', 300: '#e8c63a', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
                         obsidian: '#0f1115',
                         darkSlate: '#1a1d23'
                     },
@@ -21,24 +22,20 @@
             }
         }
     </script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .dark-glass { background: rgba(15, 17, 21, 0.92); backdrop-filter: blur(10px); }
-        .soft-shadow { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12); }
-    </style>
-    <link rel="stylesheet" href="../../css/table-responsive.css"></head>
+</head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
-    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-6 py-3 flex justify-between items-center shadow-2xl">
+
+    <!-- Navbar -->
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-4 sm:px-6 py-3 flex justify-between items-center shadow-2xl">
         <div class="flex items-center gap-3">
-            <button class="lg:hidden text-white/80 hover:text-white" onclick="toggleInstructorMenu()" aria-label="Toggle menu">
+            <button class="lg:hidden text-white/80 hover:text-white p-1" onclick="toggleInstructorMenu()" aria-label="Toggle menu">
                 <i id="instructorMenuIcon" class="fas fa-bars text-lg"></i>
             </button>
-            <a href="#" class="h-10 flex items-center">
+            <a href="#" class="h-9 flex items-center">
                 <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
             </a>
         </div>
-        <div class="flex items-center gap-6">
+        <div class="flex items-center gap-4">
             <div class="hidden md:flex flex-col text-right">
                 <span id="instructorNameNav" class="text-sm font-semibold text-white">Instructor</span>
                 <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Teaching Portal</span>
@@ -47,417 +44,524 @@
         </div>
     </nav>
 
+    <!-- Mobile Drawer -->
     <div id="instructorMobileMenu" class="fixed inset-0 z-40 hidden lg:hidden">
         <div class="absolute inset-0 bg-black/60" onclick="toggleInstructorMenu()"></div>
-        <div class="absolute inset-y-0 left-0 w-72 bg-obsidian pt-24 px-6">
-            <div class="mb-6">
+        <div class="absolute inset-y-0 left-0 w-72 bg-obsidian pt-20 px-5 overflow-y-auto">
+            <div class="mb-6 px-2">
                 <h2 class="text-xl font-extrabold text-white">Instructor Panel</h2>
-                <div class="mt-3 h-2 w-36 rounded-full bg-gold-500"></div>
+                <div class="mt-2 h-1.5 w-32 rounded-full bg-gold-500"></div>
             </div>
-            <nav class="space-y-2">
-                <a href="instructor_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                    <i class="fas fa-chart-line mr-3 text-slate-500"></i> Dashboard
-                </a>
-                <a href="instructor_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                    <i class="fas fa-user-graduate mr-3 text-slate-500"></i> My Students
-                </a>
-                 <a href="instructor_songs.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-music mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Songs
-                    </a>
-                <a href="instructor_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl transition-all">
-                    <i class="fas fa-calendar-alt mr-3 text-gold-400"></i> Sessions
-                </a>
-                <a href="instructor_grading.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                    <i class="fas fa-star mr-3 text-slate-500"></i> Grading
-                </a>
-                <a href="instructor_availability.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                    <i class="fas fa-clock mr-3 text-slate-500"></i> Availability
-                </a>
-                <a href="instructor_profile.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                    <i class="fas fa-id-badge mr-3 text-slate-500"></i> Profile
-                </a>
+            <nav class="space-y-1">
+                <a href="instructor_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-chart-line mr-3 text-slate-500 w-4"></i>Dashboard</a>
+                <a href="instructor_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-user-graduate mr-3 text-slate-500 w-4"></i>My Students</a>
+                <a href="instructor_songs.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-music mr-3 text-slate-500 w-4"></i>Songs</a>
+                <a href="instructor_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl"><i class="fas fa-calendar-alt mr-3 text-gold-400 w-4"></i>Sessions</a>
+                <a href="instructor_grading.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-star mr-3 text-slate-500 w-4"></i>Grading</a>
+                <a href="instructor_availability.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-clock mr-3 text-slate-500 w-4"></i>Availability</a>
+                <a href="instructor_profile.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"><i class="fas fa-id-badge mr-3 text-slate-500 w-4"></i>Profile</a>
             </nav>
         </div>
     </div>
 
-    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto">
-        <div class="px-6 space-y-8 flex-1 mt-4">
-            <div class="px-4 mb-4">
-                <h2 class="text-[1.5rem] leading-none font-extrabold text-white tracking-tight">Instructor Panel</h2>
-                <div class="mt-3 h-2 w-[14rem] rounded-full bg-gold-500"></div>
+    <!-- Desktop Sidebar -->
+    <aside class="instructor-sidebar fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-20 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto">
+        <div class="px-6 flex-1 mt-4 space-y-6">
+            <div class="px-2">
+                <h2 class="text-2xl font-extrabold text-white tracking-tight">Instructor Panel</h2>
+                <div class="mt-2 h-1.5 w-48 rounded-full bg-gold-500"></div>
             </div>
-            <div>
-                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Teaching</h3>
-                <nav class="space-y-2">
-                    <a href="instructor_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-chart-line mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
-                    </a>
-                    <a href="instructor_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> My Students
-                    </a>
-                         <a href="instructor_songs.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-music mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Songs
-                    </a>
-                    <a href="instructor_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl transition-all">
-                        <i class="fas fa-calendar-alt mr-3 text-gold-400"></i> Sessions
-                    </a>
-                    <a href="instructor_grading.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-star mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Grading
-                    </a>
-                    <a href="instructor_availability.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-clock mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Availability
-                    </a>
-                    <a href="instructor_profile.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
-                        <i class="fas fa-id-badge mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Profile
-                    </a>
-                </nav>
-            </div>
+            <nav class="space-y-1">
+                <a href="instructor_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-chart-line mr-3 text-slate-500 group-hover:text-gold-400 w-4 transition-colors"></i>Dashboard</a>
+                <a href="instructor_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 w-4 transition-colors"></i>My Students</a>
+                <a href="instructor_songs.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-music mr-3 text-slate-500 group-hover:text-gold-400 w-4 transition-colors"></i>Songs</a>
+                <a href="instructor_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl"><i class="fas fa-calendar-alt mr-3 text-gold-400 w-4"></i>Sessions</a>
+                <a href="instructor_grading.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-star mr-3 text-slate-500 group-hover:text-gold-400 w-4 transition-colors"></i>Grading</a>
+                <a href="instructor_availability.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-clock mr-3 text-slate-500 group-hover:text-gold-400 w-4 transition-colors"></i>Availability</a>
+                <a href="instructor_profile.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-id-badge mr-3 text-slate-500 group-hover:text-gold-400 w-4 transition-colors"></i>Profile</a>
+            </nav>
         </div>
     </aside>
 
-    <main class="lg:ml-72 pt-20 px-4 sm:px-6 md:px-8 pb-8">
-        <div class="max-w-5xl mx-auto space-y-6">
-            <div class="flex flex-wrap items-center justify-between gap-4">
+    <!-- Main -->
+    <main class="instructor-main lg:ml-72 pt-16 px-3 sm:px-5 pb-6">
+        <div class="max-w-7xl mx-auto space-y-4 mt-4">
+
+            <!-- Page header -->
+            <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">Session Schedule</h1>
-                    <p class="text-slate-500 mt-1">Review your lesson queue, report no-shows, and cancel sessions that need admin rescheduling.</p>
+                    <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">My Week</h1>
+                    <p id="weekSummaryBar" class="text-slate-500 mt-0.5 text-sm">Loading...</p>
                 </div>
-                <div class="flex items-center gap-2 bg-white rounded-2xl border border-slate-200 p-1">
-                    <button class="session-filter px-4 py-2 text-sm font-semibold rounded-xl bg-obsidian text-white" data-filter="today">Today</button>
-                    <button class="session-filter px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100" data-filter="week">Week</button>
-                    <button class="session-filter px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100" data-filter="all">All</button>
+                <!-- Week navigation -->
+                <div class="flex items-center gap-2">
+                    <button id="prevWeekBtn" class="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition soft-shadow" aria-label="Previous week">
+                        <i class="fas fa-chevron-left text-xs"></i>
+                    </button>
+                    <button id="todayBtn" class="h-9 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition soft-shadow">Today</button>
+                    <button id="nextWeekBtn" class="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition soft-shadow" aria-label="Next week">
+                        <i class="fas fa-chevron-right text-xs"></i>
+                    </button>
                 </div>
             </div>
 
-            <section class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                    <h2 class="text-lg font-bold text-slate-900">Upcoming Sessions</h2>
-                    <span id="sessionCount" class="text-xs font-semibold text-slate-500">0 sessions</span>
+            <!-- Loading -->
+            <div id="gridLoading" class="flex items-center justify-center py-20">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin text-2xl text-gold-500 mb-3"></i>
+                    <p class="text-sm text-slate-500">Loading your schedule...</p>
                 </div>
-                <div id="sessionsList" class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
-            </section>
+            </div>
 
-            <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
-                    <h2 class="text-lg font-bold text-slate-900">Session Tips</h2>
-                    <div class="mt-4 space-y-3 text-sm text-slate-500">
-                        <p>Confirm attendance 15 minutes before session start.</p>
-                        <p>Update notes right after every lesson to keep momentum.</p>
-                        <p>Log any room changes in the schedule.</p>
-                    </div>
+            <!-- ── MOBILE: Day-tab strip + day list (hidden on md+) ── -->
+            <div id="mobileView" class="hidden md:hidden space-y-3">
+                <div id="dayTabStrip" class="day-tab-strip"></div>
+                <div id="daySessionList" class="space-y-2.5"></div>
+            </div>
+
+            <!-- ── DESKTOP: Weekly grid (hidden on mobile) ── -->
+            <div id="desktopView" class="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden soft-shadow">
+                <div class="grid-scroll-wrap">
+                    <div id="weekGrid" class="week-grid"></div>
                 </div>
-                <div class="bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
-                    <h2 class="text-lg font-bold text-slate-900">Quick Actions</h2>
-                    <div class="mt-4 space-y-3">
-                        <div class="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-800">
-                            Teacher cancellations keep the original session in history and send it to admin for rescheduling.
-                        </div>
-                        <div class="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-600">
-                            Student and teacher stay fixed during admin rescheduling.
-                        </div>
-                    </div>
+            </div>
+
+            <!-- Empty state -->
+            <div id="gridEmpty" class="hidden bg-white rounded-2xl border border-slate-200 p-12 text-center soft-shadow">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-slate-100 text-slate-400 mb-4">
+                    <i class="fas fa-calendar-times text-xl"></i>
                 </div>
-            </section>
+                <p class="text-base font-bold text-slate-700">No sessions this week</p>
+                <p class="text-sm text-slate-500 mt-1">Try another week using the arrows above.</p>
+            </div>
+
         </div>
     </main>
+
+    <!-- Mobile Bottom Nav -->
+    <nav class="instructor-bottom-nav">
+        <a href="instructor_dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="instructor_students.html"><i class="fas fa-user-graduate"></i><span>Students</span></a>
+        <a href="instructor_sessions.html" class="active"><i class="fas fa-calendar-alt"></i><span>Sessions</span></a>
+        <a href="instructor_grading.html"><i class="fas fa-star"></i><span>Grading</span></a>
+        <a href="instructor_profile.html"><i class="fas fa-id-badge"></i><span>Profile</span></a>
+    </nav>
+
+    <!-- Session popover -->
+    <div id="sessionPopover" class="hidden bg-white border border-slate-200 rounded-2xl shadow-2xl p-4">
+        <div class="flex items-start justify-between gap-2 mb-3">
+            <div>
+                <div id="popStudentName" class="font-bold text-slate-900 text-sm"></div>
+                <div id="popInstrument" class="text-xs text-slate-500 mt-0.5"></div>
+            </div>
+            <button onclick="closePopover()" class="text-slate-400 hover:text-slate-600 p-1 -mr-1 -mt-1" aria-label="Close">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <div class="space-y-1.5 text-xs text-slate-600 mb-4">
+            <div class="flex items-center gap-2"><i class="fas fa-calendar w-3.5 text-gold-500"></i><span id="popDate"></span></div>
+            <div class="flex items-center gap-2"><i class="fas fa-clock w-3.5 text-gold-500"></i><span id="popTime"></span></div>
+            <div class="flex items-center gap-2"><i class="fas fa-door-open w-3.5 text-gold-500"></i><span id="popRoom"></span></div>
+            <div class="flex items-center gap-2"><i class="fas fa-hashtag w-3.5 text-slate-400"></i><span id="popSession"></span></div>
+        </div>
+        <div id="popStatus" class="mb-3"></div>
+        <div id="popActions" class="flex flex-wrap gap-2"></div>
+    </div>
+    <div id="popoverBackdrop" class="hidden fixed inset-0 z-[190]" onclick="closePopover()"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/index.js"></script>
     <script src="../../js/instructor/instructor_nav.js"></script>
     <script>
-        let currentFilter = 'today';
-        let teacherSessions = [];
+    // ─── State ───────────────────────────────────────────────
+    let teacherSessions  = [];
+    let currentWeekStart = null;
+    let activeDayIndex   = 0; // 0=Mon … 6=Sun (mobile day-view)
 
-        function toggleInstructorMenu() {
-            const menu = document.getElementById('instructorMobileMenu');
-            const icon = document.getElementById('instructorMenuIcon');
-            if (!menu || !icon) return;
-            const isHidden = menu.classList.contains('hidden');
-            menu.classList.toggle('hidden');
-            icon.classList.toggle('fa-bars', !isHidden);
-            icon.classList.toggle('fa-times', isHidden);
+    const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const GRID_START_HOUR = 7;
+    const GRID_END_HOUR   = 21;
+
+    // ─── Helpers ─────────────────────────────────────────────
+    function getMondayOf(d) {
+        const date = new Date(d);
+        const day  = date.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        date.setDate(date.getDate() + diff);
+        date.setHours(0,0,0,0);
+        return date;
+    }
+    function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+    function toYMD(d) {
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    function fmt12(t) {
+        if (!t) return '—';
+        const [hh, mm] = String(t).split(':');
+        let h = Number(hh);
+        const sfx = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return `${h}:${String(mm||0).padStart(2,'0')} ${sfx}`;
+    }
+    function dateLong(s) {
+        if (!s) return '—';
+        const d = new Date(s + 'T00:00:00');
+        return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString(undefined, {weekday:'long',month:'long',day:'numeric',year:'numeric'});
+    }
+    function todayYMD() { return toYMD(new Date()); }
+
+    // ─── Business logic ───────────────────────────────────────
+    function hasAbsent(s) {
+        const st = String(s?.status||'').toLowerCase();
+        const at = String(s?.attendance_status||'').toLowerCase();
+        return ['absent','no show','teacher absent'].includes(st)||['absent','ci','teacher absent'].includes(at);
+    }
+    function canCancel(s) {
+        const st = String(s?.status||'').toLowerCase();
+        if (['completed','cancelled_by_teacher'].includes(st)) return false;
+        const dt = new Date(`${s.session_date}T${s.start_time}`);
+        return !Number.isNaN(dt.getTime()) && dt > new Date();
+    }
+    function canEnd(s) {
+        const st = String(s?.status||'').toLowerCase();
+        if (['completed','cancelled_by_teacher','rescheduled'].includes(st)) return false;
+        const today = new Date(); today.setHours(0,0,0,0);
+        const sd = new Date(s.session_date+'T00:00:00');
+        const sdt = new Date(`${s.session_date}T${s.start_time||'00:00:00'}`);
+        return sd.getTime()===today.getTime() && sdt<=new Date();
+    }
+    function canReportAbsent(s) {
+        const st = String(s?.status||'').toLowerCase();
+        const at = String(s?.attendance_status||'').toLowerCase();
+        if (hasAbsent(s)) return false;
+        if (['completed','cancelled_by_teacher','rescheduled'].includes(st)) return false;
+        const sdt = new Date(`${s.session_date}T${s.start_time||'00:00:00'}`);
+        return sdt<=new Date() && at!=='present';
+    }
+    function statusInfo(s) {
+        const st = String(s?.status||'').toLowerCase();
+        if (st==='completed')           return {label:'Completed',   cls:'bg-emerald-100 text-emerald-700', dot:'status-completed'};
+        if (st==='cancelled_by_teacher') return {label:'Cancelled',  cls:'bg-rose-100 text-rose-700',       dot:'status-cancelled'};
+        if (st==='rescheduled')          return {label:'Rescheduled',cls:'bg-amber-100 text-amber-700',     dot:'status-cancelled'};
+        if (hasAbsent(s))                return {label:'Absent',     cls:'bg-rose-100 text-rose-700',       dot:'status-absent'};
+        return {label:'Scheduled', cls:'bg-sky-100 text-sky-700', dot:'status-scheduled'};
+    }
+    function cardClass(s) {
+        const st = String(s?.status||'').toLowerCase();
+        if (st==='completed') return 'status-completed';
+        if (st==='cancelled_by_teacher'||st==='rescheduled') return 'status-cancelled';
+        if (hasAbsent(s)) return 'status-absent';
+        return 'status-scheduled';
+    }
+
+    // ─── Summary bar ─────────────────────────────────────────
+    function updateSummaryBar() {
+        const bar = document.getElementById('weekSummaryBar');
+        if (!bar) return;
+        const end   = addDays(currentWeekStart, 6);
+        const fmt   = {month:'short', day:'numeric'};
+        const range = `${currentWeekStart.toLocaleDateString(undefined,fmt)} – ${end.toLocaleDateString(undefined,{...fmt,year:'numeric'})}`;
+        const active = teacherSessions.filter(s=>!['cancelled_by_teacher','rescheduled'].includes(String(s.status||'').toLowerCase())).length;
+        const students = new Set(teacherSessions.map(s=>s.student_id)).size;
+        bar.textContent = `${range} · ${active} lesson${active!==1?'s':''} · ${students} student${students!==1?'s':''}`;
+    }
+
+    // ─── DESKTOP: weekly grid ─────────────────────────────────
+    function renderWeekGrid() {
+        const grid = document.getElementById('weekGrid');
+        if (!grid) return;
+
+        const byDate = {};
+        for (const s of teacherSessions) {
+            const k = String(s.session_date||'');
+            if (!byDate[k]) byDate[k] = [];
+            byDate[k].push(s);
         }
 
-        function formatTime12Hour(timeString) {
-            if (!timeString) return '—';
-            const parts = String(timeString).split(':');
-            if (parts.length < 2) return timeString;
-            const h = Number(parts[0]);
-            const m = Number(parts[1]);
-            if (Number.isNaN(h) || Number.isNaN(m)) return timeString;
-            const suffix = h >= 12 ? 'PM' : 'AM';
-            const hh = h % 12 === 0 ? 12 : h % 12;
-            return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
+        const hourSet = new Set();
+        for (let h=GRID_START_HOUR; h<GRID_END_HOUR; h++) hourSet.add(h);
+        for (const s of teacherSessions) {
+            const h = parseInt((s.start_time||'').split(':')[0],10);
+            if (!Number.isNaN(h)) hourSet.add(h);
+        }
+        const hours = [...hourSet].sort((a,b)=>a-b);
+        const weekDates = Array.from({length:7},(_,i)=>addDays(currentWeekStart,i));
+        const today = todayYMD();
+
+        let html = `<div class="week-grid-header"><span class="text-[10px] font-bold uppercase tracking-widest text-slate-400">TIME</span></div>`;
+        for (let i=0;i<7;i++) {
+            const d   = weekDates[i];
+            const ymd = toYMD(d);
+            const isToday = ymd===today;
+            const hasSess = !!(byDate[ymd]?.length);
+            html += `<div class="week-grid-header">
+                <div class="text-[10px] font-bold uppercase tracking-wider ${isToday?'text-gold-500':'text-slate-400'}">${DAY_SHORT[i]}</div>
+                <div class="text-base font-extrabold mt-0.5 ${isToday?'text-gold-500':'text-slate-800'}">${d.getDate()}${isToday?'<span class="block text-[8px] font-bold uppercase text-gold-500 tracking-wide">Today</span>':''}</div>
+                ${hasSess?'<div class="mt-1 h-1 w-4 rounded-full bg-gold-400 mx-auto"></div>':''}
+            </div>`;
         }
 
-        function formatDateShort(dateString) {
-            if (!dateString) return '—';
-            const d = new Date(dateString);
-            return Number.isNaN(d.getTime()) ? dateString : d.toLocaleDateString();
-        }
-
-        function getStatusBadge(status) {
-            const normalized = String(status || '').toLowerCase();
-            let classes = 'bg-slate-100 text-slate-700';
-            if (normalized === 'scheduled') classes = 'bg-sky-100 text-sky-700';
-            if (normalized === 'completed') classes = 'bg-emerald-100 text-emerald-700';
-            if (normalized === 'absent' || normalized === 'no show' || normalized === 'ci') classes = 'bg-rose-100 text-rose-700';
-            if (normalized === 'teacher absent') classes = 'bg-orange-100 text-orange-700';
-            if (normalized === 'cancelled_by_teacher') classes = 'bg-rose-100 text-rose-700';
-            if (normalized === 'rescheduled') classes = 'bg-amber-100 text-amber-700';
-            return `text-xs font-semibold px-2.5 py-1 rounded-full ${classes}`;
-        }
-
-        function hasAbsentReport(session) {
-            const status = String(session?.status || '').toLowerCase();
-            const attendance = String(session?.attendance_status || '').toLowerCase();
-            return ['absent', 'no show', 'teacher absent'].includes(status) || ['absent', 'ci', 'teacher absent'].includes(attendance);
-        }
-
-        function canTeacherCancel(session) {
-            const status = String(session?.status || '').toLowerCase();
-            if (status === 'completed' || status === 'cancelled_by_teacher') return false;
-            const sessionDateTime = new Date(`${session.session_date}T${session.start_time}`);
-            return !Number.isNaN(sessionDateTime.getTime()) && sessionDateTime > new Date();
-        }
-
-        function canTeacherEndSession(session) {
-            const status = String(session?.status || '').toLowerCase();
-            if (status === 'completed' || status === 'cancelled_by_teacher' || status === 'rescheduled') return false;
-            if (!session?.session_date) return false;
-            const sessionDateTime = new Date(`${session.session_date}T${session.start_time || '00:00:00'}`);
-            const now = new Date();
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const sessionDate = new Date(`${session.session_date}T00:00:00`);
-            return !Number.isNaN(sessionDateTime.getTime())
-                && sessionDate >= today
-                && sessionDate <= today
-                && sessionDateTime <= now;
-        }
-
-        function canTeacherReportAbsent(session) {
-            const status = String(session?.status || '').toLowerCase();
-            const attendance = String(session?.attendance_status || '').toLowerCase();
-            if (hasAbsentReport(session)) return false;
-            if (['completed', 'cancelled_by_teacher', 'rescheduled'].includes(status)) return false;
-            if (!session?.session_date) return false;
-            const sessionDateTime = new Date(`${session.session_date}T${session.start_time || '00:00:00'}`);
-            return !Number.isNaN(sessionDateTime.getTime()) && sessionDateTime <= new Date() && attendance !== 'present';
-        }
-
-        async function loadTeacherSessions(filter = currentFilter) {
-            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
-            if (!user?.user_id) {
-                teacherSessions = [];
-                renderSessions(filter);
-                return;
+        for (const hour of hours) {
+            html += `<div class="week-grid-time"><span class="pt-1">${fmt12(String(hour).padStart(2,'0')+':00')}</span></div>`;
+            for (let i=0;i<7;i++) {
+                const ymd = toYMD(weekDates[i]);
+                const cells = (byDate[ymd]||[]).filter(s=>parseInt((s.start_time||'').split(':')[0],10)===hour);
+                if (cells.length) {
+                    html += `<div class="week-grid-cell">`;
+                    for (const s of cells) {
+                        const name = `${s.student_first_name||''} ${s.student_last_name||''}`.trim()||'Student';
+                        const trunc = name.length>14?name.slice(0,13)+'…':name;
+                        html += `<button type="button" class="session-card ${cardClass(s)}" onclick="openPopover(event,${Number(s.session_id)})" title="${name}">
+                            <div class="font-bold text-slate-900 truncate text-[12px]">${trunc}</div>
+                            <div class="text-slate-500 truncate text-[11px]">${s.instrument_name||''}${s.room_name?` · ${s.room_name}`:''}</div>
+                        </button>`;
+                    }
+                    html += `</div>`;
+                } else {
+                    html += `<div class="week-grid-cell flex items-center justify-center"><span class="open-slot-text">Open</span></div>`;
+                }
             }
-
-            try {
-                const response = await axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-sessions&user_id=${encodeURIComponent(user.user_id)}&filter=${encodeURIComponent(filter)}`);
-                const data = response.data || {};
-                teacherSessions = data.success && Array.isArray(data.sessions) ? data.sessions : [];
-            } catch (error) {
-                console.error('Failed to load teacher sessions:', error);
-                teacherSessions = [];
-            }
-
-            renderSessions(filter);
         }
+        grid.innerHTML = html;
+    }
 
-        function renderSessions(filter) {
-            const list = document.getElementById('sessionsList');
-            const count = document.getElementById('sessionCount');
-            if (!list) return;
-            currentFilter = filter;
-            const sessions = teacherSessions;
-            if (count) count.textContent = `${sessions.length} sessions`;
-            list.innerHTML = sessions.length ? sessions.map(session => `
-                <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 flex flex-col gap-3">
-                    <div class="flex items-center justify-between">
-                        <div class="text-sm font-semibold text-slate-900">${session.student_first_name || ''} ${session.student_last_name || ''}</div>
-                        <span class="${getStatusBadge(session.status)}">${session.status}</span>
-                    </div>
-                    <div class="text-xs text-slate-500">${formatDateShort(session.session_date)} | ${formatTime12Hour(session.start_time)} - ${formatTime12Hour(session.end_time)}</div>
-                    <div class="text-xs text-slate-500"><i class="fas fa-music mr-2 text-gold-500"></i>${session.instrument_name || 'Instrument'}${session.room_name ? ` • ${session.room_name}` : ''}</div>
-                    <div class="flex items-center justify-between text-xs text-slate-500">
-                        <span><i class="fas fa-map-marker-alt mr-2 text-gold-500"></i>${session.room_name || 'Room not assigned'}</span>
-                        <div class="flex items-center gap-3">
-                            ${canTeacherReportAbsent(session)
-                                ? `<button type="button" data-report-absent="${Number(session.session_id)}" data-student-id="${Number(session.student_id || 0)}" data-student-name="${String(session.student_first_name || '').replace(/"/g, '&quot;')} ${String(session.student_last_name || '').replace(/"/g, '&quot;')}" data-session-date="${String(session.session_date || '')}" class="text-rose-600 font-semibold hover:text-rose-500">Report Absent</button>`
-                                : ''}
-                            ${canTeacherEndSession(session)
-                                ? `<button type="button" data-end-session="${Number(session.session_id)}" class="text-emerald-600 font-semibold hover:text-emerald-500">End Session</button>`
-                                : canTeacherCancel(session)
-                                ? `<button type="button" data-cancel-session="${Number(session.session_id)}" class="text-rose-600 font-semibold hover:text-rose-500">Cancel Session</button>`
-                                : `<span>${session.cancellation_reason ? `Reason: ${session.cancellation_reason}` : (hasAbsentReport(session) ? 'Absence reported' : 'History kept')}</span>`}
-                        </div>
-                    </div>
+    // ─── MOBILE: day-tab strip ────────────────────────────────
+    function renderDayTabs() {
+        const strip = document.getElementById('dayTabStrip');
+        if (!strip) return;
+        const today = todayYMD();
+        const byDate = {};
+        for (const s of teacherSessions) {
+            const k = String(s.session_date||'');
+            if (!byDate[k]) byDate[k]=[];
+            byDate[k].push(s);
+        }
+        strip.innerHTML = Array.from({length:7},(_,i)=>{
+            const d   = addDays(currentWeekStart,i);
+            const ymd = toYMD(d);
+            const isToday = ymd===today;
+            const hasSess = !!(byDate[ymd]?.length);
+            const isActive = i===activeDayIndex;
+            return `<button type="button"
+                class="day-tab ${hasSess?'has-sessions':''} ${isToday?'is-today':''} ${isActive?'active':''}"
+                onclick="selectDay(${i})"
+                aria-label="${DAY_SHORT[i]} ${d.getDate()}"
+            >
+                <span class="tab-day">${DAY_SHORT[i]}</span>
+                <span class="tab-num">${d.getDate()}</span>
+                <span class="tab-dot ${hasSess?'has-sessions':''}"></span>
+            </button>`;
+        }).join('');
+    }
+
+    function selectDay(index) {
+        activeDayIndex = index;
+        renderDayTabs();
+        renderDayList();
+    }
+
+    function renderDayList() {
+        const list = document.getElementById('daySessionList');
+        if (!list) return;
+        const d   = addDays(currentWeekStart, activeDayIndex);
+        const ymd = toYMD(d);
+        const sessions = teacherSessions.filter(s=>String(s.session_date||'')===ymd)
+            .sort((a,b)=>String(a.start_time||'').localeCompare(String(b.start_time||'')));
+
+        if (!sessions.length) {
+            list.innerHTML = `<div class="flex flex-col items-center justify-center py-10 text-center">
+                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                    <i class="fas fa-calendar-check text-slate-400 text-lg"></i>
                 </div>
-            `).join('') : `
-                <div class="text-sm text-slate-500">No sessions found for this range.</div>
-            `;
-
-            list.querySelectorAll('[data-cancel-session]').forEach(btn => {
-                btn.addEventListener('click', () => promptTeacherCancellation(Number(btn.dataset.cancelSession || 0)));
-            });
-            list.querySelectorAll('[data-end-session]').forEach(btn => {
-                btn.addEventListener('click', () => promptTeacherEndSession(Number(btn.dataset.endSession || 0)));
-            });
-            list.querySelectorAll('[data-report-absent]').forEach(btn => {
-                btn.addEventListener('click', () => promptTeacherReportAbsent(
-                    Number(btn.dataset.reportAbsent || 0),
-                    Number(btn.dataset.studentId || 0),
-                    String(btn.dataset.studentName || 'this student'),
-                    String(btn.dataset.sessionDate || '')
-                ));
-            });
+                <p class="text-sm font-semibold text-slate-600">No sessions</p>
+                <p class="text-xs text-slate-400 mt-1">Free day</p>
+            </div>`;
+            return;
         }
 
-        async function promptTeacherCancellation(sessionId) {
-            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
-            if (!user?.user_id || !sessionId) return;
+        list.innerHTML = sessions.map(s=>{
+            const name = `${s.student_first_name||''} ${s.student_last_name||''}`.trim()||'Student';
+            const info = statusInfo(s);
+            return `<div class="day-view-session-card" onclick="openPopover(event,${Number(s.session_id)})">
+                <div class="day-view-time-col">
+                    <div class="time-main">${fmt12(s.start_time)}</div>
+                    <div class="time-end">${fmt12(s.end_time)}</div>
+                </div>
+                <div class="day-view-dot ${info.dot}"></div>
+                <div class="day-view-info">
+                    <div class="student-name">${name}</div>
+                    <div class="session-meta">${[s.instrument_name,s.room_name].filter(Boolean).join(' · ')||'No details'}</div>
+                    <div class="mt-1.5"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${info.cls}">${info.label}</span></div>
+                </div>
+                <i class="fas fa-chevron-right text-slate-300 text-xs mt-1 flex-shrink-0"></i>
+            </div>`;
+        }).join('');
+    }
 
-            const result = await Swal.fire({
-                icon: 'warning',
-                title: 'Cancel this session?',
-                text: 'The session will stay in history and go to admin for rescheduling.',
-                input: 'text',
-                inputPlaceholder: 'Reason for cancellation (optional)',
-                showCancelButton: true,
-                confirmButtonText: 'Cancel Session',
-                cancelButtonText: 'Keep Session',
-                confirmButtonColor: '#dc2626'
-            });
-            if (!result.isConfirmed) return;
+    // ─── Master render ────────────────────────────────────────
+    function renderAll() {
+        const loading = document.getElementById('gridLoading');
+        const mobile  = document.getElementById('mobileView');
+        const desktop = document.getElementById('desktopView');
+        const empty   = document.getElementById('gridEmpty');
 
-            try {
-                const response = await axios.post(`${baseApiUrl}/teachers.php?action=cancel-session`, {
-                    user_id: Number(user.user_id),
-                    session_id: Number(sessionId),
-                    reason: result.value || ''
-                });
-                const data = response.data || {};
-                if (data.success) {
-                    await Swal.fire({
-                        icon: 'success',
-                        title: 'Session Cancelled',
-                        text: data.message || 'Admin has been asked to reschedule this session.',
-                        confirmButtonColor: '#b8860b'
-                    });
-                    loadTeacherSessions(currentFilter);
-                } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Failed to cancel session.', confirmButtonColor: '#b8860b' });
-                }
-            } catch (error) {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Network error while cancelling session.', confirmButtonColor: '#b8860b' });
-            }
+        loading?.classList.add('hidden');
+
+        if (!teacherSessions.length) {
+            mobile?.classList.add('hidden');
+            desktop?.classList.add('hidden');
+            empty?.classList.remove('hidden');
+            return;
         }
 
-        async function promptTeacherEndSession(sessionId) {
-            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
-            if (!user?.user_id || !sessionId) return;
+        empty?.classList.add('hidden');
+        mobile?.classList.remove('hidden');   // shown on <md
+        desktop?.classList.remove('hidden');  // shown on md+  (Tailwind handles via md:block)
 
-            const result = await Swal.fire({
-                icon: 'question',
-                title: 'End this session?',
-                text: 'This will mark the lesson as completed and update the guardian view.',
-                showCancelButton: true,
-                confirmButtonText: 'End Session',
-                cancelButtonText: 'Keep Open',
-                confirmButtonColor: '#059669'
+        renderDayTabs();
+        renderDayList();
+        renderWeekGrid();
+    }
+
+    // ─── Popover ─────────────────────────────────────────────
+    function openPopover(event, sessionId) {
+        const s = teacherSessions.find(x=>Number(x.session_id)===sessionId);
+        if (!s) return;
+
+        document.getElementById('popStudentName').textContent = `${s.student_first_name||''} ${s.student_last_name||''}`.trim()||'Student';
+        document.getElementById('popInstrument').textContent  = [s.instrument_name,s.room_name].filter(Boolean).join(' · ')||'—';
+        document.getElementById('popDate').textContent  = dateLong(s.session_date);
+        document.getElementById('popTime').textContent  = `${fmt12(s.start_time)} – ${fmt12(s.end_time)}`;
+        document.getElementById('popRoom').textContent  = s.room_name||'Room not assigned';
+        document.getElementById('popSession').textContent = `Session #${s.session_number||'—'}`;
+
+        const info = statusInfo(s);
+        document.getElementById('popStatus').innerHTML = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${info.cls}">${info.label}</span>`;
+
+        const acts = [];
+        if (canEnd(s))           acts.push(`<button onclick="promptEnd(${sessionId})" class="flex-1 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold transition">End Session</button>`);
+        if (canReportAbsent(s))  acts.push(`<button onclick="promptAbsent(${sessionId},${Number(s.student_id)},'${(s.student_first_name||'')+' '+(s.student_last_name||'')}','${s.session_date||''}')" class="flex-1 px-3 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold transition">Report Absent</button>`);
+        if (canCancel(s))        acts.push(`<button onclick="promptCancel(${sessionId})" class="flex-1 px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold transition">Cancel</button>`);
+        document.getElementById('popActions').innerHTML = acts.join('')||`<span class="text-xs text-slate-400">${s.cancellation_reason?'Reason: '+s.cancellation_reason:(hasAbsent(s)?'Absence reported':'No actions available')}</span>`;
+
+        const pop = document.getElementById('sessionPopover');
+        const bd  = document.getElementById('popoverBackdrop');
+        pop.classList.remove('hidden');
+        bd.classList.remove('hidden');
+
+        // Position on desktop; CSS handles mobile bottom-sheet
+        if (window.innerWidth >= 640) {
+            const src   = event.target.closest('.session-card,.day-view-session-card') || event.target;
+            const rect  = src.getBoundingClientRect();
+            pop.style.left = ''; pop.style.right = ''; pop.style.top = '';
+            requestAnimationFrame(()=>{
+                const pw = pop.offsetWidth, ph = pop.offsetHeight;
+                let left = rect.right + 8;
+                let top  = rect.top;
+                if (left + pw > window.innerWidth - 12) left = rect.left - pw - 8;
+                if (left < 12) left = 12;
+                if (top + ph > window.innerHeight - 12) top = window.innerHeight - ph - 12;
+                if (top < 12) top = 12;
+                pop.style.left = `${left}px`;
+                pop.style.top  = `${top}px`;
             });
-            if (!result.isConfirmed) return;
+        }
+    }
 
-            try {
-                const response = await axios.post(`${baseApiUrl}/attendance.php?action=mark-present-by-instructor`, {
-                    session_id: Number(sessionId),
-                    user_id: Number(user.user_id)
-                });
-                const data = response.data || {};
-                if (data.success) {
-                    await Swal.fire({
-                        icon: 'success',
-                        title: 'Session Ended',
-                        text: data.message || 'The session has been marked complete.',
-                        confirmButtonColor: '#b8860b'
-                    });
-                    loadTeacherSessions(currentFilter);
-                } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Failed to end session.', confirmButtonColor: '#b8860b' });
-                }
-            } catch (error) {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Network error while ending session.', confirmButtonColor: '#b8860b' });
-            }
+    function closePopover() {
+        document.getElementById('sessionPopover').classList.add('hidden');
+        document.getElementById('popoverBackdrop').classList.add('hidden');
+    }
+
+    // ─── Load ─────────────────────────────────────────────────
+    async function loadWeek(weekStart) {
+        document.getElementById('gridLoading').classList.remove('hidden');
+        document.getElementById('mobileView').classList.add('hidden');
+        document.getElementById('desktopView').classList.add('hidden');
+        document.getElementById('gridEmpty').classList.add('hidden');
+        closePopover();
+
+        const user = (typeof Auth!=='undefined'&&Auth.getUser)?Auth.getUser():null;
+        if (!user?.user_id) { teacherSessions=[]; renderAll(); return; }
+
+        try {
+            const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-sessions&user_id=${encodeURIComponent(user.user_id)}&week_start=${encodeURIComponent(toYMD(weekStart))}`);
+            teacherSessions = res.data?.success && Array.isArray(res.data.sessions) ? res.data.sessions : [];
+        } catch(e) {
+            console.error('Failed to load sessions:', e);
+            teacherSessions = [];
         }
 
-        async function promptTeacherReportAbsent(sessionId, studentId, studentName, sessionDate) {
-            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
-            if (!user?.user_id || !sessionId || !studentId) return;
+        // Auto-select today's day index if in this week
+        const td = todayYMD();
+        const todayInWeek = Array.from({length:7},(_,i)=>toYMD(addDays(weekStart,i))).indexOf(td);
+        if (todayInWeek >= 0) activeDayIndex = todayInWeek;
 
-            const result = await Swal.fire({
-                icon: 'warning',
-                title: 'Report student absent?',
-                text: `Mark ${studentName || 'this student'} as absent for ${sessionDate || 'this session'}.`,
-                input: 'text',
-                inputLabel: 'Optional note',
-                inputPlaceholder: 'Student did not come to the lesson',
-                showCancelButton: true,
-                confirmButtonText: 'Report Absent',
-                cancelButtonText: 'Keep Open',
-                confirmButtonColor: '#dc2626'
-            });
-            if (!result.isConfirmed) return;
+        updateSummaryBar();
+        renderAll();
+    }
 
-            try {
-                const response = await axios.post(`${baseApiUrl}/attendance.php?action=record`, {
-                    student_id: Number(studentId),
-                    status: 'Absent',
-                    source: 'instructor',
-                    notes: result.value || `Reported absent by instructor for session #${Number(sessionId)}`,
-                    session_date: sessionDate,
-                    prior_notice: false
-                });
-                const data = response.data || {};
-                if (data.success) {
-                    await Swal.fire({
-                        icon: 'success',
-                        title: 'Absence Reported',
-                        text: 'Desk staff can now see the absence in attendance records.',
-                        confirmButtonColor: '#b8860b'
-                    });
-                    loadTeacherSessions(currentFilter);
-                } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Failed to report absence.', confirmButtonColor: '#b8860b' });
-                }
-            } catch (error) {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Network error while reporting absence.', confirmButtonColor: '#b8860b' });
-            }
+    // ─── Action dialogs ──────────────────────────────────────
+    async function promptCancel(id) {
+        closePopover();
+        const user = (typeof Auth!=='undefined'&&Auth.getUser)?Auth.getUser():null;
+        if (!user?.user_id||!id) return;
+        const r = await Swal.fire({icon:'warning',title:'Cancel this session?',text:'Goes to admin for rescheduling.',input:'text',inputPlaceholder:'Reason (optional)',showCancelButton:true,confirmButtonText:'Cancel Session',cancelButtonText:'Keep',confirmButtonColor:'#dc2626'});
+        if (!r.isConfirmed) return;
+        try {
+            const d = (await axios.post(`${baseApiUrl}/teachers.php?action=cancel-session`,{user_id:Number(user.user_id),session_id:Number(id),reason:r.value||''})).data||{};
+            if (d.success) { await Swal.fire({icon:'success',title:'Cancelled',confirmButtonColor:'#b8860b'}); loadWeek(currentWeekStart); }
+            else Swal.fire({icon:'error',title:'Error',text:d.error||'Failed',confirmButtonColor:'#b8860b'});
+        } catch { Swal.fire({icon:'error',title:'Error',text:'Network error',confirmButtonColor:'#b8860b'}); }
+    }
+
+    async function promptEnd(id) {
+        closePopover();
+        const user = (typeof Auth!=='undefined'&&Auth.getUser)?Auth.getUser():null;
+        if (!user?.user_id||!id) return;
+        const r = await Swal.fire({icon:'question',title:'End this session?',text:'Marks lesson as completed.',showCancelButton:true,confirmButtonText:'End Session',cancelButtonText:'Keep Open',confirmButtonColor:'#059669'});
+        if (!r.isConfirmed) return;
+        try {
+            const d = (await axios.post(`${baseApiUrl}/attendance.php?action=mark-present-by-instructor`,{session_id:Number(id),user_id:Number(user.user_id)})).data||{};
+            if (d.success) { await Swal.fire({icon:'success',title:'Session Ended',confirmButtonColor:'#b8860b'}); loadWeek(currentWeekStart); }
+            else Swal.fire({icon:'error',title:'Error',text:d.error||'Failed',confirmButtonColor:'#b8860b'});
+        } catch { Swal.fire({icon:'error',title:'Error',text:'Network error',confirmButtonColor:'#b8860b'}); }
+    }
+
+    async function promptAbsent(id, studentId, studentName, sessionDate) {
+        closePopover();
+        const user = (typeof Auth!=='undefined'&&Auth.getUser)?Auth.getUser():null;
+        if (!user?.user_id||!id||!studentId) return;
+        const r = await Swal.fire({icon:'warning',title:'Report absent?',text:`Mark ${studentName||'student'} absent for ${sessionDate||'this session'}.`,input:'text',inputLabel:'Optional note',inputPlaceholder:'Student did not come',showCancelButton:true,confirmButtonText:'Report Absent',cancelButtonText:'Keep',confirmButtonColor:'#dc2626'});
+        if (!r.isConfirmed) return;
+        try {
+            const d = (await axios.post(`${baseApiUrl}/attendance.php?action=record`,{student_id:Number(studentId),status:'Absent',source:'instructor',notes:r.value||`Absent – session #${id}`,session_date:sessionDate,prior_notice:false})).data||{};
+            if (d.success) { await Swal.fire({icon:'success',title:'Absence Reported',confirmButtonColor:'#b8860b'}); loadWeek(currentWeekStart); }
+            else Swal.fire({icon:'error',title:'Error',text:d.error||'Failed',confirmButtonColor:'#b8860b'});
+        } catch { Swal.fire({icon:'error',title:'Error',text:'Network error',confirmButtonColor:'#b8860b'}); }
+    }
+
+    window.closePopover = closePopover;
+    window.promptCancel = promptCancel;
+    window.promptEnd    = promptEnd;
+    window.promptAbsent = promptAbsent;
+
+    // ─── Boot ─────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof Auth!=='undefined'&&Auth.getUser) {
+            const u = Auth.getUser()||{};
+            const name = [u.first_name,u.last_name].filter(Boolean).join(' ')||u.username||u.email||'Instructor';
+            const el = document.getElementById('instructorNameNav');
+            if (el) el.textContent = name;
         }
+        currentWeekStart = getMondayOf(new Date());
+        loadWeek(currentWeekStart);
 
-        window.promptTeacherCancellation = promptTeacherCancellation;
-        window.promptTeacherEndSession = promptTeacherEndSession;
-        window.promptTeacherReportAbsent = promptTeacherReportAbsent;
-
-        document.addEventListener('DOMContentLoaded', () => {
-            if (typeof Auth !== 'undefined' && Auth.getUser) {
-                const user = Auth.getUser() || {};
-                const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || user.email || 'Instructor';
-                const nameEl = document.getElementById('instructorNameNav');
-                if (nameEl) nameEl.textContent = displayName;
-            }
-            loadTeacherSessions('today');
-            const filters = document.querySelectorAll('.session-filter');
-            filters.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    filters.forEach(b => b.className = 'session-filter px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100');
-                    btn.className = 'session-filter px-4 py-2 text-sm font-semibold rounded-xl bg-obsidian text-white';
-                    loadTeacherSessions(btn.dataset.filter);
-                });
-            });
-        });
+        document.getElementById('prevWeekBtn').addEventListener('click',()=>{ currentWeekStart=addDays(currentWeekStart,-7); loadWeek(currentWeekStart); });
+        document.getElementById('nextWeekBtn').addEventListener('click',()=>{ currentWeekStart=addDays(currentWeekStart,7);  loadWeek(currentWeekStart); });
+        document.getElementById('todayBtn').addEventListener('click',()=>{ currentWeekStart=getMondayOf(new Date()); loadWeek(currentWeekStart); });
+    });
     </script>
     <script src="../../js/session_timeout.js"></script>
 </body>
