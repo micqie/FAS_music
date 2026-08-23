@@ -678,406 +678,447 @@
 
 #walkinEnrollmentModal > div,
 #walkinEnrollmentModal .walkin-enrollment-panel {
-    width: min(97vw, 96rem);
-    max-width: min(97vw, 96rem);
-    height: min(96vh, 60rem);
-    max-height: min(96vh, 60rem);
-    border-radius: 1.15rem;
-    border: 1px solid #dbe4f0;
-    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-    box-shadow: 0 30px 70px rgba(15, 23, 42, 0.18);
+    width: min(96vw, 1120px);
+    max-width: min(96vw, 1120px);
+    height: min(92vh, 600px);
+    max-height: min(92vh, 600px);
+    border-radius: 1.4rem;
+    border: 0;
+    background: #fff;
+    box-shadow: 0 28px 90px rgba(17, 24, 39, 0.24);
     overflow: hidden;
     display: flex;
     flex-direction: column;
 }
 
-#walkinEnrollmentModal .desk-modal-header,
 #walkinEnrollmentModal .walkin-enrollment-header {
-    padding: 0.85rem 1rem;
+    padding: 1.35rem 1.8rem 1.2rem;
+    border-bottom: 1px solid #dbe3ef;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
 }
 
-#walkinEnrollmentModal .desk-modal-header h3,
-#walkinEnrollmentModal .walkin-enrollment-title {
-    font-size: 1.35rem;
+#walkinEnrollmentModal .walkin-enrollment-header h3 {
+    font-size: 1.55rem;
+    line-height: 1.15;
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
     color: #0f172a;
 }
 
-#walkinEnrollmentModal .desk-modal-header p,
-#walkinEnrollmentModal .walkin-enrollment-subtitle {
-    margin-top: 0.15rem;
-    font-size: 0.92rem;
-    line-height: 1.4;
+#walkinEnrollmentModal .walkin-enrollment-header p {
+    margin-top: 0.35rem;
+    font-size: 0.95rem;
     color: #64748b;
 }
 
-#walkinEnrollmentModal .desk-modal-body,
+#walkinEnrollmentModal .walkin-modal-close {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    color: #94a3b8;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+#walkinEnrollmentModal .walkin-modal-close:hover {
+    color: #475569;
+    background: #f8fafc;
+}
+
 #walkinEnrollmentModal .walkin-enrollment-body {
-    padding: 0.9rem 1rem 1rem;
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
-}
-
-#walkinEnrollmentModal .desk-modal-footer,
-#walkinEnrollmentModal .walkin-enrollment-footer {
-    padding-top: 0.85rem;
-    margin-top: 0.85rem;
-}
-
-#walkinEnrollmentModal label,
-#walkinEnrollmentModal .desk-modal-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #475569;
-    margin-bottom: 0.35rem;
-}
-
-#walkinEnrollmentModal .desk-modal-hint,
-#walkinEnrollmentModal .text-xs.text-slate-500 {
-    color: #64748b;
-}
-
-#walkinEnrollmentModal input:not([type="hidden"]):not([type="file"]),
-#walkinEnrollmentModal select,
-#walkinEnrollmentModal textarea {
-    border: 1px solid #d7e1ee;
-    border-radius: 0.9rem;
-    background: #fff;
-    color: #0f172a;
-    min-height: 2.75rem;
-    padding: 0.65rem 0.85rem;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-#walkinEnrollmentModal input:not([type="hidden"]):focus,
-#walkinEnrollmentModal select:focus,
-#walkinEnrollmentModal textarea:focus {
-    border-color: #b8860b;
-    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.14);
-}
-
-#walkinEnrollmentModal .walkin-field-group,
-#walkinEnrollmentModal .desk-modal-note,
-#walkinEnrollmentModal #walkinAmountInfo,
-#walkinEnrollmentModal #walkinInstrumentsContainer,
-#walkinEnrollmentModal #walkinStudentResults {
-    border: 1px solid #dbe4f0;
-    border-radius: 1rem;
-    background: #fff;
-}
-
-#walkinEnrollmentModal .walkin-field-group {
     padding: 0;
-    border: 0;
-    background: transparent;
 }
 
-#walkinEnrollmentModal .walkin-summary-panel {
-    border: 1px solid #dbe4f0;
-    border-radius: 1.05rem;
-    background: #f8fbff;
-    padding: 1rem;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+#walkinEnrollmentModal .walkin-enrollment-grid {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
 }
 
-#walkinEnrollmentModal .walkin-summary-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin-bottom: 0.9rem;
-}
-
-#walkinEnrollmentModal .walkin-summary-content {
-    border: 0;
-    background: transparent !important;
-    padding: 0;
-    color: #334155;
-    font-size: 0.92rem;
-    line-height: 1.45;
-}
-
-#walkinEnrollmentModal .walkin-summary-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    align-items: flex-start;
-}
-
-#walkinEnrollmentModal .walkin-summary-row + .walkin-summary-row {
-    margin-top: 0.9rem;
-    padding-top: 0.9rem;
-    border-top: 1px solid #dbe4f0;
-}
-
-#walkinEnrollmentModal .walkin-summary-label {
-    color: #64748b;
-}
-
-#walkinEnrollmentModal .walkin-summary-value {
-    font-weight: 700;
-    color: #0f172a;
-    text-align: right;
-}
-
-#walkinEnrollmentModal .walkin-summary-subtext {
-    margin-top: 0.2rem;
-    font-size: 0.8rem;
-    color: #64748b;
-}
-
-#walkinEnrollmentModal .walkin-summary-total {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    align-items: flex-end;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #dbe4f0;
-}
-
-#walkinEnrollmentModal .walkin-summary-total .walkin-summary-label {
-    font-size: 0.98rem;
-    font-weight: 700;
-    color: #0f172a;
-}
-
-#walkinEnrollmentModal .walkin-summary-total .walkin-summary-value {
-    font-size: 1.55rem;
-    color: #2f6cf6;
-    line-height: 1;
-}
-
-#walkinEnrollmentModal .walkin-summary-balance {
-    margin-top: 0.35rem;
-    font-size: 0.82rem;
-    color: #64748b;
-    text-align: right;
-}
-
-#walkinEnrollmentModal .walkin-sidebar-stack {
+#walkinEnrollmentModal .walkin-main-column {
+    min-width: 0;
+    padding: 1.35rem 1.8rem 1.15rem;
     display: flex;
     flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#walkinEnrollmentModal .walkin-sidebar-card {
+    background: #f7f9fc;
+    border-left: 1px solid #dbe3ef;
+    padding: 1.7rem 1.8rem 1.45rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+#walkinEnrollmentModal .walkin-section-card {
+    min-width: 0;
+}
+
+#walkinEnrollmentModal .walkin-step-header {
+    display: flex;
+    align-items: center;
     gap: 0.85rem;
 }
 
-#walkinEnrollmentModal .walkin-steps-scroll {
-    min-height: 0;
-    max-height: 100%;
-    overflow-y: auto;
-    padding-right: 0.25rem;
-    scrollbar-gutter: stable;
-}
-
-#walkinEnrollmentModal .walkin-sidebar-fixed {
-    align-self: start;
-}
-
-#walkinEnrollmentModal .walkin-sidebar-fixed .walkin-summary-panel {
-    position: relative;
-}
-
-#walkinEnrollmentModal #walkinAmountInfo,
-#walkinEnrollmentModal .desk-modal-note {
-    padding: 0.75rem 0.85rem;
-    font-size: 0.88rem;
-    line-height: 1.4;
-}
-
-#walkinEnrollmentModal #walkinAmountInfo.walkin-summary-content {
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent !important;
-}
-
-#walkinEnrollmentModal #walkinStudentResults,
-#walkinEnrollmentModal #walkinInstrumentsContainer {
-    padding: 0.65rem;
-    max-height: 16rem;
-    overflow-y: auto;
-}
-
-#walkinEnrollmentModal .desk-modal-list-item {
-    border-radius: 0.85rem;
-    border-color: #dbe4f0;
-    padding: 0.65rem 0.8rem;
-    background: #fff;
-}
-
-#walkinEnrollmentModal .desk-modal-list-item + .desk-modal-list-item {
-    margin-top: 0.5rem;
-}
-
-#walkinEnrollmentModal .desk-modal-btn,
-#walkinEnrollmentModal button {
-    border-radius: 0.9rem;
-}
-
-#walkinEnrollmentModal .desk-modal-btn-secondary,
-#walkinEnrollmentModal button.bg-slate-100 {
-    background: #f1f5f9;
-}
-
-#walkinEnrollmentModal .desk-modal-btn-gold,
-#walkinEnrollmentModal button.bg-gold-500,
-#walkinEnrollmentModal button[class*="from-gold-500"] {
-    box-shadow: 0 10px 24px rgba(184, 134, 11, 0.16);
-}
-
-#walkinEnrollmentModal .desk-modal-btn-gold:hover,
-#walkinEnrollmentModal button.bg-gold-500:hover,
-#walkinEnrollmentModal button[class*="from-gold-500"]:hover {
-    transform: translateY(-1px);
-}
-
-#walkinEnrollmentModal .walkin-package-grid {
+#walkinEnrollmentModal .walkin-step-badge {
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 999px;
+    background: #0f172a;
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 800;
     display: grid;
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-    gap: 0.75rem;
+    place-items: center;
+    flex: 0 0 auto;
 }
 
-#walkinEnrollmentModal .walkin-payment-grid {
-    display: grid;
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-    gap: 0.75rem;
+#walkinEnrollmentModal .walkin-step-header h2 {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.01em;
 }
 
-@media (min-width: 768px) {
-    #walkinEnrollmentModal .walkin-package-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    #walkinEnrollmentModal .walkin-payment-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
+#walkinEnrollmentModal .walkin-section-copy {
+    margin-top: 0.65rem;
+    font-size: 0.97rem;
+    line-height: 1.45;
+    color: #64748b;
 }
 
-#walkinEnrollmentModal .walkin-package-card {
+#walkinEnrollmentModal .walkin-search-wrap {
+    margin-top: 0.95rem;
+}
+
+#walkinEnrollmentModal .walkin-search-input,
+#walkinEnrollmentModal .walkin-instrument-select,
+#walkinEnrollmentModal .walkin-payment-select {
     width: 100%;
-    text-align: left;
-    padding: 0.95rem 1rem;
-    border: 2px solid #dbe4f0;
-    border-radius: 1rem;
+    min-height: 3rem;
+    border: 1px solid #d3dbea;
+    border-radius: 0.95rem;
     background: #fff;
     color: #0f172a;
-    transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+    font-size: 1rem;
+    padding: 0.72rem 0.9rem;
+    outline: none;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
-#walkinEnrollmentModal .walkin-package-card:hover {
-    border-color: #bfdbfe;
-    background: #fcfdff;
-    transform: translateY(-1px);
+#walkinEnrollmentModal .walkin-search-input {
+    padding-left: 2.75rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M9.167 14.333a5.167 5.167 0 1 0 0-10.333 5.167 5.167 0 0 0 0 10.333Z' stroke='%2394A3B8' stroke-width='1.6'/%3E%3Cpath d='M13 13l3.5 3.5' stroke='%2394A3B8' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 0.9rem center;
 }
 
-#walkinEnrollmentModal .walkin-package-card.is-selected {
-    border-color: #2f6cf6;
-    background: #eef4ff;
-    box-shadow: 0 0 0 1px rgba(47, 108, 246, 0.12);
+#walkinEnrollmentModal .walkin-search-input:focus,
+#walkinEnrollmentModal .walkin-instrument-select:focus,
+#walkinEnrollmentModal .walkin-payment-select:focus {
+    border-color: #d59b13;
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.16);
 }
 
-#walkinEnrollmentModal .walkin-package-card-title {
+#walkinEnrollmentModal .walkin-search-input::placeholder {
+    color: #94a3b8;
+}
+
+#walkinEnrollmentModal .walkin-selected-student-card {
+    margin-top: 0.9rem;
+    min-height: 5rem;
+    border: 1px solid #f0c75b;
+    border-radius: 0;
+    background: #fdf7e8;
+    padding: 0.95rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+#walkinEnrollmentModal .walkin-selected-student-card.hidden {
+    display: none !important;
+}
+
+#walkinEnrollmentModal .walkin-selected-avatar {
+    width: 2.8rem;
+    height: 2.8rem;
+    border-radius: 999px;
+    background: #c58c0f;
+    color: #fff;
     font-size: 0.95rem;
-    font-weight: 700;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    letter-spacing: 0.02em;
+}
+
+#walkinEnrollmentModal .walkin-selected-name {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #111827;
     line-height: 1.2;
 }
 
-#walkinEnrollmentModal .walkin-package-card-subtitle {
-    margin-top: 0.3rem;
-    font-size: 0.82rem;
-    color: #6b7a90;
+#walkinEnrollmentModal .walkin-selected-meta {
+    margin-top: 0.2rem;
+    font-size: 0.86rem;
+    color: #475569;
     line-height: 1.35;
 }
 
-#walkinEnrollmentModal .walkin-package-card-price {
-    margin-top: 0.85rem;
-    font-size: 1.02rem;
+#walkinEnrollmentModal .walkin-change-btn {
+    margin-left: auto;
+    padding: 0.4rem 0.9rem;
+    border-radius: 4px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #a16207;
+    background: transparent;
+    transition: background 0.15s ease;
+}
+
+#walkinEnrollmentModal .walkin-change-btn:hover {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+#walkinEnrollmentModal .walkin-results-list {
+    margin-top: 0.9rem;
+    border: 1px solid #d3dbea;
+    border-radius: 0;  /* Square corners */
+    background: #fff;
+    overflow-y: auto;  /* Enable vertical scrolling */
+    max-height: 18rem;  /* Increased height for more visible items */
+}
+
+/* Custom scrollbar for student list */
+#walkinEnrollmentModal .walkin-results-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#walkinEnrollmentModal .walkin-results-list::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 0;
+}
+
+#walkinEnrollmentModal .walkin-results-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+#walkinEnrollmentModal .walkin-results-list::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+#walkinEnrollmentModal .walkin-empty-state {
+    padding: 1rem 0.9rem;
+    color: #94a3b8;
+    
+    font-size: 0.93rem;
+    text-align: center;
+}
+
+#walkinEnrollmentModal .desk-modal-list-item,
+#walkinEnrollmentModal .walkin-student-result {
+    border: 0;
+    border-radius: 0;
+}
+
+#walkinEnrollmentModal .walkin-status-info {
+    margin-top: 0.55rem;
+    font-size: 0.88rem;
+    color: #64748b;
+}
+
+#walkinEnrollmentModal .walkin-learning-card {
+    margin-top: 1rem;
+    border: 1px solid #d3dbea;
+    border-radius: 0;
+    background: #fff;
+    padding: 1rem;
+}
+
+#walkinEnrollmentModal .walkin-learning-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: end;
+}
+
+#walkinEnrollmentModal .walkin-field-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #475569;
+}
+
+#walkinEnrollmentModal .walkin-session-stepper {
+    min-width: 7.7rem;
+    height: 3rem;
+    border: 1px solid #d3dbea;
+    border-radius: 0.85rem;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: stretch;
+    overflow: hidden;
+    background: #fff;
+}
+
+#walkinEnrollmentModal .walkin-stepper-btn {
+    color: #64748b;
+    background: #fff;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+#walkinEnrollmentModal .walkin-stepper-btn:hover:not(:disabled) {
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+#walkinEnrollmentModal .walkin-stepper-btn:disabled {
+    color: #cbd5e1;
+    cursor: not-allowed;
+}
+
+#walkinEnrollmentModal .walkin-session-count {
+    min-width: 2.5rem;
+    display: grid;
+    place-items: center;
+    font-size: 1rem;
     font-weight: 800;
     color: #0f172a;
 }
 
-#walkinEnrollmentModal .walkin-package-card-check {
-    margin-left: auto;
-    width: 1.3rem;
-    height: 1.3rem;
-    border-radius: 999px;
-    color: #2f6cf6;
-    flex-shrink: 0;
-}
-
-#walkinEnrollmentModal .walkin-choice-card {
-    width: 100%;
-    text-align: left;
-    padding: 0.9rem 0.95rem;
-    border: 2px solid #dbe4f0;
-    border-radius: 1rem;
-    background: #fff;
+#walkinEnrollmentModal .walkin-sidebar-section h3 {
+    font-size: 1.05rem;
+    font-weight: 800;
     color: #0f172a;
-    min-height: 5rem;
-    transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+    margin-bottom: 0.85rem;
 }
 
-#walkinEnrollmentModal .walkin-choice-card:hover {
-    border-color: #bfdbfe;
-    background: #fcfdff;
-    transform: translateY(-1px);
+#walkinEnrollmentModal .walkin-summary-divider {
+    height: 1px;
+    background: #d9e2ef;
 }
 
-#walkinEnrollmentModal .walkin-choice-card.is-selected {
-    border-color: #2f6cf6;
-    background: #eef4ff;
-    box-shadow: 0 0 0 1px rgba(47, 108, 246, 0.12);
-}
-
-#walkinEnrollmentModal .walkin-choice-card-title {
-    font-size: 0.94rem;
-    font-weight: 700;
-    line-height: 1.2;
-}
-
-#walkinEnrollmentModal .walkin-choice-card-subtitle {
-    margin-top: 0.25rem;
-    font-size: 0.8rem;
-    color: #6b7a90;
-    line-height: 1.35;
-}
-
-#walkinEnrollmentModal .walkin-choice-card-radio {
-    width: 1.15rem;
-    height: 1.15rem;
-    border-radius: 999px;
-    border: 1.5px solid #bfd0ea;
-    flex: 0 0 auto;
-    margin-top: 0.15rem;
+#walkinEnrollmentModal .walkin-summary-content {
+    color: #334155;
     display: grid;
-    place-items: center;
-    background: #fff;
+    gap: 0.7rem;
+    font-size: 0.97rem;
 }
 
-#walkinEnrollmentModal .walkin-choice-card.is-selected .walkin-choice-card-radio {
-    border-color: #2f6cf6;
+#walkinEnrollmentModal .walkin-summary-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: baseline;
 }
 
-#walkinEnrollmentModal .walkin-choice-card-radio-dot {
-    width: 0.55rem;
-    height: 0.55rem;
-    border-radius: 999px;
+#walkinEnrollmentModal .walkin-summary-line span:first-child {
+    color: #475569;
+}
+
+#walkinEnrollmentModal .walkin-summary-line span:last-child {
+    font-weight: 500;
+    color: #334155;
+    text-align: right;
+}
+
+#walkinEnrollmentModal .walkin-summary-total {
+    margin-top: 0.45rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-end;
+    color: #0f172a;
+}
+
+#walkinEnrollmentModal .walkin-summary-total span:first-child {
+    font-size: 1.02rem;
+    font-weight: 800;
+}
+
+#walkinEnrollmentModal .walkin-summary-total span:last-child {
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+#walkinEnrollmentModal .walkin-actions {
+    margin-top: auto;
+    padding-top: 0.45rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+#walkinEnrollmentModal .walkin-enroll-btn,
+#walkinEnrollmentModal .walkin-cancel-btn {
+    width: 100%;
+    border-radius: 0.95rem;
+    min-height: 3.35rem;
+    font-weight: 800;
+    transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+#walkinEnrollmentModal .walkin-enroll-btn {
+    background: #c89411;
+    color: #fff;
+    box-shadow: 0 12px 24px rgba(201, 148, 17, 0.18);
+}
+
+#walkinEnrollmentModal .walkin-enroll-btn:hover {
+    transform: translateY(-1px);
+    background: #b8860b;
+}
+
+#walkinEnrollmentModal .walkin-cancel-btn {
+    color: #334155;
     background: transparent;
 }
 
-#walkinEnrollmentModal .walkin-choice-card.is-selected .walkin-choice-card-radio-dot {
-    background: #2f6cf6;
+#walkinEnrollmentModal .walkin-cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+#walkinEnrollmentModal .walkin-package-grid,
+#walkinEnrollmentModal .walkin-payment-grid,
+#walkinEnrollmentModal .walkin-sidebar-stack,
+#walkinEnrollmentModal .walkin-field-group {
+    display: none !important;
+}
+
+#walkinEnrollmentModal .walkin-instrument-select {
+    min-height: 3rem;
+}
+
+#walkinEnrollmentModal .walkin-payment-select {
+    margin-bottom: 0;
 }
 
 @media (min-width: 1024px) {
-    #walkinEnrollmentModal .walkin-enrollment-body > .grid {
-        gap: 1rem;
+    #walkinEnrollmentModal .walkin-enrollment-grid {
+        grid-template-columns: minmax(0, 1.65fr) minmax(310px, 0.8fr);
+    }
+
+    #walkinEnrollmentModal .walkin-sidebar-card {
+        min-height: 0;
     }
 }
 

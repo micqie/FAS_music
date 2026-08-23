@@ -442,14 +442,20 @@
 
         function updateWalkinSelectedStudentCard(student) {
             const card = document.getElementById('walkinSelectedStudentCard');
+            const avatarEl = document.getElementById('walkinSelectedStudentAvatar');
             const nameEl = document.getElementById('walkinSelectedStudentName');
             const metaEl = document.getElementById('walkinSelectedStudentMeta');
+            const searchWrap = document.getElementById('walkinStudentSearchWrap');
+            const resultsEl = document.getElementById('walkinStudentResults');
             if (!card || !nameEl || !metaEl) return;
 
             if (!student) {
                 card.classList.add('hidden');
                 nameEl.textContent = '—';
                 metaEl.textContent = '—';
+                if (avatarEl) avatarEl.textContent = '--';
+                if (searchWrap) searchWrap.classList.remove('hidden');
+                if (resultsEl) resultsEl.classList.remove('hidden');
                 return;
             }
 
@@ -457,7 +463,13 @@
             const phone = student.phone || 'No phone';
             nameEl.textContent = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
             metaEl.textContent = `${student.email || 'No email'} • ${phone} • ${branch}`;
+            if (avatarEl) {
+                const initials = `${String(student.first_name || '').trim().charAt(0) || ''}${String(student.last_name || '').trim().charAt(0) || ''}`.toUpperCase();
+                avatarEl.textContent = initials || 'ST';
+            }
             card.classList.remove('hidden');
+            if (searchWrap) searchWrap.classList.add('hidden');
+            if (resultsEl) resultsEl.classList.add('hidden');
         }
 
         function renderWalkinStudentResults(query) {
@@ -503,7 +515,7 @@
                     <button
                         type="button"
                         class="walkin-student-result w-full desk-modal-list-item text-left transition ${isSelected ? 'border-gold-500 bg-amber-50' : 'hover:bg-slate-50'}"
-                        data-student-index="${index}"
+                        data-student-email="${escapeHtml(String(student.email || ''))}"
                     >
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
@@ -526,9 +538,11 @@
             const cardsContainer = document.getElementById('walkinPackageCards');
             if (!packageSelect || !cardsContainer) return;
 
-            const options = Array.from(packageSelect.options || []).filter(option => String(option.value || '').trim());
+            const options = Array.from(packageSelect.options || [])
+                .filter(option => String(option.value || '').trim())
+                .filter(option => Number(option.getAttribute('data-sessions') || 0) > 12);
             if (!options.length) {
-                cardsContainer.innerHTML = '';
+                cardsContainer.innerHTML = '<div class="text-sm text-slate-500">12 sessions is the default package.</div>';
                 return;
             }
 
@@ -542,6 +556,7 @@
                         type="button"
                         class="walkin-package-card ${isSelected ? 'is-selected' : ''}"
                         data-package-id="${escapeHtml(String(option.value || ''))}"
+                        data-session-count="${sessions}"
                     >
                         <div class="flex items-start gap-3">
                             <div class="min-w-0 flex-1">
@@ -554,6 +569,116 @@
                     </button>
                 `;
             }).join('');
+        }
+
+        function getWalkinPackageOptions() {
+            const packageSelect = document.getElementById('walkinPackageSelect');
+            if (!packageSelect) return [];
+            return Array.from(packageSelect.options || []).filter(option => String(option.value || '').trim());
+        }
+
+        function getWalkinSessionSelect() {
+            return document.getElementById('walkinSessionSelect');
+        }
+
+        function getWalkinSelectedPackageOption() {
+            const packageSelect = document.getElementById('walkinPackageSelect');
+            const sessionSelect = getWalkinSessionSelect();
+            if (!packageSelect || !sessionSelect) return null;
+
+            const selectedSessionCount = Number(sessionSelect.value || 12);
+            const options = getWalkinPackageOptions();
+            return options.find(option => Number(option.getAttribute('data-sessions') || 0) === selectedSessionCount)
+                || options.find(option => Number(option.getAttribute('data-sessions') || 0) === 12)
+                || options[0]
+                || null;
+        }
+
+        function syncWalkinSessionSelectUI() {
+            const sessionSelect = getWalkinSessionSelect();
+            const selectedPackage = getWalkinSelectedPackageOption();
+            if (!sessionSelect) return;
+
+            const sessions = Number(selectedPackage?.getAttribute('data-sessions') || 12);
+            sessionSelect.value = String(sessions || 12);
+        }
+
+        function selectWalkinSessionPackage(sessionCount) {
+            const sessionSelect = getWalkinSessionSelect();
+            if (!sessionSelect) return;
+
+            sessionSelect.value = String(sessionCount || 12);
+            const selectedPackage = getWalkinSelectedPackageOption();
+            const packageSelect = document.getElementById('walkinPackageSelect');
+            if (packageSelect && selectedPackage) {
+                packageSelect.value = String(selectedPackage.value || '');
+            }
+            updateWalkinPackageUI();
+        }
+
+        function syncWalkinSessionStepperUI() {
+            syncWalkinSessionSelectUI();
+        }
+
+        function selectWalkinPackageByOffset(delta) {
+            const sessionSelect = getWalkinSessionSelect();
+            if (!sessionSelect) return;
+            const sessions = [12, 20, 50];
+            const currentIndex = sessions.indexOf(Number(sessionSelect.value || 12));
+            const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+            const nextIndex = Math.max(0, Math.min(sessions.length - 1, safeIndex + delta));
+            selectWalkinSessionPackage(sessions[nextIndex]);
+        }
+
+        function syncWalkinInstrumentDefaults() {
+            const container = document.getElementById('walkinInstrumentsContainer');
+            if (!container) return;
+
+            const typeSelects = Array.from(container.querySelectorAll('select.student-request-instrument-type'));
+            if (!typeSelects.length) return;
+
+            const types = typeof getStudentRequestAvailableTypes === 'function'
+                ? getStudentRequestAvailableTypes()
+                : [];
+            const usedTypes = new Set();
+
+            typeSelects.forEach((select) => {
+                const currentValue = String(select.value || '').trim();
+                if (currentValue) {
+                    usedTypes.add(currentValue);
+                    return;
+                }
+
+                const nextType = types.find(type => !usedTypes.has(String(type.type_id)));
+                if (!nextType) return;
+
+                const nextValue = String(nextType.type_id || '');
+                select.value = nextValue;
+                usedTypes.add(nextValue);
+            });
+
+            if (typeof _syncStudentRequestTypeDisabledStates === 'function') {
+                _syncStudentRequestTypeDisabledStates();
+            }
+        }
+
+        function getWalkinPrimaryInstrumentLabel() {
+            const container = document.getElementById('walkinInstrumentsContainer');
+            if (!container) return '';
+
+            const typeSelect = container.querySelector('select.student-request-instrument-type');
+            if (!typeSelect) return '';
+
+            const option = typeSelect.options?.[typeSelect.selectedIndex];
+            return String(option?.textContent || '').trim();
+        }
+
+        function getWalkinSelectedInstrumentIds() {
+            return typeof getStudentRequestSelectedInstrumentIds === 'function'
+                ? getStudentRequestSelectedInstrumentIds()
+                : Array.from(document.querySelectorAll('#walkinInstrumentsContainer select.student-request-instrument'))
+                    .map(el => parseInt(el.value, 10))
+                    .filter(value => !Number.isNaN(value) && value > 0);
         }
 
         function syncWalkinPackageCardSelection() {
@@ -630,10 +755,11 @@
             const hidden = document.getElementById('walkinStudentSelect');
             const statusEl = document.getElementById('walkinStatusInfo');
             const packageSelect = document.getElementById('walkinPackageSelect');
+            const sessionSelect = getWalkinSessionSelect();
             const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
             const submitBtn = document.getElementById('submitWalkinEnrollmentBtn');
             const input = document.getElementById('walkinStudentSearch');
-            if (!hidden || !packageSelect || !instrumentsContainer) return;
+            if (!hidden || !packageSelect || !sessionSelect || !instrumentsContainer) return;
 
             hidden.value = student ? String(student.email || '') : '';
             if (input) input.value = student ? getWalkinStudentLabel(student) : '';
@@ -642,13 +768,15 @@
 
             if (!student || !hidden.value) {
                 packageSelect.innerHTML = '<option value="">Select package...</option>';
+                sessionSelect.value = '12';
                 renderWalkinPackageCards();
                 renderWalkinPaymentTypeCards();
                 syncWalkinPaymentTypeCardSelection();
-                instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
+                instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a student first.</div>';
                 if (statusEl) statusEl.textContent = '';
                 if (submitBtn) submitBtn.disabled = false;
                 walkinMeta = null;
+                syncWalkinSessionSelectUI();
                 return;
             }
 
@@ -670,12 +798,16 @@
                 const price = formatCurrencyPHP(pkg.price || 0);
                 return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''}) - ${price}</option>`;
             }).join('');
-            if (previousValue && packages.some(pkg => String(pkg.package_id) === previousValue)) {
-                packageSelect.value = previousValue;
-            } else if (defaultPackageId && packages.some(pkg => String(pkg.package_id) === defaultPackageId)) {
-                packageSelect.value = defaultPackageId;
-            } else if (packageScope === 'initial' || packages.length === 1) {
-                packageSelect.value = String(packages[0]?.package_id || '');
+            const selectedPackage = packages.find(pkg => String(pkg.package_id) === previousValue)
+                || packages.find(pkg => String(pkg.package_id) === defaultPackageId)
+                || packages.find(pkg => Number(pkg.sessions || 0) === 12)
+                || packages[0]
+                || null;
+            if (selectedPackage) {
+                packageSelect.value = String(selectedPackage.package_id || '');
+                sessionSelect.value = String(Number(selectedPackage.sessions || 12));
+            } else {
+                sessionSelect.value = '12';
             }
             renderWalkinPackageCards();
             renderWalkinPaymentTypeCards();
@@ -690,12 +822,15 @@
             }
             if (submitBtn) submitBtn.disabled = hasPending;
             updateWalkinPackageUI();
+            syncWalkinSessionSelectUI();
         }
 
         function openWalkinEnrollmentModal() {
             const modal = document.getElementById('walkinEnrollmentModal');
             if (!modal) return;
             loadWalkinStudents();
+            updateWalkinPackageUI();
+            syncWalkinSessionSelectUI();
             document.body.style.overflow = 'hidden';
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -722,65 +857,60 @@
             if (searchInput) searchInput.value = '';
             if (hiddenSelect) hiddenSelect.value = '';
             if (packageSelect) packageSelect.innerHTML = '<option value="">Select package...</option>';
+            const sessionSelect = getWalkinSessionSelect();
+            if (sessionSelect) sessionSelect.value = '12';
             renderWalkinPackageCards();
             renderWalkinPaymentTypeCards();
             syncWalkinPaymentTypeCardSelection();
             if (instrumentsContainer) instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a package first.</div>';
             updateWalkinSelectedStudentCard(null);
             renderWalkinStudentResults('');
+            syncWalkinSessionSelectUI();
         }
 
         function updateWalkinPackageUI() {
             const packageSelect = document.getElementById('walkinPackageSelect');
-            const paymentTypeEl = document.getElementById('walkinPaymentType');
+            const sessionSelect = getWalkinSessionSelect();
             const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
             const amountEl = document.getElementById('walkinAmountInfo');
-            if (!packageSelect || !paymentTypeEl || !instrumentsContainer || !amountEl) return;
+            if (!packageSelect || !sessionSelect || !instrumentsContainer || !amountEl) return;
 
-            const selected = packageSelect.options[packageSelect.selectedIndex];
+            const selectedSession = Number(sessionSelect.value || 12);
+            const selected = Array.from(packageSelect.options || []).find(option => Number(option.getAttribute('data-sessions') || 0) === selectedSession)
+                || Array.from(packageSelect.options || []).find(option => Number(option.getAttribute('data-sessions') || 0) === 12)
+                || packageSelect.options[0]
+                || null;
+            if (selected) {
+                packageSelect.value = String(selected.value || '');
+            }
             const maxInst = Number(selected?.getAttribute('data-max-instruments') || 0);
             const price = Number(selected?.getAttribute('data-price') || 0);
             const sessions = Number(selected?.getAttribute('data-sessions') || 0);
-            const paymentType = String(paymentTypeEl.value || 'Partial Payment');
             syncWalkinPackageCardSelection();
-            syncWalkinPaymentTypeCardSelection();
-            const registrationFeeDue = typeof getRegistrationFeeDueAmount === 'function'
-                ? getRegistrationFeeDueAmount(walkinMeta?.student || null)
-                : 1000;
-            const partialDeposit = 5000;
-            const partialAmount = computeStudentRequestPayableNow(price, sessions, 'Partial Payment');
-            const fullAmount = computeStudentRequestPayableNow(price, sessions, 'Full Payment');
-            const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType, registrationFeeDue);
-            const enrollmentNow = computeStudentRequestPayableNow(price, sessions, paymentType);
-            const summaryLabel = paymentType === 'Full Payment' ? 'Full Payment' : 'Partial Deposit';
+            syncWalkinSessionSelectUI();
+            const paymentTypeEl = document.getElementById('walkinPaymentType');
+            if (paymentTypeEl && !String(paymentTypeEl.value || '').trim()) {
+                paymentTypeEl.value = 'Full Payment';
+            }
+            const instrumentLabel = getWalkinPrimaryInstrumentLabel() || '—';
             amountEl.innerHTML = `
-                <div class="space-y-0">
-                    <div class="walkin-summary-row">
-                        <div>
-                            <div class="walkin-summary-label">Package Amount</div>
-                            <div class="walkin-summary-subtext">(${escapeHtml(selected?.textContent?.split(' (')[0] || 'Selected package')})</div>
-                        </div>
-                        <div class="walkin-summary-value">${formatCurrencyPHP(price)}</div>
-                    </div>
-                    <div class="walkin-summary-row">
-                        <div class="walkin-summary-label">Registration Fee</div>
-                        <div class="walkin-summary-value">${formatCurrencyPHP(registrationFeeDue)}</div>
-                    </div>
-                    <div class="walkin-summary-row">
-                        <div class="walkin-summary-label">${escapeHtml(summaryLabel)}</div>
-                        <div class="walkin-summary-value">${formatCurrencyPHP(enrollmentNow)}</div>
-                    </div>
-                    <div class="walkin-summary-total">
-                        <div class="walkin-summary-label">Total Due Now</div>
-                        <div class="walkin-summary-value">${formatCurrencyPHP(payableNow)}</div>
-                    </div>
-                    ${paymentType === 'Partial Payment'
-                        ? `<div class="walkin-summary-balance">Remaining balance: ${formatCurrencyPHP(Math.max(price - partialDeposit, 0))}</div>`
-                        : ''}
+                <div class="walkin-summary-line">
+                    <span>Instrument</span>
+                    <span>${escapeHtml(instrumentLabel || '—')}</span>
+                </div>
+                <div class="walkin-summary-line">
+                    <span>Sessions</span>
+                    <span>${sessions > 0 ? sessions : '—'}</span>
+                </div>
+                <div class="walkin-summary-total">
+                    <span>Total</span>
+                    <span>${formatCurrencyPHP(price)}</span>
                 </div>`;
             instrumentsContainer.innerHTML = maxInst > 0
                 ? renderStudentRequestInstrumentSelectors(maxInst, walkinMeta?.instruments || [])
                 : '<div class="text-sm text-slate-500">Select a package first.</div>';
+            syncWalkinInstrumentDefaults();
+            renderWalkinPackageCards();
         }
 
         async function handleWalkinStudentChange() {
@@ -2461,10 +2591,11 @@
             document.getElementById('walkinEnrollmentForm')?.addEventListener('submit', submitWalkinEnrollment);
             document.getElementById('walkinStudentSearch')?.addEventListener('input', handleWalkinStudentChange);
             document.getElementById('walkinStudentSearch')?.addEventListener('change', handleWalkinStudentChange);
+            document.getElementById('walkinSessionSelect')?.addEventListener('change', () => updateWalkinPackageUI());
             document.getElementById('walkinPackageCards')?.addEventListener('click', (event) => {
                 const button = event.target.closest('.walkin-package-card');
                 if (!button) return;
-                selectWalkinPackage(button.getAttribute('data-package-id'));
+                selectWalkinSessionPackage(button.getAttribute('data-session-count'));
             });
             document.getElementById('walkinPaymentTypeCards')?.addEventListener('click', (event) => {
                 const button = event.target.closest('.walkin-choice-card');
@@ -2474,8 +2605,8 @@
             document.getElementById('walkinStudentResults')?.addEventListener('click', async (event) => {
                 const button = event.target.closest('.walkin-student-result');
                 if (!button) return;
-                const index = Number(button.getAttribute('data-student-index') || -1);
-                const student = walkinStudents[index];
+                const email = String(button.getAttribute('data-student-email') || '').trim().toLowerCase();
+                const student = walkinStudents.find(item => String(item.email || '').trim().toLowerCase() === email);
                 if (!student) return;
                 await selectWalkinStudent(student);
             });
@@ -2501,8 +2632,8 @@
                 renderWalkinPaymentTypeCards();
                 syncWalkinPaymentTypeCardSelection();
                 updateWalkinPackageUI();
+                syncWalkinSessionSelectUI();
             });
-            document.getElementById('walkinPackageSelect')?.addEventListener('change', updateWalkinPackageUI);
             document.getElementById('walkinPaymentType')?.addEventListener('change', updateWalkinPackageUI);
             document.getElementById('assignRequestDate')?.addEventListener('change', () => {
                 updateAssignRequestRecurringSummary();

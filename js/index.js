@@ -6523,71 +6523,144 @@ function renderStudentOnboardingSteps(student, meta, portal) {
     const hasPendingReq = latestReq && String(latestReq.status || '') === 'Pending';
     const enrollmentApproved = portal?.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     const registrationLocked = !profileComplete || !regPaid;
-    const registrationBadge = isRejected
-        ? renderOnboardingStatusBadge('Rejected', 'red')
-        : profileComplete
-        ? renderOnboardingStatusBadge('Done', 'green')
-        : renderOnboardingStatusBadge('Do This First', 'amber');
-    const paymentBadge = isRejected
-        ? renderOnboardingStatusBadge('Rejected', 'red')
-        : regPaid
-        ? renderOnboardingStatusBadge('Approved', 'green')
-        : renderOnboardingStatusBadge('Waiting', 'amber');
-    const enrollmentBadge = enrollmentApproved
-        ? renderOnboardingStatusBadge('Approved', 'green')
-        : (hasPendingReq ? renderOnboardingStatusBadge('Sent', 'blue') : renderOnboardingStatusBadge('Not Yet', 'zinc'));
+
+    // Determine which step is active (1 = details, 2 = pay, 3 = request classes)
+    const currentStep = isRejected ? 1 : !profileComplete ? 1 : !regPaid ? 2 : !enrollmentApproved ? 3 : 0;
+
+    // Step progress dots
+    const stepDots = [1, 2, 3].map(n => {
+        const done = n < currentStep;
+        const active = n === currentStep;
+        return `<div class="flex items-center gap-1.5">
+            <div class="w-2.5 h-2.5 rounded-full transition-all ${done ? 'bg-emerald-500' : active ? 'bg-gold-500 ring-4 ring-gold-500/20' : 'bg-zinc-300 dark:bg-zinc-600'}"></div>
+            ${n < 3 ? '<div class="w-6 h-px ' + (done ? 'bg-emerald-400' : 'bg-zinc-300 dark:bg-zinc-600') + '"></div>' : ''}
+        </div>`;
+    }).join('');
+
+    // Build the active step card content
+    let cardIcon = '', cardTitle = '', cardDesc = '', cardCta = '', cardNote = '';
+
+    if (currentStep === 1 && isRejected) {
+        cardIcon = '<i class="fas fa-exclamation-circle text-2xl text-red-500"></i>';
+        cardTitle = 'Registration Rejected';
+        cardDesc = 'Your registration was rejected. Please review your details and resubmit.';
+        cardCta = `<button type="button" onclick="openStudentRegistrationModal()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold transition">Restart Registration</button>`;
+        cardNote = '';
+    } else if (currentStep === 1) {
+        cardIcon = '<i class="fas fa-user-edit text-2xl text-gold-500"></i>';
+        cardTitle = 'Complete your details';
+        cardDesc = 'Fill in your personal information to begin the enrollment process.';
+        cardCta = `<button type="button" onclick="openStudentRegistrationModal()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gold-500 hover:bg-gold-400 text-black font-bold transition">Open Registration</button>`;
+        cardNote = '<span class="text-zinc-400 dark:text-zinc-500 text-xs">Next: Pay the registration fee</span>';
+    } else if (currentStep === 2) {
+        cardIcon = '<i class="fas fa-credit-card text-2xl text-gold-500"></i>';
+        cardTitle = 'Pay the registration fee';
+        cardDesc = 'Upload your proof of payment so the school can approve your registration.';
+        cardCta = `<button type="button" onclick="openStudentRegistrationModal()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gold-500 hover:bg-gold-400 text-black font-bold transition">Open Payment Step</button>`;
+        cardNote = '<span class="text-zinc-400 dark:text-zinc-500 text-xs">Next: Request your classes</span>';
+    } else if (currentStep === 3) {
+        cardIcon = '<i class="fas fa-calendar-check text-2xl text-gold-500"></i>';
+        cardTitle = hasPendingReq ? 'Request submitted — waiting for approval' : 'Request your classes';
+        cardDesc = hasPendingReq
+            ? 'Your class request is under review. The school will contact you soon.'
+            : 'Choose your lesson package and preferred instrument to start classes.';
+        cardCta = hasPendingReq
+            ? `<button type="button" onclick="openStudentRequestModal()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-zinc-100 dark:bg-white/10 text-zinc-700 dark:text-white font-bold transition">View Request</button>`
+            : `<button type="button" onclick="openStudentRequestModal()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gold-500 hover:bg-gold-400 text-black font-bold transition">Request Classes</button>`;
+        cardNote = latestReq ? `<div class="mt-3 w-full">${renderStudentRequestStatus(latestReq)}</div>` : '';
+    } else {
+        // All complete - show compact summary
+        container.innerHTML = `
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                <i class="fas fa-check-circle text-lg"></i>
+                <span class="text-sm font-semibold">All steps complete — you're enrolled!</span>
+                <a href="student_sessions.html" class="ml-auto text-xs font-bold underline underline-offset-2 whitespace-nowrap">View Sessions</a>
+            </div>
+        `;
+        return;
+    }
+
+    // All steps list (collapsed by default, toggled via button)
+    const allStepsList = `
+        <div id="allOnboardingSteps" class="hidden mt-4 space-y-2 border-t border-zinc-200 dark:border-white/10 pt-4">
+            <!-- Step 1 -->
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${currentStep > 1 ? 'bg-emerald-500/8 border border-emerald-500/15' : currentStep === 1 ? 'bg-gold-500/10 border border-gold-500/25' : 'bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/10 opacity-50'}">
+                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${currentStep > 1 ? 'bg-emerald-500' : currentStep === 1 ? 'bg-gold-500' : 'bg-zinc-300 dark:bg-zinc-600'}">
+                    ${currentStep > 1 ? '<i class="fas fa-check text-white text-[10px]"></i>' : '<span class="text-white text-[10px] font-black">1</span>'}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-bold text-zinc-900 dark:text-white">Complete your details</div>
+                </div>
+                ${currentStep > 1 ? renderOnboardingStatusBadge('Done', 'green') : currentStep === 1 ? renderOnboardingStatusBadge('Do This First', 'amber') : ''}
+            </div>
+            <!-- Step 2 -->
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${currentStep > 2 ? 'bg-emerald-500/8 border border-emerald-500/15' : currentStep === 2 ? 'bg-gold-500/10 border border-gold-500/25' : 'bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/10 opacity-50'}">
+                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${currentStep > 2 ? 'bg-emerald-500' : currentStep === 2 ? 'bg-gold-500' : 'bg-zinc-300 dark:bg-zinc-600'}">
+                    ${currentStep > 2 ? '<i class="fas fa-check text-white text-[10px]"></i>' : '<span class="text-white text-[10px] font-black">2</span>'}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-bold text-zinc-900 dark:text-white">Pay registration fee</div>
+                </div>
+                ${currentStep > 2 ? renderOnboardingStatusBadge('Approved', 'green') : currentStep === 2 ? renderOnboardingStatusBadge('Waiting', 'amber') : ''}
+            </div>
+            <!-- Step 3 -->
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${currentStep > 3 ? 'bg-emerald-500/8 border border-emerald-500/15' : currentStep === 3 ? 'bg-gold-500/10 border border-gold-500/25' : 'bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/10 opacity-50'}">
+                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${currentStep > 3 ? 'bg-emerald-500' : currentStep === 3 ? 'bg-gold-500' : 'bg-zinc-300 dark:bg-zinc-600'}">
+                    ${currentStep > 3 ? '<i class="fas fa-check text-white text-[10px]"></i>' : '<span class="text-white text-[10px] font-black">3</span>'}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-bold text-zinc-900 dark:text-white">Request classes</div>
+                </div>
+                ${enrollmentApproved ? renderOnboardingStatusBadge('Approved', 'green') : hasPendingReq ? renderOnboardingStatusBadge('Sent', 'blue') : currentStep === 3 ? renderOnboardingStatusBadge('Unlock Now', 'amber') : renderOnboardingStatusBadge('Locked', 'zinc')}
+            </div>
+        </div>
+    `;
 
     container.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
-                <div class="flex items-center justify-between gap-2">
-                <div>
-                    <div class="text-lg font-extrabold">Your details</div>
-                </div>
-                    ${registrationBadge}
-                </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2 hidden" aria-hidden="true"></p>
-                <div class="mt-4 flex flex-wrap gap-3">
-                    <button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white/10 text-white text-sm font-semibold">${regPaid ? 'View Registration' : 'Open Registration'}</button>
-                    <a href="student_profile.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">Open Profile</a>
+        <div>
+            <!-- Progress indicator -->
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-1">${stepDots}</div>
+                <span class="text-xs font-semibold text-zinc-400 dark:text-zinc-500">Step ${currentStep} of 3</span>
+            </div>
+
+            <!-- Active step card -->
+            <div class="rounded-2xl border-2 ${isRejected ? 'border-red-400 bg-red-50/40 dark:bg-red-500/5' : 'border-gold-400/60 bg-gradient-to-br from-white to-gold-50/30 dark:from-white/5 dark:to-gold-500/5'} p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+                    <div class="flex-shrink-0 w-12 h-12 rounded-2xl ${isRejected ? 'bg-red-100 dark:bg-red-500/10' : 'bg-gold-100 dark:bg-gold-500/10'} flex items-center justify-center">
+                        ${cardIcon}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-lg font-extrabold text-zinc-900 dark:text-white leading-snug">${cardTitle}</h3>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">${cardDesc}</p>
+                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                            ${cardCta}
+                            ${cardNote}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
-                <div class="flex items-center justify-between gap-2">
-                    <div>
-                        <div class="text-lg font-extrabold">Pay registration</div>
-                    </div>
-                    ${paymentBadge}
-                </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2 hidden" aria-hidden="true"></p>
-                <div class="mt-4 flex flex-wrap gap-3">
-                    ${isRejected
-                        ? `<button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-white text-sm font-bold">Restart Registration</button>`
-                        : registrationLocked
-                        ? `<button type="button" onclick="openStudentRegistrationModal()" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Open Payment Step</button>`
-                        : `<button type="button" onclick="openStudentRequestModal()" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">Open Enrollment</button>`}
-                </div>
+            <!-- Toggle all steps -->
+            <div class="mt-3 text-center">
+                <button
+                    type="button"
+                    onclick="
+                        const el = document.getElementById('allOnboardingSteps');
+                        const btn = this;
+                        if (el.classList.contains('hidden')) {
+                            el.classList.remove('hidden');
+                            btn.textContent = 'Hide steps';
+                        } else {
+                            el.classList.add('hidden');
+                            btn.textContent = 'View all steps';
+                        }
+                    "
+                    class="text-xs font-semibold text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition underline underline-offset-2"
+                >View all steps</button>
             </div>
 
-            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5">
-                <div class="flex items-center justify-between gap-2">
-                    <div>
-                        <div class="text-lg font-extrabold">Request classes</div>
-                    </div>
-                    ${enrollmentBadge}
-                </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2 hidden" aria-hidden="true"></p>
-                ${regPaid
-                    ? `<div class="mt-4 flex flex-wrap gap-3">
-                        <button type="button" onclick="openStudentRequestModal()" class="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold">Open Class Request</button>
-                        <a href="student_sessions.html" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">Open Sessions</a>
-                    </div>`
-                    : `<div class="mt-4 inline-flex items-center px-3 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-sm text-zinc-600 dark:text-zinc-300">
-                        Finish steps 1 and 2 first
-                    </div>`}
-                ${latestReq ? `<div class="mt-4">${renderStudentRequestStatus(latestReq)}</div>` : ''}
-            </div>
+            ${allStepsList}
         </div>
     `;
 }
