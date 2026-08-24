@@ -198,6 +198,33 @@ if (!function_exists('fas_ensure_user_security_columns')) {
             if (!$hasColumn($conn, 'failed_login_last_at')) {
                 $conn->exec("ALTER TABLE tbl_users ADD COLUMN failed_login_last_at DATETIME NULL AFTER account_locked_reason");
             }
+
+            $statusType = null;
+            try {
+                $stmt = $conn->prepare("SHOW COLUMNS FROM tbl_users LIKE 'status'");
+                $stmt->execute();
+                $statusRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                $statusType = strtolower((string)($statusRow['Type'] ?? ''));
+            } catch (PDOException $e) {
+                $statusType = null;
+            }
+
+            if ($statusType !== null && strpos($statusType, 'deactivated') === false) {
+                $conn->exec("ALTER TABLE tbl_users MODIFY status ENUM('Active','Inactive','Deactivated') DEFAULT 'Active'");
+            }
+
+            if ($hasColumn($conn, 'failed_login_attempts') && $hasColumn($conn, 'account_locked_at') && $hasColumn($conn, 'account_locked_reason')) {
+                $conn->exec("
+                    UPDATE tbl_users
+                    SET status = 'Deactivated'
+                    WHERE status = 'Inactive'
+                      AND (
+                            COALESCE(failed_login_attempts, 0) >= 5
+                         OR account_locked_at IS NOT NULL
+                         OR account_locked_reason IS NOT NULL
+                      )
+                ");
+            }
         } catch (PDOException $e) {
             // Keep auth working even if a schema migration cannot be applied.
         }
@@ -252,7 +279,7 @@ if (!function_exists('fas_register_failed_user_login')) {
                         ELSE account_locked_reason
                     END,
                     status = CASE
-                        WHEN COALESCE(failed_login_attempts, 0) + 1 >= ? THEN 'Inactive'
+                        WHEN COALESCE(failed_login_attempts, 0) + 1 >= ? THEN 'Deactivated'
                         ELSE status
                     END
                 WHERE user_id = ?
@@ -271,7 +298,8 @@ if (!function_exists('fas_register_failed_user_login')) {
             $attempts = (int)($state['failed_login_attempts'] ?? 0);
             return [
                 'attempts' => $attempts,
-                'locked' => strcasecmp((string)($state['status'] ?? ''), 'Inactive') === 0 && $attempts >= $lockThreshold,
+                'locked' => strcasecmp((string)($state['status'] ?? ''), 'Deactivated') === 0
+                    || (strcasecmp((string)($state['status'] ?? ''), 'Inactive') === 0 && $attempts >= $lockThreshold),
                 'status' => $state['status'] ?? null,
                 'account_locked_reason' => $state['account_locked_reason'] ?? null,
                 'account_locked_at' => $state['account_locked_at'] ?? null,

@@ -1229,7 +1229,7 @@ function initLoginForm() {
                         : status === 401
                             ? 'Invalid username or password.'
                             : status === 423
-                                ? 'Your account is locked. Please contact the administrator.'
+                                ? 'Your account has been deactivated. Please contact the administrator.'
                                 : status === 403
                                     ? 'Your account was deactivated. Please contact the administrator.'
                                     : 'An error occurred. Please try again.';
@@ -1269,7 +1269,7 @@ function initLoginForm() {
                     : status === 401
                         ? 'Invalid username or password.'
                         : status === 423
-                            ? 'Your account is locked. Please contact the administrator.'
+                            ? 'Your account has been deactivated. Please contact the administrator.'
                             : status === 403
                                 ? 'Your account was deactivated. Please contact the administrator.'
                                 : 'An error occurred. Please try again.';
@@ -3395,11 +3395,13 @@ function renderStudentRequestStatus(latestRequest) {
         return '<div class="text-sm text-zinc-500">No request submitted yet.</div>';
     }
     const status = String(latestRequest.status || 'Pending');
+    const isRejected = status === 'Rejected' || status === 'Cancelled';
     const badgeClass = status === 'Approved'
         ? 'bg-green-500/15 text-green-300 border border-green-500/30'
-        : status === 'Rejected'
+        : isRejected
             ? 'bg-red-500/15 text-red-300 border border-red-500/30'
             : 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/30';
+    const displayStatus = status === 'Cancelled' ? 'Rejected' : status;
     const createdAt = latestRequest.created_at ? new Date(latestRequest.created_at).toLocaleString() : '—';
     const packageName = escapeHtml(latestRequest.package_name || 'Package');
     const amount = formatCurrencyPHP(latestRequest.requested_amount || 0);
@@ -3427,13 +3429,14 @@ function renderStudentRequestStatus(latestRequest) {
     return `
         <div class="rounded-xl border border-white/10 bg-white/5 p-3">
             <div class="flex items-center gap-2">
-                <span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold ${badgeClass}">${escapeHtml(status)}</span>
+                <span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold ${badgeClass}">${escapeHtml(displayStatus)}</span>
                 <span class="text-xs text-zinc-400">${createdAt}</span>
             </div>
             <div class="mt-2 text-sm text-zinc-200">${packageName} • ${amount}</div>
             <div class="mt-1 text-xs text-zinc-400">Payment mode: <span class="text-zinc-200 font-semibold">${escapeHtml(paymentModeLabel)}</span></div>
             ${assignmentInfo}
             ${notes}
+            ${isRejected ? '<div class="mt-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">Your request was rejected. You can submit a new enrollment request below.</div>' : ''}
         </div>
     `;
 }
@@ -5500,6 +5503,7 @@ function initStudentRequestSection(student, requestMeta) {
     const instruments = Array.isArray(requestMeta?.instruments) ? requestMeta.instruments : [];
     const availabilities = Array.isArray(requestMeta?.availabilities) ? requestMeta.availabilities : [];
     const latest = requestMeta?.latest_request || null;
+    // Only consider it "pending" if status is actually 'Pending' - not 'Cancelled' or 'Rejected'
     const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
     const packageScope = String(requestMeta?.package_scope || '').toLowerCase();
 
@@ -6225,109 +6229,115 @@ function renderStudentRegistrationModal(student, portal) {
     }
 
     body.innerHTML = `
-        <div class="space-y-4">
+        <div class="space-y-3 sm:space-y-4 min-w-0 pb-[calc(9rem+env(safe-area-inset-bottom))] sm:pb-4">
             ${studentRegistrationRestartNotice ? `
-                <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 sm:px-5">
-                    <div class="text-sm font-bold text-red-700">Registration rejected</div>
-                    <div class="text-sm text-red-600 mt-0.5">Please fill in the form again and resubmit.</div>
+                <div class="rounded-xl sm:rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 sm:px-5 sm:py-3">
+                    <div class="text-xs sm:text-sm font-bold text-red-700">Registration rejected</div>
+                    <div class="text-xs sm:text-sm text-red-600 mt-0.5">Please fill in the form again and resubmit.</div>
                 </div>
             ` : ''}
 
             <!-- Intro hint -->
-            <div class="rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
+            <div class="rounded-lg sm:rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm text-zinc-600 dark:text-zinc-300">
                 Fill in the student details below. Guardian info is required for students 18 and under. Then upload your registration payment to submit.
             </div>
 
             <!-- Two-column: left = student + guardian, right = payment -->
-            <div class="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)] gap-3 sm:gap-4 min-w-0">
 
                 <!-- LEFT -->
-                <div class="space-y-4">
+                <div class="space-y-3 sm:space-y-4 min-w-0">
 
                     <!-- 1. Student Details -->
-                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
-                        <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                    <div class="rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden min-w-0">
+                        <div class="flex items-center gap-2 sm:gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
                             <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">1</span></div>
-                            <p class="text-sm font-semibold text-zinc-900 dark:text-white">Student Details</p>
+                            <p class="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white">Student Details</p>
                         </div>
-                        <form id="registrationDetailsForm" class="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">First Name *</label>
-                                <input id="regFirstName" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                        <form id="registrationDetailsForm" class="px-3 py-3 sm:px-4 sm:py-4 grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 min-w-0">
+                            <div class="min-w-0">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">First Name *</label>
+                                <input id="regFirstName" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Last Name *</label>
-                                <input id="regLastName" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                            <div class="min-w-0">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Last Name *</label>
+                                <input id="regLastName" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Middle Name</label>
-                                <input id="regMiddleName" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                            <div class="min-w-0">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Middle Name</label>
+                                <input id="regMiddleName" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Phone *</label>
-                                <input id="regPhone" type="tel" autocomplete="off" class="intl-phone-input w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Phone number" />
+                            <div class="w-full min-w-0">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wide">Phone *</label>
+                                <input id="regPhone" type="tel" name="student_phone" required autocomplete="off"
+                                    class="intl-phone-input w-full max-w-full box-border px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-gold-500"
+                                    placeholder="Phone number" />
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Date of Birth *</label>
-                                <input id="regDob" type="date" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                            <div class="min-w-0 md:col-span-2">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Date of Birth *</label>
+                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                    <input id="regDob" type="date" class="flex-1 min-w-0 w-full px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                    <div class="flex-shrink-0 flex flex-row sm:flex-col items-center justify-center gap-2 sm:gap-0 min-w-[72px] px-3 py-2 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg sm:rounded-xl text-center self-start sm:self-auto">
+                                        <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-400 leading-none">Age</span>
+                                        <input id="regAge" readonly class="w-full bg-transparent text-center text-sm font-bold text-zinc-700 dark:text-zinc-200 cursor-not-allowed focus:outline-none leading-tight sm:mt-0.5 p-0" style="min-width:32px;max-width:44px;" />
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Age</label>
-                                <input id="regAge" readonly class="w-full px-3 py-2 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-500 cursor-not-allowed" />
+                            <div class="min-w-0">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Email</label>
+                                <input id="regEmail" type="email" readonly class="w-full min-w-0 px-3 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-500 cursor-not-allowed" />
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Email</label>
-                                <input id="regEmail" type="email" readonly class="w-full px-3 py-2 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-500 cursor-not-allowed" />
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Branch</label>
-                                <div id="regBranchDisplay" class="w-full px-3 py-2 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-600 dark:text-zinc-300 font-medium">
+                            <div class="min-w-0">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Branch</label>
+                                <div id="regBranchDisplay" class="w-full min-w-0 px-3 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-600 dark:text-zinc-300 font-medium break-words">
                                     ${escapeHtml(student?.branch_name || 'Assigned branch')}
                                 </div>
                             </div>
-                            <div class="col-span-2">
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Address *</label>
-                                <textarea id="regAddress" rows="2" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 resize-none"></textarea>
+                            <div class="col-span-1 md:col-span-2 min-w-0">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Address *</label>
+                                <textarea id="regAddress" rows="2" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 resize-none"></textarea>
                             </div>
                         </form>
                     </div>
 
                     <!-- 2. Guardian -->
-                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
-                        <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                    <div class="rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden min-w-0">
+                        <div class="flex items-center gap-2 sm:gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
                             <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">2</span></div>
-                            <p class="text-sm font-semibold text-zinc-900 dark:text-white flex-1">Guardian</p>
-                            <span id="guardianRequiredBadge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Required</span>
+                            <p class="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white flex-1 min-w-0">Guardian</p>
+                            <span id="guardianRequiredBadge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">Required</span>
                         </div>
-                        <div class="px-4 py-3">
-                            <div id="guardianAutoStatus" class="text-sm text-zinc-500 dark:text-zinc-400">
+                        <div class="px-3 py-3 sm:px-4">
+                            <div id="guardianAutoStatus" class="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
                                 Enter the student's date of birth above — guardian fields appear automatically for students 18 and under.
                             </div>
-                            <div id="guardianInputs" class="space-y-3 hidden">
-                                <div>
-                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Guardian Email *</label>
-                                    <div class="flex gap-2">
-                                        <input id="guardianEmailInput" type="email" class="flex-1 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="guardian@email.com" />
-                                        <button type="button" id="guardianFindBtn" class="px-3 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">Find</button>
+                            <div id="guardianInputs" class="space-y-2.5 sm:space-y-3 hidden min-w-0">
+                                <div class="min-w-0">
+                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Guardian Email *</label>
+                                    <div class="flex flex-col sm:flex-row gap-2">
+                                        <input id="guardianEmailInput" type="email" class="flex-1 min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="guardian@email.com" />
+                                        <button type="button" id="guardianFindBtn" class="w-full sm:w-auto px-4 py-2.5 rounded-lg sm:rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">Find</button>
                                     </div>
-                                    <div id="guardianInfoBox" class="hidden mt-1 text-xs text-zinc-500 dark:text-zinc-300"></div>
+                                    <div id="guardianInfoBox" class="hidden mt-1.5 text-xs text-zinc-500 dark:text-zinc-300 break-words"></div>
                                 </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">First Name *</label>
-                                        <input id="guardianFirstNameInput" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 min-w-0">
+                                    <div class="min-w-0">
+                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">First Name *</label>
+                                        <input id="guardianFirstNameInput" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
                                     </div>
-                                    <div>
-                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Last Name *</label>
-                                        <input id="guardianLastNameInput" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                                    <div class="min-w-0">
+                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Last Name *</label>
+                                        <input id="guardianLastNameInput" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
                                     </div>
-                                    <div>
-                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Phone *</label>
-                                        <input id="guardianPhoneInput" type="tel" autocomplete="off" class="intl-phone-input w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Phone number" />
+                                    <div class="w-full min-w-0 md:col-span-2">
+                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wide">Phone *</label>
+                                        <input id="guardianPhoneInput" type="tel" name="guardian_phone" required autocomplete="off"
+                                            class="intl-phone-input w-full max-w-full box-border px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-gold-500"
+                                            placeholder="Phone number" />
                                     </div>
-                                    <div>
-                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Relationship *</label>
-                                        <select id="guardianRelationshipInput" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                                    <div class="min-w-0 md:col-span-2">
+                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Relationship *</label>
+                                        <select id="guardianRelationshipInput" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                                             <option value="">Select…</option>
                                             <option value="Mother">Mother</option>
                                             <option value="Father">Father</option>
@@ -6343,55 +6353,55 @@ function renderStudentRegistrationModal(student, portal) {
                 </div><!-- end left col -->
 
                 <!-- RIGHT: Registration Payment -->
-                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden xl:self-start">
-                    <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                <div class="rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden min-w-0 lg:self-start">
+                    <div class="flex items-center gap-2 sm:gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
                         <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">3</span></div>
-                        <p class="text-sm font-semibold text-zinc-900 dark:text-white">Registration Payment</p>
+                        <p class="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white">Registration Payment</p>
                     </div>
-                    <form id="registrationPaymentForm" class="px-4 py-4 space-y-3">
-                        <div class="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/30 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-200">
+                    <form id="registrationPaymentForm" class="px-3 py-3 sm:px-4 sm:py-4 space-y-2.5 sm:space-y-3 min-w-0">
+                        <div class="rounded-lg sm:rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/30 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-200">
                             A <strong>₱1,000 lifetime registration fee</strong> is required before enrollment.
                         </div>
-                        <div class="flex items-center justify-between px-3 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl">
+                        <div class="flex items-center justify-between px-3 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg sm:rounded-xl">
                             <span class="text-xs text-zinc-500 font-medium">Registration Fee</span>
                             <span class="text-sm font-bold text-zinc-900 dark:text-white">₱1,000.00</span>
                         </div>
-                        <div>
-                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Payment Method *</label>
-                            <select id="regPayMethod" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                        <div class="min-w-0">
+                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Payment Method *</label>
+                            <select id="regPayMethod" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                                 <option value="GCash">GCash</option>
                                 <option value="Bank Transfer">Bank Transfer</option>
                                 <option value="Cash">Cash</option>
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Reference Number *</label>
-                            <input type="text" id="regPayReference" placeholder="Transaction / reference no." class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
-                            <div id="regPayReferenceHint" class="mt-1 text-[11px] text-zinc-400">Enter the reference or transaction number.</div>
+                        <div class="min-w-0">
+                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Reference Number *</label>
+                            <input type="text" id="regPayReference" placeholder="Transaction / reference no." class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
+                            <div id="regPayReferenceHint" class="mt-1.5 text-[11px] text-zinc-400 break-words">Enter the reference or transaction number.</div>
                         </div>
-                        <div>
-                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Proof of Payment *</label>
-                            <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
-                            <p class="mt-1 text-[11px] text-zinc-400">Screenshot or receipt · JPG, PNG, PDF</p>
+                        <div class="min-w-0">
+                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Proof of Payment *</label>
+                            <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full min-w-0 max-w-full px-2 py-2.5 sm:px-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
+                            <p class="mt-1.5 text-[11px] text-zinc-400">Screenshot or receipt · JPG, PNG, PDF</p>
                         </div>
-                        <div>
-                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Valid ID / Proof of Age *</label>
-                            <input type="file" id="regAgeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
-                            <p class="mt-1 text-[11px] text-zinc-400">For age verification · JPG, PNG, PDF</p>
+                        <div class="min-w-0">
+                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Valid ID / Proof of Age *</label>
+                            <input type="file" id="regAgeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full min-w-0 max-w-full px-2 py-2.5 sm:px-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
+                            <p class="mt-1.5 text-[11px] text-zinc-400">For age verification · JPG, PNG, PDF</p>
                         </div>
-                        <div id="regPayStatus" class="text-xs text-zinc-500 dark:text-zinc-300"></div>
+                        <div id="regPayStatus" class="text-xs text-zinc-500 dark:text-zinc-300 break-words"></div>
                     </form>
                 </div>
 
             </div><!-- end grid -->
 
             <!-- Submit row -->
-            <div class="sticky bottom-0 z-20 -mx-4 sm:mx-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-zinc-100 dark:border-white/10 bg-gradient-to-t from-white via-white/95 to-white/75 dark:from-obsidian dark:via-obsidian/95 dark:to-obsidian/75 backdrop-blur-sm px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                <div id="submitRegistrationStatus" class="text-sm text-zinc-500 dark:text-zinc-400"></div>
+            <div class="sticky bottom-0 z-20 -mx-3 sm:-mx-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 border-t border-zinc-100 dark:border-white/10 bg-gradient-to-t from-white via-white/98 to-white/90 dark:from-obsidian dark:via-obsidian/98 dark:to-obsidian/90 backdrop-blur-sm px-3 py-3 sm:px-5 sm:pt-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                <div id="submitRegistrationStatus" class="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 min-w-0"></div>
                 <button type="button" id="submitRegistrationRequestBtn"
-                    class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
-                    Submit Registration Request
+                    class="w-full sm:w-auto px-5 py-3 rounded-xl sm:rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition whitespace-nowrap shadow-lg">
+                    Submit Registration
                 </button>
             </div>
         </div>
@@ -6401,7 +6411,7 @@ function renderStudentRegistrationModal(student, portal) {
 
 function initStudentRegistrationPhonePickers() {
     if (window.FasIntlPhone) {
-        window.FasIntlPhone.init(document.getElementById('studentRegistrationPanel') || document);
+        window.FasIntlPhone.init(document.getElementById('studentRegistrationModalBody') || document);
     }
 }
 

@@ -176,8 +176,9 @@ function getLocalISODate(date = new Date()) {
 
 // ── Gradeability ───────────────────────────────────────────────────
 function isGradeable(session) {
+    const att = String(session?.attendance_status || '').toLowerCase();
     return String(session?.status || '').toLowerCase() === 'completed' &&
-           String(session?.attendance_status || '').toLowerCase() === 'present';
+           (att === 'present' || att === 'late');
 }
 function getGradeState(session) {
     if (Number(session.progress_id || 0) > 0) return 'Saved';
@@ -253,8 +254,9 @@ function renderAttendanceControl(session) {
     }
 
     if (att === 'late') {
-        container.innerHTML = badge('fa-clock', 'Late — confirmed by desk', 'border-amber-200 bg-amber-50 text-amber-700');
-        if (descEl) descEl.textContent = 'Student arrived late. You can still grade this session.';
+        // Treat "late" the same as "present" — allow grading
+        container.innerHTML = badge('fa-circle-check', 'Present — confirmed by desk', 'border-emerald-200 bg-emerald-50 text-emerald-700');
+        if (descEl) descEl.textContent = 'Attendance confirmed. You can now grade this session.';
         return;
     }
 
@@ -438,9 +440,29 @@ function populateGradeForm(session) {
     document.getElementById('sessionIdInput').value = selectedGradeSessionId ? String(selectedGradeSessionId) : '';
 
     const studentName = session ? `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student' : 'Select a session';
-    const sessionMeta = session ? `${formatShortDate(session.session_date)} · ${formatTime12Hour(session.start_time)} – ${formatTime12Hour(session.end_time)}` : '—';
-    setGradeText('gradeStudentHeading', session ? `Grade ${studentName}` : 'Select a session');
+    const instrument = session?.instrument_name || 'Instrument';
+    const duration = session?.duration ? `${session.duration} min` : '45 min';
+    const room = session?.room_name || 'Studio';
+    const time = session ? formatTime12Hour(session.start_time) : '—';
+    const sessionMeta = session ? `${instrument} · ${duration} · ${time} in ${room}` : '—';
+    
+    // Update panel header
+    setGradeText('gradeStudentHeading', studentName);
     setGradeText('gradeSessionMeta', sessionMeta);
+    
+    // Update avatar initials
+    const avatarEl = document.getElementById('gradeStudentAvatar');
+    if (avatarEl && session) {
+        const initials = studentName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        avatarEl.textContent = initials;
+    }
+    
+    // Update lesson focus section
+    const focusText = document.getElementById('gradeLessonFocusText');
+    if (focusText) {
+        focusText.textContent = session?.notes || session?.attendance_notes || 'No lesson focus specified.';
+    }
+    
     // Keep hidden fields for any legacy lookups
     const hidName = document.getElementById('gradeStudentName');
     const hidSub  = document.getElementById('gradeFormSubtitle');
@@ -458,6 +480,15 @@ function populateGradeForm(session) {
     const remarksEl = document.getElementById('remarksInput');
     if (skillEl)   skillEl.value   = session?.skill_level || '';
     if (remarksEl) remarksEl.value = session?.remarks     || '';
+    
+    // Update skill level button selection
+    document.querySelectorAll('.skill-level-btn').forEach(btn => {
+        if (btn.dataset.level === session?.skill_level) {
+            btn.classList.add('selected');
+        } else {
+            btn.classList.remove('selected');
+        }
+    });
 
     const graded    = session ? Number(session.progress_id || 0) > 0 : false;
     const gradeable = session ? isGradeable(session) : false;
@@ -488,7 +519,7 @@ function populateGradeForm(session) {
             } else if (['absent','excused','ci','teacher absent'].includes(att)) {
                 lockMsg.textContent = 'Student is not present — grading is not available for this session.';
             } else {
-                lockMsg.textContent = 'Desk hasn\'t marked attendance yet. Use the Mark as Present button above if the student is here.';
+                lockMsg.textContent = 'Desk hasn\'t marked attendance yet. Use the End Session button above if the student is here.';
             }
         }
         setScoreButtonsDisabled(true);
@@ -538,54 +569,63 @@ function renderGradeSessions() {
     if (!list) return;
 
     const rows = getVisibleGradeSessions();
-    renderGradeStats(rows);
-    if (count) count.textContent = String(rows.length);
+    if (count) count.textContent = rows.length ? `${rows.length} shown` : '0 shown';
 
     if (!rows.length) {
-        list.innerHTML = `<div class="px-4 py-10 text-center text-sm text-gray-400">
-            <i class="fas fa-calendar-xmark text-2xl text-gray-200 block mb-3"></i>
+        list.innerHTML = `<div class="px-6 py-16 text-center text-sm text-gray-400">
+            <i class="fas fa-calendar-xmark text-3xl text-gray-200 block mb-3"></i>
             No sessions found for today.
         </div>`;
         if (selectedGradeSessionId === 0 || isTodaySession(instructorGradeSessions.find(s => Number(s.session_id || 0) === selectedGradeSessionId))) {
-            populateGradeForm(null);
+            closeGradingPanel();
         }
         return;
-    }
-
-    if (!selectedGradeSessionId || (selectedGradeSessionId && !rows.some(s => Number(s.session_id) === selectedGradeSessionId) && isTodaySession(instructorGradeSessions.find(s => Number(s.session_id || 0) === selectedGradeSessionId)))) {
-        populateGradeForm(rows[0]);
     }
 
     list.innerHTML = rows.map(session => {
         const sid        = Number(session.session_id || 0);
         const isSelected = sid === selectedGradeSessionId;
         const name       = `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student';
-        const state      = getGradeState(session);
-        const stateCls   = getGradeStateCls(session);
-        const time       = session.start_time ? `${formatTime12Hour(session.start_time)} – ${formatTime12Hour(session.end_time)}` : 'Time pending';
+        const instrument = session.instrument_name || 'Instrument';
+        const duration   = session.duration ? `${session.duration} min` : '45 min';
+        const room       = session.room_name || 'Studio';
+        const time       = formatTime12Hour(session.start_time);
+        const graded     = Number(session.progress_id || 0) > 0;
+        const score      = graded && session.average_score ? Number(session.average_score).toFixed(1) : null;
+        
+        // Get initials for avatar
+        const initials   = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
         return `<button type="button" data-session-id="${sid}"
-            class="session-card w-full text-left px-4 py-4 border-l-4 transition-all ${isSelected ? 'is-selected border-l-teal-500' : 'border-l-transparent hover:border-l-gray-200'}">
-            <p class="text-sm font-semibold text-gray-900">${escapeHtml(name)}</p>
-            <div class="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
-                <i class="fas fa-calendar-alt text-[10px]"></i>
-                <span>${escapeHtml(formatShortDate(session.session_date))}</span>
-            </div>
-            <div class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-400">
-                <i class="fas fa-clock text-[10px]"></i>
-                <span>${escapeHtml(time)}</span>
-                <span class="ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${stateCls}">${escapeHtml(state)}</span>
+            class="session-card w-full text-left px-5 py-4 rounded-2xl border-2 ${isSelected ? 'selected border-teal-500' : 'border-gray-100'}">
+            <div class="flex items-start gap-3">
+                <div class="flex-shrink-0">
+                    <p class="text-base font-semibold text-gray-900">${escapeHtml(time)}</p>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        <div class="h-8 w-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                            ${escapeHtml(initials)}
+                        </div>
+                        <p class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(name)}</p>
+                    </div>
+                    <p class="text-sm text-gray-500">${escapeHtml(instrument)} · ${escapeHtml(duration)} · ${escapeHtml(room)}</p>
+                </div>
+                ${score ? `<div class="flex-shrink-0 flex items-center gap-1 text-teal-600">
+                    <i class="fas fa-check text-xs"></i>
+                    <span class="text-sm font-semibold">${score}</span>
+                </div>` : '<div class="flex-shrink-0 text-sm text-gray-400">Not graded</div>'}
             </div>
         </button>`;
     }).join('');
 
-    document.querySelectorAll('.grade-session-card, [data-session-id]').forEach(btn => {
+    document.querySelectorAll('[data-session-id]').forEach(btn => {
         btn.addEventListener('click', () => {
             const target = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(btn.dataset.sessionId || 0)) || null;
-            populateGradeForm(target);
-            renderGradeSessions();
-            if (window.innerWidth < 1024) {
-                document.getElementById('gradingForm')?.closest('.bg-white')?.scrollIntoView({ behavior:'smooth', block:'start' });
+            if (target) {
+                populateGradeForm(target);
+                renderGradeSessions();
+                openGradingPanel();
             }
         });
     });
@@ -735,7 +775,7 @@ async function saveSessionGrade(event) {
         console.error('Save failed:', e);
         showGradeMessage('Network error — please try again.', 'error');
     } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check text-xs mr-1.5"></i>Save Grade'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check text-xs"></i> Session done'; }
     }
 }
 

@@ -11,6 +11,7 @@
  <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/css/intlTelInput.css">
+    <link rel="stylesheet" href="../../css/intl-phone-input.css">
     <link rel="stylesheet" href="../../css/portal.css">
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/intlTelInput.min.js"></script>
     <script>
@@ -35,46 +36,48 @@
         html.dark .portal-nav { background: rgba(15,17,21,0.92); }
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
 
-        #studentRegistrationModal .iti {
-            width: 100%;
-        }
-
+        #studentRegistrationModal .iti,
         #studentRegistrationModal .iti input {
-            width: 100%;
-            padding-left: 88px !important;
-        }
-
-        #studentRegistrationModal .iti__selected-flag {
-            border-right: 1px solid #d4d4d8;
-            background: #f4f4f5;
-            padding-left: 12px;
-            padding-right: 10px;
-        }
-
-        #studentRegistrationModal .iti__selected-dial-code {
-            color: #18181b;
-            font-weight: 600;
-        }
-
-        #studentRegistrationModal .iti__arrow {
-            border-top-color: #71717a;
+            max-width: 100%;
         }
 
         #studentRegistrationModal .iti__country-list {
-            background-color: #27272a;
-            color: #ffffff;
-            border: 1px solid #3f3f46;
-            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.25);
             z-index: 9999;
+            max-width: min(100vw - 1.5rem, 20rem);
         }
 
-        #studentRegistrationModal .iti__country:hover,
-        #studentRegistrationModal .iti__country.iti__highlight {
-            background-color: #3f3f46;
+        html.dark #studentRegistrationModal .iti--separate-dial-code .iti__selected-flag {
+            background-color: #27272a;
+            border-right-color: #52525b;
+            color: #fff;
         }
 
-        #studentRegistrationModal .iti__dial-code {
-            color: #a1a1aa;
+        html.dark #studentRegistrationModal .iti--separate-dial-code .iti__selected-dial-code {
+            color: #fff;
+        }
+
+        @media (max-width: 640px) {
+            #studentRegistrationModal .iti__country-list {
+                left: 0 !important;
+                right: 0;
+                width: 100%;
+                max-width: none;
+            }
+            
+            /* Mobile: ensure inputs are properly sized */
+            #studentRegistrationModal input[type="text"],
+            #studentRegistrationModal input[type="email"],
+            #studentRegistrationModal input[type="tel"],
+            #studentRegistrationModal input[type="date"],
+            #studentRegistrationModal select,
+            #studentRegistrationModal textarea {
+                font-size: 16px !important; /* Prevent iOS zoom on focus */
+            }
+            
+            /* Mobile: reduce spacing in tight areas */
+            #studentRegistrationModal .iti {
+                width: 100%;
+            }
         }
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css"></head>
@@ -269,19 +272,19 @@
         </div>
     </main>
 
-    <div id="studentRegistrationModal" class="fixed inset-0 z-[70] hidden overflow-y-auto overscroll-contain bg-black/60 backdrop-blur-sm p-0 sm:p-4" aria-hidden="true">
-        <div class="min-h-full flex items-stretch sm:items-center justify-center">
-            <div class="w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-2xl bg-white dark:bg-obsidian rounded-none sm:rounded-3xl border-0 sm:border sm:border-zinc-200 dark:sm:border-white/10 shadow-2xl overflow-hidden flex flex-col">
-                <div class="flex items-center justify-between gap-4 px-4 sm:px-5 py-3.5 border-b border-zinc-200 dark:border-white/10">
-                    <div>
-                        <div class="text-[10px] uppercase tracking-[0.25em] text-gold-600 dark:text-gold-300 font-bold">Registration</div>
-                        <div class="text-base font-bold text-zinc-900 dark:text-white mt-0.5">Complete your student registration</div>
+    <div id="studentRegistrationModal" class="fixed inset-0 z-[70] hidden overflow-y-auto overscroll-contain bg-black/60 backdrop-blur-sm p-0 md:p-4" aria-hidden="true">
+        <div class="min-h-full flex items-stretch md:items-center justify-center">
+            <div class="w-full min-w-0 h-[100dvh] md:h-auto md:max-h-[92vh] md:max-w-4xl bg-white dark:bg-obsidian rounded-none md:rounded-3xl border-0 md:border md:border-zinc-200 dark:md:border-white/10 shadow-2xl overflow-hidden flex flex-col">
+                <div class="flex items-start md:items-center justify-between gap-2 px-4 md:px-5 py-3 md:py-3.5 border-b border-zinc-200 dark:border-white/10 shrink-0">
+                    <div class="min-w-0 pr-2">
+                        <div class="text-[9px] md:text-[10px] uppercase tracking-[0.2em] md:tracking-[0.25em] text-gold-600 dark:text-gold-300 font-bold">Registration</div>
+                        <div class="text-sm md:text-base font-bold text-zinc-900 dark:text-white mt-0.5 leading-snug">Complete your student registration</div>
                     </div>
-                    <button type="button" onclick="closeStudentRegistrationModal()" class="h-9 w-9 rounded-full border border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 transition flex items-center justify-center" aria-label="Close registration form">
+                    <button type="button" onclick="closeStudentRegistrationModal()" class="h-8 w-8 md:h-9 md:w-9 shrink-0 rounded-full border border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 transition flex items-center justify-center" aria-label="Close registration form">
                         <i class="fas fa-times text-sm"></i>
                     </button>
                 </div>
-                <div id="studentRegistrationModalBody" class="flex-1 min-h-0 overflow-y-auto px-3 sm:px-5 py-4 sm:py-5"></div>
+                <div id="studentRegistrationModalBody" class="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-3 md:px-5 py-3 md:py-5"></div>
             </div>
         </div>
     </div>
@@ -333,7 +336,7 @@
                                             <p class="text-xs text-zinc-500 dark:text-zinc-400">Choose when and how you'll make your first payment.</p>
                                         </div>
                                     </div>
-                                    <div class="px-4 sm:px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div class="px-4 sm:px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Payment Schedule</label>
                                             <select id="studentRequestPaymentMode"
@@ -455,6 +458,7 @@
         </div>
     </button>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="../../js/intl-phone-input.js"></script>
     <script src="../../js/portal_sidebar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="../../js/index.js"></script>

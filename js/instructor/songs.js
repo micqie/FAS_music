@@ -351,6 +351,11 @@ function updateQuickAssignControls() {
 
     if (button) {
         button.disabled = !canSend;
+        if (canSend) {
+            button.className = 'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f172a] px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800';
+        } else {
+            button.className = 'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-300 px-5 py-3 text-sm font-bold text-white transition disabled:cursor-not-allowed';
+        }
     }
 
     if (!selectedStudent && !selectedSong) {
@@ -435,58 +440,24 @@ function renderHeroSession() {
 
 function renderSelectedStudentCard() {
     const student = getStudentById(instructorSongSelectedStudentId);
-    const { session } = getCurrentSessionFocus();
-    const selectedStudentIsCurrent = !!student && Number(student.student_id || 0) === Number(session?.student_id || 0) && isActiveSession(session);
 
-    const avatarEl = document.getElementById('selectedStudentAvatar');
-    const nameEl = document.getElementById('selectedStudentName');
-    const metaEl = document.getElementById('selectedStudentMeta');
-    const statusEl = document.getElementById('selectedStudentStatus');
-    const timeEl = document.getElementById('selectedStudentTime');
-    const locationEl = document.getElementById('selectedStudentLocation');
+    const avatarEl  = document.getElementById('selectedStudentAvatar');
+    const nameEl    = document.getElementById('selectedStudentName');
+    const metaEl    = document.getElementById('selectedStudentMeta');
 
     if (!student) {
-        if (avatarEl) avatarEl.textContent = '--';
-        if (nameEl) nameEl.textContent = 'No student selected';
-        if (metaEl) metaEl.textContent = 'Choose a student to start assigning songs.';
-        if (statusEl) statusEl.textContent = 'Waiting for selection';
-        if (timeEl) timeEl.textContent = '—';
-        if (locationEl) locationEl.textContent = '—';
+        if (avatarEl) { avatarEl.textContent = ''; avatarEl.className = 'hidden'; }
+        if (nameEl)  nameEl.textContent = 'Select one of my students';
+        if (metaEl)  metaEl.textContent = '';
         return;
     }
 
-    if (avatarEl) avatarEl.textContent = getStudentInitials(student);
+    if (avatarEl) {
+        avatarEl.textContent = getStudentInitials(student);
+        avatarEl.className = 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold-500 text-sm font-black text-white';
+    }
     if (nameEl) nameEl.textContent = student.student_name || 'Student';
-    if (metaEl) {
-        metaEl.textContent = `${student.instrument_name || 'Instrument'} focus · ${student.package_name || student.branch_name || 'Student'}`;
-    }
-    if (statusEl) {
-        if (selectedStudentIsCurrent) {
-            statusEl.textContent = 'Current lesson student';
-            statusEl.className = 'mt-1 text-sm font-semibold text-emerald-700';
-        } else {
-            statusEl.textContent = 'Selected from roster';
-            statusEl.className = 'mt-1 text-sm font-semibold text-amber-700';
-        }
-    }
-    if (timeEl) {
-        if (selectedStudentIsCurrent && session) {
-            const end = getSessionEndDateTime(session);
-            const minutesLeft = end ? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 60000)) : null;
-            timeEl.textContent = minutesLeft !== null ? `In session ${minutesLeft} min` : 'In session now';
-        } else if (session && Number(session.student_id || 0) === Number(student.student_id || 0)) {
-            const start = getSessionDateTime(session);
-            const minutesUntil = start ? Math.max(0, Math.ceil((start.getTime() - Date.now()) / 60000)) : null;
-            timeEl.textContent = minutesUntil !== null ? `Starts in ${minutesUntil} min` : 'Ready for practice';
-        } else {
-            timeEl.textContent = 'Ready for practice';
-        }
-    }
-    if (locationEl) {
-        locationEl.textContent = session && Number(session.student_id || 0) === Number(student.student_id || 0)
-            ? `${session.room_name || student.branch_name || 'Studio'} • ${session.instrument_name || student.instrument_name || 'Instrument'}`
-            : (student.branch_name || student.package_name || '—');
-    }
+    if (metaEl) metaEl.textContent = `${student.instrument_name || 'Instrument'} · ${student.package_name || student.branch_name || ''}`;
 }
 
 function renderStudentSwitcherContent() {
@@ -510,26 +481,12 @@ function renderStudentSwitcherContent() {
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
                         <div class="truncate text-lg font-black text-slate-900">${escapeSongHtml(currentStudent.student_name || 'Student')}</div>
-                        <span class="rounded-full bg-[#f8a500] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white">Current session</span>
+                        <span class="rounded-full bg-[#f8a500] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white">In session</span>
                     </div>
                     <div class="mt-1 text-xs text-slate-600">${escapeSongHtml(currentStudent.instrument_name || 'Instrument')} · ${escapeSongHtml(currentStudent.package_name || currentStudent.branch_name || 'Student')}</div>
                 </div>
                 <div class="grid h-9 w-9 place-items-center rounded-full bg-[#f8a500] text-white">
                     <i class="fas fa-check"></i>
-                </div>
-            </div>
-            <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                <div class="rounded-2xl bg-white/70 px-3 py-2.5 text-sm text-slate-700">
-                    <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</div>
-                    <div class="mt-1 font-semibold text-emerald-700">Currently in session</div>
-                </div>
-                <div class="rounded-2xl bg-white/70 px-3 py-2.5 text-sm text-slate-700">
-                    <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Time</div>
-                    <div class="mt-1 font-semibold text-amber-700">${escapeSongHtml(renderSessionTimeLabel(currentSession))}</div>
-                </div>
-                <div class="rounded-2xl bg-white/70 px-3 py-2.5 text-sm text-slate-700">
-                    <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Location</div>
-                    <div class="mt-1 font-semibold text-slate-700">${escapeSongHtml(currentSession?.room_name || currentStudent.branch_name || 'Studio')}</div>
                 </div>
             </div>
         </button>
@@ -645,14 +602,11 @@ function renderSelectedSongPreview() {
 
     if (!song) {
         mount.innerHTML = `
-            <div class="flex items-center gap-4">
-                <div class="grid h-14 w-14 place-items-center rounded-2xl bg-white text-slate-400 border border-slate-200">
-                    <i class="fas fa-music"></i>
+            <div class="flex items-center gap-3">
+                <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white border border-slate-200 text-slate-400">
+                    <i class="fas fa-music text-gold-500"></i>
                 </div>
-                <div class="min-w-0">
-                    <div class="text-base font-semibold text-slate-500">Choose a song from the library to begin.</div>
-                    <div class="mt-1 text-sm text-slate-400">Your selected song will appear here with notes and practice timing.</div>
-                </div>
+                <div class="text-sm text-slate-500">Pick a song and it will show up here.</div>
             </div>
         `;
         return;
@@ -660,24 +614,15 @@ function renderSelectedSongPreview() {
 
     const allowed = !student || songIsAllowedForStudent(student, song);
     mount.innerHTML = `
-        <div class="flex items-start gap-4">
-            <div class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${allowed ? 'bg-[#0f172a] text-white' : 'bg-amber-100 text-amber-700'}">
+        <div class="flex items-center gap-3">
+            <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl ${allowed ? 'bg-gold-500/15 text-gold-600' : 'bg-rose-50 text-rose-500'} border border-slate-200">
                 <i class="fas fa-music"></i>
             </div>
             <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                    <h3 class="truncate text-xl font-black text-slate-900">${escapeSongHtml(song.title || 'Untitled')}</h3>
-                    <span class="rounded-full ${allowed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]">${allowed ? 'Ready to assign' : 'Not allowed'}</span>
-                </div>
-                <p class="mt-1 text-sm text-slate-600">${escapeSongHtml(song.artist || 'Unknown Artist')} · ${escapeSongHtml(song.category || 'Category')}</p>
-                <p class="mt-2 text-sm text-slate-500">${escapeSongHtml(song.notes || 'No teaching notes saved for this song yet.')}</p>
+                <div class="text-sm font-bold text-slate-900 truncate">${escapeSongHtml(song.title || 'Untitled')}</div>
+                <div class="text-xs text-slate-500 truncate">${escapeSongHtml([song.artist, song.category].filter(Boolean).join(' · ') || '—')}</div>
             </div>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-2">
-            ${song.youtube_link ? `<a href="${escapeSongHtml(song.youtube_link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700"><i class="fab fa-youtube mr-2"></i>YouTube</a>` : ''}
-            ${song.spotify_link ? `<a href="${escapeSongHtml(song.spotify_link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"><i class="fab fa-spotify mr-2"></i>Spotify</a>` : ''}
-            ${song.sheet_music_path ? `<a href="${escapeSongHtml(songAssetUrl(song.sheet_music_path))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700"><i class="fas fa-file-pdf mr-2"></i>Sheet PDF</a>` : ''}
-            ${song.accompaniment_audio_path ? `<a href="${escapeSongHtml(songAssetUrl(song.accompaniment_audio_path))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700"><i class="fas fa-headphones mr-2"></i>Audio</a>` : ''}
+            ${!allowed ? '<span class="flex-shrink-0 text-xs font-semibold text-rose-500">Not allowed</span>' : ''}
         </div>
     `;
 }
@@ -713,30 +658,18 @@ function renderSongLibrary() {
     grid.innerHTML = rows.map(song => {
         const selected = Number(song.song_id || 0) === Number(instructorSongSelectedSongId || 0);
         const allowed = !selectedStudent || songIsAllowedForStudent(selectedStudent, song);
+        const meta = [song.artist, song.category, song.difficulty_level].filter(Boolean).join(' · ');
         return `
-            <button type="button" data-song-select="${Number(song.song_id || 0)}" class="w-full rounded-[1.25rem] border px-3.5 py-3.5 text-left transition ${selected ? 'border-[#d9a81f] bg-[#fff8e8]' : 'border-slate-200 bg-white hover:border-gold-300 hover:bg-[#fffaf0]'} ${allowed ? '' : 'opacity-70'}">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${selected ? 'bg-[#0f172a] text-white' : 'bg-slate-100 text-slate-500'}">
-                            <i class="fas fa-music"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <div class="truncate text-base font-black text-slate-900">${escapeSongHtml(song.title || 'Untitled')}</div>
-                            <div class="mt-0.5 text-xs text-slate-600">${escapeSongHtml(song.artist || 'Unknown Artist')} · ${escapeSongHtml(song.difficulty_level || 'No level')}</div>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">${escapeSongHtml(song.category || 'Category')}</span>
-                                ${song.genre ? `<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">${escapeSongHtml(song.genre)}</span>` : ''}
-                                ${allowed ? '<span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Allowed</span>' : '<span class="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Not for selected student</span>'}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex shrink-0 items-center gap-2 text-slate-400">
-                        ${song.sheet_music_path ? '<i class="fas fa-file-pdf"></i>' : ''}
-                        ${song.youtube_link ? '<i class="fab fa-youtube"></i>' : ''}
-                        ${song.accompaniment_audio_path ? '<i class="fas fa-headphones"></i>' : ''}
-                    </div>
+            <div class="flex items-center justify-between gap-3 py-3 px-1 ${selected ? 'bg-amber-50/60' : ''} ${!allowed ? 'opacity-50' : ''}">
+                <div class="min-w-0 flex-1">
+                    <div class="text-sm font-bold text-slate-900 truncate">${escapeSongHtml(song.title || 'Untitled')}</div>
+                    <div class="text-xs text-slate-500 mt-0.5 truncate">${escapeSongHtml(meta || '—')}</div>
                 </div>
-            </button>
+                <button type="button" data-song-select="${Number(song.song_id || 0)}"
+                    class="flex-shrink-0 text-sm font-semibold ${selected ? 'text-gold-600 font-bold' : 'text-gold-500 hover:text-gold-600'} transition">
+                    ${selected ? 'Selected' : 'Choose'}
+                </button>
+            </div>
         `;
     }).join('');
 }

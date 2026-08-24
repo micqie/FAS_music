@@ -1850,18 +1850,27 @@ class Admin
 
         $userId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
         $status = trim((string)($data['status'] ?? ''));
-        $normalized = strcasecmp($status, 'Active') === 0 ? 'Active' : (strcasecmp($status, 'Inactive') === 0 ? 'Inactive' : '');
+        $normalized = strcasecmp($status, 'Active') === 0
+            ? 'Active'
+            : (strcasecmp($status, 'Inactive') === 0 || strcasecmp($status, 'Deactivated') === 0 ? 'Deactivated' : '');
 
         if ($userId <= 0 || $normalized === '') {
             $this->sendJSON(['error' => 'user_id and valid status are required'], 400);
         }
 
         try {
+            if (function_exists('fas_ensure_user_security_columns')) {
+                fas_ensure_user_security_columns($this->conn);
+            }
+
             $stmtUserInfo = $this->conn->prepare("SELECT username, email, first_name, last_name FROM tbl_users WHERE user_id = ? LIMIT 1");
             $stmtUserInfo->execute([$userId]);
             $targetUser = $stmtUserInfo->fetch(PDO::FETCH_ASSOC) ?: [];
             $targetLabel = trim((string)(($targetUser['first_name'] ?? '') . ' ' . ($targetUser['last_name'] ?? '')));
             if ($targetLabel === '') $targetLabel = $targetUser['email'] ?? ($targetUser['username'] ?? "User #{$userId}");
+            $previousStatus = $this->conn->prepare("SELECT status FROM tbl_users WHERE user_id = ? LIMIT 1");
+            $previousStatus->execute([$userId]);
+            $existingStatus = (string)($previousStatus->fetchColumn() ?: 'Inactive');
 
             if ($normalized === 'Active' && function_exists('fas_reset_user_security_state')) {
                 fas_reset_user_security_state($this->conn, $userId);
@@ -1883,8 +1892,8 @@ class Admin
                 'Users',
                 "User account {$targetLabel} set to {$normalized}.",
                 'user', $userId, $targetLabel,
-                $normalized === 'Inactive' ? 'warning' : 'info',
-                ['status' => $normalized === 'Active' ? 'Inactive' : 'Active'],
+                $normalized === 'Active' ? 'info' : 'warning',
+                ['status' => $existingStatus],
                 ['status' => $normalized],
                 $pById, $pByName, $pByRole, $pByEmail
             );

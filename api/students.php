@@ -1089,6 +1089,7 @@ class StudentsApi
                     ts.absence_notice,
                     ts.attendance_notes,
                     ts.notes,
+                    ts.notes AS lesson_focus,
                     {$roomExpr} AS room_name,
                     {$packageNameExpr} AS package_name,
                     COALESCE(inst.instrument_name, CONCAT('Instrument #', COALESCE(ts.instrument_id, e.instrument_id))) AS instrument_name,

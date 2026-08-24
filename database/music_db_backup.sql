@@ -63,7 +63,7 @@ CREATE TABLE `tbl_branches` (
   `address` text DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
-  `status` enum('Active','Inactive') DEFAULT 'Active',
+  `status` enum('Active','Inactive','Deactivated') DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

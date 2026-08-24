@@ -1243,11 +1243,13 @@ class User
             $storedStatus = (string)($user['status'] ?? '');
             $failedAttempts = (int)($user['failed_login_attempts'] ?? 0);
             $lockThreshold = 5;
-            $isLockedAccount = strcasecmp($storedStatus, 'Inactive') === 0
-                && ($failedAttempts >= $lockThreshold || trim((string)($user['account_locked_reason'] ?? '')) !== '' || trim((string)($user['account_locked_at'] ?? '')) !== '');
+            $lockMetadataPresent = $failedAttempts >= $lockThreshold
+                || trim((string)($user['account_locked_reason'] ?? '')) !== ''
+                || trim((string)($user['account_locked_at'] ?? '')) !== '';
+            $isLockedAccount = in_array(strtolower($storedStatus), ['inactive', 'deactivated'], true) && $lockMetadataPresent;
             if ($isLockedAccount) {
                 $this->sendJSON([
-                    'error' => 'Your account is locked after too many failed login attempts. Please contact the administrator to reactivate it.',
+                    'error' => 'Your account has been deactivated after too many failed login attempts. Please contact the administrator to reactivate it.',
                     'account_locked' => true,
                     'failed_login_attempts' => $failedAttempts,
                     'warning' => false
@@ -1271,7 +1273,7 @@ class User
                 $securityState = fas_register_failed_user_login($this->conn, (int)($user['user_id'] ?? 0), $lockThreshold);
                 if (!empty($securityState['locked'])) {
                     $this->sendJSON([
-                        'error' => 'Your account has been locked after 5 failed login attempts. Please contact the administrator to reactivate it.',
+                        'error' => 'Your account has been deactivated after 5 failed login attempts. Please contact the administrator to reactivate it.',
                         'account_locked' => true,
                         'failed_login_attempts' => (int)($securityState['attempts'] ?? $lockThreshold),
                         'warning' => false

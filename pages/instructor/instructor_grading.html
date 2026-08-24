@@ -35,10 +35,40 @@
         .score-btn-4.active { background:#dcfce7; border-color:#4ade80; color:#15803d; }
         .score-btn-5.active { background:#d1fae5; border-color:#34d399; color:#065f46; }
 
-        /* Session list */
-        .session-card { transition: background .12s, border-color .12s; }
-        .session-card:hover { background: #f9fafb; }
-        .session-card.is-selected { background: #f0fdf4; border-color: #0d9488 !important; }
+        /* Session card */
+        .session-card {
+            transition: all .15s ease;
+            cursor: pointer;
+        }
+        .session-card:hover {
+            background: #f9fafb;
+            border-color: #e5e7eb !important;
+        }
+        .session-card.selected {
+            background: #ecfdf5;
+            border-color: #0d9488 !important;
+        }
+
+        /* Skill level buttons */
+        .skill-level-btn.selected {
+            background: #d1fae5 !important;
+            border-color: #0d9488 !important;
+        }
+
+        /* Grading panel slide */
+        #gradingPanel.show {
+            transform: translateX(0);
+        }
+
+        /* Attendance cards */
+        .attendance-card {
+            transition: all .15s ease;
+            cursor: pointer;
+        }
+        .attendance-card.selected {
+            background: #d1fae5 !important;
+            border-color: #0d9488 !important;
+        }
 
         /* Scrollbar */
         .scroll-thin { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
@@ -153,183 +183,179 @@
 <div class="max-w-5xl mx-auto space-y-5">
 
     <!-- Page title row -->
-    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-6">
-        <div>
-            <p class="text-xs font-bold uppercase tracking-widest text-teal-600 mb-1">Teacher Workspace</p>
-            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Session grades</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div class="flex-1">
+            <h1 class="text-[1.75rem] font-semibold text-gray-900 tracking-tight">Session schedule</h1>
         </div>
-        <p class="text-sm text-gray-400">A simple step-by-step record for each student.</p>
-    </div>
-
-    <!-- Quick stats -->
-    <div class="grid grid-cols-3 gap-3 mb-6">
-        <div class="bg-white rounded-2xl border border-gray-100 px-4 py-3 shadow-sm">
-            <p class="text-xs text-gray-400 font-medium">Sessions</p>
-            <p id="statSessionsInView" class="text-xl font-black text-gray-900 mt-0.5">—</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-gray-100 px-4 py-3 shadow-sm">
-            <p class="text-xs text-gray-400 font-medium">Graded</p>
-            <p id="statGradedSessions" class="text-xl font-black text-teal-600 mt-0.5">—</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-gray-100 px-4 py-3 shadow-sm">
-            <p class="text-xs text-gray-400 font-medium">Avg Score</p>
-            <p id="statAverageScore" class="text-xl font-black text-gray-900 mt-0.5">—</p>
+        <div class="flex items-center gap-3">
+            <div class="relative flex-1 sm:flex-initial sm:w-96">
+                <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                <input id="gradeSearch" type="text" placeholder="Search students, instruments or lesson focus"
+                    class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-gray-300 transition-colors">
+            </div>
+            <button type="button" onclick="openLessonHistoryModal()"
+                class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap">
+                <i class="fas fa-history text-gray-400"></i>
+                <span class="hidden sm:inline">Lesson history</span>
+            </button>
         </div>
     </div>
 
-    <!-- Search -->
-    <div class="flex flex-col sm:flex-row gap-2 mb-5">
-        <div class="relative flex-1">
-            <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 text-sm"></i>
-            <input id="gradeSearch" type="text" placeholder="Search today's students or instruments..."
-                class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-teal-500 transition-colors">
-        </div>
+    <!-- Session count badge -->
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-semibold text-gray-900">Session schedule</h2>
+        <span id="sessionGradeCount" class="text-sm text-gray-500">— shown</span>
     </div>
 
-    <!-- Two-column layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5 items-start">
+    <!-- Session list -->
+    <div id="sessionGradeList" class="space-y-3"></div>
+</div>
+</main>
 
-        <!-- ══ LEFT: Session list ══ -->
-        <div class="sticky-panel">
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+<!-- ══ Grading Panel (Slide-over) ══ -->
+<div id="gradingPanel" class="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-white shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out hidden">
+    <div class="h-full flex flex-col">
+        <!-- Panel Header -->
+        <div class="flex items-start justify-between px-8 py-6 border-b border-gray-100">
+            <div class="flex items-start gap-4">
+                <div id="gradeStudentAvatar" class="h-14 w-14 rounded-full bg-teal-600 flex items-center justify-center text-white text-lg font-bold shrink-0">
+                    AN
+                </div>
+                <div>
+                    <h2 id="gradeStudentHeading" class="text-2xl font-semibold text-gray-900">Amelia Novak</h2>
+                    <p id="gradeSessionMeta" class="text-sm text-gray-500 mt-1">Violin · Junior Strings · 09:00 in Studio A</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="gradeScoreBadge" class="text-right hidden">
+                    <p class="text-xs uppercase tracking-wider text-gray-500 font-semibold">SESSION SCORE</p>
+                    <p id="gradeScoreValue" class="text-2xl font-bold text-gray-900 mt-0.5">— / 5</p>
+                </div>
+                <button type="button" onclick="closeGradingPanel()" 
+                    class="h-10 w-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Panel Body -->
+        <div class="flex-1 overflow-y-auto px-8 py-6 space-y-8">
+            <!-- Status message -->
+            <div id="gradeMessage" class="hidden rounded-xl border px-4 py-3 text-sm font-medium"></div>
+
+            <!-- Lesson Focus -->
+            <div id="gradeLessonFocusSection">
+                <p class="text-sm font-semibold text-gray-900 mb-2">Lesson focus.</p>
+                <p id="gradeLessonFocusText" class="text-sm text-gray-600">Suzuki Book 2 — Minuet No. 2</p>
+            </div>
+
+            <form id="gradingForm" class="space-y-8">
+                <input type="hidden" id="sessionIdInput">
+                <input type="hidden" id="gradeStudentName">
+                <input type="hidden" id="gradeFormSubtitle">
+
+                <!-- 1. Attendance -->
+                <section>
+                    <h3 class="text-base font-semibold text-gray-900 mb-1">1. Attendance</h3>
+                    <p class="text-sm text-gray-500 mb-4" id="attendanceSectionDesc">Grading opens once the student is marked present or late.</p>
+                    <div id="attendanceControl"></div>
+                </section>
+
+                <!-- Lock banner -->
+                <div id="gradeLockBanner" class="hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
+                    <i class="fas fa-lock text-amber-500 text-sm shrink-0"></i>
                     <div>
-                        <p class="text-sm font-semibold text-gray-700">Today's sessions</p>
-                        <p class="text-xs text-gray-400 mt-0.5">Choose a student to grade</p>
+                        <p class="text-sm font-semibold text-amber-900">Grading is not ready yet</p>
+                        <p id="gradeLockMsg" class="text-xs text-amber-700 mt-0.5">Select Present to continue.</p>
                     </div>
-                    <span id="sessionGradeCount" class="text-xs font-bold text-teal-600 bg-teal-50 rounded-full px-2 py-0.5">—</span>
                 </div>
-                <div id="sessionGradeList" class="scroll-thin overflow-y-auto divide-y divide-gray-50" style="max-height:72vh;"></div>
-            </div>
+
+                <!-- 2. Performance scores -->
+                <section>
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900">2. Performance scores</h3>
+                            <p class="text-sm text-gray-500 mt-0.5">0 of 5 criteria rated.</p>
+                        </div>
+                        <button type="button" id="editCriteriaBtn"
+                            onclick="toggleEditCriteria()"
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 transition">
+                            <i class="fas fa-pencil text-xs"></i>Edit criteria
+                        </button>
+                    </div>
+                    <div id="scoreCriteriaContainer" class="space-y-6"></div>
+                </section>
+
+                <!-- Hidden score inputs -->
+                <input type="hidden" id="performanceScoreInput">
+                <input type="hidden" id="techniqueScoreInput">
+                <input type="hidden" id="rhythmScoreInput">
+                <input type="hidden" id="focusScoreInput">
+                <input type="hidden" id="assignmentScoreInput">
+
+                <!-- 3. Overall level -->
+                <section>
+                    <h3 class="text-base font-semibold text-gray-900 mb-1">3. Overall level</h3>
+                    <p class="text-sm text-gray-500 mb-4">Where the student sits right now on their instrument.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button type="button" onclick="selectSkillLevel('Beginner')" data-level="Beginner"
+                            class="skill-level-btn text-left rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 hover:border-gray-300 transition">
+                            <p class="text-sm font-semibold text-gray-900">Beginner</p>
+                            <p class="text-xs text-gray-500 mt-0.5">Learning the fundamentals with guidance.</p>
+                        </button>
+                        <button type="button" onclick="selectSkillLevel('Developing')" data-level="Developing"
+                            class="skill-level-btn text-left rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 hover:border-gray-300 transition">
+                            <p class="text-sm font-semibold text-gray-900">Developing</p>
+                            <p class="text-xs text-gray-500 mt-0.5">Plays assigned material with some support.</p>
+                        </button>
+                        <button type="button" onclick="selectSkillLevel('Proficient')" data-level="Proficient"
+                            class="skill-level-btn text-left rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 hover:border-gray-300 transition">
+                            <p class="text-sm font-semibold text-gray-900">Proficient</p>
+                            <p class="text-xs text-gray-500 mt-0.5">Independent and consistent week to week.</p>
+                        </button>
+                        <button type="button" onclick="selectSkillLevel('Advanced')" data-level="Advanced"
+                            class="skill-level-btn text-left rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 hover:border-gray-300 transition">
+                            <p class="text-sm font-semibold text-gray-900">Advanced</p>
+                            <p class="text-xs text-gray-500 mt-0.5">Performs with confidence and interpretation.</p>
+                        </button>
+                    </div>
+                    <input type="hidden" id="skillLevelInput">
+                </section>
+
+                <!-- 4. Notes for the student -->
+                <section>
+                    <h3 class="text-base font-semibold text-gray-900 mb-1">4. Notes for the student</h3>
+                    <p class="text-sm text-gray-500 mb-4">Optional — shared with the student and their parents.</p>
+                    <textarea id="remarksInput" rows="4"
+                        placeholder="Bow hold is much steadier. Keep the metronome at 72 this week."
+                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-gray-300 transition-colors resize-none leading-relaxed"></textarea>
+                </section>
+
+                <!-- Criteria still to rate -->
+                <div class="text-sm text-gray-500">
+                    <span id="criteriaRemainingCount">5 criteria still to rate.</span>
+                </div>
+            </form>
         </div>
 
-        <!-- ══ RIGHT: Grade form ══ -->
-        <div>
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden fade-in">
-
-                <!-- Form header -->
-                <div class="px-6 py-5 border-b border-gray-100">
-                    <p class="text-xs font-bold text-teal-600 uppercase tracking-widest mb-1">Session grading</p>
-                    <h2 id="gradeStudentHeading" class="text-xl font-bold text-gray-900">Select a session</h2>
-                    <p id="gradeSessionMeta" class="text-sm text-gray-400 mt-0.5">—</p>
-                </div>
-
-                <div class="px-6 py-6 space-y-7">
-
-                    <!-- Status message -->
-                    <div id="gradeMessage" class="hidden rounded-xl border px-4 py-3 text-sm font-medium"></div>
-
-                    <form id="gradingForm" class="space-y-7">
-                        <input type="hidden" id="sessionIdInput">
-                        <input type="hidden" id="gradeStudentName">
-                        <input type="hidden" id="gradeFormSubtitle">
-
-                        <!-- ── Step 1: Attendance ── -->
-                        <section>
-                            <p class="text-base font-semibold text-gray-800 mb-1">Attendance</p>
-                            <p class="text-sm text-gray-400 mb-3" id="attendanceSectionDesc">Session attendance status.</p>
-                            <!-- Dynamic attendance UI rendered by JS here -->
-                            <div id="attendanceControl"></div>
-                        </section>
-
-                        <!-- Lock banner (shown when not present) -->
-                        <div id="gradeLockBanner" class="hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
-                            <i class="fas fa-lock text-amber-400 text-sm shrink-0"></i>
-                            <div>
-                                <p class="text-sm font-semibold text-amber-800">Grading is not ready yet</p>
-                                <p id="gradeLockMsg" class="text-xs text-amber-600 mt-0.5">Select Present to continue.</p>
-                            </div>
-                        </div>
-
-                        <!-- ── Step 2: Overall level ── -->
-                        <section>
-                            <p class="text-base font-semibold text-gray-800 mb-1">Overall level</p>
-                            <p class="text-sm text-gray-400 mb-3">Choose the best overall description.</p>
-                            <select id="skillLevelInput"
-                                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:border-teal-500 transition-colors appearance-none">
-                                <option value="">Choose a level…</option>
-                                <option value="Needs Improvement">Needs Improvement</option>
-                                <option value="Developing">Developing</option>
-                                <option value="Good">Good</option>
-                                <option value="Very Good">Very Good</option>
-                                <option value="Excellent">Excellent</option>
-                            </select>
-                        </section>
-
-                        <!-- ── Step 3: Performance scores ── -->
-                        <section>
-                            <div class="flex items-center justify-between mb-3">
-                                <div>
-                                    <p class="text-base font-semibold text-gray-800">Performance Scores</p>
-                                    <p class="text-sm text-gray-400 mt-0.5">Rate the student on each criterion.</p>
-                                </div>
-                                <button type="button" id="editCriteriaBtn"
-                                    onclick="toggleEditCriteria()"
-                                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-indigo-600 text-xs font-semibold hover:bg-indigo-50 transition">
-                                    <i class="fas fa-pencil text-[10px]"></i>Edit Criteria
-                                </button>
-                            </div>
-                            <div id="scoreCriteriaContainer" class="space-y-4"></div>
-                        </section>
-
-                        <!-- Hidden score inputs -->
-                        <input type="hidden" id="performanceScoreInput">
-                        <input type="hidden" id="techniqueScoreInput">
-                        <input type="hidden" id="rhythmScoreInput">
-                        <input type="hidden" id="focusScoreInput">
-                        <input type="hidden" id="assignmentScoreInput">
-
-                        <!-- Average preview -->
-                        <div id="avgPreviewBox" class="hidden rounded-xl bg-teal-50 border border-teal-100 px-4 py-3 flex items-center justify-between">
-                            <span class="text-sm font-medium text-teal-700">Average score</span>
-                            <span id="scorePreview" class="text-lg font-black text-teal-700">—</span>
-                        </div>
-
-                        <!-- ── Step 4: Remarks ── -->
-                        <section>
-                            <p class="text-base font-semibold text-gray-800 mb-1">Teacher Remarks</p>
-                            <p class="text-sm text-gray-400 mb-3">Optional notes — visible to the student.</p>
-                            <textarea id="remarksInput" rows="3"
-                                placeholder="Write your observations here…"
-                                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-teal-500 transition-colors resize-none leading-relaxed"></textarea>
-                        </section>
-
-                        <!-- Actions row -->
-                        <div class="flex items-center gap-3 pt-1">
-                            <button type="submit" id="saveGradeBtn"
-                                class="flex-1 py-3.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 active:scale-[.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                                <i class="fas fa-check text-xs"></i> Save Grade
-                            </button>
-                            <button type="button" id="viewProgressBtn"
-                                onclick="openProgressModal()"
-                                class="px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50 transition hidden">
-                                View Progress
-                            </button>
-                        </div>
-
-                        <!-- Grade average badge (compact) -->
-                        <div id="gradeAverageBadge" class="hidden justify-end">
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">
-                                <i class="fas fa-star text-[9px]"></i><span></span>
-                            </span>
-                        </div>
-
-                    </form>
-                </div>
-            </div>
-
-            <div class="mt-5 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden fade-in">
-                <div class="px-6 py-4 border-b border-gray-100">
-                    <p class="text-xs font-bold text-teal-600 uppercase tracking-widest mb-1">Student history</p>
-                    <h3 id="studentHistoryHeading" class="text-lg font-bold text-gray-900">Select a student</h3>
-                    <p class="text-sm text-gray-400 mt-0.5">All sessions and grades for the selected student.</p>
-                </div>
-                <div id="studentHistoryList" class="divide-y divide-gray-100 max-h-[32rem] overflow-y-auto scroll-thin"></div>
+        <!-- Panel Footer -->
+        <div class="border-t border-gray-100 px-8 py-4 bg-gray-50">
+            <div class="flex items-center justify-end gap-3">
+                <button type="button" onclick="closeGradingPanel()"
+                    class="px-5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="submit" form="gradingForm" id="saveGradeBtn"
+                    class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    <i class="fas fa-check text-xs"></i> Session done
+                </button>
             </div>
         </div>
-
     </div>
 </div>
+
+<!-- Backdrop -->
+<div id="gradingBackdrop" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden"></div>
 </main>
 
 <!-- ══ Progress modal ══ -->
@@ -384,6 +410,44 @@
     </div>
 </div>
 
+<!-- ══ Lesson History Modal ══ -->
+<div id="lessonHistoryModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-0.5">Lesson history</p>
+                <h3 id="lessonHistoryModalTitle" class="text-lg font-bold text-gray-900">—</h3>
+                <p id="lessonHistoryModalSubtitle" class="text-sm text-gray-400 mt-0.5">—</p>
+            </div>
+            <button onclick="closeLessonHistoryModal()" class="h-9 w-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition shrink-0">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-hidden">
+            <div class="overflow-x-auto overflow-y-auto scroll-thin h-full">
+                <table class="w-full">
+                    <thead class="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">DATE</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">FOCUS</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">ATTENDANCE</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">LEVEL</th>
+                            <th class="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">SCORE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lessonHistoryTableBody" class="bg-white divide-y divide-gray-100">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+            <p id="lessonHistoryRecordCount" class="text-sm text-gray-500">— records</p>
+            <button onclick="closeLessonHistoryModal()" class="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition">Close</button>
+        </div>
+    </div>
+</div>
+
 <!-- analyticsStudentLabel / analyticsSessionCount — used by JS -->
 <span id="analyticsStudentLabel" class="hidden"></span>
 <span id="analyticsSessionCount" class="hidden"></span>
@@ -395,6 +459,7 @@
 <script src="../../js/index.js"></script>
 <script src="../../js/instructor/instructor_nav.js"></script>
 <script src="../../js/instructor/grading.js"></script>
+<script src="../../js/instructor/grading_ui.js"></script>
 <script src="../../js/session_timeout.js"></script>
 
 <!-- Mobile Bottom Nav -->
