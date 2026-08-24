@@ -4800,9 +4800,29 @@ class StudentsApi
                 $latestRequest = null;
             }
 
+            // Get student's most recent skill level from graded sessions
+            $studentSkillLevel = null;
+            try {
+                if ($this->tableExists('tbl_student_progress')) {
+                    $stmtSkillLevel = $this->conn->prepare("
+                        SELECT skill_level
+                        FROM tbl_student_progress
+                        WHERE student_id = ? AND skill_level IS NOT NULL AND skill_level != ''
+                        ORDER BY assessment_date DESC, updated_at DESC, progress_id DESC
+                        LIMIT 1
+                    ");
+                    $stmtSkillLevel->execute([(int) $student['student_id']]);
+                    $skillRow = $stmtSkillLevel->fetch(PDO::FETCH_ASSOC);
+                    $studentSkillLevel = $skillRow ? trim((string)($skillRow['skill_level'] ?? '')) : null;
+                }
+            } catch (PDOException $e) {
+                $studentSkillLevel = null;
+            }
+
             $this->sendJSON([
                 'success' => true,
                 'student' => $student,
+                'student_skill_level' => $studentSkillLevel,
                 'packages' => $packages,
                 'package_scope' => $isInitialEnrollment ? 'initial' : 'extension',
                 'is_initial_enrollment' => $isInitialEnrollment,

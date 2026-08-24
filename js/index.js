@@ -5506,11 +5506,19 @@ function initStudentRequestSection(student, requestMeta) {
     // Only consider it "pending" if status is actually 'Pending' - not 'Cancelled' or 'Rejected'
     const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
     const packageScope = String(requestMeta?.package_scope || '').toLowerCase();
+    const studentSkillLevel = String(requestMeta?.student_skill_level || '').toLowerCase();
 
-    // Filter packages - only show 12 Session Package for all students
-    // The 20 and 50 session packages were promotional and are no longer offered
-    // Students can only select 12 sessions initially
-    const filteredPackages = packages.filter(pkg => Number(pkg.sessions || 0) === 12);
+    // Filter packages based on student skill level:
+    // - Beginner students: Only 12-session package
+    // - Non-beginner (Developing, Proficient, Advanced): 12, 20, and 50-session packages
+    const isBeginner = studentSkillLevel === 'beginner' || !studentSkillLevel;
+    const filteredPackages = isBeginner 
+        ? packages.filter(pkg => Number(pkg.sessions || 0) === 12)
+        : packages.filter(pkg => {
+            const sessions = Number(pkg.sessions || 0);
+            return sessions === 12 || sessions === 20 || sessions === 50;
+        });
+    
     const defaultPackageId = String(requestMeta?.default_package_id || '');
     let selectedPackageId = defaultPackageId;
 

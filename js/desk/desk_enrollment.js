@@ -791,17 +791,30 @@
             const packages = Array.isArray(meta.packages) ? meta.packages : [];
             const packageScope = String(meta.package_scope || '').toLowerCase();
             const defaultPackageId = String(meta.default_package_id || '');
+            const studentSkillLevel = String(meta.student_skill_level || '').toLowerCase();
             const previousValue = String(packageSelect.value || '');
-            packageSelect.innerHTML = '<option value="">Select package...</option>' + packages.map(pkg => {
+            
+            // Filter packages based on student skill level:
+            // - Beginner students: Only 12-session package
+            // - Non-beginner (Developing, Proficient, Advanced): 12, 20, and 50-session packages
+            const isBeginner = studentSkillLevel === 'beginner' || !studentSkillLevel;
+            const filteredPackages = isBeginner 
+                ? packages.filter(pkg => Number(pkg.sessions || 0) === 12)
+                : packages.filter(pkg => {
+                    const sessions = Number(pkg.sessions || 0);
+                    return sessions === 12 || sessions === 20 || sessions === 50;
+                });
+            
+            packageSelect.innerHTML = '<option value="">Select package...</option>' + filteredPackages.map(pkg => {
                 const sessions = Number(pkg.sessions || 0);
                 const maxInst = Number(pkg.max_instruments || 1);
                 const price = formatCurrencyPHP(pkg.price || 0);
                 return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''}) - ${price}</option>`;
             }).join('');
-            const selectedPackage = packages.find(pkg => String(pkg.package_id) === previousValue)
-                || packages.find(pkg => String(pkg.package_id) === defaultPackageId)
-                || packages.find(pkg => Number(pkg.sessions || 0) === 12)
-                || packages[0]
+            const selectedPackage = filteredPackages.find(pkg => String(pkg.package_id) === previousValue)
+                || filteredPackages.find(pkg => String(pkg.package_id) === defaultPackageId)
+                || filteredPackages.find(pkg => Number(pkg.sessions || 0) === 12)
+                || filteredPackages[0]
                 || null;
             if (selectedPackage) {
                 packageSelect.value = String(selectedPackage.package_id || '');
