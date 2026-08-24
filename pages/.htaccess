@@ -1,2 +1,8 @@
 Options -Indexes
-FallbackResource /FAS_music/index.html
+
+RewriteEngine On
+
+# If someone lands on /FAS_music/pages/ directly, send them to the real
+# app entry point so the login/session redirect can route them back to the
+# correct role dashboard without breaking asset paths.
+RewriteRule ^$ /FAS_music/index.html [R=302,L]

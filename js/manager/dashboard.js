@@ -157,6 +157,12 @@
             const enrollments = dashboardState.enrollments;
 
             const activeStudents = new Set(enrollments.map(item => Number(item.student_id || 0)).filter(Boolean)).size;
+            const studentsWithOutstanding = new Set(
+                enrollments
+                    .filter(item => Math.max(0, Number(item.total_amount || 0) - Number(item.paid_amount || 0)) > 0)
+                    .map(item => Number(item.student_id || 0))
+                    .filter(Boolean)
+            ).size;
             const registrationRevenue = registrations.reduce((sum, item) => sum + Number(item.registration_fee_paid || 0), 0);
             const enrollmentRevenue = enrollments.reduce((sum, item) => sum + Number(item.paid_amount || 0), 0);
             const enrollmentOutstanding = enrollments.reduce((sum, item) => {
@@ -167,11 +173,97 @@
 
             return {
                 activeStudents,
+                studentsWithOutstanding,
                 registrationRevenue,
                 enrollmentRevenue,
                 enrollmentOutstanding,
                 activeEnrollments: enrollments.length
             };
+        }
+
+        function collectTodaySessions() {
+            const seen = new Set();
+            const sessions = [];
+
+            dashboardState.enrollments.forEach((enrollment) => {
+                const studentName = `${enrollment.first_name || ''} ${enrollment.last_name || ''}`.trim() || 'Student';
+                const teacherName = `${enrollment.teacher_first_name || ''} ${enrollment.teacher_last_name || ''}`.trim()
+                    || enrollment.teacher_name
+                    || '—';
+                const packageName = enrollment.package_name || 'Package';
+                const roomName = enrollment.room_name || enrollment.room_number || enrollment.room || 'Room not set';
+
+                (Array.isArray(enrollment.sessions_list) ? enrollment.sessions_list : []).forEach((session) => {
+                    if (!session?.session_date) return;
+                    if (!isToday(session.session_date)) return;
+                    const key = [
+                        enrollment.enrollment_id || enrollment.student_id || '',
+                        session.session_date || '',
+                        session.start_time || '',
+                        session.end_time || '',
+                        session.session_id || ''
+                    ].join('|');
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    sessions.push({
+                        session_date: session.session_date,
+                        start_time: session.start_time,
+                        end_time: session.end_time,
+                        studentName,
+                        teacherName,
+                        packageName,
+                        roomName
+                    });
+                });
+            });
+
+            return sessions.sort((a, b) => {
+                const left = parseDate(`${a.session_date || ''}T${a.start_time || '00:00:00'}`)?.getTime() || 0;
+                const right = parseDate(`${b.session_date || ''}T${b.start_time || '00:00:00'}`)?.getTime() || 0;
+                return left - right;
+            });
+        }
+
+        function renderTodayClassesList() {
+            const listEl = document.getElementById('todayClassesList');
+            const metaEl = document.getElementById('todayClassesMeta');
+            if (!listEl || !metaEl) return;
+
+            const sessions = collectTodaySessions();
+            const dateLabel = new Date().toLocaleDateString(undefined, { weekday: 'long' });
+            metaEl.textContent = `${dateLabel} • ${sessions.length} class${sessions.length === 1 ? '' : 'es'}`;
+
+            if (!sessions.length) {
+                listEl.innerHTML = `
+                    <div class="px-6 py-8 text-sm text-slate-500">
+                        No classes are scheduled for today yet.
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = sessions.map((session) => `
+                <div class="px-6 py-5">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="text-lg font-black text-slate-900">${escapeHtml(session.studentName)}</div>
+                            <div class="mt-1 text-sm text-slate-500">with ${escapeHtml(session.teacherName)}</div>
+                        </div>
+                        <div class="flex items-center gap-3 text-slate-500 shrink-0">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span class="text-sm font-medium">${escapeHtml(session.roomName)}</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+                        <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 font-semibold">
+                            <i class="far fa-clock text-slate-400"></i>
+                            ${escapeHtml(formatTime12Hour(session.start_time))}
+                        </span>
+                        <span class="text-slate-400">•</span>
+                        <span>${escapeHtml(session.packageName)}</span>
+                    </div>
+                </div>
+            `).join('');
         }
 
         function renderMakeupSummary(summary) {
@@ -303,6 +395,15 @@
             setText('statActiveStudents', String(summary.activeStudents));
             setText('statActiveStudentsMeta', `${activeEnrollments} active enrollment${activeEnrollments === 1 ? '' : 's'} across ${summary.activeStudents} student${summary.activeStudents === 1 ? '' : 's'}`);
             setText('reportOutstandingBalance', formatPeso(summary.enrollmentOutstanding));
+            setText(
+                'queueCollectionText',
+                summary.studentsWithOutstanding
+                    ? `${summary.studentsWithOutstanding} of ${summary.activeStudents} student${summary.activeStudents === 1 ? '' : 's'} have an unpaid balance. Follow up with them to close out this month.`
+                    : 'No unpaid balances are currently showing for this branch.'
+            );
+            setText('todayClassesMeta', `${new Date().toLocaleDateString(undefined, { weekday: 'long' })} • ${collectTodaySessions().length} classes`);
+
+            renderTodayClassesList();
 
             const briefLines = [
                 `${dashboardState.branchName} branch currently has ${summary.activeStudents} active enrollee${summary.activeStudents === 1 ? '' : 's'}.`,
@@ -371,17 +472,7 @@
         }
 
         document.getElementById('copyReportBtn')?.addEventListener('click', async () => {
-            const reportText = document.getElementById('managerReportText')?.textContent || '';
-            if (!reportText.trim()) {
-                showToast('No report text is ready yet.', 'warning');
-                return;
-            }
-            try {
-                await navigator.clipboard.writeText(reportText);
-                showToast('Manager report copied.', 'success');
-            } catch (error) {
-                showToast('Unable to copy the report.', 'error');
-            }
+            window.location.href = 'manager_enrollments.html?view=active';
         });
 
         document.addEventListener('DOMContentLoaded', async () => {

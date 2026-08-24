@@ -31,13 +31,54 @@
         .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
         .dashboard-shell {
             background:
-                radial-gradient(circle at top left, rgba(212, 175, 55, 0.14), transparent 28%),
-                radial-gradient(circle at top right, rgba(15, 76, 129, 0.12), transparent 26%),
-                linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+                radial-gradient(circle at top left, rgba(212, 175, 55, 0.12), transparent 28%),
+                radial-gradient(circle at top right, rgba(15, 76, 129, 0.10), transparent 24%),
+                linear-gradient(180deg, #f7f9fc 0%, #edf2f7 100%);
         }
         .glass-card {
             background: rgba(255, 255, 255, 0.88);
             backdrop-filter: blur(10px);
+        }
+        .branch-hero-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.94));
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+        }
+        .branch-summary-card {
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+        }
+        .branch-tile {
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }
+        .branch-action {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            border-radius: 1.25rem;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background: #fff;
+            padding: 1rem 1.05rem;
+            transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+        }
+        .branch-action:hover {
+            transform: translateY(-1px);
+            border-color: rgba(212, 175, 55, 0.30);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+        }
+        .branch-action-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.9rem;
+            display: grid;
+            place-items: center;
+            background: #fff7df;
+            color: #996515;
+            flex-shrink: 0;
         }
         .sidebar-item-active {
             background: linear-gradient(135deg, rgba(184, 134, 11, 0.25), rgba(212, 175, 55, 0.15));
@@ -116,98 +157,106 @@
         </div>
     </aside>
 
-    <main class="lg:ml-72 pt-28 p-6 md:p-8">
-        <div class="max-w-5xl mx-auto space-y-8">
-            <section class="glass-card rounded-[2rem] border border-white/80 shadow-2xl shadow-slate-200/60 overflow-hidden">
-                <div class="px-6 mt-5 py-8 md:px-8 bg-gradient-to-r from-branchBlue via-slate-900 to-obsidian text-white">
-                    <div class="max-w-3xl">
+    <main class="lg:ml-72 pt-24 pb-10 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1500px] mx-auto space-y-6">
+            <section class="space-y-2">
+                <p class="text-[11px] sm:text-xs font-bold uppercase tracking-[0.3em] text-gold-600">Branch Summary</p>
+                <h1 id="heroBranchLabel" class="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-slate-900">Branch</h1>
+                <p id="heroSummary" class="max-w-2xl text-sm sm:text-base text-slate-600">
+                    Loading the latest active enrollee, balance, and revenue summary for your branch.
+                </p>
+            </section>
 
-                        <h1 class="mt-4 text-3xl md:text-5xl font-black tracking-tight">Branch Summary</h1>
-                        <p id="heroSummary" class="mt-3 text-sm md:text-base text-slate-200 max-w-2xl">
-                            Loading the latest active enrollee, balance, and revenue summary for your branch.
-                        </p>
+            <section class="grid gap-6 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,0.95fr)]">
+                <article class="branch-hero-card rounded-[1.6rem] p-5 sm:p-6 lg:p-8">
+                    <div class="text-[11px] sm:text-xs font-bold uppercase tracking-[0.24em] text-gold-700">Still to collect</div>
+                    <div id="reportOutstandingBalance" class="mt-3 text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900">₱0</div>
+                    <p id="queueCollectionText" class="mt-3 max-w-xl text-sm sm:text-base leading-6 text-slate-600">
+                        Loading branch collection status.
+                    </p>
+                    <div class="mt-6">
+                        <button id="copyReportBtn" type="button" class="inline-flex items-center gap-2 rounded-xl bg-gold-500 px-5 py-3 text-sm font-extrabold text-black shadow-lg shadow-gold-500/20 transition hover:bg-gold-400">
+                            Review balances <i class="fas fa-arrow-right"></i>
+                        </button>
                     </div>
+                </article>
+
+                <div class="grid gap-6">
+                    <article class="branch-summary-card rounded-[1.5rem] p-5 sm:p-6">
+                        <div class="flex items-center gap-3 text-slate-500">
+                            <i class="fas fa-user-group text-base"></i>
+                            <div class="text-sm font-medium">Students learning now</div>
+                        </div>
+                        <div id="statActiveStudents" class="mt-3 text-3xl sm:text-4xl font-black text-slate-900">0</div>
+                        <div id="statActiveStudentsMeta" class="mt-2 text-sm leading-6 text-slate-600">Students carrying active enrollments</div>
+                    </article>
+
+                    <article class="branch-summary-card rounded-[1.5rem] p-5 sm:p-6">
+                        <div class="flex items-center gap-3 text-slate-500">
+                            <i class="fas fa-wallet text-base"></i>
+                            <div class="text-sm font-medium">Money collected</div>
+                        </div>
+                        <div id="branchTotalRevenue" class="mt-3 text-3xl sm:text-4xl font-black text-slate-900">₱0</div>
+                        <div class="mt-2 text-sm leading-6 text-slate-600">Registrations and lesson payments</div>
+                    </article>
                 </div>
             </section>
 
-            <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <article class="glass-card rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/50 p-5">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Active Enrollees</div>
-                            <div id="statActiveStudents" class="mt-3 text-3xl font-black text-slate-900">0</div>
-                            <div id="statActiveStudentsMeta" class="mt-2 text-sm text-slate-500">Students carrying active enrollments</div>
+            <section class="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,0.85fr)]">
+                <article class="branch-summary-card rounded-[1.5rem] overflow-hidden">
+                    <div class="flex items-center justify-between gap-4 border-b border-slate-200/70 px-5 py-4">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-calendar-days text-gold-500 text-base"></i>
+                            <h2 class="text-lg sm:text-xl font-black text-slate-900">Classes today</h2>
                         </div>
-                        <div class="h-12 w-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                            <i class="fas fa-user-graduate text-xl"></i>
-                        </div>
+                        <div id="todayClassesMeta" class="text-xs sm:text-sm text-slate-500">Loading today’s classes</div>
+                    </div>
+                    <div id="todayClassesList" class="divide-y divide-slate-200/70"></div>
+                </article>
+
+                <article class="branch-summary-card rounded-[1.5rem] overflow-hidden">
+                    <div class="px-5 py-4 border-b border-slate-200/70">
+                        <h2 class="text-lg sm:text-xl font-black text-slate-900">What would you like to do?</h2>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <a href="manager_enrollments.html?view=active" class="branch-action">
+                            <div class="flex items-center gap-4 min-w-0">
+                                <div class="branch-action-icon">
+                                    <i class="fas fa-credit-card"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="text-base font-bold text-slate-900">Record a payment</div>
+                                    <div class="text-sm text-slate-500">Update what a student has paid</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-slate-300"></i>
+                        </a>
+                        <a href="manager_registration.html" class="branch-action">
+                            <div class="flex items-center gap-4 min-w-0">
+                                <div class="branch-action-icon">
+                                    <i class="fas fa-id-card"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="text-base font-bold text-slate-900">Approve a registration</div>
+                                    <div class="text-sm text-slate-500">Review the queue for approval</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-slate-300"></i>
+                        </a>
+                        <a href="manager_sessions.html?page=sessions" class="branch-action">
+                            <div class="flex items-center gap-4 min-w-0">
+                                <div class="branch-action-icon">
+                                    <i class="fas fa-calendar-check"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="text-base font-bold text-slate-900">Change a schedule</div>
+                                    <div class="text-sm text-slate-500">Move a class to another day</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-slate-300"></i>
+                        </a>
                     </div>
                 </article>
-                <article class="glass-card rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/50 p-5">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Outstanding Balance</div>
-                            <div id="reportOutstandingBalance" class="mt-3 text-3xl font-black text-rose-600">P0</div>
-                            <div id="queueCollectionText" class="mt-2 text-xs text-slate-500">Loading branch collection status.</div>
-                        </div>
-                        <div class="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-                            <i class="fas fa-receipt text-xl"></i>
-                        </div>
-                    </div>
-                </article>
-                <article class="glass-card rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/50 p-5">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Branch Revenue</div>
-                            <div id="branchTotalRevenue" class="mt-3 text-3xl font-black text-slate-900">P0</div>
-                            <div class="mt-2 text-xs text-slate-500">Registration + enrollment payments</div>
-                        </div>
-                        <div class="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                            <i class="fas fa-coins text-xl"></i>
-                        </div>
-                    </div>
-                </article>
-            </section>
-
-            <section class="glass-card rounded-[1.75rem] border border-slate-200/70 shadow-xl shadow-slate-200/40 p-6">
-                <div class="flex items-center justify-between gap-4 flex-wrap">
-                    <div>
-                        <div class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Quick Links</div>
-
-                    </div>
-
-                </div>
-
-                <div class="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <a href="manager_enrollments.html?view=active" class="group rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-                        <div class="h-11 w-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center group-hover:bg-sky-600 group-hover:text-white transition">
-                            <i class="fas fa-credit-card"></i>
-                        </div>
-                        <div class="mt-3 text-sm font-bold text-slate-900">Payments</div>
-                        <div class="mt-1 text-xs text-slate-500">Review balances</div>
-                    </a>
-                    <a href="manager_registration.html" class="group rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-                        <div class="h-11 w-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition">
-                            <i class="fas fa-id-card"></i>
-                        </div>
-                        <div class="mt-3 text-sm font-bold text-slate-900">Registrations</div>
-                        <div class="mt-1 text-xs text-slate-500">Approve requests</div>
-                    </a>
-                    <a href="manager_sessions.html?page=sessions" class="group rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-                        <div class="h-11 w-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition">
-                            <i class="fas fa-calendar-check"></i>
-                        </div>
-                        <div class="mt-3 text-sm font-bold text-slate-900">Sessions</div>
-                        <div class="mt-1 text-xs text-slate-500">Manage schedules</div>
-                    </a>
-                    <a href="manager_teachers.html" class="group rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-                        <div class="h-11 w-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center group-hover:bg-violet-600 group-hover:text-white transition">
-                            <i class="fas fa-chalkboard-teacher"></i>
-                        </div>
-                        <div class="mt-3 text-sm font-bold text-slate-900">Teachers</div>
-                        <div class="mt-1 text-xs text-slate-500">Branch staff</div>
-                    </a>
-                </div>
             </section>
         </div>
     </main>
