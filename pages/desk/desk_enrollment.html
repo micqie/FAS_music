@@ -96,14 +96,31 @@
     <main class="desk-main flex-1 px-4 sm:px-6 lg:px-8 py-6">
         <div class="max-w-7xl mx-auto">
             <div class="mb-6">
-                <h1 id="sessionsPageTitle" class="text-3xl sm:text-4xl font-bold text-slate-900">Enrollments</h1>
-                <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-                    <div class="desk-toolbar-pill inline-flex items-center bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm">
-                        <button id="viewNavPending" class="px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Pending</button>
-                        <button id="viewNavActive" class="px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Active</button>
+                <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                    <div>
+                        <h1 id="sessionsPageTitle" class="text-3xl sm:text-4xl font-bold text-slate-900">Enrollments</h1>
+                        <p id="sessionsPageSubtitle" class="mt-2 text-slate-500">Review portal sign-ups, approve add-on sessions, and keep active students on schedule.</p>
                     </div>
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center px-5 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-base font-bold rounded-xl shadow-lg shadow-gold-500/20 transition">
+                    <div class="text-sm text-slate-500 xl:text-right">
+                        <span id="itemsNeedActionCount" class="font-bold text-slate-900">0</span> items need action
+                    </div>
+                </div>
+                <div class="mt-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div class="desk-toolbar-pill inline-flex items-center bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm w-fit">
+                        <button id="viewNavPending" class="px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Pending (<span id="pendingTabCount">0</span>)</button>
+                        <button id="viewNavActive" class="px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Active (<span id="activeTabCount">0</span>)</button>
+                    </div>
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-end w-full xl:w-auto">
+                        <div class="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+                            <div class="relative w-full sm:w-[380px]">
+                                <i class="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input id="enrollmentSearchInput" type="search" placeholder="Search student, branch, package" class="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            </div>
+                            <select id="branchFilter" class="w-full sm:w-52 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
+                                <option value="">All branches</option>
+                            </select>
+                        </div>
+                        <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-base font-bold rounded-xl shadow-lg shadow-gold-500/20 transition whitespace-nowrap">
                             <i class="fas fa-list-check mr-2"></i>
                             Walk-In Enrollment
                         </button>
@@ -115,9 +132,32 @@
         <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
 
         <!-- Pending Student Requests -->
+        <section class="mt-2 mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-col gap-4 px-5 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-center gap-4">
+                    <label class="inline-flex cursor-pointer items-center gap-3">
+                        <input id="extensionOnlyToggle" type="checkbox" class="peer sr-only">
+                        <span class="relative h-8 w-14 rounded-full border-2 border-gold-500 bg-gold-500/20 transition peer-checked:border-gold-500 peer-checked:bg-gold-500">
+                            <span class="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-6"></span>
+                        </span>
+                    </label>
+                    <div>
+                        <h2 class="text-lg sm:text-xl font-bold text-slate-900">Session extension requests only</h2>
+                        <p class="text-sm text-slate-500">Turn on to focus on add-on session requests.</p>
+                    </div>
+                </div>
+                <span class="inline-flex w-fit items-center rounded-full bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700">
+                    <span id="sessionExtensionRequestCount" class="mr-1">0</span> requests waiting
+                </span>
+            </div>
+        </section>
+
         <div id="pendingSessionsSection" class="desk-panel bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden mb-6">
             <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                <h3 id="pendingSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Student Requests</h3>
+                <div>
+                    <h3 id="pendingSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Enrollments</h3>
+                    <p class="text-xs text-slate-500 mt-1">Review portal sign-ups before assigning them to a schedule.</p>
+                </div>
                 <span class="text-sm text-slate-600" id="pendingRequestCount">Loading...</span>
             </div>
             <div class="overflow-x-auto">
@@ -150,7 +190,7 @@
                     <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-calendar-plus mr-2 text-gold-500"></i>Pending Session Extension Requests</h3>
                     <p class="text-xs text-slate-500 mt-1">₱650 per 1-hour add-on session from the student portal.</p>
                 </div>
-                <span class="text-sm text-slate-600" id="sessionExtensionRequestCount">Loading...</span>
+                <span class="text-sm text-slate-600" id="sessionExtensionRequestCountHeader">Loading...</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">

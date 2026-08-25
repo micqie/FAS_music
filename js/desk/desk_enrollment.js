@@ -4,6 +4,9 @@
         let managerBranchName = '';
         let uiIsDesk = false;
         let managerPageMode = 'enrollments';
+        let allPendingRequests = [];
+        let allSessionExtensionRequests = [];
+        let pendingRequestsById = {};
         let assignRequestTeacherCandidates = [];
         let assignRequestInstruments = [];
         let activeAssignRequestSlotRow = null;
@@ -63,6 +66,74 @@
                 text: msg,
                 confirmButtonColor: '#b8860b'
             });
+        }
+
+        function getEnrollmentSearchTerm() {
+            const input = document.getElementById('enrollmentSearchInput');
+            return String(input?.value || '').trim().toLowerCase();
+        }
+
+        function getEnrollmentBranchId() {
+            const branchFilter = document.getElementById('branchFilter');
+            return Number(branchFilter?.value || 0);
+        }
+
+        function getEnrollmentExtensionOnlyState() {
+            const toggle = document.getElementById('extensionOnlyToggle');
+            return Boolean(toggle?.checked);
+        }
+
+        function matchesEnrollmentSearch(values) {
+            const term = getEnrollmentSearchTerm();
+            if (!term) return true;
+            return values.some(value => String(value || '').toLowerCase().includes(term));
+        }
+
+        function matchesSelectedBranch(rowBranchId, rowBranchName) {
+            const selectedBranchId = getEnrollmentBranchId();
+            if (!selectedBranchId) return true;
+            if (Number(rowBranchId || 0) === selectedBranchId) return true;
+            const selectedBranch = document.getElementById('branchFilter')?.selectedOptions?.[0]?.textContent || '';
+            return String(rowBranchName || '').toLowerCase() === String(selectedBranch || '').toLowerCase();
+        }
+
+        function setEnrollmentSummaryText(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+
+        function updateEnrollmentSummary() {
+            const pendingCount = allPendingRequests.length;
+            const activeCount = allStudents.length;
+            const extensionCount = allSessionExtensionRequests.length;
+
+            setEnrollmentSummaryText('pendingTabCount', String(pendingCount));
+            setEnrollmentSummaryText('activeTabCount', String(activeCount));
+            setEnrollmentSummaryText('itemsNeedActionCount', String(pendingCount + extensionCount));
+            setEnrollmentSummaryText('pendingRequestCount', `${pendingCount} pending`);
+            setEnrollmentSummaryText('studentCount', `${activeCount} active`);
+            setEnrollmentSummaryText('sessionExtensionRequestCount', `${extensionCount}`);
+            setEnrollmentSummaryText('sessionExtensionRequestCountHeader', `${extensionCount} pending`);
+        }
+
+        async function loadBranchesForFilter() {
+            const branchFilter = document.getElementById('branchFilter');
+            if (!branchFilter) return;
+
+            try {
+                const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
+                const data = response.data || {};
+                if (!data.success || !Array.isArray(data.branches)) return;
+
+                const currentBranchId = String(managerBranchId || '');
+                branchFilter.innerHTML = '<option value="">All branches</option>' + data.branches.map(branch => {
+                    const branchId = String(branch.branch_id || '');
+                    const selected = currentBranchId && branchId === currentBranchId ? ' selected' : '';
+                    return `<option value="${escapeHtml(branchId)}"${selected}>${escapeHtml(branch.branch_name || 'Branch')}</option>`;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load branches:', error);
+            }
         }
 
         function normalizeText(value) {
@@ -169,8 +240,8 @@
         function setSessionNavState(view) {
             const topPending = document.getElementById('viewNavPending');
             const topActive = document.getElementById('viewNavActive');
-            const topBase = 'px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition';
-            const topActiveClass = 'px-4 py-2 text-sm font-semibold rounded-lg bg-gold-500 text-white shadow';
+            const topBase = 'px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition';
+            const topActiveClass = 'px-5 py-2.5 text-base font-semibold rounded-lg bg-gold-500 text-black shadow';
             if (topPending) topPending.className = (view === 'pending') ? topActiveClass : topBase;
             if (topActive) topActive.className = (view === 'active') ? topActiveClass : topBase;
 
@@ -236,6 +307,7 @@
             const view = String(params.get('view') || 'active').toLowerCase();
             const pendingSection = document.getElementById('pendingSessionsSection');
             const activeSection = document.getElementById('activeSessionsSection');
+            const extensionSection = document.getElementById('sessionExtensionRequestsSection');
             const title = document.getElementById('sessionsPageTitle');
             const subtitle = document.getElementById('sessionsPageSubtitle');
 
@@ -252,10 +324,22 @@
             const baseSub = enrollmentMode
                 ? 'Manage pending and active enrollments'
                 : 'Manage pending and active sessions';
+            const extensionOnly = getEnrollmentExtensionOnlyState();
+
+            if (extensionOnly) {
+                if (pendingSection) pendingSection.classList.add('hidden');
+                if (activeSection) activeSection.classList.add('hidden');
+                if (extensionSection) extensionSection.classList.remove('hidden');
+                if (title) title.textContent = baseLabel;
+                if (subtitle) subtitle.textContent = 'Showing just the request list - enrollments are hidden.';
+                setSessionNavState('');
+                return;
+            }
 
             if (view === 'pending') {
                 if (pendingSection) pendingSection.classList.remove('hidden');
                 if (activeSection) activeSection.classList.add('hidden');
+                if (extensionSection) extensionSection.classList.remove('hidden');
                 if (title) title.textContent = pendingLabel;
                 if (subtitle) subtitle.textContent = pendingSub;
                 setSessionNavState('pending');
@@ -265,6 +349,7 @@
             if (view === 'active') {
                 if (pendingSection) pendingSection.classList.add('hidden');
                 if (activeSection) activeSection.classList.remove('hidden');
+                if (extensionSection) extensionSection.classList.remove('hidden');
                 if (title) title.textContent = activeLabel;
                 if (subtitle) subtitle.textContent = activeSub;
                 setSessionNavState('active');
@@ -273,6 +358,7 @@
 
             if (pendingSection) pendingSection.classList.remove('hidden');
             if (activeSection) activeSection.classList.remove('hidden');
+            if (extensionSection) extensionSection.classList.remove('hidden');
             if (title) title.textContent = baseLabel;
             if (subtitle) subtitle.textContent = baseSub;
             setSessionNavState('');
@@ -1121,148 +1207,135 @@
             return Math.max(1, explicitMax || 1);
         }
 
-        async function loadPendingRequests() {
+        function renderPendingRequests() {
             const tableBody = document.getElementById('pendingRequestsTable');
             const countEl = document.getElementById('pendingRequestCount');
             if (!tableBody) return;
 
-            try {
-                if (!requireManagerBranch()) return;
-                let url = `${baseApiUrl}/students.php?action=get-pending-package-requests&branch_id=${encodeURIComponent(managerBranchId)}`;
+            const rows = (Array.isArray(allPendingRequests) ? allPendingRequests : []).filter(r => {
+                if (!matchesSelectedBranch(r.branch_id, r.branch_name)) return false;
+                return matchesEnrollmentSearch([
+                    `${r.first_name || ''} ${r.last_name || ''}`,
+                    r.email,
+                    r.branch_name,
+                    r.package_name,
+                    Array.isArray(r.instruments) ? r.instruments.map(i => i.type_name || i.instrument_name || '').join(', ') : '',
+                    'Based on instructor availability',
+                    r.payment_type,
+                    r.payment_method
+                ]);
+            });
 
-                const response = await axios.get(url);
-                const data = response.data;
-                const requests = data.success && Array.isArray(data.requests) ? data.requests : [];
+            if (countEl) countEl.textContent = `${rows.length} pending`;
 
-                if (countEl) countEl.textContent = `${requests.length} pending`;
-
-                if (!requests.length) {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
-                                <p>${uiIsDesk ? 'No pending enrollment requests.' : 'No pending student requests.'}</p>
-                            </td>
-                        </tr>`;
-                    return;
-                }
-
-                pendingRequestsById = {};
-                tableBody.innerHTML = requests.map(r => {
-                    pendingRequestsById[String(r.request_id)] = r;
-                    const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
-                    const pkg = escapeHtml(r.package_name || '—');
-                    const instruments = Array.isArray(r.instruments) && r.instruments.length
-                        ? r.instruments.map(i => escapeHtml(i.type_name || i.instrument_name || 'Instrument')).join(', ')
-                        : '—';
-                    const paymentType = escapeHtml(r.payment_type || 'Partial Payment');
-                    const payableNow = Number(r.payable_now || 0);
-                    return `
-                        <tr class="hover:bg-slate-50/80 transition">
-                            <td class="px-6 py-4">
-                                <div class="font-semibold text-base text-slate-900">${studentName || 'Student'}</div>
-                                <div class="text-base text-slate-600">${escapeHtml(r.email || '')}</div>
-                                <div class="text-sm text-slate-500">${escapeHtml(r.branch_name || '')}</div>
-                            </td>
-                            <td class="px-6 py-4 text-base text-slate-700">${pkg}</td>
-                            <td class="px-6 py-4 text-base text-slate-700">${instruments}</td>
-                            <td class="px-6 py-4 text-base text-slate-700">Based on instructor availability</td>
-                            <td class="px-6 py-4 text-base text-slate-700">
-                                <div class="space-y-2">
-                                   
-                                    <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 transition">
-                                        Payment Info
-                                    </button>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-bold">
-                                        View
-                                    </button>
-                                    <button onclick="handleScheduleClick(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-sm font-bold">
-                                        ${window.pendingRequestActionLabel || 'Assign & Approve'}
-                                    </button>
-                                    <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-sm font-bold">
-                                        Reject
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>`;
-                }).join('');
-            } catch (error) {
-                console.error('Failed to load pending package requests:', error);
-                if (countEl) countEl.textContent = 'Error';
+            if (!rows.length) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
-                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                            <p>Failed to load pending requests.</p>
+                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
+                            <p>No pending enrollment requests.</p>
                         </td>
-                </tr>`;
+                    </tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = rows.map(r => {
+                const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
+                const pkg = escapeHtml(r.package_name || '—');
+                const instruments = Array.isArray(r.instruments) && r.instruments.length
+                    ? r.instruments.map(i => escapeHtml(i.type_name || i.instrument_name || 'Instrument')).join(', ')
+                    : '—';
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="px-6 py-4">
+                            <div class="font-semibold text-base text-slate-900">${studentName || 'Student'}</div>
+                            <div class="text-base text-slate-600">${escapeHtml(r.email || '')}</div>
+                            <div class="text-sm text-slate-500">${escapeHtml(r.branch_name || '')}</div>
+                        </td>
+                        <td class="px-6 py-4 text-base text-slate-700">${pkg}</td>
+                        <td class="px-6 py-4 text-base text-slate-700">${instruments}</td>
+                        <td class="px-6 py-4 text-base text-slate-700">Based on instructor availability</td>
+                        <td class="px-6 py-4 text-base text-slate-700">
+                            <div class="space-y-2">
+                                <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 transition">
+                                    Payment Info
+                                </button>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-bold">
+                                    View
+                                </button>
+                                <button onclick="handleScheduleClick(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-sm font-bold">
+                                    ${window.pendingRequestActionLabel || 'Assign & Approve'}
+                                </button>
+                                <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-sm font-bold">
+                                    Reject
+                                </button>
+                            </div>
+                        </td>
+                    </tr>`;
+            }).join('');
+        }
+
+        async function loadPendingRequests() {
+            if (!requireManagerBranch()) return;
+
+            try {
+                const branchId = getEnrollmentBranchId();
+                let url = `${baseApiUrl}/students.php?action=get-pending-package-requests`;
+                if (branchId > 0) {
+                    url += `&branch_id=${encodeURIComponent(branchId)}`;
+                }
+
+                const response = await axios.get(url);
+                const data = response.data || {};
+                allPendingRequests = data.success && Array.isArray(data.requests) ? data.requests : [];
+                pendingRequestsById = {};
+                allPendingRequests.forEach(r => {
+                    pendingRequestsById[String(r.request_id)] = r;
+                });
+                updateEnrollmentSummary();
+                renderPendingRequests();
+            } catch (error) {
+                console.error('Failed to load pending package requests:', error);
+                const tableBody = document.getElementById('pendingRequestsTable');
+                const countEl = document.getElementById('pendingRequestCount');
+                if (countEl) countEl.textContent = 'Error';
+                if (tableBody) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-red-500">
+                                <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                                <p>Failed to load pending requests.</p>
+                            </td>
+                    </tr>`;
+                }
             }
         }
 
         async function loadPendingSessionExtensionRequests() {
             const tableBody = document.getElementById('sessionExtensionRequestsTable');
-            const countEl = document.getElementById('sessionExtensionRequestCount');
+            const countEl = document.getElementById('sessionExtensionRequestCountHeader');
             if (!tableBody) return;
 
             try {
                 if (!requireManagerBranch()) return;
-                const url = `${baseApiUrl}/students.php?action=get-pending-session-extension-requests&branch_id=${encodeURIComponent(managerBranchId)}`;
+                const branchId = getEnrollmentBranchId();
+                let url = `${baseApiUrl}/students.php?action=get-pending-session-extension-requests`;
+                if (branchId > 0) {
+                    url += `&branch_id=${encodeURIComponent(branchId)}`;
+                }
                 const response = await axios.get(url);
                 const data = response.data || {};
-                const requests = data.success && Array.isArray(data.requests) ? data.requests : [];
-
-                if (countEl) countEl.textContent = `${requests.length} pending`;
-
-                if (!requests.length) {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-calendar-plus text-2xl mb-2 text-gold-500/60"></i>
-                                <p>No pending session extension requests.</p>
-                            </td>
-                        </tr>`;
-                    return;
-                }
-
+                allSessionExtensionRequests = data.success && Array.isArray(data.requests) ? data.requests : [];
                 pendingSessionExtensionRequestsById = {};
-                tableBody.innerHTML = requests.map(req => {
+                allSessionExtensionRequests.forEach(req => {
                     pendingSessionExtensionRequestsById[String(req.request_id)] = req;
-                    const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
-                    const schedule = req.preferred_day_of_week
-                        ? `${escapeHtml(req.preferred_day_of_week)} • ${formatTime12Hour(req.preferred_start_time || '')} - ${formatTime12Hour(req.preferred_end_time || '')}`
-                        : '—';
-                    const amount = formatCurrencyPHP(req.requested_amount || 650);
-                    const paymentMethod = escapeHtml(req.payment_method || 'Cash');
-                    const proofLink = req.payment_proof_path
-                        ? `<a href="${escapeHtml(buildPublicFileUrl(req.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">Proof</a>`
-                        : '<span class="text-xs text-slate-400">No proof</span>';
-                    return `
-                        <tr class="hover:bg-slate-50/80 transition">
-                            <td class="px-6 py-4">
-                                <div class="font-semibold text-base text-slate-900">${studentName}</div>
-                                <div class="text-sm text-slate-500">${escapeHtml(req.email || '')}</div>
-                            </td>
-                            <td class="px-6 py-4 text-base text-slate-700">${escapeHtml(req.branch_name || '')}</td>
-                            <td class="px-6 py-4 text-base text-slate-700">${schedule}</td>
-                            <td class="px-6 py-4 text-base text-slate-700">
-                                <div>${paymentMethod}</div>
-                                <div class="mt-1">${proofLink}</div>
-                            </td>
-                            <td class="px-6 py-4 text-base text-slate-700">${amount}</td>
-                            <td class="px-6 py-4">
-                                <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">Pending</span>
-                            </td>
-                            <td class="px-6 py-4">
-                                <button type="button" onclick="approveSessionExtensionRequest(${Number(req.request_id)})" class="px-4 py-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-sm font-bold">
-                                    Approve
-                                </button>
-                            </td>
-                        </tr>`;
-                }).join('');
+                });
+                updateEnrollmentSummary();
+                renderSessionExtensionRequests();
             } catch (error) {
                 console.error('Failed to load pending session extension requests:', error);
                 if (countEl) countEl.textContent = 'Error';
@@ -1272,8 +1345,76 @@
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Failed to load session extension requests.</p>
                         </td>
-                    </tr>`;
+                        </tr>`;
             }
+        }
+
+        function renderSessionExtensionRequests() {
+            const tableBody = document.getElementById('sessionExtensionRequestsTable');
+            const countEl = document.getElementById('sessionExtensionRequestCountHeader');
+            if (!tableBody) return;
+
+            const rows = (Array.isArray(allSessionExtensionRequests) ? allSessionExtensionRequests : []).filter(req => {
+                if (!matchesSelectedBranch(req.branch_id, req.branch_name)) return false;
+                return matchesEnrollmentSearch([
+                    `${req.first_name || ''} ${req.last_name || ''}`,
+                    req.email,
+                    req.branch_name,
+                    req.preferred_day_of_week,
+                    req.preferred_start_time,
+                    req.preferred_end_time,
+                    req.payment_method,
+                    req.requested_amount
+                ]);
+            });
+
+            if (countEl) countEl.textContent = `${rows.length} pending`;
+            setEnrollmentSummaryText('sessionExtensionRequestCount', String(rows.length));
+
+            if (!rows.length) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                            <i class="fas fa-calendar-plus text-2xl mb-2 text-gold-500/60"></i>
+                            <p>No pending session extension requests.</p>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = rows.map(req => {
+                const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
+                const schedule = req.preferred_day_of_week
+                    ? `${escapeHtml(req.preferred_day_of_week)} • ${formatTime12Hour(req.preferred_start_time || '')} - ${formatTime12Hour(req.preferred_end_time || '')}`
+                    : '—';
+                const amount = formatCurrencyPHP(req.requested_amount || 650);
+                const paymentMethod = escapeHtml(req.payment_method || 'Cash');
+                const proofLink = req.payment_proof_path
+                    ? `<a href="${escapeHtml(buildPublicFileUrl(req.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">Proof</a>`
+                    : '<span class="text-xs text-slate-400">No proof</span>';
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="px-6 py-4">
+                            <div class="font-semibold text-base text-slate-900">${studentName}</div>
+                            <div class="text-sm text-slate-500">${escapeHtml(req.email || '')}</div>
+                        </td>
+                        <td class="px-6 py-4 text-base text-slate-700">${escapeHtml(req.branch_name || '')}</td>
+                        <td class="px-6 py-4 text-base text-slate-700">${schedule}</td>
+                        <td class="px-6 py-4 text-base text-slate-700">
+                            <div>${paymentMethod}</div>
+                            <div class="mt-1">${proofLink}</div>
+                        </td>
+                        <td class="px-6 py-4 text-base text-slate-700">${amount}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">Pending</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <button type="button" onclick="approveSessionExtensionRequest(${Number(req.request_id)})" class="px-4 py-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-sm font-bold">
+                                Approve
+                            </button>
+                        </td>
+                    </tr>`;
+            }).join('');
         }
 
         async function approveSessionExtensionRequest(requestId) {
@@ -2318,7 +2459,11 @@
 
             try {
                 if (!requireManagerBranch()) return;
-                let url = `${baseApiUrl}/students.php?action=get-active-enrollments&branch_id=${encodeURIComponent(managerBranchId)}`;
+                const branchId = getEnrollmentBranchId();
+                let url = `${baseApiUrl}/students.php?action=get-active-enrollments`;
+                if (branchId > 0) {
+                    url += `&branch_id=${encodeURIComponent(branchId)}`;
+                }
 
                 const response = await axios.get(url);
                 const data = response.data;
@@ -2350,7 +2495,23 @@
         }
 
         function renderStudents(tableBody) {
-            if (!allStudents.length) {
+            const rows = (Array.isArray(allStudents) ? allStudents : []).filter(student => {
+                if (!matchesSelectedBranch(student.branch_id, student.branch_name)) return false;
+                return matchesEnrollmentSearch([
+                    `${student.first_name || ''} ${student.last_name || ''}`,
+                    student.email,
+                    student.branch_name,
+                    student.package_name,
+                    student.teacher_first_name,
+                    student.teacher_last_name,
+                    student.first_session_date
+                ]);
+            });
+
+            const countEl = document.getElementById('studentCount');
+            if (countEl) countEl.textContent = `${rows.length} active`;
+
+            if (!rows.length) {
                 tableBody.innerHTML = `
                     <tr>
                         <td colspan="6" class="px-6 py-8 text-center text-slate-500">
@@ -2361,7 +2522,7 @@
                 return;
             }
 
-            tableBody.innerHTML = allStudents.map(student => {
+            tableBody.innerHTML = rows.map(student => {
                 const packageName = student.package_name || '—';
                 const totalAmount = Number(student.total_amount || 0);
                 const paidAmount = Number(student.paid_amount || 0);
@@ -2679,6 +2840,7 @@
             initPaymentForm();
             initWalkinPage();
             await lockWalkinBranchToManager();
+            await loadBranchesForFilter();
 
             await Promise.all([
                 loadSessionPackages(),
@@ -2719,6 +2881,16 @@
                 loadPendingRequests();
                 loadPendingSessionExtensionRequests();
                 loadActiveStudents();
+                applySessionView();
+            });
+            document.getElementById('enrollmentSearchInput')?.addEventListener('input', () => {
+                renderPendingRequests();
+                renderSessionExtensionRequests();
+                renderStudents(document.getElementById('studentsTable'));
+                updateEnrollmentSummary();
+            });
+            document.getElementById('extensionOnlyToggle')?.addEventListener('change', () => {
+                applySessionView();
             });
             document.getElementById('openWalkinRegistrationModalBtn')?.addEventListener('click', openWalkinRegistrationModal);
             document.getElementById('closeRegisterStudentModalBtn')?.addEventListener('click', closeWalkinRegistrationModal);

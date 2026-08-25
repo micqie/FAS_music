@@ -1,4 +1,3 @@
-        window.adminEnrollmentsAllowActions = false;
         window.pendingRequestActionLabel = 'Branch Review';
         window.onPendingRequestAssignClick = null;
         let adminPendingEnrollments = [];
