@@ -328,7 +328,7 @@
 
     <!-- Register Student Modal -->
     <div id="registerStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/45 backdrop-blur-sm overflow-y-auto">
-        <div class="walkin-panel w-full max-w-3xl relative my-6 overflow-hidden">
+        <div class="walkin-panel w-full max-w-4xl relative my-6 overflow-hidden">
             <button id="closeRegisterStudentModalBtn" class="absolute top-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition">
                 <i class="fas fa-times text-lg"></i>
             </button>
@@ -340,7 +340,7 @@
                     <p class="text-sm text-slate-600 leading-6">
                         Fill in the student details, use a simple login name if needed, and the system will turn it into a
                         <span class="font-semibold text-slate-900">@fas.com</span> account automatically.
-                        As admin, you can select any branch for this registration.
+                        As admin, you can select either branch for this registration.
                     </p>
                 </div>
 
@@ -383,7 +383,7 @@
                                     Phone *
                                 </label>
                                 <input id="phone" type="tel" name="student_phone" required autocomplete="off"
-                                class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900  placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500"
                                 placeholder="Phone number">
                             </div>
                             <div>
@@ -447,7 +447,7 @@
                             </div>
                             <div class="w-full">
                                 <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider guardian-label">Phone</label>
-                                <input type="tel" name="guardian_phone" autocomplete="off" class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500 guardian-field" placeholder="Phone number">
+                                <input type="tel" name="guardian_phone" autocomplete="off" class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900  placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500 guardian-field" placeholder="Phone number">
                             </div>
                             <div>
                                 <label id="walkin_guardian_email_label" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Login Email (Becomes @fas.com)</label>

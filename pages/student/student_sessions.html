@@ -194,9 +194,138 @@
                     </button>
                 </div>
                 <div id="studentAdditionalSessionStatus" class="mt-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 text-sm text-zinc-600 dark:text-zinc-300"></div>
+                <div class="mt-4 rounded-2xl border border-dashed border-zinc-300 dark:border-white/10 bg-gold-50/70 dark:bg-gold-500/5 px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300">
+                    <div class="font-bold text-zinc-900 dark:text-white">₱650 per session</div>
+                    <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Each extra session is 1 hour long and will be reviewed by the school before it is confirmed.</div>
+                </div>
             </div>
         </div>
     </main>
+
+    <div id="studentSessionExtensionModal" class="fixed inset-0 z-[70] hidden overflow-y-auto overscroll-contain bg-black/60 backdrop-blur-sm p-0 sm:p-4" aria-hidden="true">
+        <div class="min-h-full flex items-stretch sm:items-center justify-center">
+            <div class="w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-3xl bg-white dark:bg-obsidian rounded-none sm:rounded-3xl border-0 sm:border sm:border-zinc-200 dark:sm:border-white/10 shadow-2xl overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between gap-4 px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-white/10">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.25em] text-gold-600 dark:text-gold-300 font-bold">Session Request</div>
+                        <div class="text-base sm:text-lg font-extrabold text-zinc-900 dark:text-white mt-1">Request one more 1-hour session</div>
+                    </div>
+                    <button type="button" onclick="closeStudentSessionExtensionModal()" class="h-10 w-10 rounded-full border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 transition" aria-label="Close session request form">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 sm:py-5">
+                    <div id="studentSessionExtensionStatus"></div>
+                    <form id="studentSessionExtensionForm" class="mt-4 space-y-4 pb-24 sm:pb-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_320px] gap-4 lg:gap-5">
+                            <div class="space-y-4">
+                                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
+                                    <div class="flex items-center gap-3 px-4 sm:px-5 py-4 border-b border-zinc-100 dark:border-white/8 bg-zinc-50 dark:bg-white/3">
+                                        <div class="h-7 w-7 rounded-full bg-gold-500 flex items-center justify-center shrink-0">
+                                            <span class="text-black text-xs font-black">1</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-bold text-zinc-900 dark:text-white">Choose a day and time</p>
+                                            <p class="text-xs text-zinc-500 dark:text-zinc-400">Pick your preferred start time for the next 1-hour session.</p>
+                                        </div>
+                                    </div>
+                                    <div class="px-4 sm:px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Preferred Day</label>
+                                            <select id="studentSessionExtensionDay" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-gold-500 transition-colors">
+                                                <option value="">Select day…</option>
+                                                <option value="Monday">Monday</option>
+                                                <option value="Tuesday">Tuesday</option>
+                                                <option value="Wednesday">Wednesday</option>
+                                                <option value="Thursday">Thursday</option>
+                                                <option value="Friday">Friday</option>
+                                                <option value="Saturday">Saturday</option>
+                                                <option value="Sunday">Sunday</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Start Time</label>
+                                            <input id="studentSessionExtensionStartTime" type="time" step="3600" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
+                                    <div class="flex items-center gap-3 px-4 sm:px-5 py-4 border-b border-zinc-100 dark:border-white/8 bg-zinc-50 dark:bg-white/3">
+                                        <div class="h-7 w-7 rounded-full bg-gold-500 flex items-center justify-center shrink-0">
+                                            <span class="text-black text-xs font-black">2</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-bold text-zinc-900 dark:text-white">Payment details</p>
+                                            <p class="text-xs text-zinc-500 dark:text-zinc-400">Cash requests do not need proof. GCash or Bank Transfer does.</p>
+                                        </div>
+                                    </div>
+                                    <div class="px-4 sm:px-5 py-4 space-y-4">
+                                        <div>
+                                            <label class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Payment Method</label>
+                                            <select id="studentSessionExtensionPaymentMethod" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-gold-500 transition-colors">
+                                                <option value="Cash">Cash</option>
+                                                <option value="GCash">GCash</option>
+                                                <option value="Bank Transfer">Bank Transfer</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">
+                                                Payment Screenshot
+                                                <span id="studentSessionExtensionProofHint" class="ml-1 text-zinc-400 normal-case font-normal tracking-normal">Not required for cash payments</span>
+                                            </label>
+                                            <label class="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-5 cursor-pointer hover:border-gold-400 hover:bg-amber-50 dark:hover:bg-gold-500/5 transition-colors">
+                                                <i class="fas fa-cloud-arrow-up text-2xl text-zinc-400"></i>
+                                                <span class="text-sm text-zinc-500 dark:text-zinc-400">Click to upload your payment proof</span>
+                                                <span class="text-xs text-zinc-400">JPG, PNG, or PDF</span>
+                                                <input type="file" id="studentSessionExtensionPaymentProof" name="session_payment_proof_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="hidden">
+                                            </label>
+                                            <p id="studentSessionExtensionProofFileName" class="mt-2 text-xs text-gold-600 dark:text-gold-400 hidden"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <aside class="space-y-4 lg:sticky lg:top-4 self-start">
+                                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
+                                    <div class="px-4 sm:px-5 py-4 border-b border-zinc-100 dark:border-white/8 bg-zinc-50 dark:bg-white/3">
+                                        <p class="text-sm font-bold text-zinc-900 dark:text-white">Request Summary</p>
+                                        <p class="text-xs text-zinc-500 dark:text-zinc-400">A 1-hour extension request is always ₱650.</p>
+                                    </div>
+                                    <div id="studentSessionExtensionAmount" class="px-4 sm:px-5 py-4 text-sm text-zinc-700 dark:text-zinc-100">
+                                        <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3">
+                                            <div class="text-xs uppercase tracking-[0.25em] text-gold-600 dark:text-gold-400 font-bold">Session Extension</div>
+                                            <div class="mt-2 text-lg font-black text-zinc-900 dark:text-white">₱650.00</div>
+                                            <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">One 1-hour session request</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
+                                    <div class="px-4 sm:px-5 py-4 border-b border-zinc-100 dark:border-white/8 bg-zinc-50 dark:bg-white/3">
+                                        <p class="text-sm font-bold text-zinc-900 dark:text-white">Notes</p>
+                                        <p class="text-xs text-zinc-500 dark:text-zinc-400">Add a short message if you want staff to know anything specific.</p>
+                                    </div>
+                                    <div class="px-4 sm:px-5 py-4">
+                                        <textarea id="studentSessionExtensionNotes" rows="4" class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-gold-500 transition-colors" placeholder="Optional note for the school"></textarea>
+                                    </div>
+                                </div>
+                            </aside>
+                        </div>
+
+                        <div class="sticky bottom-0 z-20 -mx-3 sm:mx-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-zinc-200/80 dark:border-white/10 bg-gradient-to-t from-white via-white/95 to-white/70 dark:from-obsidian dark:via-obsidian/95 dark:to-obsidian/75 backdrop-blur-sm px-3 sm:px-0 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                            <p class="text-xs text-zinc-400 dark:text-zinc-500">
+                                <i class="fas fa-circle-info mr-1"></i>
+                                Each request is for one 1-hour session at ₱650.
+                            </p>
+                            <button type="submit" id="studentSessionExtensionSubmitBtn" class="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gold-500 hover:bg-gold-400 active:scale-[.98] text-black text-sm font-extrabold transition shadow-lg shadow-gold-500/20">
+                                <i class="fas fa-paper-plane mr-2"></i>Submit Request
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/mode.js"></script>

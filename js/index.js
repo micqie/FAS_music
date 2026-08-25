@@ -5452,7 +5452,7 @@ function initStudentAdditionalSessionAction(student, portal, requestMeta, attend
     if (hasPendingRequest) {
         statusEl.textContent = 'You already have a pending request. Please wait for approval.';
     } else if (totalSessions > 0) {
-        statusEl.textContent = `${attendedSessions} of ${totalSessions} sessions done. ${remainingSessions} left.`;
+        statusEl.textContent = `${attendedSessions} of ${totalSessions} sessions done. ${remainingSessions} left. You can still request an extra session below.`;
     } else {
         statusEl.textContent = 'Finish your current package before adding more sessions.';
     }
@@ -5463,21 +5463,13 @@ function initStudentAdditionalSessionAction(student, portal, requestMeta, attend
             return;
         }
 
-        if (remainingSessions > 0) {
-            showMessage(`You still have ${remainingSessions} session(s) left to finish.`, 'error');
-            return;
-        }
-
-        const requestModal = document.getElementById('studentRequestModal');
+        const requestModal = document.getElementById('studentSessionExtensionModal');
         if (requestModal) {
-            openStudentRequestModal();
-            showMessage('Use the request form to select a 20-session or 50-session package for extension.', 'success');
+            openStudentSessionExtensionModal();
             return;
         }
 
-        const dashboardUrl = new URL('student_dashboard.html', window.location.href);
-        dashboardUrl.searchParams.set('open_request', '1');
-        window.location.href = dashboardUrl.toString();
+        showMessage('Unable to open the session request modal right now.', 'error');
     };
 }
 
@@ -5505,6 +5497,9 @@ function initStudentRequestSection(student, requestMeta) {
     const latest = requestMeta?.latest_request || null;
     // Only consider it "pending" if status is actually 'Pending' - not 'Cancelled' or 'Rejected'
     const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
+    // Check if form should be disabled (Pending or Approved status means no editing allowed)
+    const requestStatus = String(latest?.status || '');
+    const isFormDisabled = requestStatus === 'Pending' || requestStatus === 'Approved';
     const packageScope = String(requestMeta?.package_scope || '').toLowerCase();
     const studentSkillLevel = String(requestMeta?.student_skill_level || '').toLowerCase();
 
@@ -5571,11 +5566,12 @@ function initStudentRequestSection(student, requestMeta) {
 
             return `
                 <button type="button"
-                    class="student-request-package-card w-full text-left rounded-[1.25rem] border px-4 py-3 transition ${active ? 'border-gold-500 bg-gold-50/70 dark:bg-gold-500/10 ring-1 ring-gold-500/25' : 'border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900/40 hover:border-gold-300 dark:hover:border-gold-500/30'}"
+                    class="student-request-package-card w-full text-left rounded-[1.25rem] border px-4 py-3 transition ${active ? 'border-gold-500 bg-gold-50/70 dark:bg-gold-500/10 ring-1 ring-gold-500/25' : 'border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900/40 hover:border-gold-300 dark:hover:border-gold-500/30'} ${isFormDisabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}"
                     data-package-id="${escapeHtml(packageId)}"
                     data-max-instruments="${maxInst}"
                     data-sessions="${sessions}"
-                    data-price="${pkg.price || 0}">
+                    data-price="${pkg.price || 0}"
+                    ${isFormDisabled ? 'disabled' : ''}>
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                         <div class="flex items-center gap-4 min-w-0">
                             <span class="h-6 w-6 rounded-full border flex items-center justify-center shrink-0 ${active ? 'border-gold-500 bg-gold-500 text-white' : 'border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-950 text-transparent'}">
@@ -5592,14 +5588,16 @@ function initStudentRequestSection(student, requestMeta) {
             `;
         }).join('');
 
-        packageCardsContainer.querySelectorAll('.student-request-package-card').forEach((card) => {
-            card.addEventListener('click', () => {
-                selectedPackageId = String(card.dataset.packageId || '');
-                packageSelect.value = selectedPackageId;
-                renderPackageCards();
-                updateRequestPackageUI();
+        if (!isFormDisabled) {
+            packageCardsContainer.querySelectorAll('.student-request-package-card').forEach((card) => {
+                card.addEventListener('click', () => {
+                    selectedPackageId = String(card.dataset.packageId || '');
+                    packageSelect.value = selectedPackageId;
+                    renderPackageCards();
+                    updateRequestPackageUI();
+                });
             });
-        });
+        }
     };
 
     if (filteredPackages.length === 0) {
@@ -6302,8 +6300,30 @@ function renderStudentRegistrationModal(student, portal) {
                                 </div>
                             </div>
                             <div class="col-span-1 md:col-span-2 min-w-0">
-                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Address *</label>
-                                <textarea id="regAddress" rows="2" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500 resize-none"></textarea>
+                                <input type="hidden" id="regAddress">
+                                <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Address</label>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 min-w-0">
+                                    <div class="min-w-0">
+                                        <label class="block text-[10px] font-medium text-zinc-400 dark:text-zinc-500 mb-1">Street</label>
+                                        <input type="text" id="regStreet" placeholder="House no., street, subdivision" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-gold-500">
+                                    </div>
+                                    <div class="min-w-0">
+                                        <label class="block text-[10px] font-medium text-zinc-400 dark:text-zinc-500 mb-1">Barangay</label>
+                                        <input type="text" id="regBarangay" placeholder="Barangay" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-gold-500">
+                                    </div>
+                                    <div class="min-w-0">
+                                        <label class="block text-[10px] font-medium text-zinc-400 dark:text-zinc-500 mb-1">Province</label>
+                                        <select id="regProvince" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                                            <option value="">Loading provinces...</option>
+                                        </select>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <label class="block text-[10px] font-medium text-zinc-400 dark:text-zinc-500 mb-1">City / Municipality</label>
+                                        <select id="regCity" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" disabled>
+                                            <option value="">Select province first</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -6392,11 +6412,17 @@ function renderStudentRegistrationModal(student, portal) {
                             <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Proof of Payment *</label>
                             <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full min-w-0 max-w-full px-2 py-2.5 sm:px-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
                             <p class="mt-1.5 text-[11px] text-zinc-400">Screenshot or receipt · JPG, PNG, PDF</p>
+                            <button type="button" id="regPayProofViewBtn" class="hidden mt-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-flex items-center gap-1">
+                                <i class="fas fa-eye text-[10px]"></i> Click to view uploaded file
+                            </button>
                         </div>
                         <div class="min-w-0">
                             <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Valid ID / Proof of Age *</label>
                             <input type="file" id="regAgeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full min-w-0 max-w-full px-2 py-2.5 sm:px-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
-                            <p class="mt-1.5 text-[11px] text-zinc-400">For age verification · JPG, PNG, PDF</p>
+                            <p class="mt-1.5 text-[11px] text-zinc-400">Birth certificate, valid ID, etc. · JPG, PNG, PDF</p>
+                            <button type="button" id="regAgeProofViewBtn" class="hidden mt-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-flex items-center gap-1">
+                                <i class="fas fa-eye text-[10px]"></i> Click to view uploaded file
+                            </button>
                         </div>
                         <div id="regPayStatus" class="text-xs text-zinc-500 dark:text-zinc-300 break-words"></div>
                     </form>
@@ -6421,6 +6447,161 @@ function initStudentRegistrationPhonePickers() {
     if (window.FasIntlPhone) {
         window.FasIntlPhone.init(document.getElementById('studentRegistrationModalBody') || document);
     }
+}
+
+// PH Address data for student registration modal
+let studentRegPhProvinces = [];
+let studentRegPhCities = [];
+let studentRegAddressLoaded = false;
+
+async function loadStudentRegAddressData() {
+    if (studentRegAddressLoaded) return;
+    try {
+        const [provRes, cityRes] = await Promise.all([
+            fetch('https://raw.githubusercontent.com/darklight721/philippines/master/provinces.json'),
+            fetch('https://raw.githubusercontent.com/darklight721/philippines/master/cities.json')
+        ]);
+        studentRegPhProvinces = provRes.ok ? await provRes.json() : [];
+        studentRegPhCities = cityRes.ok ? await cityRes.json() : [];
+        studentRegPhProvinces = (Array.isArray(studentRegPhProvinces) ? studentRegPhProvinces : [])
+            .filter(r => r && r.key && r.name)
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+        studentRegPhCities = Array.isArray(studentRegPhCities) ? studentRegPhCities : [];
+        studentRegAddressLoaded = true;
+    } catch (err) {
+        console.error('Failed to load PH address data:', err);
+    }
+}
+
+function studentRegPopulateSelect(selectEl, items, placeholder) {
+    if (!selectEl) return;
+    const options = [`<option value="">${placeholder}</option>`];
+    items.forEach(item => {
+        const val = String(item.value || '').replace(/"/g, '&quot;');
+        const lbl = String(item.label || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        options.push(`<option value="${val}">${lbl}</option>`);
+    });
+    selectEl.innerHTML = options.join('');
+}
+
+function studentRegGetSelectText(selectEl) {
+    if (!selectEl) return '';
+    const option = selectEl.options?.[selectEl.selectedIndex];
+    return option && option.value ? option.textContent.trim() : '';
+}
+
+function studentRegSyncCityOptions() {
+    const provinceSelect = document.getElementById('regProvince');
+    const citySelect = document.getElementById('regCity');
+    if (!provinceSelect || !citySelect) return;
+    
+    const provinceKey = provinceSelect.value;
+    const provinceName = studentRegGetSelectText(provinceSelect);
+    const cities = provinceKey
+        ? studentRegPhCities
+            .filter(row => String(row.province || '') === String(provinceKey))
+            .map(row => ({ value: row.name, label: row.name }))
+            .sort((a, b) => a.label.localeCompare(b.label))
+        : [];
+    
+    studentRegPopulateSelect(
+        citySelect,
+        cities,
+        provinceKey ? `Select city/municipality in ${provinceName}` : 'Select province first'
+    );
+    citySelect.disabled = !provinceKey;
+}
+
+function studentRegSyncHiddenAddress() {
+    const street = document.getElementById('regStreet')?.value.trim() || '';
+    const barangay = document.getElementById('regBarangay')?.value.trim() || '';
+    const city = studentRegGetSelectText(document.getElementById('regCity'));
+    const province = studentRegGetSelectText(document.getElementById('regProvince'));
+    const hidden = document.getElementById('regAddress');
+    if (hidden) {
+        hidden.value = [street, barangay, city, province].filter(Boolean).join(', ');
+    }
+}
+
+async function initStudentRegistrationAddressCascade() {
+    await loadStudentRegAddressData();
+    
+    const provinceSelect = document.getElementById('regProvince');
+    const citySelect = document.getElementById('regCity');
+    
+    if (!provinceSelect || !citySelect) return;
+    
+    // Populate provinces
+    studentRegPopulateSelect(
+        provinceSelect,
+        studentRegPhProvinces.map(r => ({ value: r.key, label: r.name })),
+        'Select province'
+    );
+    
+    // Add event listeners
+    ['regStreet', 'regBarangay', 'regCity', 'regProvince'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', studentRegSyncHiddenAddress);
+            el.addEventListener('change', studentRegSyncHiddenAddress);
+        }
+    });
+    
+    provinceSelect.addEventListener('change', () => {
+        studentRegSyncCityOptions();
+        studentRegSyncHiddenAddress();
+    });
+    
+    citySelect.addEventListener('change', studentRegSyncHiddenAddress);
+    
+    // Initial sync
+    studentRegSyncCityOptions();
+    studentRegSyncHiddenAddress();
+}
+
+// Global function to show image preview modal
+function showImageModal(imageUrl, fileName) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('imagePreviewModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'imagePreviewModal';
+        modal.className = 'fixed inset-0 z-[80] hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm';
+        modal.innerHTML = `
+            <div class="relative max-w-4xl max-h-[90vh] w-full">
+                <button onclick="document.getElementById('imagePreviewModal').classList.add('hidden'); document.getElementById('imagePreviewModal').classList.remove('flex');" class="absolute -top-12 right-0 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+                <div class="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden shadow-2xl">
+                    <div class="p-4 border-b border-zinc-200 dark:border-zinc-700">
+                        <p id="imagePreviewFileName" class="text-sm font-semibold text-zinc-900 dark:text-white truncate"></p>
+                    </div>
+                    <div class="p-4 flex items-center justify-center bg-zinc-50 dark:bg-zinc-800" style="max-height: calc(90vh - 8rem);">
+                        <img id="imagePreviewImg" src="" alt="Preview" class="max-w-full max-h-full object-contain" />
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        });
+    }
+    
+    // Update modal content
+    const img = document.getElementById('imagePreviewImg');
+    const fileNameEl = document.getElementById('imagePreviewFileName');
+    if (img) img.src = imageUrl;
+    if (fileNameEl) fileNameEl.textContent = fileName;
+    
+    // Show modal
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
 }
 
 function renderStudentActionBanner(student, meta, portal) {
@@ -6787,6 +6968,9 @@ function wireStudentOnboardingActions(student, meta, portal) {
     if (regDob && !regDob.value) regDob.value = student?.date_of_birth || '';
     if (regAddress && !regAddress.value) regAddress.value = student?.address || '';
 
+    // Initialize PH address cascade for student registration
+    initStudentRegistrationAddressCascade();
+
     if (regForm) {
         regForm.onsubmit = (e) => e.preventDefault();
     }
@@ -6796,6 +6980,31 @@ function wireStudentOnboardingActions(student, meta, portal) {
         const updateAge = () => {
             const age = computeAgeFromDob(regDob.value || '');
             regAge.value = age === null ? '' : String(age);
+            
+            // Date validation with red indicator
+            const dobValue = regDob.value;
+            if (dobValue) {
+                const dobDate = new Date(dobValue);
+                const today = new Date();
+                const minDate = new Date(1900, 0, 1);
+                
+                // Check if date is valid and within reasonable range
+                if (isNaN(dobDate.getTime()) || dobDate > today || dobDate < minDate) {
+                    regDob.classList.add('!border-red-500', 'dark:!border-red-500');
+                    regAge.classList.add('!border-red-500', 'dark:!border-red-500');
+                } else if (age !== null && age < 3) {
+                    // Minimum age 3 years old
+                    regDob.classList.add('!border-red-500', 'dark:!border-red-500');
+                    regAge.classList.add('!border-red-500', 'dark:!border-red-500');
+                } else {
+                    regDob.classList.remove('!border-red-500', 'dark:!border-red-500');
+                    regAge.classList.remove('!border-red-500', 'dark:!border-red-500');
+                }
+            } else {
+                regDob.classList.remove('!border-red-500', 'dark:!border-red-500');
+                regAge.classList.remove('!border-red-500', 'dark:!border-red-500');
+            }
+            
             syncGuardianState();
         };
         regDob.addEventListener('change', updateAge);
@@ -6822,6 +7031,42 @@ function wireStudentOnboardingActions(student, meta, portal) {
     };
     document.getElementById('regPayMethod')?.addEventListener('change', updateRegistrationReferenceUI);
     updateRegistrationReferenceUI();
+
+    // File link for proof of payment - clickable to view
+    if (regPayProof) {
+        regPayProof.addEventListener('change', () => {
+            const file = regPayProof.files?.[0];
+            const link = document.getElementById('regPayProofLink');
+            const nameSpan = document.getElementById('regPayProofName');
+            
+            if (file && link && nameSpan) {
+                const objectURL = URL.createObjectURL(file);
+                link.href = objectURL;
+                nameSpan.textContent = file.name;
+                link.classList.remove('hidden');
+            } else if (link) {
+                link.classList.add('hidden');
+            }
+        });
+    }
+    
+    // File link for proof of ID - clickable to view
+    if (regAgeProof) {
+        regAgeProof.addEventListener('change', () => {
+            const file = regAgeProof.files?.[0];
+            const link = document.getElementById('regAgeProofLink');
+            const nameSpan = document.getElementById('regAgeProofName');
+            
+            if (file && link && nameSpan) {
+                const objectURL = URL.createObjectURL(file);
+                link.href = objectURL;
+                nameSpan.textContent = file.name;
+                link.classList.remove('hidden');
+            } else if (link) {
+                link.classList.add('hidden');
+            }
+        });
+    }
 
     if (submitAllBtn) {
         submitAllBtn.onclick = async () => {

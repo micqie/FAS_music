@@ -3,6 +3,29 @@
         window.onPendingRequestAssignClick = null;
         let adminPendingEnrollments = [];
         let adminActiveEnrollments = [];
+        let adminEnrollmentSearch = '';
+        let adminEnrollmentExtensionOnly = false;
+
+        function getEnrollmentSearchTerm() {
+            const input = document.getElementById('enrollmentSearchInput');
+            return String(input?.value || adminEnrollmentSearch || '').trim().toLowerCase();
+        }
+
+        function getEnrollmentBranchId() {
+            const branchFilter = document.getElementById('branchFilter');
+            return Number(branchFilter?.value || 0);
+        }
+
+        function getEnrollmentExtensionOnlyState() {
+            const toggle = document.getElementById('extensionOnlyToggle');
+            return Boolean(toggle?.checked || adminEnrollmentExtensionOnly);
+        }
+
+        function matchesEnrollmentSearch(row, values) {
+            const term = getEnrollmentSearchTerm();
+            if (!term) return true;
+            return values.some(value => String(value || '').toLowerCase().includes(term));
+        }
 
         function setEnrollmentSummaryText(id, value) {
             const el = document.getElementById(id);
@@ -23,23 +46,19 @@
             setEnrollmentSummaryText('enrollSummaryActiveCount', String(activeCount));
             setEnrollmentSummaryText('enrollSummaryCollected', formatCurrencyPHP(collected));
             setEnrollmentSummaryText('enrollSummaryOutstanding', formatCurrencyPHP(outstanding));
+            setEnrollmentSummaryText('pendingTabCount', String(pendingCount));
+            setEnrollmentSummaryText('activeTabCount', String(activeCount));
+            setEnrollmentSummaryText('itemsNeedActionCount', String(pendingCount));
         }
 
         function setEnrollmentNavState(view) {
             const pendingLink = document.getElementById('enrollNavPending');
             const activeLink = document.getElementById('enrollNavActive');
-            const sidebarPending = document.getElementById('navEnrollPending');
-            const sidebarActive = document.getElementById('navEnrollActive');
 
-            const baseClass = 'px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition';
-            const activeClass = 'px-4 py-2 text-sm font-semibold rounded-lg bg-gold-500 text-white shadow';
+            const baseClass = 'px-5 py-2.5 text-sm font-semibold rounded-xl text-slate-800 hover:bg-slate-100 transition';
+            const activeClass = 'px-5 py-2.5 text-sm font-semibold rounded-xl bg-gold-500 text-black shadow-sm';
             if (pendingLink) pendingLink.className = (view === 'pending') ? activeClass : baseClass;
             if (activeLink) activeLink.className = (view === 'active') ? activeClass : baseClass;
-
-            const sidebarBase = 'block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all';
-            const sidebarActiveClass = 'block ml-11 px-3 py-2 text-sm font-semibold text-white bg-white/10 rounded-lg';
-            if (sidebarPending) sidebarPending.className = (view === 'pending') ? sidebarActiveClass : sidebarBase;
-            if (sidebarActive) sidebarActive.className = (view === 'active') ? sidebarActiveClass : sidebarBase;
         }
 
         function applyEnrollmentView() {
@@ -53,8 +72,8 @@
             if (view === 'pending') {
                 if (pendingSection) pendingSection.classList.remove('hidden');
                 if (activeSection) activeSection.classList.add('hidden');
-                if (title) title.textContent = 'Pending Enrollment Queue';
-                if (subtitle) subtitle.textContent = 'Read-only queue of requests waiting for desk or branch admin action.';
+                if (title) title.textContent = 'Enrollments';
+                if (subtitle) subtitle.textContent = 'Read-only enrollment oversight across all branches.';
                 setEnrollmentNavState('pending');
                 return;
             }
@@ -62,16 +81,24 @@
             if (view === 'active') {
                 if (pendingSection) pendingSection.classList.add('hidden');
                 if (activeSection) activeSection.classList.remove('hidden');
-                if (title) title.textContent = 'Active Enrollments';
-                if (subtitle) subtitle.textContent = 'Read-only list of approved enrollments and payment balances.';
+                if (title) title.textContent = 'Enrollments';
+                if (subtitle) subtitle.textContent = 'Read-only enrollment oversight across all branches.';
                 setEnrollmentNavState('active');
                 return;
             }
 
             if (pendingSection) pendingSection.classList.remove('hidden');
-            if (activeSection) activeSection.classList.remove('hidden');
+            if (activeSection) {
+                if (getEnrollmentExtensionOnlyState()) {
+                    activeSection.classList.add('hidden');
+                } else {
+                    activeSection.classList.remove('hidden');
+                }
+            }
             if (title) title.textContent = 'Enrollments';
-            if (subtitle) subtitle.textContent = 'Read-only enrollment oversight across all branches.';
+            if (subtitle) subtitle.textContent = getEnrollmentExtensionOnlyState()
+                ? 'Focused on add-on session requests.'
+                : 'Review portal sign-ups, approve add-on sessions, and keep active students on schedule.';
             setEnrollmentNavState('');
         }
 
@@ -100,90 +127,79 @@
             return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] || '';
         }
 
-        async function loadActiveEnrollments() {
-            const tableBody = document.getElementById('activeEnrollmentsTable');
-            const countEl = document.getElementById('activeEnrollmentCount');
+        function renderPendingSessionExtensionRequests() {
+            const tableBody = document.getElementById('pendingRequestsTable');
+            const countEl = document.getElementById('pendingRequestCount');
             if (!tableBody) return;
 
-            try {
-                const branchFilter = document.getElementById('branchFilter');
-                let url = `${baseApiUrl}/students.php?action=get-active-enrollments`;
-                if (branchFilter && branchFilter.value) {
-                    url += `&branch_id=${branchFilter.value}`;
-                }
+            const rows = adminPendingEnrollments.filter(req => {
+                const branchId = getEnrollmentBranchId();
+                if (branchId > 0 && Number(req.branch_id || 0) !== branchId) return false;
+                const branchName = String(req.branch_name || '').toLowerCase();
+                const studentName = `${req.first_name || ''} ${req.last_name || ''}`.toLowerCase();
+                const email = String(req.email || '').toLowerCase();
+                const schedule = `${req.preferred_day_of_week || ''} ${req.preferred_start_time || ''}`.toLowerCase();
+                return matchesEnrollmentSearch(req, [branchName, studentName, email, schedule, req.payment_method, req.requested_amount]);
+            });
 
-                const response = await axios.get(url);
-                const data = response.data;
-                const enrollments = data.success && Array.isArray(data.enrollments) ? data.enrollments : [];
-                adminActiveEnrollments = enrollments;
-                updateEnrollmentSummary();
+            if (countEl) countEl.textContent = `${rows.length} pending`;
 
-                if (countEl) countEl.textContent = `${enrollments.length} active`;
-
-                if (!enrollments.length) {
-                    tableBody.innerHTML = `
-                        <tr>
-                                <td colspan="10" class="px-6 py-8 text-center text-slate-500">
-                                    <i class="fas fa-user-check text-2xl mb-2 text-gold-500/60"></i>
-                                    <p>No active enrollments found.</p>
-                                </td>
-                            </tr>`;
-                    return;
-                }
-
-                tableBody.innerHTML = enrollments.map(r => {
-                    const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
-                    const email = escapeHtml(r.email || '');
-                    const packageName = escapeHtml(r.package_name || '—');
-                    const teacherName = `${escapeHtml(r.teacher_first_name || '')} ${escapeHtml(r.teacher_last_name || '')}`.trim() || '—';
-                    const roomName = escapeHtml(r.assigned_room || '—');
-                    const branchName = escapeHtml(r.branch_name || '—');
-                    const sessionDate = r.first_session_date ? new Date(r.first_session_date).toLocaleDateString() : '—';
-                    const startTime = formatTime12Hour(r.first_start_time);
-                    const endTime = formatTime12Hour(r.first_end_time);
-                    const sessionTime = r.first_session_date ? `${sessionDate} • ${startTime} - ${endTime}` : '—';
-                    const paymentType = escapeHtml(r.payment_type || '—');
-                    const totalAmount = Number(r.total_amount || 0);
-                    const paidAmount = Number(r.paid_amount || 0);
-                    const amountText = `${formatCurrencyPHP(paidAmount)} / ${formatCurrencyPHP(totalAmount)}`;
-                    const balanceText = formatCurrencyPHP(Math.max(0, totalAmount - paidAmount));
-                    const statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-700">Active</span>';
-                    return `
-                        <tr class="hover:bg-slate-50/80 transition">
-                            <td class="px-6 py-4 table-name-cell">
-                                <div class="font-medium text-slate-900 truncate-text" title="${studentName || 'Student'}">${studentName || 'Student'}</div>
-                                <div class="text-sm text-slate-500 truncate-text" title="${email}">${email}</div>
-                            </td>
-                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${branchName}">${branchName}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${packageName}">${packageName}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700 table-date-cell truncate-text" title="${sessionTime}">${sessionTime}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${teacherName}">${teacherName}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${roomName}">${roomName}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell">${paymentType}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700 table-money-cell">${amountText}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700 table-money-cell">${balanceText}</td>
-                            <td class="px-6 py-4 table-status-cell">${statusBadge}</td>
-                        </tr>`;
-                }).join('');
-            } catch (error) {
-                console.error('Failed to load active enrollments:', error);
-                adminActiveEnrollments = [];
-                updateEnrollmentSummary();
-                if (countEl) countEl.textContent = 'Error';
+            if (!rows.length) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="10" class="px-6 py-8 text-center text-red-500">
-                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                            <p>Failed to load active enrollments.</p>
+                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <i class="fas fa-calendar-plus text-2xl mb-2 text-gold-500/60"></i>
+                            <p>No pending session extension requests found.</p>
                         </td>
                     </tr>`;
+                return;
             }
+
+            tableBody.innerHTML = rows.map(req => {
+                const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
+                const email = escapeHtml(req.email || '');
+                const branchName = escapeHtml(req.branch_name || '—');
+                const schedule = req.preferred_day_of_week
+                    ? `${escapeHtml(req.preferred_day_of_week)} • ${escapeHtml(formatTime12Hour(req.preferred_start_time || ''))}`
+                    : 'Based on instructor availability';
+                const addOn = `${Number(req.requested_sessions || 1)} session${Number(req.requested_sessions || 1) > 1 ? 's' : ''}`;
+                const paymentMethod = escapeHtml(req.payment_method || 'Cash');
+                const amount = formatCurrencyPHP(req.requested_amount || 650);
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="px-6 py-4">
+                            <div class="font-semibold text-slate-900">${studentName}</div>
+                            <div class="text-sm text-slate-500">${email}</div>
+                            <div class="text-xs text-slate-400">Requested ${new Date(req.created_at || Date.now()).toLocaleDateString()}</div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-slate-700">${branchName}</td>
+                        <td class="px-6 py-4 text-sm text-slate-700">${schedule}</td>
+                        <td class="px-6 py-4">
+                            <div class="font-semibold text-slate-900">${addOn}</div>
+                            <div class="text-xs text-slate-500">1 hour each</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="inline-flex items-center gap-2">
+                                <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">${escapeHtml(paymentMethod === 'Cash' ? 'Cash' : 'Paid')}</span>
+                                <span class="font-semibold text-slate-900">${amount}</span>
+                            </div>
+                            <div class="text-xs text-slate-500">${paymentMethod}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button type="button" onclick="openPendingSessionExtensionViewModal(${Number(req.request_id)})" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-bold">View</button>
+                                <button type="button" onclick="approveSessionExtensionRequest(${Number(req.request_id)})" class="px-4 py-2 rounded-lg bg-gold-500 text-black hover:bg-gold-400 text-sm font-bold">Approve</button>
+                                <button type="button" onclick="rejectSessionExtensionRequest(${Number(req.request_id)})" class="px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-sm font-bold">Decline</button>
+                            </div>
+                        </td>
+                    </tr>`;
+            }).join('');
         }
 
         async function loadPendingEnrollmentSummary() {
             try {
                 const branchFilter = document.getElementById('branchFilter');
-                let url = `${baseApiUrl}/students.php?action=get-pending-package-requests`;
+                let url = `${baseApiUrl}/students.php?action=get-pending-session-extension-requests`;
                 if (branchFilter && branchFilter.value) {
                     url += `&branch_id=${branchFilter.value}`;
                 }
@@ -195,6 +211,165 @@
                 adminPendingEnrollments = [];
             }
             updateEnrollmentSummary();
+            renderPendingSessionExtensionRequests();
+        }
+
+        async function loadActiveEnrollments() {
+            const tableBody = document.getElementById('activeEnrollmentsTable');
+            const countEl = document.getElementById('activeEnrollmentCount');
+            if (!tableBody) return;
+
+            try {
+                const branchId = getEnrollmentBranchId();
+                let url = `${baseApiUrl}/students.php?action=get-active-enrollments`;
+                if (branchId > 0) {
+                    url += `&branch_id=${branchId}`;
+                }
+
+                const response = await axios.get(url);
+                const data = response.data;
+                const enrollments = data.success && Array.isArray(data.enrollments) ? data.enrollments : [];
+                adminActiveEnrollments = enrollments;
+                updateEnrollmentSummary();
+
+                const rows = enrollments.filter(r => {
+                    const branchName = String(r.branch_name || '').toLowerCase();
+                    const studentName = `${r.first_name || ''} ${r.last_name || ''}`.toLowerCase();
+                    const email = String(r.email || '').toLowerCase();
+                    const packageName = String(r.package_name || '').toLowerCase();
+                    const teacherName = `${r.teacher_first_name || ''} ${r.teacher_last_name || ''}`.toLowerCase();
+                    const nextSession = String(r.first_session_date || '').toLowerCase();
+                    return matchesEnrollmentSearch(r, [branchName, studentName, email, packageName, teacherName, nextSession]);
+                });
+
+                if (countEl) countEl.textContent = `${rows.length} active`;
+
+                if (!rows.length) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-user-check text-2xl mb-2 text-gold-500/60"></i>
+                                <p>No active enrollments found.</p>
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                tableBody.innerHTML = rows.map(r => {
+                    const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
+                    const email = escapeHtml(r.email || '');
+                    const packageName = escapeHtml(r.package_name || '—');
+                    const teacherName = `${escapeHtml(r.teacher_first_name || '')} ${escapeHtml(r.teacher_last_name || '')}`.trim() || '—';
+                    const branchName = escapeHtml(r.branch_name || '—');
+                    const totalSessions = Number(r.sessions || 0);
+                    const completedSessions = Number(r.completed_sessions || r.used_sessions || 0);
+                    const progress = totalSessions > 0 ? Math.min(100, Math.round((completedSessions / totalSessions) * 100)) : 0;
+                    const progressText = totalSessions > 0 ? `${completedSessions}/${totalSessions}` : '—';
+                    const sessionDate = r.first_session_date ? new Date(r.first_session_date).toLocaleDateString() : '—';
+                    const startTime = formatTime12Hour(r.first_start_time);
+                    const nextSession = r.first_session_date ? `${sessionDate} • ${startTime}` : '—';
+                    const statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-700">Active</span>';
+                    return `
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="px-6 py-4 table-name-cell">
+                                <div class="font-medium text-slate-900 truncate-text" title="${studentName || 'Student'}">${studentName || 'Student'}</div>
+                                <div class="text-sm text-slate-500 truncate-text" title="${email}">${email}</div>
+                                <div class="text-xs text-slate-400 truncate-text" title="${branchName}">${branchName}</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${packageName}">${packageName}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${teacherName}">${teacherName}</td>
+                            <td class="px-6 py-4">
+                                <div class="font-semibold text-slate-900">${progressText}</div>
+                                <div class="mt-2 h-2 w-full max-w-[180px] rounded-full bg-slate-100 overflow-hidden">
+                                    <div class="h-full rounded-full bg-gold-500" style="width:${progress}%"></div>
+                                </div>
+                                <div class="mt-1 text-xs text-slate-400">${progress}%</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-700 table-date-cell truncate-text" title="${nextSession}">${nextSession}</td>
+                            <td class="px-6 py-4">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button type="button" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-bold">View</button>
+                                    <button type="button" class="px-4 py-2 rounded-lg bg-gold-500 text-black hover:bg-gold-400 text-sm font-bold">Manage</button>
+                                </div>
+                                ${statusBadge}
+                            </td>
+                        </tr>`;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load active enrollments:', error);
+                adminActiveEnrollments = [];
+                updateEnrollmentSummary();
+                if (countEl) countEl.textContent = 'Error';
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>Failed to load active enrollments.</p>
+                        </td>
+                    </tr>`;
+            }
+        }
+
+        function openPendingSessionExtensionViewModal(requestId) {
+            const req = adminPendingEnrollments.find(row => String(row.request_id) === String(requestId));
+            if (!req) {
+                showMessage('Request not found.', 'error');
+                return;
+            }
+
+            const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
+            const schedule = req.preferred_day_of_week
+                ? `${escapeHtml(req.preferred_day_of_week)} ${escapeHtml(formatTime12Hour(req.preferred_start_time || ''))}`
+                : 'Based on instructor availability';
+
+            Swal.fire({
+                title: 'Session Extension Request',
+                width: 760,
+                confirmButtonText: 'Close',
+                html: `
+                    <div class="text-left space-y-3 text-sm text-slate-700">
+                        <div><span class="font-semibold text-slate-900">Student:</span> ${studentName}</div>
+                        <div><span class="font-semibold text-slate-900">Branch:</span> ${escapeHtml(req.branch_name || '—')}</div>
+                        <div><span class="font-semibold text-slate-900">Schedule:</span> ${schedule}</div>
+                        <div><span class="font-semibold text-slate-900">Payment:</span> ${escapeHtml(req.payment_method || 'Cash')} • ${formatCurrencyPHP(req.requested_amount || 650)}</div>
+                        <div><span class="font-semibold text-slate-900">Notes:</span> ${escapeHtml(req.notes || '—')}</div>
+                    </div>
+                `
+            });
+        }
+
+        async function rejectSessionExtensionRequest(requestId) {
+            if (!requestId) return;
+            const result = await Swal.fire({
+                icon: 'warning',
+                title: 'Decline session extension?',
+                text: 'You can add a short reason for the student.',
+                input: 'text',
+                inputPlaceholder: 'Reason (optional)',
+                showCancelButton: true,
+                confirmButtonText: 'Decline',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#dc2626'
+            });
+            if (!result.isConfirmed) return;
+
+            try {
+                const response = await axios.post(`${baseApiUrl}/students.php`, {
+                    action: 'reject-session-extension-request',
+                    request_id: Number(requestId),
+                    admin_notes: result.value || '',
+                    branch_id: Number(getEnrollmentBranchId() || 0)
+                });
+                const data = response.data || {};
+                if (data.success) {
+                    showMessage(data.message || 'Session extension request declined.', 'success');
+                    await loadPendingEnrollmentSummary();
+                } else {
+                    showMessage(data.error || 'Failed to decline request.', 'error');
+                }
+            } catch (error) {
+                showMessage(error?.response?.data?.error || 'Network error while declining request.', 'error');
+            }
         }
 
         let walkinStudents = [];
@@ -429,7 +604,7 @@
                 const response = await postStudentPackageRequest(requestFormData);
                 if (response.success) {
                     closeWalkinEnrollmentModal();
-                    loadPendingRequests();
+                    loadPendingEnrollmentSummary();
                     showMessage(response.message || 'Walk-in enrollment submitted.', 'success');
                     if (response.request_id) {
                         window.location.href = `admin_sessions.html?view=pending&assign_request_id=${response.request_id}`;
@@ -458,15 +633,22 @@
             }
 
             loadBranches();
-            loadPendingRequests();
             loadPendingEnrollmentSummary();
             loadActiveEnrollments();
             applyEnrollmentView();
 
             document.getElementById('branchFilter')?.addEventListener('change', () => {
-                loadPendingRequests();
                 loadPendingEnrollmentSummary();
                 loadActiveEnrollments();
+            });
+            document.getElementById('enrollmentSearchInput')?.addEventListener('input', () => {
+                adminEnrollmentSearch = String(document.getElementById('enrollmentSearchInput')?.value || '');
+                renderPendingSessionExtensionRequests();
+                loadActiveEnrollments();
+            });
+            document.getElementById('extensionOnlyToggle')?.addEventListener('change', (event) => {
+                adminEnrollmentExtensionOnly = Boolean(event.target.checked);
+                applyEnrollmentView();
             });
             document.getElementById('enrollNavPending')?.addEventListener('click', () => {
                 const viewUrl = new URL(window.location.href);
@@ -479,5 +661,9 @@
                 viewUrl.searchParams.set('view', 'active');
                 window.history.replaceState({}, '', viewUrl.toString());
                 applyEnrollmentView();
+            });
+            document.getElementById('branchFilter')?.addEventListener('change', () => {
+                loadPendingEnrollmentSummary();
+                loadActiveEnrollments();
             });
         });

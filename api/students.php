@@ -677,6 +677,74 @@ class StudentsApi
         }
     }
 
+    /** Ensure tbl_student_session_extension_requests exists (one-hour add-on session flow) */
+    private function ensureStudentSessionExtensionRequestsTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_session_extension_requests (
+                    request_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    branch_id INT NOT NULL,
+                    requested_sessions INT NOT NULL DEFAULT 1,
+                    requested_amount DECIMAL(10,2) NOT NULL DEFAULT 650.00,
+                    preferred_day_of_week ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NULL,
+                    preferred_start_time TIME NULL,
+                    preferred_end_time TIME NULL,
+                    payment_method ENUM('Cash','GCash','Bank Transfer','Other') NOT NULL DEFAULT 'Cash',
+                    payment_proof_path VARCHAR(255) NULL,
+                    notes TEXT NULL,
+                    status ENUM('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
+                    admin_notes TEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ");
+            try { $this->conn->exec("CREATE INDEX idx_student_session_extension_requests_student ON tbl_student_session_extension_requests(student_id)"); } catch (PDOException $e) {}
+            try { $this->conn->exec("CREATE INDEX idx_student_session_extension_requests_status ON tbl_student_session_extension_requests(status)"); } catch (PDOException $e) {}
+            try { $this->conn->exec("CREATE INDEX idx_student_session_extension_requests_created ON tbl_student_session_extension_requests(created_at)"); } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+            // Do not break API
+        }
+    }
+
+    private function getLatestStudentSessionExtensionRequest(int $studentId): ?array
+    {
+        if ($studentId < 1 || !$this->tableExists('tbl_student_session_extension_requests')) {
+            return null;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    request_id,
+                    student_id,
+                    branch_id,
+                    requested_sessions,
+                    requested_amount,
+                    preferred_day_of_week,
+                    preferred_start_time,
+                    preferred_end_time,
+                    payment_method,
+                    payment_proof_path,
+                    notes,
+                    status,
+                    admin_notes,
+                    created_at,
+                    updated_at
+                FROM tbl_student_session_extension_requests
+                WHERE student_id = ?
+                ORDER BY request_id DESC
+                LIMIT 1
+            ");
+            $stmt->execute([$studentId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+
     /**
      * Compatibility guard for DBs with legacy triggers on tbl_enrollments.
      * Those triggers reference split enrollment tables that may be missing.
@@ -4800,6 +4868,8 @@ class StudentsApi
                 $latestRequest = null;
             }
 
+            $latestSessionExtensionRequest = $this->getLatestStudentSessionExtensionRequest((int)($student['student_id'] ?? 0));
+
             // Get student's most recent skill level from graded sessions
             $studentSkillLevel = null;
             try {
@@ -4829,7 +4899,153 @@ class StudentsApi
                 'default_package_id' => $defaultPackageId,
                 'instruments' => $instruments,
                 'availabilities' => $availabilities,
-                'latest_request' => $latestRequest
+                'latest_request' => $latestRequest,
+                'latest_session_extension_request' => $latestSessionExtensionRequest
+            ]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function submitSessionExtensionRequest()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $isMultipart = $this->isMultipartRequest();
+        $data = $isMultipart ? ($_POST ?: []) : (json_decode(file_get_contents('php://input'), true) ?: []);
+        $studentId = (int)($data['student_id'] ?? 0);
+        $preferredDay = trim((string)($data['preferred_day_of_week'] ?? ''));
+        $preferredStartTime = trim((string)($data['preferred_start_time'] ?? ''));
+        $paymentMethod = $this->normalizeEnrollmentPaymentMethod((string)($data['payment_method'] ?? 'Cash'));
+        $notes = trim((string)($data['notes'] ?? ''));
+        $requestedAmount = 650.00;
+        $validDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+        if ($studentId < 1) {
+            $this->sendJSON(['error' => 'student_id is required'], 400);
+        }
+        if ($preferredDay === '' || !in_array($preferredDay, $validDays, true)) {
+            $this->sendJSON(['error' => 'Please choose a valid preferred day.'], 400);
+        }
+        if ($preferredStartTime === '') {
+            $this->sendJSON(['error' => 'Please choose a preferred start time.'], 400);
+        }
+        if (!in_array($paymentMethod, ['Cash', 'GCash', 'Bank Transfer', 'Other'], true)) {
+            $paymentMethod = 'Cash';
+        }
+
+        $paymentProofPath = null;
+        if ($isMultipart && !empty($_FILES['session_payment_proof_file']['name']) && ($_FILES['session_payment_proof_file']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            try {
+                $paymentProofPath = $this->storePaymentProofUpload($_FILES['session_payment_proof_file'], 'session_extension_requests');
+            } catch (Exception $e) {
+                $this->sendJSON(['error' => $e->getMessage()], 400);
+            }
+        }
+        if ($paymentMethod !== 'Cash' && !$paymentProofPath) {
+            $this->sendJSON(['error' => 'Upload proof of payment for GCash or Bank Transfer requests.'], 400);
+        }
+
+        try {
+            $stmtStudent = $this->conn->prepare("
+                SELECT student_id, branch_id, status
+                FROM tbl_students
+                WHERE student_id = ?
+                LIMIT 1
+            ");
+            $stmtStudent->execute([$studentId]);
+            $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+            if (!$student) {
+                $this->sendJSON(['error' => 'Student not found'], 404);
+            }
+            if (strcasecmp((string)($student['status'] ?? ''), 'Active') !== 0) {
+                $this->sendJSON(['error' => 'Student account is not active yet'], 400);
+            }
+
+            $this->ensureStudentSessionExtensionRequestsTable();
+
+            $stmtPending = $this->conn->prepare("
+                SELECT request_id
+                FROM tbl_student_session_extension_requests
+                WHERE student_id = ? AND status = 'Pending'
+                ORDER BY request_id DESC
+                LIMIT 1
+            ");
+            $stmtPending->execute([$studentId]);
+            if ($stmtPending->fetchColumn()) {
+                $this->sendJSON(['error' => 'You already have a pending session request. Please wait for approval.'], 400);
+            }
+
+            if ($this->tableExists('tbl_enrollments')) {
+                $stmtPendingEnrollment = $this->conn->prepare("
+                    SELECT enrollment_id
+                    FROM tbl_enrollments
+                    WHERE student_id = ? AND status = 'Pending'
+                    ORDER BY enrollment_id DESC
+                    LIMIT 1
+                ");
+                $stmtPendingEnrollment->execute([$studentId]);
+                if ($stmtPendingEnrollment->fetchColumn()) {
+                    $this->sendJSON(['error' => 'You already have a pending enrollment request. Please wait for approval.'], 400);
+                }
+            }
+
+            if ($this->tableExists('tbl_student_package_requests')) {
+                $stmtPendingPackage = $this->conn->prepare("
+                    SELECT request_id
+                    FROM tbl_student_package_requests
+                    WHERE student_id = ? AND status = 'Pending'
+                    ORDER BY request_id DESC
+                    LIMIT 1
+                ");
+                $stmtPendingPackage->execute([$studentId]);
+                if ($stmtPendingPackage->fetchColumn()) {
+                    $this->sendJSON(['error' => 'You already have a pending package request. Please wait for approval.'], 400);
+                }
+            }
+
+            $start = DateTime::createFromFormat('H:i:s', $preferredStartTime) ?: DateTime::createFromFormat('H:i', $preferredStartTime);
+            if (!$start) {
+                $this->sendJSON(['error' => 'Please choose a valid preferred start time.'], 400);
+            }
+            $end = clone $start;
+            $end->modify('+1 hour');
+
+            $stmt = $this->conn->prepare("
+                INSERT INTO tbl_student_session_extension_requests (
+                    student_id,
+                    branch_id,
+                    requested_sessions,
+                    requested_amount,
+                    preferred_day_of_week,
+                    preferred_start_time,
+                    preferred_end_time,
+                    payment_method,
+                    payment_proof_path,
+                    notes,
+                    status
+                ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, 'Pending')
+            ");
+            $stmt->execute([
+                $studentId,
+                (int)($student['branch_id'] ?? 0),
+                $requestedAmount,
+                $preferredDay,
+                $start->format('H:i:s'),
+                $end->format('H:i:s'),
+                $paymentMethod,
+                $paymentProofPath,
+                $notes !== '' ? $notes : null
+            ]);
+
+            $requestId = (int)$this->conn->lastInsertId();
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Your 1-hour session request has been submitted for review.',
+                'request_id' => $requestId,
+                'requested_amount' => $requestedAmount
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
@@ -5049,6 +5265,206 @@ class StudentsApi
                 'payable_now' => $payableNow
             ]);
         } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getPendingSessionExtensionRequests()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
+        $this->ensureStudentSessionExtensionRequestsTable();
+
+        try {
+            $sql = "
+                SELECT
+                    r.request_id,
+                    r.student_id,
+                    r.branch_id,
+                    r.requested_sessions,
+                    r.requested_amount,
+                    r.preferred_day_of_week,
+                    r.preferred_start_time,
+                    r.preferred_end_time,
+                    r.payment_method,
+                    r.payment_proof_path,
+                    r.notes,
+                    r.status,
+                    r.admin_notes,
+                    r.created_at,
+                    r.updated_at,
+                    s.first_name,
+                    s.last_name,
+                    s.email,
+                    b.branch_name
+                FROM tbl_student_session_extension_requests r
+                INNER JOIN tbl_students s ON r.student_id = s.student_id
+                LEFT JOIN tbl_branches b ON r.branch_id = b.branch_id
+                WHERE r.status = 'Pending'
+            ";
+            $params = [];
+            if ($branchId > 0) {
+                $sql .= " AND r.branch_id = ?";
+                $params[] = $branchId;
+            }
+            $sql .= " ORDER BY r.request_id DESC";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $this->sendJSON(['success' => true, 'requests' => $rows]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function approveSessionExtensionRequest()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $requestId = (int)($data['request_id'] ?? 0);
+        $branchId = (int)($data['branch_id'] ?? $data['desk_branch_id'] ?? 0);
+        $adminNotes = trim((string)($data['admin_notes'] ?? ''));
+
+        if ($requestId < 1) {
+            $this->sendJSON(['error' => 'request_id is required'], 400);
+        }
+
+        $this->ensureStudentSessionExtensionRequestsTable();
+
+        try {
+            $this->conn->beginTransaction();
+
+            $stmt = $this->conn->prepare("
+                SELECT r.request_id, r.student_id, r.branch_id, r.status, r.notes
+                FROM tbl_student_session_extension_requests r
+                WHERE r.request_id = ?
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $stmt->execute([$requestId]);
+            $request = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$request) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Request not found'], 404);
+            }
+
+            if (strcasecmp((string)($request['status'] ?? ''), 'Pending') !== 0) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Only pending session requests can be approved'], 400);
+            }
+
+            if ($branchId > 0 && (int)($request['branch_id'] ?? 0) !== $branchId) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Request does not belong to your branch'], 403);
+            }
+
+            $meta = [];
+            if (!empty($request['notes'])) {
+                $decoded = json_decode((string)$request['notes'], true);
+                if (is_array($decoded)) {
+                    $meta = $decoded;
+                }
+            }
+            if ($adminNotes !== '') {
+                $meta['admin_notes'] = $adminNotes;
+            }
+
+            $stmtUpdate = $this->conn->prepare("
+                UPDATE tbl_student_session_extension_requests
+                SET status = 'Approved',
+                    admin_notes = ?
+                WHERE request_id = ?
+            ");
+            $stmtUpdate->execute([
+                $adminNotes !== '' ? $adminNotes : null,
+                $requestId
+            ]);
+
+            $this->conn->commit();
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Session extension request approved successfully.'
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function rejectSessionExtensionRequest()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $requestId = (int)($data['request_id'] ?? 0);
+        $branchId = (int)($data['branch_id'] ?? $data['desk_branch_id'] ?? 0);
+        $adminNotes = trim((string)($data['admin_notes'] ?? ''));
+
+        if ($requestId < 1) {
+            $this->sendJSON(['error' => 'request_id is required'], 400);
+        }
+
+        $this->ensureStudentSessionExtensionRequestsTable();
+
+        try {
+            $this->conn->beginTransaction();
+
+            $stmt = $this->conn->prepare("
+                SELECT request_id, branch_id, status
+                FROM tbl_student_session_extension_requests
+                WHERE request_id = ?
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $stmt->execute([$requestId]);
+            $request = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$request) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Request not found'], 404);
+            }
+
+            if (strcasecmp((string)($request['status'] ?? ''), 'Pending') !== 0) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Only pending session requests can be declined'], 400);
+            }
+
+            if ($branchId > 0 && (int)($request['branch_id'] ?? 0) !== $branchId) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Request does not belong to your branch'], 403);
+            }
+
+            $stmtUpdate = $this->conn->prepare("
+                UPDATE tbl_student_session_extension_requests
+                SET status = 'Rejected',
+                    admin_notes = ?
+                WHERE request_id = ?
+            ");
+            $stmtUpdate->execute([
+                $adminNotes !== '' ? $adminNotes : null,
+                $requestId
+            ]);
+
+            $this->conn->commit();
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Session extension request declined.'
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }
@@ -7269,6 +7685,12 @@ switch ($action) {
     case 'submit-package-request':
         $studentsApi->submitPackageRequest();
         break;
+    case 'submit-session-extension-request':
+        $studentsApi->submitSessionExtensionRequest();
+        break;
+    case 'get-pending-session-extension-requests':
+        $studentsApi->getPendingSessionExtensionRequests();
+        break;
     case 'get-pending-package-requests':
         $studentsApi->getPendingPackageRequests();
         break;
@@ -7289,6 +7711,12 @@ switch ($action) {
         break;
     case 'approve-package-request':
         $studentsApi->approvePackageRequest();
+        break;
+    case 'approve-session-extension-request':
+        $studentsApi->approveSessionExtensionRequest();
+        break;
+    case 'reject-session-extension-request':
+        $studentsApi->rejectSessionExtensionRequest();
         break;
     case 'repair-fixed-schedule-sessions':
         $studentsApi->repairFixedScheduleSessions();

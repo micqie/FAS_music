@@ -19,6 +19,7 @@
         let walkinStudents = [];
         let walkinMeta = null;
         let walkinStudentLookup = new Map();
+        let pendingSessionExtensionRequestsById = {};
 
         function nextFrame() {
             if (typeof requestAnimationFrame === 'function') {
@@ -548,7 +549,7 @@
 
             const selectedValue = String(packageSelect.value || '');
             cardsContainer.innerHTML = options.map(option => {
-                const maxInst = Number(option.getAttribute('data-max-instruments') || 0);
+                const maxInst = getWalkinPackageInstrumentLimitFromOption(option);
                 const sessions = Number(option.getAttribute('data-sessions') || 0);
                 const isSelected = selectedValue && selectedValue === String(option.value || '');
                 return `
@@ -807,7 +808,7 @@
             
             packageSelect.innerHTML = '<option value="">Select package...</option>' + filteredPackages.map(pkg => {
                 const sessions = Number(pkg.sessions || 0);
-                const maxInst = Number(pkg.max_instruments || 1);
+                const maxInst = sessions === 12 ? 1 : sessions === 20 ? 2 : sessions >= 50 ? 3 : Math.max(1, Number(pkg.max_instruments || 1));
                 const price = formatCurrencyPHP(pkg.price || 0);
                 return `<option value="${pkg.package_id}" data-max-instruments="${maxInst}" data-sessions="${sessions}" data-price="${pkg.price || 0}">${escapeHtml(pkg.package_name || 'Package')} (${sessions} sessions, up to ${maxInst} instrument${maxInst > 1 ? 's' : ''}) - ${price}</option>`;
             }).join('');
@@ -896,7 +897,7 @@
             if (selected) {
                 packageSelect.value = String(selected.value || '');
             }
-            const maxInst = Number(selected?.getAttribute('data-max-instruments') || 0);
+            const maxInst = getWalkinPackageInstrumentLimitFromOption(selected);
             const price = Number(selected?.getAttribute('data-price') || 0);
             const sessions = Number(selected?.getAttribute('data-sessions') || 0);
             syncWalkinPackageCardSelection();
@@ -914,6 +915,10 @@
                 <div class="walkin-summary-line">
                     <span>Sessions</span>
                     <span>${sessions > 0 ? sessions : '—'}</span>
+                </div>
+                <div class="walkin-summary-line">
+                    <span>Max instruments</span>
+                    <span>${maxInst > 0 ? maxInst : '—'}</span>
                 </div>
                 <div class="walkin-summary-total">
                     <span>Total</span>
@@ -1006,7 +1011,7 @@
             }
 
             const selectedOption = packageSelect.options[packageSelect.selectedIndex];
-            const maxInst = Number(selectedOption?.getAttribute('data-max-instruments') || 1);
+            const maxInst = getWalkinPackageInstrumentLimitFromOption(selectedOption) || 1;
             if (uniqueInstrumentIds.length > maxInst) {
                 showToast(`You can select up to ${maxInst} instrument(s) for this package.`, 'error');
                 console.error('[Walk-in Enrollment] Validation failed: too many instruments');
@@ -1107,6 +1112,15 @@
             return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
         }
 
+        function getWalkinPackageInstrumentLimitFromOption(option) {
+            const sessions = Number(option?.getAttribute?.('data-sessions') || 0);
+            const explicitMax = Number(option?.getAttribute?.('data-max-instruments') || 0);
+            if (sessions === 12) return Math.max(1, explicitMax || 1);
+            if (sessions === 20) return Math.max(2, explicitMax || 2);
+            if (sessions >= 50) return Math.max(3, explicitMax || 3);
+            return Math.max(1, explicitMax || 1);
+        }
+
         async function loadPendingRequests() {
             const tableBody = document.getElementById('pendingRequestsTable');
             const countEl = document.getElementById('pendingRequestCount');
@@ -1185,7 +1199,112 @@
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Failed to load pending requests.</p>
                         </td>
+                </tr>`;
+            }
+        }
+
+        async function loadPendingSessionExtensionRequests() {
+            const tableBody = document.getElementById('sessionExtensionRequestsTable');
+            const countEl = document.getElementById('sessionExtensionRequestCount');
+            if (!tableBody) return;
+
+            try {
+                if (!requireManagerBranch()) return;
+                const url = `${baseApiUrl}/students.php?action=get-pending-session-extension-requests&branch_id=${encodeURIComponent(managerBranchId)}`;
+                const response = await axios.get(url);
+                const data = response.data || {};
+                const requests = data.success && Array.isArray(data.requests) ? data.requests : [];
+
+                if (countEl) countEl.textContent = `${requests.length} pending`;
+
+                if (!requests.length) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-calendar-plus text-2xl mb-2 text-gold-500/60"></i>
+                                <p>No pending session extension requests.</p>
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                pendingSessionExtensionRequestsById = {};
+                tableBody.innerHTML = requests.map(req => {
+                    pendingSessionExtensionRequestsById[String(req.request_id)] = req;
+                    const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
+                    const schedule = req.preferred_day_of_week
+                        ? `${escapeHtml(req.preferred_day_of_week)} • ${formatTime12Hour(req.preferred_start_time || '')} - ${formatTime12Hour(req.preferred_end_time || '')}`
+                        : '—';
+                    const amount = formatCurrencyPHP(req.requested_amount || 650);
+                    const paymentMethod = escapeHtml(req.payment_method || 'Cash');
+                    const proofLink = req.payment_proof_path
+                        ? `<a href="${escapeHtml(buildPublicFileUrl(req.payment_proof_path))}" target="_blank" rel="noopener" class="text-xs text-blue-600 underline">Proof</a>`
+                        : '<span class="text-xs text-slate-400">No proof</span>';
+                    return `
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="px-6 py-4">
+                                <div class="font-semibold text-base text-slate-900">${studentName}</div>
+                                <div class="text-sm text-slate-500">${escapeHtml(req.email || '')}</div>
+                            </td>
+                            <td class="px-6 py-4 text-base text-slate-700">${escapeHtml(req.branch_name || '')}</td>
+                            <td class="px-6 py-4 text-base text-slate-700">${schedule}</td>
+                            <td class="px-6 py-4 text-base text-slate-700">
+                                <div>${paymentMethod}</div>
+                                <div class="mt-1">${proofLink}</div>
+                            </td>
+                            <td class="px-6 py-4 text-base text-slate-700">${amount}</td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">Pending</span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <button type="button" onclick="approveSessionExtensionRequest(${Number(req.request_id)})" class="px-4 py-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-sm font-bold">
+                                    Approve
+                                </button>
+                            </td>
+                        </tr>`;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load pending session extension requests:', error);
+                if (countEl) countEl.textContent = 'Error';
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>Failed to load session extension requests.</p>
+                        </td>
                     </tr>`;
+            }
+        }
+
+        async function approveSessionExtensionRequest(requestId) {
+            if (!requestId) return;
+
+            const confirm = await Swal.fire({
+                icon: 'question',
+                title: 'Approve session extension?',
+                text: 'This will confirm the student\'s ₱650 extra session request.',
+                showCancelButton: true,
+                confirmButtonText: 'Approve',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#059669'
+            });
+            if (!confirm.isConfirmed) return;
+
+            try {
+                const response = await axios.post(`${baseApiUrl}/students.php`, {
+                    action: 'approve-session-extension-request',
+                    request_id: Number(requestId),
+                    branch_id: Number(managerBranchId || 0)
+                });
+                const data = response.data || {};
+                if (data.success) {
+                    showMessage(data.message || 'Session extension request approved.', 'success');
+                    await loadPendingSessionExtensionRequests();
+                } else {
+                    showMessage(data.error || 'Failed to approve session extension request.', 'error');
+                }
+            } catch (error) {
+                showMessage(error?.response?.data?.error || 'Network error while approving session extension request.', 'error');
             }
         }
 
@@ -2567,6 +2686,7 @@
             ]);
 
             await loadPendingRequests();
+            await loadPendingSessionExtensionRequests();
             await loadActiveStudents();
 
             applySessionView();
@@ -2594,6 +2714,11 @@
                 viewUrl.searchParams.set('view', 'active');
                 window.history.replaceState({}, '', viewUrl.toString());
                 applySessionView();
+            });
+            document.getElementById('branchFilter')?.addEventListener('change', () => {
+                loadPendingRequests();
+                loadPendingSessionExtensionRequests();
+                loadActiveStudents();
             });
             document.getElementById('openWalkinRegistrationModalBtn')?.addEventListener('click', openWalkinRegistrationModal);
             document.getElementById('closeRegisterStudentModalBtn')?.addEventListener('click', closeWalkinRegistrationModal);

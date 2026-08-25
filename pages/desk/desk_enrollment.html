@@ -29,6 +29,18 @@
         body { font-family: 'Space Grotesk', sans-serif; }
         .sidebar-scroll { -ms-overflow-style: none; scrollbar-width: none; }
         .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+        .walkin-enrollment-panel {
+            max-height: calc(100vh - 1.5rem);
+            display: flex;
+            flex-direction: column;
+        }
+        .walkin-enrollment-body {
+            min-height: 0;
+            overflow-y: auto;
+        }
+        .walkin-enrollment-grid {
+            min-height: 0;
+        }
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css"></head>
 <body class="desk-app desk-enrollment-page bg-slate-100 text-slate-900">
@@ -125,6 +137,39 @@
                             <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading requests...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="sessionExtensionRequestsSection" class="desk-panel bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden mb-6">
+            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-calendar-plus mr-2 text-gold-500"></i>Pending Session Extension Requests</h3>
+                    <p class="text-xs text-slate-500 mt-1">₱650 per 1-hour add-on session from the student portal.</p>
+                </div>
+                <span class="text-sm text-slate-600" id="sessionExtensionRequestCount">Loading...</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessionExtensionRequestsTable" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading session extension requests...</p>
                             </td>
                         </tr>
                     </tbody>
@@ -464,8 +509,8 @@
         </div>
     </div>
 
-    <div id="walkinEnrollmentModal" class="desk-modal fixed inset-0 z-[1100] hidden items-center justify-center bg-[#1f2430]/70 backdrop-blur-[2px] overflow-hidden p-3 sm:p-4">
-        <div class="desk-modal-panel walkin-enrollment-panel w-full max-w-[1120px] overflow-hidden my-4">
+    <div id="walkinEnrollmentModal" class="desk-modal fixed inset-0 z-[1100] hidden items-start justify-center bg-[#1f2430]/70 backdrop-blur-[2px] overflow-y-auto p-3 sm:p-4">
+        <div class="desk-modal-panel walkin-enrollment-panel w-full max-w-[1120px] overflow-hidden my-2 sm:my-4">
             <div class="walkin-enrollment-header">
                 <div>
                     <h3>New walk-in enrollment</h3>
@@ -478,7 +523,7 @@
 
             <div id="walkinEnrollmentMessage" class="hidden mx-5 mt-4 p-3 rounded-xl text-sm border"></div>
 
-            <form id="walkinEnrollmentForm" class="walkin-enrollment-body">
+            <form id="walkinEnrollmentForm" class="walkin-enrollment-body flex-1 min-h-0">
                 <div class="walkin-enrollment-grid">
                     <div class="walkin-main-column">
                         <section class="walkin-section-card">
