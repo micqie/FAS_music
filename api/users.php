@@ -302,6 +302,20 @@ class User
         }
     }
 
+    private function isStudentLoginIdentifier($loginInput)
+    {
+        $loginInput = trim((string) $loginInput);
+        if ($loginInput === '') {
+            return false;
+        }
+
+        if (ctype_digit($loginInput)) {
+            return true;
+        }
+
+        return preg_match('/^STU-\d{4}-\d{4,}$/i', $loginInput) === 1;
+    }
+
     private function getStudentAccountMetaForUser(array $user): ?array
     {
         $hasSourceCol = $this->hasStudentColumn('registration_source');
@@ -1203,6 +1217,7 @@ class User
             $this->ensureUserVerificationColumns();
             $this->ensureWalkInAccountsSynced();
             $this->ensureUserSecurityColumns();
+            $isStudentLogin = $this->isStudentLoginIdentifier($username);
             $studentLoginEmail = $this->resolveStudentLoginEmail($username);
             $resolvedUsername = $studentLoginEmail ?: $this->resolveWalkInLoginIdentifier($username);
             $loginCandidates = array_values(array_unique(array_filter([
@@ -1221,20 +1236,44 @@ class User
                 ? ", u.failed_login_attempts, u.account_locked_at, u.account_locked_reason, u.failed_login_last_at"
                 : ", 0 AS failed_login_attempts, NULL AS account_locked_at, NULL AS account_locked_reason, NULL AS failed_login_last_at";
             $joinBranch = $hasUserBranch ? " LEFT JOIN tbl_branches b ON b.branch_id = u.branch_id " : "";
-            // First check if user exists and get status
+            $roleOrderSql = $isStudentLogin
+                ? "CASE WHEN LOWER(r.role_name) = 'student' THEN 0 ELSE 1 END, "
+                : "";
+            $primaryLogin = $loginCandidates[0];
+            $secondaryLogin = $loginCandidates[1] ?? $primaryLogin;
+
             $stmt = $this->conn->prepare("
                 SELECT u.user_id, u.username, u.password, u.first_name, u.last_name,
                        u.email, u.phone, u.status, r.role_name{$selectBranch}{$selectVerification}{$selectSecurity}
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 {$joinBranch}
-                WHERE u.username = ? OR u.email = ? OR u.username = ? OR u.email = ?
+                WHERE (
+                    u.username = ?
+                    OR u.email = ?
+                    OR u.username = ?
+                    OR u.email = ?
+                )
+                " . ($isStudentLogin ? " AND LOWER(r.role_name) = 'student' " : "") . "
+                ORDER BY {$roleOrderSql}
+                    CASE WHEN u.username = ? THEN 0 ELSE 1 END,
+                    CASE WHEN u.email = ? THEN 0 ELSE 1 END,
+                    u.user_id ASC
                 LIMIT 1
             ");
-            $primaryLogin = $loginCandidates[0];
-            $secondaryLogin = $loginCandidates[1] ?? $primaryLogin;
-            $stmt->execute([$primaryLogin, $primaryLogin, $secondaryLogin, $secondaryLogin]);
+            $stmt->execute([
+                $primaryLogin,
+                $primaryLogin,
+                $secondaryLogin,
+                $secondaryLogin,
+                $username,
+                $username
+            ]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user && $isStudentLogin) {
+                $this->sendJSON(['error' => 'Invalid username or password'], 401);
+            }
 
             if (!$user) {
                 $this->sendJSON(['error' => 'Invalid username or password'], 401);

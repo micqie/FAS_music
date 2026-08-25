@@ -6,8 +6,10 @@
     <title>Desk - Registrations</title>
     <!-- Tailwind CSS - Using CDN for development (warning is expected) -->
     <script src="https://cdn.tailwindcss.com"></script>
- <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
+    <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/css/intlTelInput.css">
+    <link rel="stylesheet" href="../../css/intl-phone-input.css">
     <link rel="stylesheet" href="../../css/desk-premium.css">
     <script>
         tailwind.config = {
@@ -323,9 +325,14 @@
                                 <input type="text" id="walkin_student_email" name="student_email" placeholder="Login name" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                                 <p id="walkin_student_email_hint" class="mt-1.5 text-xs text-slate-500">Enter a simple name or username. The system will turn it into a <code>@fas.com</code> login automatically.</p>
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Phone *</label>
-                                <input type="text" name="student_phone" required placeholder="09x-xxx-xxxx" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            <div class="w-full">
+                                <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">
+                                    Phone *
+                                </label>
+
+                                <input id="phone" type="tel" name="student_phone" required autocomplete="off"
+                                class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                placeholder="Phone number">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Branch *</label>
@@ -336,8 +343,30 @@
                             </div>
                         </div>
                         <div class="mt-3">
+                            <input type="hidden" name="student_address" id="walkin_student_address">
                             <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Address</label>
-                            <textarea name="student_address" rows="2" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"></textarea>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">Street</label>
+                                    <input type="text" name="student_street" id="walkin_student_street" placeholder="House no., street, subdivision" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">Barangay</label>
+                                    <input type="text" name="student_barangay" id="walkin_student_barangay" placeholder="Barangay" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">Province</label>
+                                    <select name="student_province" id="walkin_student_province" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                        <option value="">Loading provinces...</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">City / Municipality</label>
+                                    <select name="student_city" id="walkin_student_city" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20" disabled>
+                                        <option value="">Select province first</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -364,9 +393,9 @@
                                     <option value="Other">Other</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em] guardian-label">Phone</label>
-                                <input type="text" name="guardian_phone" placeholder="09x-xxx-xxxx" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 guardian-field">
+                            <div class="w-full">
+                                <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider guardian-label">Phone</label>
+                                <input type="tel" name="guardian_phone" autocomplete="off" class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500 guardian-field" placeholder="Phone number">
                             </div>
                             <div>
                                 <label id="walkin_guardian_email_label" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Login Email (Becomes @fas.com)</label>
@@ -379,8 +408,30 @@
                             </div>
                         </div>
                         <div class="mt-3">
+                            <input type="hidden" name="guardian_address" id="walkin_guardian_address">
                             <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Address</label>
-                            <textarea name="guardian_address" rows="2" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"></textarea>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">Street</label>
+                                    <input type="text" name="guardian_street" id="walkin_guardian_street" placeholder="House no., street, subdivision" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">Barangay</label>
+                                    <input type="text" name="guardian_barangay" id="walkin_guardian_barangay" placeholder="Barangay" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">Province</label>
+                                    <select name="guardian_province" id="walkin_guardian_province" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                        <option value="">Loading provinces...</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1">City / Municipality</label>
+                                    <select name="guardian_city" id="walkin_guardian_city" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20" disabled>
+                                        <option value="">Select province first</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -464,10 +515,140 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/intlTelInput.min.js"></script>
+    <script src="../../js/intl-phone-input.js"></script>
     <script src="../../js/session_timeout.js"></script>
     <script src="../../js/desk/desk_nav.js"></script>
       <script src="../../js/desk/desk_registration.js"></script>
         <script src="../../js/birthdate_validation.js"></script>
+    <script>
+        const PH_PROVINCES_URL = 'https://raw.githubusercontent.com/darklight721/philippines/master/provinces.json';
+        const PH_CITIES_URL = 'https://raw.githubusercontent.com/darklight721/philippines/master/cities.json';
+        let phProvinceRows = [];
+        let phCityRows = [];
+
+        function getSelectDisplayValue(selectEl) {
+            if (!selectEl) return '';
+            const option = selectEl.options?.[selectEl.selectedIndex];
+            return option && option.value ? option.textContent.trim() : '';
+        }
+
+        function populateSelect(selectEl, items, placeholder, selectedValue = '') {
+            if (!selectEl) return;
+            const options = [`<option value="">${placeholder}</option>`];
+            items.forEach((item) => {
+                options.push(`<option value="${String(item.value || '').replace(/"/g, '&quot;')}">${String(item.label || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`);
+            });
+            selectEl.innerHTML = options.join('');
+            if (selectedValue) selectEl.value = selectedValue;
+        }
+
+        async function loadPhAddressData() {
+            const [provinceRes, cityRes] = await Promise.all([
+                fetch(PH_PROVINCES_URL),
+                fetch(PH_CITIES_URL)
+            ]);
+
+            phProvinceRows = provinceRes.ok ? await provinceRes.json() : [];
+            phCityRows = cityRes.ok ? await cityRes.json() : [];
+
+            phProvinceRows = (Array.isArray(phProvinceRows) ? phProvinceRows : [])
+                .filter((row) => row && row.key && row.name)
+                .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+            phCityRows = Array.isArray(phCityRows) ? phCityRows : [];
+        }
+
+        function syncCityOptions(prefix) {
+            const provinceSelect = document.getElementById(`${prefix}_province`);
+            const citySelect = document.getElementById(`${prefix}_city`);
+            if (!provinceSelect || !citySelect) return;
+
+            const provinceKey = provinceSelect.value;
+            const provinceName = getSelectDisplayValue(provinceSelect);
+            const cities = provinceKey
+                ? phCityRows
+                    .filter((row) => String(row.province || '') === String(provinceKey))
+                    .map((row) => ({
+                        value: row.name,
+                        label: row.name
+                    }))
+                    .sort((a, b) => a.label.localeCompare(b.label))
+                : [];
+
+            populateSelect(
+                citySelect,
+                cities,
+                provinceKey ? `Select city/municipality in ${provinceName}` : 'Select province first'
+            );
+            citySelect.disabled = !provinceKey;
+        }
+
+        function syncHiddenAddress(prefix) {
+            const street = document.getElementById(`${prefix}_street`)?.value.trim() || '';
+            const barangay = document.getElementById(`${prefix}_barangay`)?.value.trim() || '';
+            const city = getSelectDisplayValue(document.getElementById(`${prefix}_city`));
+            const province = getSelectDisplayValue(document.getElementById(`${prefix}_province`));
+            const hidden = document.getElementById(`${prefix}_address`);
+            if (hidden) {
+                hidden.value = [street, barangay, city, province].filter(Boolean).join(', ');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('walkinForm');
+            if (!form) return;
+
+            const syncAll = () => {
+                syncCityOptions('walkin_student');
+                syncCityOptions('walkin_guardian');
+                syncHiddenAddress('walkin_student');
+                syncHiddenAddress('walkin_guardian');
+            };
+
+            ['walkin_student_street', 'walkin_student_barangay', 'walkin_student_city', 'walkin_student_province',
+             'walkin_guardian_street', 'walkin_guardian_barangay', 'walkin_guardian_city', 'walkin_guardian_province'
+            ].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', syncAll);
+                    el.addEventListener('change', syncAll);
+                }
+            });
+
+            loadPhAddressData().then(() => {
+                populateSelect(
+                    document.getElementById('walkin_student_province'),
+                    phProvinceRows.map((row) => ({ value: row.key, label: row.name })),
+                    'Select province'
+                );
+                populateSelect(
+                    document.getElementById('walkin_guardian_province'),
+                    phProvinceRows.map((row) => ({ value: row.key, label: row.name })),
+                    'Select province'
+                );
+                syncAll();
+            }).catch(() => {
+                const studentProvince = document.getElementById('walkin_student_province');
+                const guardianProvince = document.getElementById('walkin_guardian_province');
+                if (studentProvince) studentProvince.innerHTML = '<option value="">Failed to load provinces</option>';
+                if (guardianProvince) guardianProvince.innerHTML = '<option value="">Failed to load provinces</option>';
+            });
+
+            document.getElementById('walkin_student_province')?.addEventListener('change', () => {
+                syncCityOptions('walkin_student');
+                syncHiddenAddress('walkin_student');
+            });
+            document.getElementById('walkin_guardian_province')?.addEventListener('change', () => {
+                syncCityOptions('walkin_guardian');
+                syncHiddenAddress('walkin_guardian');
+            });
+            document.getElementById('walkin_student_city')?.addEventListener('change', () => syncHiddenAddress('walkin_student'));
+            document.getElementById('walkin_guardian_city')?.addEventListener('change', () => syncHiddenAddress('walkin_guardian'));
+
+            form.addEventListener('submit', syncAll);
+            syncAll();
+        });
+    </script>
 
 </body>
 </html>

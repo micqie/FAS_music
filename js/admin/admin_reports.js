@@ -5,6 +5,12 @@ let reportCharts = {
     paymentMix: null
 };
 
+let latestReportPayload = {
+    branches: [],
+    registrations: [],
+    enrollments: []
+};
+
 function setReportText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -215,16 +221,13 @@ function buildSummary(registrations, enrollments, branchMetrics) {
 }
 
 function updateHeroAndStats(summary) {
-    setReportText('heroProcessRate', reportPercent(summary.processRate));
-    setReportText('heroProcessHint', `${summary.activeEnrollments} active enrollment${summary.activeEnrollments === 1 ? '' : 's'} from ${summary.totalRegistrations} tracked registration${summary.totalRegistrations === 1 ? '' : 's'}`);
-    setReportText('heroCollectionRate', reportPercent(summary.collectionRate));
-    setReportText('heroCollectionHint', `${reportCurrency(summary.revenue)} collected with ${reportCurrency(summary.outstanding)} still outstanding`);
-
     setReportText('reportStatRegistrations', String(summary.totalRegistrations));
     setReportText('reportStatApprovedFees', String(summary.approvedFees));
     setReportText('reportStatEnrollments', String(summary.activeEnrollments));
     setReportText('reportStatRevenue', reportCurrency(summary.revenue));
     setReportText('reportStatOutstanding', reportCurrency(summary.outstanding));
+    setReportText('heroCollectionRate', reportPercent(summary.collectionRate));
+    setReportText('heroCollectionHint', `${summary.activeEnrollments} active enrollment${summary.activeEnrollments === 1 ? '' : 's'} from ${summary.totalRegistrations} tracked registration${summary.totalRegistrations === 1 ? '' : 's'}. ${reportCurrency(summary.revenue)} collected with ${reportCurrency(summary.outstanding)} still outstanding.`);
 }
 
 function renderFunnelChart(summary) {
@@ -405,29 +408,46 @@ function renderBranchRanking(branchMetrics, sortMode, scope) {
     `).join('');
 }
 
-function renderInsights(summary, branchMetrics, filters) {
-    const box = document.getElementById('reportInsights');
-    if (!box) return;
+function renderBranchBreakdown(branchMetrics, sortMode) {
+    const tableBody = document.getElementById('branchBreakdownBody');
+    const summary = document.getElementById('branchBreakdownSummary');
+    if (!tableBody) return;
 
-    const topBranch = summary.topBranch;
-    const weakestCollection = [...branchMetrics].sort((a, b) => Number(a.collectionRate || 0) - Number(b.collectionRate || 0))[0] || null;
-    const mostOutstanding = [...branchMetrics].sort((a, b) => Number(b.outstanding || 0) - Number(a.outstanding || 0))[0] || null;
+    if (!branchMetrics.length) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="px-5 py-8 text-center text-sm text-slate-500">
+                    No branch records match the current filter.
+                </td>
+            </tr>
+        `;
+        if (summary) summary.textContent = '0 branches';
+        return;
+    }
 
-    const items = [
-        `The current process completion rate is ${reportPercent(summary.processRate)}, based on ${summary.activeEnrollments} active enrollments from ${summary.totalRegistrations} tracked registrations.`,
-        `Total revenue in this report view is ${reportCurrency(summary.revenue)}, while remaining outstanding balances are ${reportCurrency(summary.outstanding)}.`,
-        topBranch ? `${escapeHtml(topBranch.branch_name)} is currently the top revenue branch at ${reportCurrency(topBranch.totalRevenue)}.` : 'No branch revenue records were returned for the current filter.',
-        mostOutstanding ? `${escapeHtml(mostOutstanding.branch_name)} carries the largest outstanding balance at ${reportCurrency(mostOutstanding.outstanding)}.` : 'No outstanding balances were returned for the current filter.',
-        weakestCollection ? `${escapeHtml(weakestCollection.branch_name)} has the weakest collection rate at ${reportPercent(weakestCollection.collectionRate)}, which may need follow-up on unpaid balances.` : 'No collection gaps were returned for the current filter.',
-        filters.scope === 'payments'
-            ? `Payment mix is ${summary.fullPayments} full, ${summary.partialPayments} partial, and ${summary.installmentPayments} installment enrollments.`
-            : `Registration fee approvals currently stand at ${summary.approvedFees}, with ${summary.pendingRegistrations} still pending confirmation.`
-    ];
+    const sorted = [...branchMetrics].sort((a, b) => {
+        if (sortMode === 'collection') return Number(b.collectionRate || 0) - Number(a.collectionRate || 0);
+        if (sortMode === 'outstanding') return Number(b.outstanding || 0) - Number(a.outstanding || 0);
+        if (sortMode === 'students') return Number(b.activeStudents || 0) - Number(a.activeStudents || 0);
+        return Number(b.totalRevenue || 0) - Number(a.totalRevenue || 0);
+    });
 
-    box.innerHTML = items.map(text => `
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
-            ${text}
-        </div>
+    if (summary) {
+        summary.textContent = `${sorted.length} branch${sorted.length === 1 ? '' : 'es'} shown`;
+    }
+
+    tableBody.innerHTML = sorted.map((item) => `
+        <tr class="hover:bg-slate-50/70 transition">
+            <td class="px-5 py-4">
+                <div class="font-semibold text-slate-900">${escapeHtml(item.branch_name || 'Branch')}</div>
+                <div class="text-xs text-slate-500 mt-1">${escapeHtml(item.address || 'Branch snapshot')}</div>
+            </td>
+            <td class="px-5 py-4 text-slate-700">${Number(item.activeStudents || 0)}</td>
+            <td class="px-5 py-4 text-slate-700">${Number(item.approvedFees || 0)}${Number(item.pendingFees || 0) ? ` <span class="text-amber-600">(${Number(item.pendingFees || 0)} pending)</span>` : ''}</td>
+            <td class="px-5 py-4 font-semibold text-slate-900">${reportCurrency(item.totalRevenue)}</td>
+            <td class="px-5 py-4 font-semibold text-amber-600">${reportCurrency(item.outstanding)}</td>
+            <td class="px-5 py-4 font-semibold text-slate-900">${reportPercent(item.collectionRate)}</td>
+        </tr>
     `).join('');
 }
 
@@ -449,8 +469,7 @@ function renderReports(data) {
     renderRevenueChart(summary);
     renderBranchChart(branchMetrics);
     renderPaymentMixChart(summary);
-    renderBranchRanking(branchMetrics, filters.sortMode, filters.scope);
-    renderInsights(summary, branchMetrics, filters);
+    renderBranchBreakdown(branchMetrics, filters.sortMode);
 }
 
 async function loadReportsData() {
@@ -484,11 +503,47 @@ async function loadReportsData() {
 }
 
 function attachReportFilters(refresh) {
-    ['reportBranchFilter', 'reportScopeFilter', 'reportSortFilter'].forEach(id => {
+    ['reportBranchFilter', 'reportSortFilter'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         el.addEventListener('change', refresh);
     });
+}
+
+function buildReportCsvRows(data) {
+    const rows = [['Branch', 'Students', 'Registrations', 'Revenue', 'Outstanding', 'Collected']];
+    const branchMap = mapBranches(data.branches);
+    const metrics = computeBranchMetrics(
+        data.branches,
+        data.registrations,
+        data.enrollments
+    ).sort((a, b) => Number(b.totalRevenue || 0) - Number(a.totalRevenue || 0));
+
+    metrics.forEach((item) => {
+        rows.push([
+            item.branch_name || branchMap.get(Number(item.branch_id || 0))?.branch_name || 'Branch',
+            String(Number(item.activeStudents || 0)),
+            String(Number(item.approvedFees || 0) + Number(item.pendingFees || 0)),
+            String(Number(item.totalRevenue || 0)),
+            String(Number(item.outstanding || 0)),
+            String(Number(item.collectionRate || 0))
+        ]);
+    });
+
+    return rows;
+}
+
+function downloadCsv(filename, rows) {
+    const csv = rows
+        .map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
@@ -510,8 +565,13 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     try {
         const data = await loadReportsData();
+        latestReportPayload = data;
         const refresh = () => renderReports(data);
         attachReportFilters(refresh);
+        document.getElementById('printReportsBtn')?.addEventListener('click', () => window.print());
+        document.getElementById('exportReportsBtn')?.addEventListener('click', () => {
+            downloadCsv('admin-reports.csv', buildReportCsvRows(data));
+        });
         refresh();
     } catch (error) {
         console.error('Failed to load admin reports:', error);

@@ -108,18 +108,40 @@ async function openLessonHistoryModal() {
     document.body.style.overflow = 'hidden';
 }
 
-function renderLessonHistoryTable(history) {
+function renderLessonHistoryTable(history, showStudentColumn = false) {
     const tbody = document.getElementById('lessonHistoryTableBody');
     const recordCount = document.getElementById('lessonHistoryRecordCount');
+    const tableHead = document.querySelector('#lessonHistoryModal thead tr');
     
     if (!tbody) return;
     
+    // Update table header based on showStudentColumn
+    if (tableHead) {
+        if (showStudentColumn) {
+            tableHead.innerHTML = `
+                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">DATE</th>
+                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">STUDENT</th>
+                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">FOCUS</th>
+                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">ATTENDANCE</th>
+                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">LEVEL</th>
+                <th class="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">SCORE</th>`;
+        } else {
+            tableHead.innerHTML = `
+                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">DATE</th>
+                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">FOCUS</th>
+                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">ATTENDANCE</th>
+                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">LEVEL</th>
+                <th class="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">SCORE</th>`;
+        }
+    }
+    
     if (!history.length) {
+        const colspan = showStudentColumn ? 6 : 5;
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-400">
+                <td colspan="${colspan}" class="px-6 py-10 text-center text-sm text-gray-400">
                     <i class="fas fa-history text-2xl text-gray-200 block mb-3 mx-auto"></i>
-                    No lesson history found for this student.
+                    No lesson history found.
                 </td>
             </tr>`;
         if (recordCount) recordCount.textContent = '0 records';
@@ -150,6 +172,9 @@ function renderLessonHistoryTable(history) {
         };
         
         const date = formatDate(record.session_date, record.start_time);
+        const studentName = showStudentColumn 
+            ? `${record.student_first_name || ''} ${record.student_last_name || ''}`.trim() || '—'
+            : '';
         const focus = record.lesson_focus || record.notes || '—';
         const attendance = String(record.attendance_status || 'Pending');
         const level = record.skill_level || '—';
@@ -162,14 +187,26 @@ function renderLessonHistoryTable(history) {
             ? 'Late'
             : 'Absent';
         
-        return `
-            <tr class="border-b border-gray-100 last:border-b-0">
-                <td class="px-6 py-4 text-sm text-gray-700">${date}</td>
-                <td class="px-6 py-4 text-sm text-gray-900">${focus}</td>
-                <td class="px-6 py-4 text-sm text-gray-700">${attText}</td>
-                <td class="px-6 py-4 text-sm text-gray-700">${level}</td>
-                <td class="px-6 py-4 text-right text-base font-semibold text-gray-900">${score}</td>
-            </tr>`;
+        if (showStudentColumn) {
+            return `
+                <tr class="border-b border-gray-100 last:border-b-0">
+                    <td class="px-6 py-4 text-sm text-gray-700">${date}</td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${studentName}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${focus}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${attText}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${level}</td>
+                    <td class="px-6 py-4 text-right text-base font-semibold text-gray-900">${score}</td>
+                </tr>`;
+        } else {
+            return `
+                <tr class="border-b border-gray-100 last:border-b-0">
+                    <td class="px-6 py-4 text-sm text-gray-700">${date}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${focus}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${attText}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${level}</td>
+                    <td class="px-6 py-4 text-right text-base font-semibold text-gray-900">${score}</td>
+                </tr>`;
+        }
     }).join('');
     
     if (recordCount) recordCount.textContent = `${history.length} record${history.length !== 1 ? 's' : ''}`;
