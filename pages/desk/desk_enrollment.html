@@ -633,23 +633,30 @@
                                 <option value="">Select package...</option>
                             </select>
 
-                            <div id="walkinPaymentTypeCards" class="hidden"></div>
-                            <select id="walkinPaymentType" class="hidden">
-                                <option value="Full Payment" selected>Full Payment</option>
-                                <option value="Partial Payment">Partial Payment</option>
-                            </select>
                         </section>
                     </div>
 
                     <aside class="walkin-sidebar-card">
                         <div class="walkin-sidebar-section">
                             <h3>3. How are they paying?</h3>
-                            <select id="walkinPaymentMethod" class="walkin-payment-select">
-                                <option value="">Choose a method</option>
-                                <option value="Cash">Cash</option>
-                                <option value="GCash">GCash</option>
-                                <option value="Bank Transfer">Bank Transfer</option>
-                            </select>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="walkin-field-label">Payment Type</label>
+                                    <select id="walkinPaymentType" class="walkin-payment-select">
+                                        <option value="Full Payment">Full Payment</option>
+                                        <option value="Partial Payment">Partial Payment</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="walkin-field-label">Payment Method</label>
+                                    <select id="walkinPaymentMethod" class="walkin-payment-select">
+                                        <option value="">Choose a method</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="GCash">GCash</option>
+                                        <option value="Bank Transfer">Bank Transfer</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="walkin-summary-divider"></div>

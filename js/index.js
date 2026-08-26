@@ -5280,7 +5280,7 @@ function renderStudentRequestInstrumentSelectors(maxInstruments, instruments) {
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Type</label>
                     <select class="student-request-instrument-type w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-400" data-slot="${i}" onchange="onStudentRequestInstrumentTypeChange(${i})">
-                        <option value="">Select type...</option>
+                        <option value="">Select...</option>
                         ${typeOptionsHtml}
                     </select>
                 </div>
@@ -5378,9 +5378,9 @@ function getStudentRequestSelectedInstrumentIds() {
 function getWalkinSelectedInstrumentIds() {
     return getResolvedInstrumentIdsFromSelectors(
         '#walkinInstrumentsContainer',
-        'select.walkin-instrument-type-select',
-        'select.walkin-instrument-select',
-        walkinAvailableInstruments
+        'select.student-request-instrument-type',
+        'select.student-request-instrument',
+        studentRequestAvailableInstruments
     );
 }
 
@@ -8741,9 +8741,9 @@ function updateWalkinPackageDetails() {
 function getWalkinSelectedInstrumentIds() {
     return getResolvedInstrumentIdsFromSelectors(
         '#walkinInstrumentsContainer',
-        'select.walkin-instrument-type-select',
-        'select.walkin-instrument-select',
-        walkinAvailableInstruments
+        'select.student-request-instrument-type',
+        'select.student-request-instrument',
+        studentRequestAvailableInstruments
     );
 }
 

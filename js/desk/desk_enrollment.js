@@ -1194,8 +1194,16 @@
             });
 
             if (!email || !studentId || !packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
-                showToast('Please complete student, package, instruments, payment type, and payment method.', 'error');
-                console.error('[Walk-in Enrollment] Validation failed: missing required fields');
+                const missingFields = [];
+                if (!email || !studentId) missingFields.push('student');
+                if (!packageId) missingFields.push('package');
+                if (uniqueInstrumentIds.length < 1) missingFields.push('instrument(s)');
+                if (!paymentType) missingFields.push('payment type');
+                if (!paymentMethod) missingFields.push('payment method');
+                
+                const fieldList = missingFields.join(', ');
+                showToast(`Please complete: ${fieldList}`, 'error');
+                console.error('[Walk-in Enrollment] Validation failed: missing required fields:', missingFields);
                 return;
             }
             if (instrumentIds.length !== uniqueInstrumentIds.length) {
@@ -1204,18 +1212,7 @@
                 return;
             }
 
-            // Validate that no two instrument slots share the same type
-            const typeSelects = Array.from(document.querySelectorAll('#walkinInstrumentsContainer .student-request-instrument-type'));
-            const selectedTypeIds = typeSelects.map(el => String(el.value || '').trim()).filter(Boolean);
-            
-            console.log('[Walk-in Enrollment Type Check]', { typeSelects: typeSelects.length, selectedTypeIds });
-            
-            // Only check for duplicate types if there are multiple types selected
-            if (selectedTypeIds.length > 1 && selectedTypeIds.length !== new Set(selectedTypeIds).size) {
-                showToast('Each instrument slot must have a different instrument type. Please change the duplicate type selection.', 'error');
-                console.error('[Walk-in Enrollment] Validation failed: duplicate types');
-                return;
-            }
+            // Note: Instrument type/brand is optional, only the main instrument selection is required
 
             const selectedOption = packageSelect.options[packageSelect.selectedIndex];
             const maxInst = getWalkinPackageInstrumentLimitFromOption(selectedOption) || 1;
