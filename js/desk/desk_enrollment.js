@@ -664,10 +664,55 @@
         function syncWalkinSessionSelectUI() {
             const sessionSelect = getWalkinSessionSelect();
             const selectedPackage = getWalkinSelectedPackageOption();
+            const addSessionsBtn = document.getElementById('addSessionsBtn');
+            const sessionHint = document.getElementById('walkinSessionHint');
             if (!sessionSelect) return;
 
             const sessions = Number(selectedPackage?.getAttribute('data-sessions') || 12);
             sessionSelect.value = String(sessions || 12);
+            
+            // Update hint text
+            if (sessionHint) {
+                if (walkinMeta && canAccessExtendedWalkinPackages(walkinMeta)) {
+                    sessionHint.textContent = 'Returning student - all packages available. Additional sessions: ₱650 each.';
+                } else if (walkinMeta) {
+                    sessionHint.textContent = 'Beginner student - 12 session package. Additional sessions: ₱650 each.';
+                } else {
+                    sessionHint.textContent = '';
+                }
+            }
+            
+            // Enable/disable add sessions button
+            if (addSessionsBtn) {
+                addSessionsBtn.disabled = !walkinMeta;
+            }
+        }
+        
+        function populateWalkinSessionDropdown(isReturningStudent) {
+            const sessionSelect = getWalkinSessionSelect();
+            const addSessionsBtn = document.getElementById('addSessionsBtn');
+            if (!sessionSelect) return;
+            
+            sessionSelect.disabled = false;
+            
+            if (isReturningStudent) {
+                // Returning students can choose 12, 20, or 50 sessions
+                sessionSelect.innerHTML = `
+                    <option value="12">12 Sessions</option>
+                    <option value="20">20 Sessions</option>
+                    <option value="50">50 Sessions</option>
+                `;
+            } else {
+                // Beginners only get 12 sessions
+                sessionSelect.innerHTML = `
+                    <option value="12">12 Sessions</option>
+                `;
+            }
+            
+            // Enable add sessions button if student selected
+            if (addSessionsBtn) {
+                addSessionsBtn.disabled = false;
+            }
         }
 
         function selectWalkinSessionPackage(sessionCount) {
@@ -835,7 +880,10 @@
 
             if (!student || !hidden.value) {
                 packageSelect.innerHTML = '<option value="">Select package...</option>';
-                sessionSelect.value = '12';
+                sessionSelect.disabled = true;
+                sessionSelect.innerHTML = '<option value="">Select student first</option>';
+                const addSessionsBtn = document.getElementById('addSessionsBtn');
+                if (addSessionsBtn) addSessionsBtn.disabled = true;
                 renderWalkinPackageCards();
                 renderWalkinPaymentTypeCards();
                 syncWalkinPaymentTypeCardSelection();
@@ -862,6 +910,10 @@
             const previousValue = String(packageSelect.value || '');
 
             const canAccessExtendedPackages = canAccessExtendedWalkinPackages(meta);
+            
+            // Populate session dropdown based on student type
+            populateWalkinSessionDropdown(canAccessExtendedPackages);
+            
             const filteredPackages = canAccessExtendedPackages
                 ? packages.filter(pkg => {
                     const sessions = Number(pkg.sessions || 0);
@@ -934,12 +986,17 @@
             const hiddenSelect = document.getElementById('walkinStudentSelect');
             const packageSelect = document.getElementById('walkinPackageSelect');
             const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
+            const sessionSelect = getWalkinSessionSelect();
+            const addSessionsBtn = document.getElementById('addSessionsBtn');
             if (statusEl) statusEl.textContent = '';
             if (searchInput) searchInput.value = '';
             if (hiddenSelect) hiddenSelect.value = '';
             if (packageSelect) packageSelect.innerHTML = '<option value="">Select package...</option>';
-            const sessionSelect = getWalkinSessionSelect();
-            if (sessionSelect) sessionSelect.value = '12';
+            if (sessionSelect) {
+                sessionSelect.disabled = true;
+                sessionSelect.innerHTML = '<option value="">Select student first</option>';
+            }
+            if (addSessionsBtn) addSessionsBtn.disabled = true;
             renderWalkinPackageCards();
             renderWalkinPaymentTypeCards();
             syncWalkinPaymentTypeCardSelection();
@@ -947,6 +1004,78 @@
             updateWalkinSelectedStudentCard(null);
             renderWalkinStudentResults('');
             syncWalkinSessionSelectUI();
+        }
+        
+        function showAddSessionsModal() {
+            if (!walkinMeta) {
+                showMessage('Please select a student first.', 'error');
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Add Extra Sessions',
+                html: `
+                    <div class="text-left space-y-3">
+                        <p class="text-sm text-slate-600">Add additional sessions to this enrollment at ₱650 per session.</p>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Number of Sessions to Add</label>
+                            <input type="number" id="extraSessionsInput" min="1" max="50" value="1" 
+                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-gold-500">
+                        </div>
+                        <div class="bg-gold-50 border border-gold-200 rounded-lg p-3">
+                            <div class="flex justify-between text-sm">
+                                <span class="font-semibold">Additional Cost:</span>
+                                <span id="extraSessionsCost" class="font-bold text-gold-700">₱650.00</span>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Add Sessions',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#b8860b',
+                didOpen: () => {
+                    const input = document.getElementById('extraSessionsInput');
+                    const costDisplay = document.getElementById('extraSessionsCost');
+                    if (input && costDisplay) {
+                        input.addEventListener('input', () => {
+                            const count = Number(input.value) || 0;
+                            const cost = count * 650;
+                            costDisplay.textContent = formatCurrencyPHP(cost);
+                        });
+                    }
+                },
+                preConfirm: () => {
+                    const input = document.getElementById('extraSessionsInput');
+                    const extraSessions = Number(input?.value) || 0;
+                    if (extraSessions < 1) {
+                        Swal.showValidationMessage('Please enter at least 1 session');
+                        return false;
+                    }
+                    return extraSessions;
+                }
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    const sessionSelect = getWalkinSessionSelect();
+                    if (sessionSelect) {
+                        const currentSessions = Number(sessionSelect.value) || 12;
+                        const newTotal = currentSessions + result.value;
+                        
+                        // Create a custom option if needed
+                        const existingOption = Array.from(sessionSelect.options).find(opt => Number(opt.value) === newTotal);
+                        if (!existingOption) {
+                            const option = document.createElement('option');
+                            option.value = String(newTotal);
+                            option.textContent = `${newTotal} Sessions`;
+                            sessionSelect.appendChild(option);
+                        }
+                        
+                        sessionSelect.value = String(newTotal);
+                        updateWalkinPackageUI();
+                        showToast(`Added ${result.value} session(s). Total: ${newTotal} sessions`, 'success');
+                    }
+                }
+            });
         }
 
         function updateWalkinPackageUI() {
@@ -956,8 +1085,8 @@
             const amountEl = document.getElementById('walkinAmountInfo');
             if (!packageSelect || !sessionSelect || !instrumentsContainer || !amountEl) return;
 
-            const selectedSession = Number(sessionSelect.value || 12);
-            const selected = Array.from(packageSelect.options || []).find(option => Number(option.getAttribute('data-sessions') || 0) === selectedSession)
+            const selectedSessionCount = Number(sessionSelect.value || 12);
+            const selected = Array.from(packageSelect.options || []).find(option => Number(option.getAttribute('data-sessions') || 0) === selectedSessionCount)
                 || Array.from(packageSelect.options || []).find(option => Number(option.getAttribute('data-sessions') || 0) === 12)
                 || packageSelect.options[0]
                 || null;
@@ -965,8 +1094,15 @@
                 packageSelect.value = String(selected.value || '');
             }
             const maxInst = getWalkinPackageInstrumentLimitFromOption(selected);
-            const price = Number(selected?.getAttribute('data-price') || 0);
-            const sessions = Number(selected?.getAttribute('data-sessions') || 0);
+            const basePrice = Number(selected?.getAttribute('data-price') || 0);
+            const baseSessions = Number(selected?.getAttribute('data-sessions') || 12);
+            
+            // Calculate actual sessions and price (including add-ons)
+            const actualSessions = selectedSessionCount;
+            const extraSessions = Math.max(0, actualSessions - baseSessions);
+            const extraCost = extraSessions * 650;
+            const totalPrice = basePrice + extraCost;
+            
             syncWalkinPackageCardSelection();
             syncWalkinSessionSelectUI();
             const paymentTypeEl = document.getElementById('walkinPaymentType');
@@ -981,7 +1117,7 @@
                 </div>
                 <div class="walkin-summary-line">
                     <span>Sessions</span>
-                    <span>${sessions > 0 ? sessions : '—'}</span>
+                    <span>${actualSessions > 0 ? actualSessions : '—'}</span>
                 </div>
                 <div class="walkin-summary-line">
                     <span>Max instruments</span>
@@ -993,7 +1129,7 @@
                 </div>
                 <div class="walkin-summary-total">
                     <span>Total</span>
-                    <span>${formatCurrencyPHP(price)}</span>
+                    <span>${formatCurrencyPHP(totalPrice)}</span>
                 </div>`;
             instrumentsContainer.innerHTML = maxInst > 0
                 ? renderStudentRequestInstrumentSelectors(maxInst, walkinMeta?.instruments || [])
@@ -2947,6 +3083,7 @@
             document.getElementById('closeWalkinEnrollmentModalBtn')?.addEventListener('click', closeWalkinEnrollmentModal);
             document.getElementById('cancelWalkinEnrollmentBtn')?.addEventListener('click', closeWalkinEnrollmentModal);
             document.getElementById('walkinEnrollmentForm')?.addEventListener('submit', submitWalkinEnrollment);
+            document.getElementById('addSessionsBtn')?.addEventListener('click', showAddSessionsModal);
             document.getElementById('walkinStudentSearch')?.addEventListener('input', handleWalkinStudentChange);
             document.getElementById('walkinStudentSearch')?.addEventListener('change', handleWalkinStudentChange);
             document.getElementById('walkinSessionSelect')?.addEventListener('change', () => updateWalkinPackageUI());
