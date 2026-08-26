@@ -8,7 +8,8 @@
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../../css/admin-responsive.css">
-     <link rel="stylesheet" href="../../css/table-responsive.css">
+    <link rel="stylesheet" href="../../css/table-responsive.css">
+    <link rel="stylesheet" href="../../css/desk-modals.css">
     <script>
         tailwind.config = {
             theme: {
@@ -30,6 +31,30 @@
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: white !important; }
         .sidebar-scroll { -ms-overflow-style: none; scrollbar-width: none; }
         .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+        .walkin-enrollment-panel {
+            max-height: calc(100vh - 1.5rem);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .walkin-enrollment-body {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding-bottom: 1rem;
+        }
+        .walkin-enrollment-grid {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+        table { font-size: 0.875rem; }
+        th { font-size: 0.75rem; padding: 0.75rem 1rem; }
+        td { padding: 0.75rem 1rem; }
+        .table-compact th { padding: 0.5rem 0.75rem; }
+        .table-compact td { padding: 0.5rem 0.75rem; }
     </style>
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
@@ -170,23 +195,23 @@
                             <option value="">All branches</option>
                         </select>
                     </div>
-                    <a href="admin_registration.html" class="inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-2xl shadow-lg shadow-gold-500/25 transition-all duration-200 whitespace-nowrap">
+                    <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-2xl shadow-lg shadow-gold-500/25 transition-all duration-200 whitespace-nowrap">
                         <i class="fas fa-list-check mr-2"></i>
                         Walk-In Enrollment
-                    </a>
+                    </button>
                 </div>
             </div>
 
-            <section class="mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <div class="flex items-center justify-between gap-4 px-5 py-4 border-b border-slate-200">
+            <section class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex items-center justify-between gap-4 px-4 py-3 border-b border-slate-200">
                     <div>
-                        <h2 class="text-xl font-bold text-slate-900">Session extension requests only</h2>
-                        <p class="text-sm text-slate-500">Turn on to focus on add-on session requests.</p>
+                        <h2 class="text-base font-bold text-slate-900">Session extension requests only</h2>
+                        <p class="text-xs text-slate-500">Turn on to focus on add-on session requests.</p>
                     </div>
                     <label class="inline-flex cursor-pointer items-center gap-3">
                         <input id="extensionOnlyToggle" type="checkbox" class="peer sr-only">
-                        <span class="relative h-8 w-14 rounded-full border-2 border-gold-500 bg-gold-500/20 transition peer-checked:bg-gold-500 peer-checked:border-gold-500">
-                            <span class="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-6"></span>
+                        <span class="relative h-7 w-12 rounded-full border-2 border-gold-500 bg-gold-500/20 transition peer-checked:bg-gold-500 peer-checked:border-gold-500">
+                            <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
                         </span>
                     </label>
                 </div>
@@ -194,31 +219,31 @@
 
             <div class="mt-6">
                 <!-- Pending Enrollments -->
-                <div id="pendingSessionsSection" class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-                    <div class="p-6 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
+                <div id="pendingSessionsSection" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+                    <div class="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
                         <div>
-                            <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-calendar-plus mr-2 text-gold-500"></i>Pending Session Extension Requests</h3>
+                            <h3 class="text-base font-bold text-slate-800"><i class="fas fa-calendar-plus mr-2 text-gold-500"></i>Pending Session Extension Requests</h3>
                             <p class="text-xs text-slate-500 mt-1">₱650 per 1-hour add-on session from the student portal.</p>
                         </div>
                         <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full">
+                        <table class="w-full table-compact">
                             <thead class="bg-slate-50">
                                 <tr>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Add-on</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Schedule</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Add-on</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="pendingRequestsTable" class="divide-y divide-slate-100">
                                 <tr>
-                                    <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                        <p>Loading requests...</p>
+                                    <td colspan="6" class="px-4 py-6 text-center text-slate-500">
+                                        <i class="fas fa-spinner fa-spin text-xl mb-2"></i>
+                                        <p class="text-sm">Loading requests...</p>
                                     </td>
                                 </tr>
                             </tbody>
@@ -227,31 +252,31 @@
                 </div>
 
                 <!-- Active Enrollments -->
-                <div id="activeEnrollmentsSection" class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-6 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
+                <div id="activeEnrollmentsSection" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
                         <div>
-                            <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-user-check mr-2 text-gold-500"></i>Active Enrollments</h3>
+                            <h3 class="text-base font-bold text-slate-800"><i class="fas fa-user-check mr-2 text-gold-500"></i>Active Enrollments</h3>
                             <p class="text-xs text-slate-500 mt-1">Students currently working through their session packages.</p>
                         </div>
                         <span class="text-xs text-slate-500" id="activeEnrollmentCount">Loading...</span>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full">
+                        <table class="w-full table-compact">
                             <thead class="bg-slate-50">
                                 <tr>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instructor</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Progress</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Next Session</th>
-                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instructor</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Progress</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Next Session</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="activeEnrollmentsTable" class="divide-y divide-slate-100">
                                 <tr>
-                                    <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                        <p>Loading active enrollments...</p>
+                                    <td colspan="6" class="px-4 py-6 text-center text-slate-500">
+                                        <i class="fas fa-spinner fa-spin text-xl mb-2"></i>
+                                        <p class="text-sm">Loading active enrollments...</p>
                                     </td>
                                 </tr>
                             </tbody>
@@ -262,12 +287,149 @@
         </div>
     </main>
 
+    <!-- Walk-in Enrollment Modal -->
+    <div id="walkinEnrollmentModal" class="desk-modal fixed inset-0 z-[1100] hidden items-start justify-center bg-[#1f2430]/70 backdrop-blur-[2px] overflow-y-auto p-3 sm:p-4">
+        <div class="desk-modal-panel walkin-enrollment-panel w-full max-w-[1120px] overflow-hidden my-2 sm:my-4">
+            <div class="walkin-enrollment-header">
+                <div>
+                    <h3>New walk-in enrollment</h3>
+                    <p>Admin can enroll students across all branches.</p>
+                </div>
+                <button type="button" id="closeWalkinEnrollmentModalBtn" class="walkin-modal-close" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div id="walkinEnrollmentMessage" class="hidden mx-5 mt-4 p-3 rounded-xl text-sm border"></div>
+
+            <form id="walkinEnrollmentForm" class="walkin-enrollment-body flex-1 min-h-0">
+                <div class="walkin-enrollment-grid">
+                    <div class="walkin-main-column">
+                        <section class="walkin-section-card">
+                            <div class="walkin-step-header">
+                                <span class="walkin-step-badge">1</span>
+                                <h2>Who is enrolling?</h2>
+                            </div>
+
+                            <div id="walkinStudentSearchWrap" class="walkin-search-wrap">
+                                <input type="text" id="walkinStudentSearch" placeholder="Type a name or phone number" class="walkin-search-input">
+                                <input type="hidden" id="walkinStudentSelect" value="">
+                            </div>
+
+                            <div id="walkinSelectedStudentCard" class="hidden walkin-selected-student-card">
+                                <div class="walkin-selected-avatar" id="walkinSelectedStudentAvatar">--</div>
+                                <div class="min-w-0 flex-1">
+                                    <div id="walkinSelectedStudentName" class="walkin-selected-name">—</div>
+                                    <div id="walkinSelectedStudentMeta" class="walkin-selected-meta">—</div>
+                                </div>
+                                <button type="button" id="walkinClearStudentBtn" class="walkin-change-btn">Change</button>
+                            </div>
+
+                            <div id="walkinStudentResults" class="walkin-results-list">
+                                <div class="walkin-empty-state">Type to search students.</div>
+                            </div>
+                            <p id="walkinStatusInfo" class="walkin-status-info"></p>
+                        </section>
+
+                        <section class="walkin-section-card">
+                            <div class="walkin-step-header">
+                                <span class="walkin-step-badge">2</span>
+                                <h2>Select Branch & Package</h2>
+                            </div>
+                            <p class="walkin-section-copy">Choose the branch for this enrollment.</p>
+
+                            <div class="walkin-learning-card mb-4">
+                                <div class="walkin-learning-row">
+                                    <div class="walkin-learning-field flex-1">
+                                        <label class="walkin-field-label">Branch *</label>
+                                        <select id="walkinBranchSelect" class="walkin-session-select">
+                                            <option value="">Loading branches...</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="walkin-learning-card">
+                                <div class="walkin-learning-row">
+                                    <div class="walkin-learning-field">
+                                        <label class="walkin-field-label">Instrument</label>
+                                        <div id="walkinInstrumentsContainer" class="walkin-instrument-stack">
+                                            <div class="text-sm text-slate-500">Select a student first.</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="walkin-learning-sessions">
+                                        <label class="walkin-field-label">Sessions</label>
+                                        <select id="walkinSessionSelect" class="walkin-session-select">
+                                            <option value="12">12 Sessions</option>
+                                            <option value="20">20 Sessions</option>
+                                            <option value="50">50 Sessions</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="walkin-upgrade-packages">
+                                <div class="walkin-upgrade-label">Upgrade packages</div>
+                                <div id="walkinPackageCards" class="walkin-package-grid"></div>
+                            </div>
+
+                            <select id="walkinPackageSelect" class="hidden">
+                                <option value="">Select package...</option>
+                            </select>
+
+                            <div id="walkinPaymentTypeCards" class="hidden"></div>
+                            <select id="walkinPaymentType" class="hidden">
+                                <option value="Full Payment" selected>Full Payment</option>
+                                <option value="Partial Payment">Partial Payment</option>
+                            </select>
+                        </section>
+                    </div>
+
+                    <aside class="walkin-sidebar-card">
+                        <div class="walkin-sidebar-section">
+                            <h3>3. How are they paying?</h3>
+                            <select id="walkinPaymentMethod" class="walkin-payment-select">
+                                <option value="">Choose a method</option>
+                                <option value="Cash">Cash</option>
+                                <option value="GCash">GCash</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="walkin-summary-divider"></div>
+
+                        <div id="walkinAmountInfo" class="walkin-summary-content">
+                            <div class="walkin-summary-line">
+                                <span>Instrument</span>
+                                <span>—</span>
+                            </div>
+                            <div class="walkin-summary-line">
+                                <span>Sessions</span>
+                                <span>—</span>
+                            </div>
+                            <div class="walkin-summary-total">
+                                <span>Total</span>
+                                <span>₱0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="walkin-actions">
+                            <button type="submit" id="submitWalkinEnrollmentBtn" class="walkin-enroll-btn">Enroll &amp; collect payment</button>
+                            <button type="button" id="cancelWalkinEnrollmentBtn" class="walkin-cancel-btn">Cancel</button>
+                        </div>
+                    </aside>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/admin/admin_responsive.js"></script>
     <script src="../../js/index.js?v=20260329a"></script>
-    <script src="../../js/admin/admin_enrollments.js?v=20260329a"></script>
-
+    <script src="../../js/admin/admin_enrollments.js?v=20260329b"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>
 </html>

@@ -100,57 +100,123 @@
         </div>
     </aside>
 
-    <main class="lg:ml-72 pt-28 p-8">
+    <main class="lg:ml-72 pt-28 px-4 sm:px-6 md:px-8 pb-8">
         <div class="max-w-7xl mx-auto">
-            <div class="mb-10 flex items-center justify-between flex-wrap gap-4">
+            <!-- Header -->
+            <div class="mb-8 flex items-start justify-between flex-wrap gap-4">
                 <div>
-                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">Branch Teachers</h1>
-                    <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
-                    <p class="text-slate-500 mt-2">Manage teachers for your branch only.</p>
-                    <div class="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                        Branch: <span id="managerBranchName">—</span>
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-lg shadow-gold-500/30">
+                            <i class="fas fa-chalkboard-teacher text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-3xl font-black text-slate-900 tracking-tight">Branch Teachers</h1>
+                            <p class="text-sm text-slate-500 mt-0.5">Manage instructors and their availability</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-semibold text-blue-700 border border-blue-200">
+                        <i class="fas fa-location-dot"></i>
+                        <span id="managerBranchName">—</span>
                     </div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button id="openTeacherModalBtn" class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/25 transition-all duration-200">
-                        <i class="fas fa-plus mr-2"></i> Add Teacher
-                    </button>
+                <button id="openTeacherModalBtn" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/25 hover:shadow-xl hover:shadow-gold-500/30 transition-all duration-200 hover:scale-105">
+                    <i class="fas fa-plus-circle mr-2"></i> Add Teacher
+                </button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Teachers</p>
+                            <p class="text-2xl font-black text-slate-900 mt-1" id="totalTeachersCount">0</p>
+                        </div>
+                        <div class="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center">
+                            <i class="fas fa-users text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active</p>
+                            <p class="text-2xl font-black text-emerald-600 mt-1" id="activeTeachersCount">0</p>
+                        </div>
+                        <div class="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center">
+                            <i class="fas fa-check-circle text-emerald-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Inactive</p>
+                            <p class="text-2xl font-black text-slate-400 mt-1" id="inactiveTeachersCount">0</p>
+                        </div>
+                        <div class="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center">
+                            <i class="fas fa-pause-circle text-slate-400 text-xl"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                    <label class="block text-sm font-medium text-slate-700 mb-2"><i class="fas fa-toggle-on mr-2 text-gold-500"></i>Status</label>
-                    <select id="statusFilter" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900">
-                        <option value="">All Status</option>
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
-                </div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                    <label class="block text-sm font-medium text-slate-700 mb-2"><i class="fas fa-search mr-2 text-gold-500"></i>Search</label>
-                    <input id="searchInput" type="text" placeholder="Name, specialization, email" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900">
+            <!-- Filters -->
+            <div class="mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                            <i class="fas fa-search text-gold-500 mr-1"></i> Search
+                        </label>
+                        <div class="relative">
+                            <i class="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input id="searchInput" type="text" placeholder="Name, specialization, email..." class="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                            <i class="fas fa-filter text-gold-500 mr-1"></i> Filter by Status
+                        </label>
+                        <select id="statusFilter" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
+                            <option value="">All Status</option>
+                            <option value="Active">Active Only</option>
+                            <option value="Inactive">Inactive Only</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-                <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                    <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-chalkboard-teacher mr-2 text-gold-500"></i>Teachers</h3>
-                    <span class="text-xs text-slate-500" id="teacherCount">Loading...</span>
+            <!-- Teachers Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-4 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="h-10 w-10 rounded-xl bg-gold-500/10 flex items-center justify-center">
+                            <i class="fas fa-chalkboard-teacher text-gold-600 text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900">Teachers Directory</h3>
+                            <p class="text-xs text-slate-500" id="teacherCount">Loading...</p>
+                        </div>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full">
-                        <thead class="bg-slate-50">
+                        <thead class="bg-slate-50/70 border-b border-slate-200">
                             <tr>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Teacher</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Specialization</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Employment</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Teacher</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Specialization</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Employment</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="teachersTable" class="divide-y divide-slate-100">
-                            <tr><td colspan="5" class="px-6 py-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin text-2xl mb-2 text-gold-500"></i><p>Loading teachers...</p></td></tr>
+                            <tr>
+                                <td colspan="5" class="px-6 py-12 text-center">
+                                    <i class="fas fa-spinner fa-spin text-3xl mb-3 text-gold-500"></i>
+                                    <p class="text-sm text-slate-500">Loading teachers...</p>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -158,57 +224,110 @@
         </div>
     </main>
 
-    <div id="teacherModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-2xl p-8 relative">
-            <button id="closeTeacherModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
-            <h3 id="teacherModalTitle" class="text-2xl font-bold text-white mb-2">Add Teacher</h3>
-            <p class="text-zinc-400 text-xs mb-4">Teachers are added to your branch only.</p>
-            <form id="teacherForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div id="teacherModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-gold-500 to-gold-400 px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+                        <i class="fas fa-chalkboard-teacher text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 id="teacherModalTitle" class="text-xl font-bold text-white">Add Teacher</h3>
+                        <p class="text-xs text-white/80">Teachers are added to your branch only</p>
+                    </div>
+                </div>
+                <button id="closeTeacherModalBtn" class="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <form id="teacherForm" class="p-6">
                 <input type="hidden" id="teacherId">
                 <input type="hidden" id="branchId">
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">First Name *</label>
-                    <input id="firstName" required class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <!-- First Name -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <i class="fas fa-user text-gold-500 mr-1"></i> First Name *
+                        </label>
+                        <input id="firstName" required class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
+                    </div>
+
+                    <!-- Last Name -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <i class="fas fa-user text-gold-500 mr-1"></i> Last Name *
+                        </label>
+                        <input id="lastName" required class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
+                    </div>
+
+                    <!-- Branch (Read-only) -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <i class="fas fa-location-dot text-gold-500 mr-1"></i> Branch
+                        </label>
+                        <div class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium" id="branchNameDisplay">—</div>
+                    </div>
+
+                    <!-- Employment Type -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <i class="fas fa-briefcase text-gold-500 mr-1"></i> Employment Type *
+                        </label>
+                        <select id="employmentType" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
+                            <option value="Full-time">Full-time</option>
+                            <option value="Part-time">Part-time</option>
+                            <option value="Contract">Contract</option>
+                        </select>
+                    </div>
+
+                    <!-- Status -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <i class="fas fa-toggle-on text-gold-500 mr-1"></i> Status *
+                        </label>
+                        <select id="status" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+
+                    <!-- Specializations -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <i class="fas fa-music text-gold-500 mr-1"></i> Specializations *
+                        </label>
+                        <p class="text-xs text-slate-500 mb-3">Select one or more instruments the teacher can teach</p>
+                        <div id="specializationChipGrid" class="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-wrap gap-2 max-h-48 overflow-y-auto"></div>
+                    </div>
+
+                    <!-- Email -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <i class="fas fa-envelope text-gold-500 mr-1"></i> Email
+                        </label>
+                        <input id="email" type="email" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all" placeholder="teacher@example.com">
+                    </div>
+
+                    <!-- Phone -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <i class="fas fa-phone text-gold-500 mr-1"></i> Phone
+                        </label>
+                        <input id="phone" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all" placeholder="09xx-xxx-xxxx">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Last Name *</label>
-                    <input id="lastName" required class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Branch</label>
-                    <div class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white" id="branchNameDisplay">—</div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Employment Type *</label>
-                    <select id="employmentType" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
-                        <option value="Full-time">Full-time</option>
-                        <option value="Part-time">Part-time</option>
-                        <option value="Contract">Contract</option>
-                    </select>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Specializations *</label>
-                    <p class="text-xs text-zinc-500 mb-2">Tap to select one or more.</p>
-                    <div id="specializationChipGrid" class="rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 flex flex-wrap gap-2 max-h-40 overflow-y-auto"></div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Email</label>
-                    <input id="email" type="email" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Phone</label>
-                    <input id="phone" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Status *</label>
-                    <select id="status" class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white">
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
-                </div>
-                <div class="md:col-span-2 flex items-center justify-end gap-3 pt-4">
-                    <button type="button" id="cancelTeacherBtn" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">Cancel</button>
-                    <button type="submit" id="submitTeacherBtn" class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-end gap-3 pt-6 mt-6 border-t border-slate-200">
+                    <button type="button" id="cancelTeacherBtn" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitTeacherBtn" class="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/20 hover:shadow-xl hover:shadow-gold-500/30 transition-all">
+                        <i class="fas fa-save"></i>
                         <span id="submitTeacherBtnText">Save Teacher</span>
                     </button>
                 </div>
@@ -216,55 +335,122 @@
         </div>
     </div>
 
-    <div id="teacherAvailabilityModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden">
-            <div class="border-b border-slate-200 px-6 py-5 flex items-start justify-between gap-4">
-                <div>
-                    <h3 id="teacherAvailabilityModalTitle" class="text-2xl font-black text-slate-900">Teacher Availability</h3>
-                    <p id="teacherAvailabilityModalMeta" class="mt-1 text-sm text-slate-500">Manage the weekly schedule blocks for this instructor.</p>
+    <div id="teacherAvailabilityModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden max-h-[90vh] flex flex-col">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-amber-500 to-orange-400 px-6 py-4 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center">
+                        <i class="fas fa-calendar-alt text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 id="teacherAvailabilityModalTitle" class="text-xl font-bold text-white">Teacher Availability</h3>
+                        <p id="teacherAvailabilityModalMeta" class="text-sm text-white/80">Manage weekly schedule</p>
+                    </div>
                 </div>
-                <button id="closeTeacherAvailabilityModalBtn" class="rounded-full p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"><i class="fas fa-times text-lg"></i></button>
+                <button id="closeTeacherAvailabilityModalBtn" class="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
             </div>
-            <div class="grid grid-cols-1 lg:grid-cols-[1.35fr_0.9fr] gap-0">
-                <div class="p-6 bg-slate-50/70 border-b lg:border-b-0 lg:border-r border-slate-200">
-                    <div class="flex items-center justify-between flex-wrap gap-2">
+
+            <!-- Content -->
+            <div class="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] flex-1 overflow-hidden">
+                <!-- Left: Schedule Grid -->
+                <div class="p-6 overflow-y-auto bg-slate-50">
+                    <div class="flex items-center justify-between mb-5">
                         <div>
-                            <h4 class="text-lg font-bold text-slate-900">Weekly Schedule</h4>
-                            <p class="text-sm text-slate-500">Set the exact time ranges the instructor can be scheduled.</p>
+                            <h4 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fas fa-clock text-amber-600"></i>
+                                Weekly Schedule
+                            </h4>
+                            <p class="text-sm text-slate-600 mt-1">Set availability blocks for each day</p>
                         </div>
-                        <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">Manager editable</span>
+                        <span class="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 border border-amber-200">
+                            <i class="fas fa-edit"></i> Manager Editable
+                        </span>
                     </div>
-                    <div id="teacherAvailabilityStatus" class="hidden mt-4 rounded-2xl border px-4 py-3 text-sm"></div>
-                    <div id="teacherAvailabilityGrid" class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+                    <div id="teacherAvailabilityStatus" class="hidden mb-4 rounded-xl border px-4 py-3 text-sm"></div>
+                    <div id="teacherAvailabilityGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
-                <div class="p-6">
-                    <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h4 class="text-base font-bold text-slate-900">Editing Notes</h4>
-                        <ul class="mt-3 space-y-3 text-sm text-slate-600">
-                            <li class="flex gap-3"><i class="fas fa-circle text-[8px] mt-2 text-amber-500"></i><span>Only branch managers can edit availability.</span></li>
-                            <li class="flex gap-3"><i class="fas fa-circle text-[8px] mt-2 text-amber-500"></i><span>Instructors will only see the saved schedule as read-only.</span></li>
-                            <li class="flex gap-3"><i class="fas fa-circle text-[8px] mt-2 text-amber-500"></i><span>Leave a day unchecked if the teacher is not available.</span></li>
-                        </ul>
-                        <div class="mt-6 flex items-center gap-3">
-                            <button type="button" id="saveTeacherAvailabilityBtn" onclick="saveTeacherAvailability()" class="inline-flex items-center px-5 py-2.5 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-xl shadow transition">
-                                <span id="saveTeacherAvailabilityText">Save Availability</span>
-                            </button>
-                            <button type="button" onclick="closeTeacherAvailabilityModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Close</button>
+
+                <!-- Right: Info & Actions -->
+                <div class="p-6 bg-white border-l border-slate-200 overflow-y-auto flex flex-col">
+                    <div class="flex-1">
+                        <div class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-5">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                                    <i class="fas fa-info-circle text-blue-600 text-lg"></i>
+                                </div>
+                                <h4 class="text-base font-bold text-slate-900">Quick Guide</h4>
+                            </div>
+                            <ul class="space-y-3">
+                                <li class="flex gap-3 items-start">
+                                    <div class="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <i class="fas fa-check text-amber-600 text-xs"></i>
+                                    </div>
+                                    <span class="text-sm text-slate-700">Check the box to enable a day</span>
+                                </li>
+                                <li class="flex gap-3 items-start">
+                                    <div class="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <i class="fas fa-clock text-amber-600 text-xs"></i>
+                                    </div>
+                                    <span class="text-sm text-slate-700">Set one time block per day</span>
+                                </li>
+                                <li class="flex gap-3 items-start">
+                                    <div class="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <i class="fas fa-eye-slash text-amber-600 text-xs"></i>
+                                    </div>
+                                    <span class="text-sm text-slate-700">Leave unchecked if teacher is unavailable</span>
+                                </li>
+                                <li class="flex gap-3 items-start">
+                                    <div class="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <i class="fas fa-lock text-amber-600 text-xs"></i>
+                                    </div>
+                                    <span class="text-sm text-slate-700">Only managers can edit availability</span>
+                                </li>
+                            </ul>
                         </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="pt-6 mt-6 border-t border-slate-200 flex flex-col gap-3">
+                        <button type="button" id="saveTeacherAvailabilityBtn" onclick="saveTeacherAvailability()" 
+                            class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/20 hover:shadow-xl hover:shadow-gold-500/30 transition-all">
+                            <i class="fas fa-save"></i>
+                            <span id="saveTeacherAvailabilityText">Save Availability</span>
+                        </button>
+                        <button type="button" onclick="closeTeacherAvailabilityModal()" 
+                            class="w-full px-6 py-3 rounded-xl border-2 border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                            Close
+                        </button>
                     </div>
                 </div>
             </div>
+
+            <!-- Template -->
             <template id="teacherAvailabilityCardTemplate">
-                <div class="availability-card p-4 rounded-2xl border border-slate-200 bg-white space-y-3 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="availability-label font-semibold text-slate-900"></span>
-                        <input type="checkbox" class="availability-enabled h-4 w-4">
+                <div class="availability-card p-4 rounded-xl border-2 border-slate-200 bg-white hover:border-gold-300 hover:shadow-md transition-all">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="flex items-center gap-3 cursor-pointer group">
+                            <input type="checkbox" class="availability-enabled h-5 w-5 rounded border-slate-300 text-gold-500 focus:ring-gold-400 cursor-pointer">
+                            <span class="availability-label font-bold text-slate-900 group-hover:text-gold-600 transition-colors"></span>
+                        </label>
                     </div>
-                    <div class="grid grid-cols-2 gap-3 text-sm">
-                        <input type="time" class="availability-start rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
-                        <input type="time" class="availability-end rounded-xl border border-slate-200 p-2 focus:outline-none focus:ring-2 focus:ring-gold-400/40">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Start Time</label>
+                            <input type="time" class="availability-start w-full rounded-lg border border-slate-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40 focus:border-gold-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">End Time</label>
+                            <input type="time" class="availability-end w-full rounded-lg border border-slate-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40 focus:border-gold-400">
+                        </div>
                     </div>
-                    <p class="text-xs text-slate-500">Set one available time block for this day.</p>
+                    <p class="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                        <i class="fas fa-info-circle"></i>
+                        <span>One continuous time block per day</span>
+                    </p>
                 </div>
             </template>
         </div>
@@ -531,28 +717,90 @@
         function renderTeachers() {
             const tbody = document.getElementById('teachersTable');
             const count = document.getElementById('teacherCount');
+            
+            // Update stats
+            const totalCount = allTeachers.length;
+            const activeCount = allTeachers.filter(t => t.status === 'Active').length;
+            const inactiveCount = allTeachers.filter(t => t.status === 'Inactive').length;
+            
+            document.getElementById('totalTeachersCount').textContent = totalCount;
+            document.getElementById('activeTeachersCount').textContent = activeCount;
+            document.getElementById('inactiveTeachersCount').textContent = inactiveCount;
+            
             if (!tbody) return;
-            if (count) count.textContent = `${filteredTeachers.length} teacher(s)`;
+            if (count) count.textContent = `${filteredTeachers.length} of ${totalCount} teachers shown`;
+            
             if (!filteredTeachers.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-500"><i class="fas fa-inbox text-2xl mb-2 text-gold-500/50"></i><p>No teachers found.</p></td></tr>';
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <div class="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                                    <i class="fas fa-inbox text-2xl text-slate-400"></i>
+                                </div>
+                                <p class="text-slate-600 font-medium">No teachers found</p>
+                                <p class="text-sm text-slate-400 mt-1">Try adjusting your filters</p>
+                            </div>
+                        </td>
+                    </tr>`;
                 return;
             }
+            
             tbody.innerHTML = filteredTeachers.map(t => {
                 const fullName = `${t.first_name || ''} ${t.last_name || ''}`.trim();
+                const initials = `${(t.first_name || '').charAt(0)}${(t.last_name || '').charAt(0)}`.toUpperCase();
+                const statusColor = t.status === 'Active' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : 'bg-slate-100 text-slate-600 border-slate-200';
+                const statusIcon = t.status === 'Active' 
+                    ? '<i class="fas fa-check-circle mr-1"></i>' 
+                    : '<i class="fas fa-pause-circle mr-1"></i>';
+                
                 return `
-                <tr class="hover:bg-slate-50/80 transition">
+                <tr class="hover:bg-slate-50 transition-colors group">
                     <td class="px-6 py-4">
-                        <div class="font-medium text-slate-900">${esc(fullName || 'N/A')}</div>
-                        <div class="text-sm text-slate-500">${esc(t.email || '')}${t.phone ? ' • ' + esc(t.phone) : ''}</div>
+                        <div class="flex items-center gap-3">
+                            <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                <span class="text-white text-sm font-bold">${esc(initials)}</span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="font-semibold text-slate-900 truncate">${esc(fullName || 'N/A')}</div>
+                                <div class="text-xs text-slate-500 truncate">${esc(t.email || 'No email')}${t.phone ? ' • ' + esc(t.phone) : ''}</div>
+                            </div>
+                        </div>
                     </td>
-                    <td class="px-6 py-4 text-slate-700">${esc(t.specialization || 'General')}</td>
-                    <td class="px-6 py-4 text-slate-700">${esc(t.employment_type || 'Full-time')}</td>
-                    <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs font-semibold border ${statusBadge(t.status)}">${esc(t.status || 'Inactive')}</span></td>
+                    <td class="px-6 py-4">
+                        <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
+                            <i class="fas fa-music text-[10px]"></i>
+                            <span>${esc(t.specialization || 'General')}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-sm text-slate-700">${esc(t.employment_type || 'Full-time')}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColor}">
+                            ${statusIcon}${esc(t.status || 'Inactive')}
+                        </span>
+                    </td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
-                            <button onclick="openEditTeacher(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold">Edit</button>
-                            <button onclick="openTeacherAvailabilityModal(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-bold">Availability</button>
-                            <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" class="px-3 py-1.5 rounded-lg ${t.status === 'Active' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'} text-xs font-bold">${t.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
+                            <button onclick="openEditTeacher(${Number(t.teacher_id)})" 
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition-colors"
+                                title="Edit teacher">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button onclick="openTeacherAvailabilityModal(${Number(t.teacher_id)})" 
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-colors"
+                                title="Manage availability">
+                                <i class="fas fa-calendar-alt"></i> Schedule
+                            </button>
+                            <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" 
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${t.status === 'Active' ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'} text-xs font-bold transition-colors"
+                                title="${t.status === 'Active' ? 'Deactivate' : 'Activate'} teacher">
+                                <i class="fas fa-${t.status === 'Active' ? 'times-circle' : 'check-circle'}"></i>
+                                ${t.status === 'Active' ? 'Deactivate' : 'Activate'}
+                            </button>
                         </div>
                     </td>
                 </tr>`;

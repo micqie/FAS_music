@@ -33,13 +33,20 @@
             max-height: calc(100vh - 1.5rem);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
         .walkin-enrollment-body {
+            display: flex;
+            flex-direction: column;
             min-height: 0;
             overflow-y: auto;
+            overscroll-behavior: contain;
+            padding-bottom: 1rem;
         }
         .walkin-enrollment-grid {
+            flex: 1;
             min-height: 0;
+            overflow-y: auto;
         }
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css"></head>
@@ -93,37 +100,44 @@
     <div class="flex-1 flex flex-col min-w-0">
     <div id="deskTopNavMount"></div>
     <!-- Main Content -->
-    <main class="desk-main flex-1 px-4 sm:px-6 lg:px-8 py-6">
-        <div class="max-w-7xl mx-auto">
-            <div class="mb-6">
-                <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+    <main class="desk-main flex-1 px-3 sm:px-4 lg:px-6 py-4">
+        <div class="max-w-[1680px] mx-auto">
+            <div class="mb-5">
+                <div class="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
                     <div>
-                        <h1 id="sessionsPageTitle" class="text-3xl sm:text-4xl font-bold text-slate-900">Enrollments</h1>
-                        <p id="sessionsPageSubtitle" class="mt-2 text-slate-500">Review portal sign-ups, approve add-on sessions, and keep active students on schedule.</p>
+                        <h1 id="sessionsPageTitle" class="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">Enrollments</h1>
+                        <p id="sessionsPageSubtitle" class="mt-1.5 text-slate-500">Review enrollments, approve add-on sessions, and keep active students on schedule.</p>
                     </div>
                     <div class="text-sm text-slate-500 xl:text-right">
                         <span id="itemsNeedActionCount" class="font-bold text-slate-900">0</span> items need action
                     </div>
                 </div>
-                <div class="mt-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div class="desk-toolbar-pill inline-flex items-center bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm w-fit">
-                        <button id="viewNavPending" class="px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Pending (<span id="pendingTabCount">0</span>)</button>
-                        <button id="viewNavActive" class="px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Active (<span id="activeTabCount">0</span>)</button>
+                <div class="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <div class="desk-toolbar-pill inline-flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm w-fit">
+                        <button id="viewNavPending" class="px-4 py-2 text-sm sm:text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Pending (<span id="pendingTabCount">0</span>)</button>
+                        <button id="viewNavActive" class="px-4 py-2 text-sm sm:text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Active (<span id="activeTabCount">0</span>)</button>
                     </div>
                     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-end w-full xl:w-auto">
                         <div class="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
-                            <div class="relative w-full sm:w-[380px]">
+                            <div class="relative w-full sm:w-[340px]">
                                 <i class="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                <input id="enrollmentSearchInput" type="search" placeholder="Search student, branch, package" class="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                <input id="enrollmentSearchInput" type="search" placeholder="Search student, branch, package" class="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                             </div>
-                            <select id="branchFilter" class="w-full sm:w-52 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
+                            <select id="branchFilter" class="w-full sm:w-48 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
                                 <option value="">All branches</option>
                             </select>
                         </div>
-                        <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-base font-bold rounded-xl shadow-lg shadow-gold-500/20 transition whitespace-nowrap">
+                        <div class="flex flex-wrap items-center gap-3">
+                        <button id="openSessionExtensionRequestsModalBtn" type="button" class="inline-flex items-center gap-2 rounded-2xl border border-gold-200 bg-white px-4 py-2.5 text-sm font-bold text-gold-700 shadow-sm hover:bg-gold-50 transition whitespace-nowrap">
+                            <i class="fas fa-calendar-plus"></i>
+                            Session Extension Requests
+                            <span id="sessionExtensionRequestCount" class="inline-flex items-center justify-center min-w-7 rounded-full bg-gold-100 px-2 py-0.5 text-xs font-black text-gold-700">0</span>
+                        </button>
+                        <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center justify-center px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/20 transition whitespace-nowrap">
                             <i class="fas fa-list-check mr-2"></i>
                             Walk-In Enrollment
                         </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -131,31 +145,10 @@
         <!-- Messages -->
         <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
 
-        <!-- Pending Student Requests -->
-        <section class="mt-2 mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div class="flex flex-col gap-4 px-5 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
-                <div class="flex items-center gap-4">
-                    <label class="inline-flex cursor-pointer items-center gap-3">
-                        <input id="extensionOnlyToggle" type="checkbox" class="peer sr-only">
-                        <span class="relative h-8 w-14 rounded-full border-2 border-gold-500 bg-gold-500/20 transition peer-checked:border-gold-500 peer-checked:bg-gold-500">
-                            <span class="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-6"></span>
-                        </span>
-                    </label>
-                    <div>
-                        <h2 class="text-lg sm:text-xl font-bold text-slate-900">Session extension requests only</h2>
-                        <p class="text-sm text-slate-500">Turn on to focus on add-on session requests.</p>
-                    </div>
-                </div>
-                <span class="inline-flex w-fit items-center rounded-full bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700">
-                    <span id="sessionExtensionRequestCount" class="mr-1">0</span> requests waiting
-                </span>
-            </div>
-        </section>
-
-        <div id="pendingSessionsSection" class="desk-panel bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden mb-6">
-            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
+        <div id="pendingSessionsSection" class="desk-panel bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+            <div class="px-4 py-4 sm:px-5 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between gap-3">
                 <div>
-                    <h3 id="pendingSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Enrollments</h3>
+                    <h3 id="pendingSectionTitle" class="text-lg sm:text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Enrollments</h3>
                     <p class="text-xs text-slate-500 mt-1">Review portal sign-ups before assigning them to a schedule.</p>
                 </div>
                 <span class="text-sm text-slate-600" id="pendingRequestCount">Loading...</span>
@@ -164,17 +157,17 @@
                 <table class="w-full">
                     <thead class="bg-slate-50">
                         <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Requested Package</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Requested Package</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="pendingRequestsTable" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading requests...</p>
                             </td>
@@ -184,60 +177,27 @@
             </div>
         </div>
 
-        <div id="sessionExtensionRequestsSection" class="desk-panel bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden mb-6">
-            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                <div>
-                    <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-calendar-plus mr-2 text-gold-500"></i>Pending Session Extension Requests</h3>
-                    <p class="text-xs text-slate-500 mt-1">₱650 per 1-hour add-on session from the student portal.</p>
-                </div>
-                <span class="text-sm text-slate-600" id="sessionExtensionRequestCountHeader">Loading...</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="sessionExtensionRequestsTable" class="divide-y divide-slate-100">
-                        <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading session extension requests...</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
         <!-- Active Enrollments Table -->
-        <div id="activeSessionsSection" class="desk-panel bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                <h3 id="activeSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-box mr-2 text-gold-500"></i>Active Enrollments</h3>
+        <div id="activeSessionsSection" class="desk-panel bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-4 py-4 sm:px-5 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between gap-3">
+                <h3 id="activeSectionTitle" class="text-lg sm:text-xl font-bold text-slate-800"><i class="fas fa-box mr-2 text-gold-500"></i>Active Enrollments</h3>
                 <span class="text-sm text-slate-600" id="studentCount">Loading...</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-slate-50">
                         <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Enrollment Fee</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Paid</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Balance</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Enrollment Fee</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Paid</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Balance</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="studentsTable" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading active enrollments...</p>
                             </td>
@@ -249,6 +209,47 @@
         </div>
     </main>
     </div>
+    </div>
+
+    <div id="sessionExtensionRequestsModal" class="desk-modal fixed inset-0 z-[1100] hidden items-center justify-center bg-[#1f2430]/70 backdrop-blur-[2px] p-3 sm:p-4">
+        <div class="desk-modal-panel w-full max-w-[1100px] max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col rounded-3xl bg-white shadow-2xl">
+            <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-5">
+                <div>
+                    <h3 class="text-lg sm:text-2xl font-bold text-slate-900">Session Extension Requests</h3>
+                    <p class="text-sm text-slate-500">₱650 per 1-hour add-on session from the student portal.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
+                        <span id="sessionExtensionRequestCountHeader" class="mr-1">0</span> waiting
+                    </span>
+                    <button type="button" id="closeSessionExtensionRequestsModalBtn" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-500 hover:text-slate-700 hover:bg-slate-50" aria-label="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto overflow-y-auto flex-1">
+                <table class="w-full">
+                    <thead class="sticky top-0 bg-slate-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessionExtensionRequestsTable" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading session extension requests...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Assign Package Modal -->
@@ -597,7 +598,7 @@
                                 <span class="walkin-step-badge">2</span>
                                 <h2>What will they learn?</h2>
                             </div>
-                            <p class="walkin-section-copy">Starts with 12 sessions. Add more now, or anytime later.</p>
+                            <p class="walkin-section-copy">Beginner students start with 12 sessions. Returnees can choose 20 or 50 sessions.</p>
 
                             <div class="walkin-learning-card">
                                 <div class="walkin-learning-row">
@@ -615,6 +616,7 @@
                                             <option value="20">20 Sessions</option>
                                             <option value="50">50 Sessions</option>
                                         </select>
+                                        <p class="mt-2 text-xs text-slate-500">Additional sessions are priced at ₱650 each.</p>
                                     </div>
                                 </div>
                             </div>

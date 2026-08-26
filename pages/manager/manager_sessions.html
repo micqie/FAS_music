@@ -36,6 +36,43 @@
             color: #d4af37;
         }
         .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+        
+        /* Action button styles */
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: 1px solid;
+            text-decoration: none;
+        }
+        
+        .action-btn-view {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        
+        .action-btn-view:hover {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+        
+        .action-btn-edit {
+            background-color: #f59e0b;
+            color: white;
+            border-color: #f59e0b;
+        }
+        
+        .action-btn-edit:hover {
+            background-color: #d97706;
+            border-color: #d97706;
+        }
     </style>
     <script src="manager_shared.js" defer></script>
     <link rel="stylesheet" href="../../css/table-responsive.css"></head>
@@ -107,61 +144,69 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="lg:ml-72 pt-28 p-8">
+    <main class="lg:ml-72 pt-28 px-4 sm:px-6 md:px-8 pb-8">
         <div class="max-w-7xl mx-auto">
-            <div class="mb-10">
-                <h1 id="sessionsPageTitle" class="text-3xl font-black text-slate-900 tracking-tight">Sessions</h1>
-                <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
+            <!-- Header -->
+            <div class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                            <i class="fas fa-calendar-check text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 id="sessionsPageTitle" class="text-3xl font-black text-slate-900 tracking-tight">Sessions</h1>
+                            <p id="sessionsPageSubtitle" class="text-sm text-slate-500 mt-0.5">Manage class schedules and attendance</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-semibold text-blue-700 border border-blue-200">
+                        <i class="fas fa-location-dot"></i>
+                        <span id="sessionsBranchName">—</span>
+                    </div>
+                </div>
 
+                <div class="flex flex-col gap-3 xl:items-end">
+                    <div class="inline-flex w-full sm:w-fit items-center gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
+                        <button id="viewNavPending" class="px-5 py-3 text-sm font-semibold rounded-xl text-slate-700 hover:bg-slate-100 transition-colors">
+                            <i class="fas fa-clock mr-1.5"></i>Pending <span id="pendingTabCount" class="ml-2 inline-flex min-w-7 items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">0</span>
+                        </button>
+                        <button id="viewNavActive" class="px-5 py-3 text-sm font-semibold rounded-xl bg-gold-500 text-white shadow">
+                            <i class="fas fa-play-circle mr-1.5"></i>Active <span id="activeTabCount" class="ml-2 inline-flex min-w-7 items-center justify-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">0</span>
+                        </button>
+                        <button id="viewNavCompleted" class="px-5 py-3 text-sm font-semibold rounded-xl text-slate-700 hover:bg-slate-100 transition-colors">
+                            <i class="fas fa-check-circle mr-1.5"></i>Completed <span id="completedTabCount" class="ml-2 inline-flex min-w-7 items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">0</span>
+                        </button>
+                    </div>
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center">
+                        <div class="relative w-full md:w-[390px]">
+                            <i class="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input id="searchInput" type="text" placeholder="Search student, teacher, package" class="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 shadow-sm focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
+                        </div>
+                        <select id="branchFilter" class="w-full md:w-44 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
+                            <option value="">All branches</option>
+                        </select>
+                        <button id="openScheduleSessionBtn" class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-gold-500 to-gold-400 px-5 py-3 text-sm font-bold text-black shadow-lg shadow-gold-500/20 transition hover:from-gold-400 hover:to-gold-500 whitespace-nowrap">
+                            <i class="fas fa-calendar-plus mr-2"></i> Schedule Session
+                        </button>
+                    </div>
+                </div>
             </div>
-
-
-
-
-        <!-- Pending Sessions Table -->
-        <div id="pendingSessionsSection" class="hidden mb-6 bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                <h3 id="pendingSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Student Requests</h3>
-                <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pendingRequestsTable" class="divide-y divide-slate-100">
-                        <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading pending requests...</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
         <!-- Active Sessions Table -->
-        <div id="activeSessionsSection" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                <h3 id="activeSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-box mr-2 text-gold-500"></i>Active Sessions</h3>
-                <span class="text-xs text-slate-500" id="studentCount">Loading...</span>
+            <div id="activeSessionsSection" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <div class="px-5 py-5 sm:px-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between gap-3">
+                <div>
+                    <h3 id="activeSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-box mr-2 text-gold-500"></i>Active Sessions</h3>
+                    <p id="activeSectionSubtitle" class="text-sm text-slate-500 mt-1">Ongoing schedules across every branch.</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700" id="studentCount">0 of 0</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-slate-50">
                         <tr>
                             <th id="activeColStudent" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th id="activeColBranch" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
-                            <th id="activeColPackage" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
-                            <th id="activeColFour" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Schedule</th>
+                            <th id="activeColPackage" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package &amp; Progress</th>
+                            <th id="activeColFour" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Weekly Schedule</th>
                             <th id="activeColFive" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
                             <th id="activeColSix" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
                             <th id="activeColSeven" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
@@ -171,13 +216,78 @@
                         <tr>
                             <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading active sessions...</p>
+                                <p>Loading sessions...</p>
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
+
+        <!-- Pending Sessions Table -->
+        <div id="pendingSessionsSection" class="hidden bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <div class="px-5 py-5 sm:px-6 bg-amber-50/50 border-b border-amber-200 flex items-center justify-between gap-3">
+                <div>
+                    <h3 id="pendingSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-clock mr-2 text-amber-500"></i>Pending Sessions</h3>
+                    <p id="pendingSectionSubtitle" class="text-sm text-slate-500 mt-1">Awaiting schedule assignment.</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-700" id="pendingCount">0 of 0</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th id="pendingColStudent" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th id="pendingColPackage" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                            <th id="pendingColInstrument" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instrument</th>
+                            <th id="pendingColBranch" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
+                            <th id="pendingColStatus" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                            <th id="pendingColActions" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingTable" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading pending sessions...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Completed Sessions Table -->
+        <div id="completedSessionsSection" class="hidden bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <div class="px-5 py-5 sm:px-6 bg-violet-50/50 border-b border-violet-200 flex items-center justify-between gap-3">
+                <div>
+                    <h3 id="completedSectionTitle" class="text-xl font-bold text-slate-800"><i class="fas fa-check-circle mr-2 text-violet-500"></i>Completed Sessions</h3>
+                    <p id="completedSectionSubtitle" class="text-sm text-slate-500 mt-1">Finished sessions.</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-violet-100 px-3 py-1 text-sm font-bold text-violet-700" id="completedCount">0 of 0</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th id="completedColStudent" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
+                            <th id="completedColPackage" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package &amp; Progress</th>
+                            <th id="completedColSchedule" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Schedule</th>
+                            <th id="completedColTeacher" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
+                            <th id="completedColRoom" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
+                            <th id="completedColActions" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="completedTable" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading completed sessions...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </main>
 
@@ -820,55 +930,91 @@
             const view = String(params.get('view') || 'active').toLowerCase();
             const pendingSection = document.getElementById('pendingSessionsSection');
             const activeSection = document.getElementById('activeSessionsSection');
+            const completedSection = document.getElementById('completedSessionsSection');
             const title = document.getElementById('sessionsPageTitle');
             const subtitle = document.getElementById('sessionsPageSubtitle');
 
-            const enrollmentMode = uiIsDesk || managerPageMode === 'enrollments';
-            const baseLabel = enrollmentMode ? 'Enrollments' : 'Sessions';
-            const pendingLabel = enrollmentMode ? 'Pending Enrollments' : 'Pending Sessions';
-            const activeLabel = enrollmentMode ? 'Enrollment Payments' : 'Active Sessions';
-            const pendingSub = enrollmentMode
-                ? 'Review and assign pending enrollment requests'
-                : 'Review and assign pending session requests';
-            const activeSub = enrollmentMode
-                ? 'Review package payment type, paid amount, and remaining balance for active enrollments'
-                : 'Manage active student session assignments';
-            const baseSub = enrollmentMode
-                ? 'Manage pending enrollments and track payment progress'
-                : 'View and manage active enrolled students in your branch.';
+            // Hide all sections first
+            if (pendingSection) pendingSection.classList.add('hidden');
+            if (activeSection) activeSection.classList.add('hidden');
+            if (completedSection) completedSection.classList.add('hidden');
 
-            if (managerPageMode === 'sessions') {
-                if (pendingSection) pendingSection.classList.add('hidden');
-                if (activeSection) activeSection.classList.remove('hidden');
-                if (title) title.textContent = 'Sessions';
-                if (subtitle) subtitle.textContent = baseSub;
-                setSessionNavState('');
-                return;
-            }
-
+            // Show the appropriate section based on view
             if (view === 'pending') {
                 if (pendingSection) pendingSection.classList.remove('hidden');
-                if (activeSection) activeSection.classList.add('hidden');
-                if (title) title.textContent = pendingLabel;
-                if (subtitle) subtitle.textContent = pendingSub;
-                setSessionNavState('pending');
-                return;
-            }
-
-            if (view === 'active') {
-                if (pendingSection) pendingSection.classList.add('hidden');
+                if (title) title.textContent = 'Pending Sessions';
+                if (subtitle) subtitle.textContent = 'Review and assign pending session requests';
+                updateTabNavigation('pending');
+            } else if (view === 'completed') {
+                if (completedSection) completedSection.classList.remove('hidden');
+                if (title) title.textContent = 'Completed Sessions';
+                if (subtitle) subtitle.textContent = 'View finished sessions';
+                updateTabNavigation('completed');
+            } else {
+                // Default to active
                 if (activeSection) activeSection.classList.remove('hidden');
-                if (title) title.textContent = activeLabel;
-                if (subtitle) subtitle.textContent = activeSub;
-                setSessionNavState('active');
-                return;
+                if (title) title.textContent = 'Active Sessions';
+                if (subtitle) subtitle.textContent = 'Manage active student session assignments';
+                updateTabNavigation('active');
             }
+        }
 
-            if (pendingSection) pendingSection.classList.remove('hidden');
-            if (activeSection) activeSection.classList.remove('hidden');
-            if (title) title.textContent = baseLabel;
-            if (subtitle) subtitle.textContent = baseSub;
-            setSessionNavState('');
+        function updateTabNavigation(view) {
+            const pendingBtn = document.getElementById('viewNavPending');
+            const activeBtn = document.getElementById('viewNavActive');
+            const completedBtn = document.getElementById('viewNavCompleted');
+
+            const baseClass = 'px-5 py-3 text-sm font-semibold rounded-xl text-slate-700 hover:bg-slate-100 transition-colors';
+            const activeClass = 'px-5 py-3 text-sm font-semibold rounded-xl bg-gold-500 text-white shadow';
+
+            if (pendingBtn) {
+                pendingBtn.className = view === 'pending' ? activeClass : baseClass;
+            }
+            if (activeBtn) {
+                activeBtn.className = view === 'active' ? activeClass : baseClass;
+            }
+            if (completedBtn) {
+                completedBtn.className = view === 'completed' ? activeClass : baseClass;
+            }
+        }
+
+        function updateSessionStats() {
+            // Count sessions by status
+            let totalSessions = allStudents.length;
+            let pendingCount = 0;
+            let activeCount = 0;
+            let completedCount = 0;
+
+            allStudents.forEach(student => {
+                const status = String(student.enrollment_status || '').toLowerCase();
+                if (status === 'pending') {
+                    pendingCount++;
+                } else if (status === 'active') {
+                    activeCount++;
+                } else if (status === 'completed') {
+                    completedCount++;
+                }
+            });
+
+            // Update stats cards
+            const totalEl = document.getElementById('totalSessionsCount');
+            const pendingEl = document.getElementById('pendingSessionsCount');
+            const activeEl = document.getElementById('activeSessionsCount');
+            const completedEl = document.getElementById('completedSessionsCount');
+
+            if (totalEl) totalEl.textContent = totalSessions;
+            if (pendingEl) pendingEl.textContent = pendingCount;
+            if (activeEl) activeEl.textContent = activeCount;
+            if (completedEl) completedEl.textContent = completedCount;
+
+            // Update tab badges
+            const pendingTabEl = document.getElementById('pendingTabCount');
+            const activeTabEl = document.getElementById('activeTabCount');
+            const completedTabEl = document.getElementById('completedTabCount');
+
+            if (pendingTabEl) pendingTabEl.textContent = pendingCount;
+            if (activeTabEl) activeTabEl.textContent = activeCount;
+            if (completedTabEl) completedTabEl.textContent = completedCount;
         }
 
         async function maybeAutoOpenAssignPackageModalFromUrl() {
@@ -2183,6 +2329,8 @@
                                 ? `${escapeHtml(slot.teacher_first_name || '')} ${escapeHtml(slot.teacher_last_name || '')}`.trim()
                                 : '';
                             const teacherText = slotTeacherName ? ` • ${slotTeacherName}` : '';
+                            const roomName = slot?.room_name ? escapeHtml(slot.room_name) : '';
+                            const roomText = roomName ? ` • ${roomName}` : '';
                             const normalizedStatus = String(slot?.status || '').toLowerCase();
                             const slotDateMs = slot?.session_date ? new Date(`${slot.session_date}T00:00:00`).setHours(0, 0, 0, 0) : NaN;
                             const editableThisSlot = normalizedStatus === 'scheduled' && !Number.isNaN(slotDateMs) && slotDateMs >= todayMs;
@@ -2462,7 +2610,8 @@
                 if (data.success) {
                     closeAssignPackageModal();
                     showMessage('Package assigned successfully.', 'success');
-                    loadActiveStudents();
+                    await loadActiveStudents();
+                    updateSessionStats();
                 } else {
                     showAssignPackageMessage(data.error || 'Failed to assign package.', 'error');
                 }
@@ -2516,8 +2665,10 @@
 
                 const branchNameEl = document.getElementById('managerBranchName');
                 const branchNotice = document.getElementById('managerBranchNotice');
+                const sessionsBranchEl = document.getElementById('sessionsBranchName');
                 if (branchNameEl) branchNameEl.textContent = managerBranchName || '—';
                 if (branchNotice) branchNotice.textContent = managerBranchName || '—';
+                if (sessionsBranchEl) sessionsBranchEl.textContent = managerBranchName || '—';
                 if (window.syncManagerShell) {
                     window.syncManagerShell(displayName, managerBranchName, user.email);
                 }
@@ -2538,6 +2689,7 @@
             }
 
             applySessionView();
+            updateSessionStats(); // Update session counts after loading data
             await maybeAutoOpenAssignPackageModalFromUrl();
             if (managerPageMode === 'enrollments') {
                 await maybeAutoOpenAssignRequestModalFromUrl();
@@ -2554,19 +2706,28 @@
             document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', closeAssignRequestModal);
             document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', closeAssignRequestModal);
             document.getElementById('assignRequestForm')?.addEventListener('submit', submitAssignRequestForm);
+            
+            // Tab navigation for both sessions and enrollments
+            document.getElementById('viewNavPending')?.addEventListener('click', () => {
+                const viewUrl = new URL(window.location.href);
+                viewUrl.searchParams.set('view', 'pending');
+                window.history.replaceState({}, '', viewUrl.toString());
+                applySessionView();
+            });
+            document.getElementById('viewNavActive')?.addEventListener('click', () => {
+                const viewUrl = new URL(window.location.href);
+                viewUrl.searchParams.set('view', 'active');
+                window.history.replaceState({}, '', viewUrl.toString());
+                applySessionView();
+            });
+            document.getElementById('viewNavCompleted')?.addEventListener('click', () => {
+                const viewUrl = new URL(window.location.href);
+                viewUrl.searchParams.set('view', 'completed');
+                window.history.replaceState({}, '', viewUrl.toString());
+                applySessionView();
+            });
+            
             if (managerPageMode === 'enrollments') {
-                document.getElementById('viewNavPending')?.addEventListener('click', () => {
-                    const viewUrl = new URL(window.location.href);
-                    viewUrl.searchParams.set('view', 'pending');
-                    window.history.replaceState({}, '', viewUrl.toString());
-                    applySessionView();
-                });
-                document.getElementById('viewNavActive')?.addEventListener('click', () => {
-                    const viewUrl = new URL(window.location.href);
-                    viewUrl.searchParams.set('view', 'active');
-                    window.history.replaceState({}, '', viewUrl.toString());
-                    applySessionView();
-                });
                 document.getElementById('openWalkinRegistrationModalBtn')?.addEventListener('click', openWalkinRegistrationModal);
                 document.getElementById('closeRegisterStudentModalBtn')?.addEventListener('click', closeWalkinRegistrationModal);
                 document.getElementById('cancelRegisterStudentBtn')?.addEventListener('click', closeWalkinRegistrationModal);
@@ -2581,7 +2742,110 @@
             }
             document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
             document.getElementById('assignRequestDate')?.addEventListener('change', () => loadAssignRequestAvailability());
+            
+            // Convert View Schedule and Edit Schedule text to clickable buttons
+            enhanceScheduleButtons();
         });
+        
+        // Function to enhance schedule action buttons
+        function enhanceScheduleButtons() {
+            // Use MutationObserver to watch for table changes
+            const observer = new MutationObserver(() => {
+                const studentsTable = document.getElementById('studentsTable');
+                if (!studentsTable) return;
+                
+                // Find all action cells
+                const actionCells = studentsTable.querySelectorAll('td');
+                actionCells.forEach(cell => {
+                    const cellText = cell.textContent.trim();
+                    
+                    // Check if cell contains "View Schedule" and hasn't been enhanced yet
+                    if (cellText.includes('View Schedule') && !cell.querySelector('.action-btn-view')) {
+                        const enrollmentId = cell.closest('tr')?.dataset?.enrollmentId;
+                        if (enrollmentId) {
+                            const viewBtn = document.createElement('button');
+                            viewBtn.className = 'action-btn action-btn-view mr-2';
+                            viewBtn.innerHTML = '<i class="fas fa-calendar-alt mr-1"></i> View Schedule';
+                            viewBtn.onclick = () => openSessionScheduleModal(Number(enrollmentId));
+                            cell.innerHTML = '';
+                            cell.appendChild(viewBtn);
+                        }
+                    }
+                    
+                    // Check if cell contains "Edit Schedule" and hasn't been enhanced yet
+                    if (cellText.includes('Edit Schedule') && !cell.querySelector('.action-btn-edit')) {
+                        const enrollmentId = cell.closest('tr')?.dataset?.enrollmentId;
+                        if (enrollmentId) {
+                            const editBtn = document.createElement('button');
+                            editBtn.className = 'action-btn action-btn-edit';
+                            editBtn.innerHTML = '<i class="fas fa-edit mr-1"></i> Edit Schedule';
+                            editBtn.onclick = () => openSessionScheduleModal(Number(enrollmentId), { autoEditFirst: true });
+                            
+                            // If View Schedule button already exists, append Edit button
+                            const viewBtn = cell.querySelector('.action-btn-view');
+                            if (viewBtn) {
+                                cell.appendChild(editBtn);
+                            } else {
+                                cell.innerHTML = '';
+                                cell.appendChild(editBtn);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            const studentsTable = document.getElementById('studentsTable');
+            if (studentsTable) {
+                observer.observe(studentsTable, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true
+                });
+                
+                // Run once immediately
+                enhanceScheduleButtons.process();
+            }
+        }
+        
+        enhanceScheduleButtons.process = function() {
+            const studentsTable = document.getElementById('studentsTable');
+            if (!studentsTable) return;
+            
+            const rows = studentsTable.querySelectorAll('tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const enrollmentId = row.dataset?.enrollmentId;
+                
+                cells.forEach(cell => {
+                    const cellText = cell.textContent.trim();
+                    
+                    // Look for action cells containing schedule buttons
+                    if ((cellText.includes('View Schedule') || cellText.includes('Edit Schedule')) && enrollmentId) {
+                        const hasViewBtn = cellText.includes('View Schedule');
+                        const hasEditBtn = cellText.includes('Edit Schedule');
+                        
+                        cell.innerHTML = '';
+                        cell.style.whiteSpace = 'nowrap';
+                        
+                        if (hasViewBtn) {
+                            const viewBtn = document.createElement('button');
+                            viewBtn.className = 'action-btn action-btn-view mr-2';
+                            viewBtn.innerHTML = '<i class="fas fa-calendar-alt mr-1"></i> View Schedule';
+                            viewBtn.onclick = () => openSessionScheduleModal(Number(enrollmentId));
+                            cell.appendChild(viewBtn);
+                        }
+                        
+                        if (hasEditBtn) {
+                            const editBtn = document.createElement('button');
+                            editBtn.className = 'action-btn action-btn-edit';
+                            editBtn.innerHTML = '<i class="fas fa-edit mr-1"></i> Edit Schedule';
+                            editBtn.onclick = () => openSessionScheduleModal(Number(enrollmentId), { autoEditFirst: true });
+                            cell.appendChild(editBtn);
+                        }
+                    }
+                });
+            });
+        };
     </script>
     <script src="../../js/session_timeout.js"></script>
 </body>

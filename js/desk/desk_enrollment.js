@@ -6,7 +6,7 @@
         let managerPageMode = 'enrollments';
         let allPendingRequests = [];
         let allSessionExtensionRequests = [];
-        let pendingRequestsById = {};
+        let pendingEnrollmentRequestsById = {};
         let assignRequestTeacherCandidates = [];
         let assignRequestInstruments = [];
         let activeAssignRequestSlotRow = null;
@@ -76,11 +76,6 @@
         function getEnrollmentBranchId() {
             const branchFilter = document.getElementById('branchFilter');
             return Number(branchFilter?.value || 0);
-        }
-
-        function getEnrollmentExtensionOnlyState() {
-            const toggle = document.getElementById('extensionOnlyToggle');
-            return Boolean(toggle?.checked);
         }
 
         function matchesEnrollmentSearch(values) {
@@ -307,7 +302,6 @@
             const view = String(params.get('view') || 'active').toLowerCase();
             const pendingSection = document.getElementById('pendingSessionsSection');
             const activeSection = document.getElementById('activeSessionsSection');
-            const extensionSection = document.getElementById('sessionExtensionRequestsSection');
             const title = document.getElementById('sessionsPageTitle');
             const subtitle = document.getElementById('sessionsPageSubtitle');
 
@@ -324,22 +318,10 @@
             const baseSub = enrollmentMode
                 ? 'Manage pending and active enrollments'
                 : 'Manage pending and active sessions';
-            const extensionOnly = getEnrollmentExtensionOnlyState();
-
-            if (extensionOnly) {
-                if (pendingSection) pendingSection.classList.add('hidden');
-                if (activeSection) activeSection.classList.add('hidden');
-                if (extensionSection) extensionSection.classList.remove('hidden');
-                if (title) title.textContent = baseLabel;
-                if (subtitle) subtitle.textContent = 'Showing just the request list - enrollments are hidden.';
-                setSessionNavState('');
-                return;
-            }
 
             if (view === 'pending') {
                 if (pendingSection) pendingSection.classList.remove('hidden');
                 if (activeSection) activeSection.classList.add('hidden');
-                if (extensionSection) extensionSection.classList.remove('hidden');
                 if (title) title.textContent = pendingLabel;
                 if (subtitle) subtitle.textContent = pendingSub;
                 setSessionNavState('pending');
@@ -349,7 +331,6 @@
             if (view === 'active') {
                 if (pendingSection) pendingSection.classList.add('hidden');
                 if (activeSection) activeSection.classList.remove('hidden');
-                if (extensionSection) extensionSection.classList.remove('hidden');
                 if (title) title.textContent = activeLabel;
                 if (subtitle) subtitle.textContent = activeSub;
                 setSessionNavState('active');
@@ -358,7 +339,6 @@
 
             if (pendingSection) pendingSection.classList.remove('hidden');
             if (activeSection) activeSection.classList.remove('hidden');
-            if (extensionSection) extensionSection.classList.remove('hidden');
             if (title) title.textContent = baseLabel;
             if (subtitle) subtitle.textContent = baseSub;
             setSessionNavState('');
@@ -880,17 +860,14 @@
             const defaultPackageId = String(meta.default_package_id || '');
             const studentSkillLevel = String(meta.student_skill_level || '').toLowerCase();
             const previousValue = String(packageSelect.value || '');
-            
-            // Filter packages based on student skill level:
-            // - Beginner students: Only 12-session package
-            // - Non-beginner (Developing, Proficient, Advanced): 12, 20, and 50-session packages
-            const isBeginner = studentSkillLevel === 'beginner' || !studentSkillLevel;
-            const filteredPackages = isBeginner 
-                ? packages.filter(pkg => Number(pkg.sessions || 0) === 12)
-                : packages.filter(pkg => {
+
+            const canAccessExtendedPackages = canAccessExtendedWalkinPackages(meta);
+            const filteredPackages = canAccessExtendedPackages
+                ? packages.filter(pkg => {
                     const sessions = Number(pkg.sessions || 0);
                     return sessions === 12 || sessions === 20 || sessions === 50;
-                });
+                })
+                : packages.filter(pkg => Number(pkg.sessions || 0) === 12);
             
             packageSelect.innerHTML = '<option value="">Select package...</option>' + filteredPackages.map(pkg => {
                 const sessions = Number(pkg.sessions || 0);
@@ -916,9 +893,13 @@
             const latest = meta.latest_request || null;
             const hasPending = latest && String(latest.status || '') === 'Pending';
             if (statusEl) {
-                statusEl.textContent = hasPending
-                    ? 'This student already has a pending enrollment request. Finish that scheduling first before creating another one.'
-                    : 'Student selected. Continue with package, instrument, and payment details.';
+                if (hasPending) {
+                    statusEl.textContent = 'This student already has a pending enrollment request. Finish that scheduling first before creating another one.';
+                } else if (canAccessExtendedPackages) {
+                    statusEl.textContent = 'Returnee student detected. 20-session and 50-session packages are available.';
+                } else {
+                    statusEl.textContent = 'Beginner student selected. Continue with the 12-session package, instrument, and payment details.';
+                }
             }
             if (submitBtn) submitBtn.disabled = hasPending;
             updateWalkinPackageUI();
@@ -1005,6 +986,10 @@
                 <div class="walkin-summary-line">
                     <span>Max instruments</span>
                     <span>${maxInst > 0 ? maxInst : '—'}</span>
+                </div>
+                <div class="walkin-summary-line">
+                    <span>Add-on rate</span>
+                    <span>₱650/session</span>
                 </div>
                 <div class="walkin-summary-total">
                     <span>Total</span>
@@ -1207,6 +1192,16 @@
             return Math.max(1, explicitMax || 1);
         }
 
+        function canAccessExtendedWalkinPackages(meta) {
+            const packageScope = String(meta?.package_scope || '').toLowerCase();
+            const studentSkillLevel = String(meta?.student_skill_level || '').toLowerCase();
+            const isInitialEnrollment = Boolean(meta?.is_initial_enrollment);
+            const isReturnee = packageScope === 'extension' || !isInitialEnrollment;
+            if (isReturnee) return true;
+            if (!studentSkillLevel) return false;
+            return studentSkillLevel !== 'beginner';
+        }
+
         function renderPendingRequests() {
             const tableBody = document.getElementById('pendingRequestsTable');
             const countEl = document.getElementById('pendingRequestCount');
@@ -1227,11 +1222,15 @@
             });
 
             if (countEl) countEl.textContent = `${rows.length} pending`;
+            
+            // Update tab count
+            const pendingTabCountEl = document.getElementById('pendingTabCount');
+            if (pendingTabCountEl) pendingTabCountEl.textContent = String(allPendingRequests.length);
 
             if (!rows.length) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                        <td colspan="6" class="px-4 py-6 text-center text-slate-500">
                             <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
                             <p>No pending enrollment requests.</p>
                         </td>
@@ -1247,22 +1246,22 @@
                     : '—';
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-6 py-4">
-                            <div class="font-semibold text-base text-slate-900">${studentName || 'Student'}</div>
-                            <div class="text-base text-slate-600">${escapeHtml(r.email || '')}</div>
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-sm sm:text-base text-slate-900">${studentName || 'Student'}</div>
+                            <div class="text-sm sm:text-base text-slate-600">${escapeHtml(r.email || '')}</div>
                             <div class="text-sm text-slate-500">${escapeHtml(r.branch_name || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-base text-slate-700">${pkg}</td>
-                        <td class="px-6 py-4 text-base text-slate-700">${instruments}</td>
-                        <td class="px-6 py-4 text-base text-slate-700">Based on instructor availability</td>
-                        <td class="px-6 py-4 text-base text-slate-700">
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${pkg}</td>
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${instruments}</td>
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">Based on instructor availability</td>
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">
                             <div class="space-y-2">
                                 <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 transition">
                                     Payment Info
                                 </button>
                             </div>
                         </td>
-                        <td class="px-6 py-4">
+                        <td class="px-4 py-3">
                             <div class="flex flex-wrap items-center gap-2">
                                 <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-bold">
                                     View
@@ -1292,9 +1291,9 @@
                 const response = await axios.get(url);
                 const data = response.data || {};
                 allPendingRequests = data.success && Array.isArray(data.requests) ? data.requests : [];
-                pendingRequestsById = {};
+                pendingEnrollmentRequestsById = {};
                 allPendingRequests.forEach(r => {
-                    pendingRequestsById[String(r.request_id)] = r;
+                    pendingEnrollmentRequestsById[String(r.request_id)] = r;
                 });
                 updateEnrollmentSummary();
                 renderPendingRequests();
@@ -1306,7 +1305,7 @@
                 if (tableBody) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-red-500">
+                            <td colspan="6" class="px-4 py-6 text-center text-red-500">
                                 <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                                 <p>Failed to load pending requests.</p>
                             </td>
@@ -1341,7 +1340,7 @@
                 if (countEl) countEl.textContent = 'Error';
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-red-500">
+                        <td colspan="7" class="px-4 py-6 text-center text-red-500">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Failed to load session extension requests.</p>
                         </td>
@@ -1374,7 +1373,7 @@
             if (!rows.length) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                        <td colspan="7" class="px-4 py-6 text-center text-slate-500">
                             <i class="fas fa-calendar-plus text-2xl mb-2 text-gold-500/60"></i>
                             <p>No pending session extension requests.</p>
                         </td>
@@ -1394,27 +1393,45 @@
                     : '<span class="text-xs text-slate-400">No proof</span>';
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-6 py-4">
-                            <div class="font-semibold text-base text-slate-900">${studentName}</div>
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-sm sm:text-base text-slate-900">${studentName}</div>
                             <div class="text-sm text-slate-500">${escapeHtml(req.email || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-base text-slate-700">${escapeHtml(req.branch_name || '')}</td>
-                        <td class="px-6 py-4 text-base text-slate-700">${schedule}</td>
-                        <td class="px-6 py-4 text-base text-slate-700">
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${escapeHtml(req.branch_name || '')}</td>
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${schedule}</td>
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">
                             <div>${paymentMethod}</div>
                             <div class="mt-1">${proofLink}</div>
                         </td>
-                        <td class="px-6 py-4 text-base text-slate-700">${amount}</td>
-                        <td class="px-6 py-4">
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${amount}</td>
+                        <td class="px-4 py-3">
                             <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">Pending</span>
                         </td>
-                        <td class="px-6 py-4">
+                        <td class="px-4 py-3">
                             <button type="button" onclick="approveSessionExtensionRequest(${Number(req.request_id)})" class="px-4 py-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-sm font-bold">
                                 Approve
                             </button>
                         </td>
                     </tr>`;
             }).join('');
+        }
+
+        async function openSessionExtensionRequestsModal() {
+            const modal = document.getElementById('sessionExtensionRequestsModal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+            await loadPendingSessionExtensionRequests();
+            renderSessionExtensionRequests();
+        }
+
+        function closeSessionExtensionRequestsModal() {
+            const modal = document.getElementById('sessionExtensionRequestsModal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = '';
         }
 
         async function approveSessionExtensionRequest(requestId) {
@@ -1463,7 +1480,7 @@
         };
 
         function openPendingRequestViewModal(requestId) {
-            const req = pendingRequestsById[String(requestId)];
+            const req = pendingEnrollmentRequestsById[String(requestId)];
             if (!req) {
                 showMessage('Request not found.', 'error');
                 return;
@@ -1615,9 +1632,7 @@
             const options = teachers.length
                 ? teachers.map(teacher => {
                     const selected = Number(teacher.teacher_id) === Number(teacherIdToUse);
-                    const label = teacher.specialization
-                        ? `${teacher.teacher_name} • ${teacher.specialization}`
-                        : teacher.teacher_name;
+                    const label = teacher.teacher_name;
                     return `<option value="${Number(teacher.teacher_id)}"${selected ? ' selected' : ''}>${escapeHtml(label || 'Teacher')}</option>`;
                 }).join('')
                 : '<option value="">No matching teacher found</option>';
@@ -1746,7 +1761,7 @@
         }
 
         function openPendingRequestPaymentModal(requestId) {
-            const req = pendingRequestsById[String(requestId)];
+            const req = pendingEnrollmentRequestsById[String(requestId)];
             if (!req) {
                 showMessage('Payment details not found.', 'error');
                 return;
@@ -2202,7 +2217,7 @@
                 if (selectedDate) params.append('start_date', selectedDate);
 
                 const response = await axios.get(`${baseApiUrl}/students.php?${params.toString()}`, {
-                    timeout: 8000
+                    timeout: 30000 // Increased to 30 seconds for complex availability queries
                 });
                 if (requestToken !== assignRequestAvailabilityRequestToken) return;
                 const data = response.data || {};
@@ -2215,6 +2230,8 @@
                 
                 console.error('Failed to load availability:', error);
                 const status = Number(error?.response?.status || 0);
+                const isTimeout = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout');
+                
                 if (status === 403) {
                     listEl.innerHTML = `
                         <div class="flex items-center justify-center h-64">
@@ -2229,6 +2246,24 @@
                     `;
                     return;
                 }
+                
+                if (isTimeout) {
+                    listEl.innerHTML = `
+                        <div class="flex items-center justify-center h-64">
+                            <div class="text-center max-w-sm px-4">
+                                <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-50 text-amber-600 mb-3">
+                                    <i class="fas fa-clock text-xl"></i>
+                                </div>
+                                <p class="text-sm font-semibold text-slate-800">Loading is taking longer than expected.</p>
+                                <p class="text-xs text-slate-500 mt-1">The teacher's schedule is being calculated. Please try again in a moment.</p>
+                                <button onclick="loadAssignRequestAvailability()" class="mt-3 px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-600 text-white text-sm font-semibold transition">
+                                    Retry
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
 
                 listEl.innerHTML = `
                     <div class="flex items-center justify-center h-64">
@@ -2238,6 +2273,9 @@
                             </div>
                             <p class="text-sm font-semibold text-slate-800">Unable to load schedule.</p>
                             <p class="text-xs text-slate-500 mt-1">Check your connection and try again.</p>
+                            <button onclick="loadAssignRequestAvailability()" class="mt-3 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition">
+                                Retry
+                            </button>
                         </div>
                     </div>
                 `;
@@ -2245,7 +2283,7 @@
         }
 
         async function openAssignRequestModal(requestId) {
-            const req = pendingRequestsById[String(requestId)];
+            const req = pendingEnrollmentRequestsById[String(requestId)];
             if (!req) {
                 showMessage('Request not found.', 'error');
                 return;
@@ -2472,21 +2510,23 @@
                     allStudents = data.enrollments;
                     renderStudents(tableBody);
                     if (countEl) countEl.textContent = `${data.enrollments.length} active`;
+                    updateEnrollmentSummary(); // Update tab counts
                 } else {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">
                                 <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
                                 <p>${uiIsDesk ? 'No active enrollments found.' : 'No active sessions found.'}</p>
                             </td>
                         </tr>`;
                     if (countEl) countEl.textContent = '0 active';
+                    updateEnrollmentSummary(); // Update tab counts even when empty
                 }
             } catch (error) {
                 console.error('Failed to load active sessions:', error);
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
+                        <td colspan="6" class="px-4 py-6 text-center text-red-500">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Failed to load active enrollments. Please try again.</p>
                         </td>
@@ -2510,11 +2550,15 @@
 
             const countEl = document.getElementById('studentCount');
             if (countEl) countEl.textContent = `${rows.length} active`;
+            
+            // Update tab count
+            const activeTabCountEl = document.getElementById('activeTabCount');
+            if (activeTabCountEl) activeTabCountEl.textContent = String(allStudents.length);
 
             if (!rows.length) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                        <td colspan="6" class="px-4 py-6 text-center text-slate-500">
                             <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
                             <p>No active enrollments found.</p>
                         </td>
@@ -2530,15 +2574,15 @@
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-6 py-4">
-                            <div class="font-semibold text-base text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
-                            <div class="text-base text-slate-600">${escapeHtml(student.email || '')}</div>
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-sm sm:text-base text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
+                            <div class="text-sm sm:text-base text-slate-600">${escapeHtml(student.email || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-base text-slate-700">${escapeHtml(packageName)}</td>
-                        <td class="px-6 py-4 text-base text-slate-700 font-semibold">${formatCurrencyPHP(totalAmount)}</td>
-                        <td class="px-6 py-4 text-base text-emerald-700 font-semibold">${formatCurrencyPHP(paidAmount)}</td>
-                        <td class="px-6 py-4 text-base ${balance > 0 ? 'text-red-600' : 'text-slate-700'} font-semibold">${formatCurrencyPHP(balance)}</td>
-                        <td class="px-6 py-4">
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${escapeHtml(packageName)}</td>
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700 font-semibold">${formatCurrencyPHP(totalAmount)}</td>
+                        <td class="px-4 py-3 text-sm sm:text-base text-emerald-700 font-semibold">${formatCurrencyPHP(paidAmount)}</td>
+                        <td class="px-4 py-3 text-sm sm:text-base ${balance > 0 ? 'text-red-600' : 'text-slate-700'} font-semibold">${formatCurrencyPHP(balance)}</td>
+                        <td class="px-4 py-3">
                             <button type="button" class="px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-sm font-bold" onclick="openEnrollmentDetailsModal(${Number(student.enrollment_id)})">
                                 More Details
                             </button>
@@ -2877,6 +2921,13 @@
                 window.history.replaceState({}, '', viewUrl.toString());
                 applySessionView();
             });
+            document.getElementById('openSessionExtensionRequestsModalBtn')?.addEventListener('click', openSessionExtensionRequestsModal);
+            document.getElementById('closeSessionExtensionRequestsModalBtn')?.addEventListener('click', closeSessionExtensionRequestsModal);
+            document.getElementById('sessionExtensionRequestsModal')?.addEventListener('click', (event) => {
+                if (event.target?.id === 'sessionExtensionRequestsModal') {
+                    closeSessionExtensionRequestsModal();
+                }
+            });
             document.getElementById('branchFilter')?.addEventListener('change', () => {
                 loadPendingRequests();
                 loadPendingSessionExtensionRequests();
@@ -2888,9 +2939,6 @@
                 renderSessionExtensionRequests();
                 renderStudents(document.getElementById('studentsTable'));
                 updateEnrollmentSummary();
-            });
-            document.getElementById('extensionOnlyToggle')?.addEventListener('change', () => {
-                applySessionView();
             });
             document.getElementById('openWalkinRegistrationModalBtn')?.addEventListener('click', openWalkinRegistrationModal);
             document.getElementById('closeRegisterStudentModalBtn')?.addEventListener('click', closeWalkinRegistrationModal);

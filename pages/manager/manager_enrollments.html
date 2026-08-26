@@ -121,11 +121,7 @@
                         <button id="viewNavPending" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Pending</button>
                         <button id="viewNavActive" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition">Active</button>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <button id="openWalkinRegistrationModalBtn" class="inline-flex items-center px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition">
-                            <i class="fas fa-user-plus mr-2"></i>
-                            Walk-In Registration
-                        </button>
+                    <div class="flex flex-wrap items-center gap-2"></div>
                         <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/20 transition">
                             <i class="fas fa-list-check mr-2"></i>
                             Walk-In Enrollment
@@ -2365,7 +2361,7 @@
                 window.history.replaceState({}, '', viewUrl.toString());
                 applySessionView();
             });
-            document.getElementById('openWalkinRegistrationModalBtn')?.addEventListener('click', openWalkinRegistrationModal);
+
             document.getElementById('closeRegisterStudentModalBtn')?.addEventListener('click', closeWalkinRegistrationModal);
             document.getElementById('cancelRegisterStudentBtn')?.addEventListener('click', closeWalkinRegistrationModal);
             document.getElementById('openWalkinEnrollmentModalBtn')?.addEventListener('click', openWalkinEnrollmentModal);

@@ -374,15 +374,27 @@
         let walkinStudents = [];
         let walkinMeta = null;
         let walkinStudentLookup = new Map();
+        let walkinAllBranches = [];
+
+        async function loadWalkinBranches() {
+            try {
+                const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
+                const data = response.data;
+                walkinAllBranches = data.success && Array.isArray(data.branches) ? data.branches : [];
+                const branchSelect = document.getElementById('walkinBranchSelect');
+                if (branchSelect) {
+                    branchSelect.innerHTML = '<option value="">Select branch...</option>' + walkinAllBranches.map(b => {
+                        return `<option value="${escapeHtml(String(b.branch_id || ''))}">${escapeHtml(b.branch_name || 'Branch')}</option>`;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load branches for walk-in:', error);
+            }
+        }
 
         async function loadWalkinStudents() {
             try {
-                const branchFilter = document.getElementById('branchFilter');
-                let url = `${baseApiUrl}/students.php?action=get-active-students`;
-                if (branchFilter && branchFilter.value) {
-                    url += `&branch_id=${branchFilter.value}`;
-                }
-                const response = await axios.get(url);
+                const response = await axios.get(`${baseApiUrl}/students.php?action=get-active-students`);
                 const data = response.data;
                 const students = data.success && Array.isArray(data.students) ? data.students : [];
                 walkinStudents = students.filter(s => {
@@ -665,4 +677,48 @@
                 loadPendingEnrollmentSummary();
                 loadActiveEnrollments();
             });
+
+            // Walk-in enrollment modal
+            document.getElementById('openWalkinEnrollmentModalBtn')?.addEventListener('click', () => {
+                openWalkinEnrollmentModal();
+            });
+            document.getElementById('closeWalkinEnrollmentModalBtn')?.addEventListener('click', () => {
+                closeWalkinEnrollmentModal();
+            });
+            document.getElementById('cancelWalkinEnrollmentBtn')?.addEventListener('click', () => {
+                closeWalkinEnrollmentModal();
+            });
+
+            loadWalkinBranches();
+            loadWalkinStudents();
         });
+
+        function openWalkinEnrollmentModal() {
+            const modal = document.getElementById('walkinEnrollmentModal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            loadWalkinBranches();
+            loadWalkinStudents();
+        }
+
+        function closeWalkinEnrollmentModal() {
+            const modal = document.getElementById('walkinEnrollmentModal');
+            const form = document.getElementById('walkinEnrollmentForm');
+            const msg = document.getElementById('walkinEnrollmentMessage');
+            const submitBtn = document.getElementById('submitWalkinEnrollmentBtn');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            if (form) form.reset();
+            if (msg) msg.classList.add('hidden');
+            if (submitBtn) submitBtn.disabled = false;
+            walkinMeta = null;
+            const searchInput = document.getElementById('walkinStudentSearch');
+            const hiddenSelect = document.getElementById('walkinStudentSelect');
+            if (searchInput) searchInput.value = '';
+            if (hiddenSelect) hiddenSelect.value = '';
+            const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
+            if (instrumentsContainer) instrumentsContainer.innerHTML = '<div class="text-sm text-slate-500">Select a student first.</div>';
+        }
