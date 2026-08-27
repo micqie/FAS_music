@@ -89,14 +89,15 @@
             <!-- Header -->
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">My Students</h1>
-                    <p id="studentsSummaryBar" class="text-slate-500 mt-0.5 text-sm">Loading...</p>
+                    <h1 class="text-2xl sm:text-3xl mt-7 font-black text-slate-900 tracking-tight ">My Students</h1>
+
                 </div>
+
                 <!-- Search -->
                 <div class="relative w-full sm:w-64">
-                    <i class="fas fa-search text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 text-sm"></i>
+                    <i class="fas fa-search text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 text-sm mt-3"></i>
                     <input id="studentSearch" type="text" placeholder="Search by name or instrument…"
-                        class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40 transition">
+                        class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/40 transition mt-7">
                 </div>
             </div>
 
@@ -107,6 +108,10 @@
                     <p class="text-sm text-slate-500">Loading students...</p>
                 </div>
             </div>
+
+                     <span id="studentsSummaryBar" class="text-slate-500 mt-7 mr-70 text-sm">
+                        Loading...
+                    </span>
 
             <!-- Student list table (works on all screen sizes) -->
             <div id="studentsTableWrap" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden soft-shadow">
