@@ -7,7 +7,7 @@
 body { font-family: 'Inter', sans-serif; }
 
 .dark-glass {
-    background: rgba(15, 17, 21, 0.92);
+    background: #0f1115;
     backdrop-filter: blur(10px);
 }
 .soft-shadow { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12); }

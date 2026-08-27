@@ -87,7 +87,7 @@
                         </div>
                     </div>
                 </summary>
-                <div class="absolute right-0 mt-3 w-60 rounded-2xl border border-white/10 bg-[#0f1115]/98 backdrop-blur-md shadow-2xl overflow-hidden
+                <div class="absolute right-0 mt-3 w-60 rounded-2xl border border-white/10 bg-[#0f1115] backdrop-blur-md shadow-2xl overflow-hidden
                             opacity-0 pointer-events-none
                             group-open/instr-profile:opacity-100 group-open/instr-profile:pointer-events-auto
                             transition-all duration-150 z-50">

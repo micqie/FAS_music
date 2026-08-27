@@ -3817,6 +3817,183 @@ function renderGuardianAbsenceStudentOptions(items) {
     }).join('');
 }
 
+function getGuardianAbsenceStudentSummary(item, index) {
+    const student = item?.student || {};
+    const studentId = Number(student.student_id || 0);
+    const studentName = getGuardianStudentName(item, index);
+    const nextSession = formatGuardianNextSessionLabel(item);
+    const statusMetrics = getGuardianSessionStatusMetrics(item);
+    const packageName = item?.current_enrollment?.package_name || student.package_name || 'No package';
+    return {
+        studentId,
+        studentName,
+        nextSession,
+        packageName,
+        upcoming: statusMetrics.upcoming
+    };
+}
+
+function renderGuardianAbsenceStudentChoice(item, index, isSelected = false) {
+    const summary = getGuardianAbsenceStudentSummary(item, index);
+    return `
+        <button
+            type="button"
+            class="guardian-absence-student-choice w-full rounded-2xl border px-4 py-3 text-left transition ${isSelected ? 'border-gold-300 bg-gold-50 dark:border-gold-500/30 dark:bg-gold-500/10' : 'border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 hover:border-gold-200'}"
+            data-student-id="${summary.studentId}"
+        >
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="text-sm font-bold text-zinc-900 dark:text-white">${escapeHtml(summary.studentName)}</div>
+                    <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">${escapeHtml(summary.packageName)}</div>
+                </div>
+                <span class="rounded-full border px-2.5 py-1 text-[10px] font-bold ${isSelected ? 'border-gold-300 bg-white text-gold-700 dark:border-gold-500/30 dark:bg-black/20 dark:text-gold-300' : 'border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-white/10 dark:bg-black/20 dark:text-zinc-300'}">
+                    ${summary.upcoming} upcoming
+                </span>
+            </div>
+            <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">${escapeHtml(summary.nextSession)}</div>
+        </button>
+    `;
+}
+
+function renderGuardianAbsenceStudentCards(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) {
+        return `
+            <div class="rounded-3xl border border-dashed border-zinc-200 dark:border-white/10 px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                No linked students found.
+            </div>
+        `;
+    }
+
+    return rows.map((item, index) => {
+        const summary = getGuardianAbsenceStudentSummary(item, index);
+        const statusClass = summary.upcoming > 0
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300'
+            : 'border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-white/10 dark:bg-black/20 dark:text-zinc-300';
+        return `
+            <button
+                type="button"
+                class="guardian-absence-card w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-4 text-left transition hover:border-gold-300 hover:shadow-sm"
+                data-student-id="${summary.studentId}"
+                data-student-name="${escapeHtml(summary.studentName)}"
+            >
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="text-sm font-bold text-zinc-900 dark:text-white">${escapeHtml(summary.studentName)}</div>
+                        <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">${escapeHtml(summary.packageName)}</div>
+                    </div>
+                    <span class="rounded-full border px-2.5 py-1 text-[10px] font-bold ${statusClass}">
+                        ${summary.upcoming} upcoming
+                    </span>
+                </div>
+                <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">${escapeHtml(summary.nextSession)}</div>
+                <div class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-gold-600 dark:text-gold-300">
+                    <i class="fas fa-paper-plane"></i> Request absence
+                </div>
+            </button>
+        `;
+    }).join('');
+}
+
+async function openGuardianAbsenceStudentPicker(items, currentStudentId = '') {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) {
+        showMessage('No linked students found.', 'error');
+        return null;
+    }
+
+    let selectedStudentId = String(currentStudentId || rows[0]?.student?.student_id || '');
+
+    const result = await Swal.fire({
+        title: 'Choose student',
+        width: 620,
+        showCancelButton: true,
+        confirmButtonText: 'Use student',
+        cancelButtonText: 'Close',
+        confirmButtonColor: '#b8860b',
+        cancelButtonColor: '#6b7280',
+        html: `
+            <div class="text-left">
+                <div class="mb-3 text-sm text-zinc-500 dark:text-zinc-400">Select the child you want to mark absent.</div>
+                <div id="guardianAbsenceStudentPicker" class="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+                    ${rows.map((item, index) => renderGuardianAbsenceStudentChoice(item, index, String(item?.student?.student_id || '') === selectedStudentId)).join('')}
+                </div>
+            </div>
+        `,
+        didOpen: () => {
+            const popup = Swal.getPopup();
+            const picker = popup?.querySelector('#guardianAbsenceStudentPicker');
+            picker?.querySelectorAll('.guardian-absence-student-choice').forEach((button) => {
+                button.addEventListener('click', () => {
+                    selectedStudentId = String(button.dataset.studentId || '');
+                    picker.querySelectorAll('.guardian-absence-student-choice').forEach((item) => {
+                        const isActive = String(item.dataset.studentId || '') === selectedStudentId;
+                        item.classList.toggle('border-gold-300', isActive);
+                        item.classList.toggle('bg-gold-50', isActive);
+                        item.classList.toggle('dark:border-gold-500/30', isActive);
+                        item.classList.toggle('dark:bg-gold-500/10', isActive);
+                        item.classList.toggle('border-zinc-200', !isActive);
+                        item.classList.toggle('bg-white', !isActive);
+                        item.classList.toggle('dark:border-white/10', !isActive);
+                        item.classList.toggle('dark:bg-white/5', !isActive);
+                    });
+                });
+            });
+        },
+        preConfirm: () => {
+            if (!selectedStudentId) {
+                Swal.showValidationMessage('Please choose a student.');
+                return false;
+            }
+            return selectedStudentId;
+        }
+    });
+
+    if (!result.isConfirmed || !result.value) {
+        return null;
+    }
+
+    return String(result.value);
+}
+
+function openAbsenceModal(studentId, studentName = '') {
+    const modal = document.getElementById('absenceRequestModal');
+    const hiddenStudentId = document.getElementById('selectedStudentId');
+    const modalStudentName = document.getElementById('modalStudentName');
+    const dateInput = document.getElementById('guardianAbsenceSessionDate');
+    const reasonInput = document.getElementById('guardianAbsenceReason');
+    const notesInput = document.getElementById('guardianAbsenceNotes');
+    if (!modal || !hiddenStudentId || !modalStudentName) return;
+
+    hiddenStudentId.value = String(studentId || '');
+    const matchIndex = Array.isArray(guardianPortalStudents)
+        ? guardianPortalStudents.findIndex((item, index) => String(getGuardianAbsenceStudentSummary(item, index).studentId) === String(studentId))
+        : -1;
+    const student = matchIndex >= 0 ? guardianPortalStudents[matchIndex] : null;
+    const resolvedName = studentName || (student ? getGuardianAbsenceStudentSummary(student, matchIndex).studentName : 'Student');
+    modalStudentName.textContent = resolvedName;
+    if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().slice(0, 10);
+    }
+    if (reasonInput) reasonInput.value = '';
+    if (notesInput) notesInput.value = '';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.classList.add('overflow-hidden');
+}
+
+function closeAbsenceModal() {
+    const modal = document.getElementById('absenceRequestModal');
+    const hiddenStudentId = document.getElementById('selectedStudentId');
+    const modalStudentName = document.getElementById('modalStudentName');
+    if (!modal) return;
+    if (hiddenStudentId) hiddenStudentId.value = '';
+    if (modalStudentName) modalStudentName.textContent = '';
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.classList.remove('overflow-hidden');
+}
+
 function renderGuardianAbsenceRequests(items) {
     const rows = Array.isArray(items) ? items : [];
     if (!rows.length) {
@@ -4676,20 +4853,14 @@ async function guardianRegisterNewStudent() {
                                             </button>
                                         </div>
                                         <div class="md:col-span-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3">
-                                            <div class="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400 mb-2">Password checker</div>
-                                            <div class="space-y-1.5 text-xs">
-                                                <div id="guardian-pass-req-length" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>At least 8 characters</span></div>
-                                                <div id="guardian-pass-req-uppercase" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>One uppercase letter</span></div>
-                                                <div id="guardian-pass-req-lowercase" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>One lowercase letter</span></div>
-                                                <div id="guardian-pass-req-number" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>One number</span></div>
-                                                <div id="guardian-pass-req-special" class="flex items-center gap-2 text-zinc-500 dark:text-zinc-300"><i class="fas fa-circle text-zinc-400"></i><span>One special character (!@#$%^&*)</span></div>
-                                                <div id="guardian-pass-match" class="pt-1 text-xs"></div>
+                                            <div class="flex gap-1">
+                                                <div id="guardian-pass-bar-1" class="h-1 flex-1 rounded bg-zinc-200"></div>
+                                                <div id="guardian-pass-bar-2" class="h-1 flex-1 rounded bg-zinc-200"></div>
+                                                <div id="guardian-pass-bar-3" class="h-1 flex-1 rounded bg-zinc-200"></div>
+                                                <div id="guardian-pass-bar-4" class="h-1 flex-1 rounded bg-zinc-200"></div>
                                             </div>
-                                        </div>
-                                        <div class="rounded-xl border border-dashed border-gold-300 bg-gold-50/70 dark:bg-gold-500/10 px-4 py-3">
-                                            <div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Guardian Email</div>
-                                            <div class="mt-1 text-sm text-zinc-700 dark:text-zinc-200 break-words">${escapeHtml(guardianEmail || 'No guardian email found')}</div>
-                                            <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">This account will be linked automatically.</div>
+                                            <p id="guardian-pass-strength" class="mt-1 text-xs text-zinc-500">Password strength</p>
+                                            <p id="guardian-pass-match" class="mt-1 text-xs"></p>
                                         </div>
                                         <div class="md:col-span-2">
                                             <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Branch</label>
@@ -4751,58 +4922,75 @@ async function guardianRegisterNewStudent() {
             const ageInput = document.getElementById('guardian-new-age');
             const passwordInput = document.getElementById('guardian-new-password');
             const confirmInput = document.getElementById('guardian-new-password-confirm');
+            const strengthText = document.getElementById('guardian-pass-strength');
+            const matchText = document.getElementById('guardian-pass-match');
+            const bars = [
+                document.getElementById('guardian-pass-bar-1'),
+                document.getElementById('guardian-pass-bar-2'),
+                document.getElementById('guardian-pass-bar-3'),
+                document.getElementById('guardian-pass-bar-4')
+            ];
             const updateGuardianAge = () => {
                 if (!dobInput || !ageInput) return;
                 const age = calculateAgeFromBirthdate(dobInput.value);
                 ageInput.value = age === null || age < 0 ? '' : `${age} years old`;
             };
-            const updatePasswordRequirement = (id, met) => {
-                const element = document.getElementById(id);
-                if (!element) return;
-                const icon = element.querySelector('i');
-                if (!icon) return;
-
-                if (met) {
-                    icon.classList.remove('fa-circle', 'text-zinc-400');
-                    icon.classList.add('fa-check-circle', 'text-green-500');
-                    element.classList.remove('text-zinc-500', 'dark:text-zinc-300');
-                    element.classList.add('text-zinc-700', 'dark:text-zinc-100');
-                } else {
-                    icon.classList.remove('fa-check-circle', 'text-green-500');
-                    icon.classList.add('fa-circle', 'text-zinc-400');
-                    element.classList.add('text-zinc-500', 'dark:text-zinc-300');
-                    element.classList.remove('text-zinc-700', 'dark:text-zinc-100');
-                }
+            const resetBars = () => {
+                bars.forEach((bar) => {
+                    if (bar) bar.className = 'h-1 flex-1 rounded bg-zinc-200';
+                });
             };
             const updateGuardianPasswordChecker = () => {
                 const password = String(passwordInput?.value || '');
                 const confirm = String(confirmInput?.value || '');
-                const hasPassword = password.length > 0;
-                const requirements = {
-                    length: password.length >= 8,
-                    uppercase: /[A-Z]/.test(password),
-                    lowercase: /[a-z]/.test(password),
-                    number: /[0-9]/.test(password),
-                    special: /[!@#$%^&*]/.test(password)
-                };
+                let score = 0;
+                if (password.length >= 8) score++;
+                if (/[A-Z]/.test(password)) score++;
+                if (/[a-z]/.test(password)) score++;
+                if (/[0-9]/.test(password)) score++;
+                if (/[!@#$%^&*]/.test(password)) score++;
 
-                updatePasswordRequirement('guardian-pass-req-length', requirements.length);
-                updatePasswordRequirement('guardian-pass-req-uppercase', requirements.uppercase);
-                updatePasswordRequirement('guardian-pass-req-lowercase', requirements.lowercase);
-                updatePasswordRequirement('guardian-pass-req-number', requirements.number);
-                updatePasswordRequirement('guardian-pass-req-special', requirements.special);
+                resetBars();
 
-                const matchDiv = document.getElementById('guardian-pass-match');
-                if (matchDiv) {
-                    if (!hasPassword && !confirm) {
-                        matchDiv.textContent = '';
-                        matchDiv.className = 'pt-1 text-xs';
+                if (!password) {
+                    if (strengthText) {
+                        strengthText.textContent = 'Password strength';
+                        strengthText.className = 'mt-1 text-xs text-zinc-500';
+                    }
+                } else if (score <= 2) {
+                    if (strengthText) {
+                        strengthText.textContent = 'Weak password';
+                        strengthText.className = 'mt-1 text-xs text-red-500';
+                    }
+                    if (bars[0]) bars[0].classList.replace('bg-zinc-200', 'bg-red-500');
+                } else if (score <= 4) {
+                    if (strengthText) {
+                        strengthText.textContent = 'Medium password';
+                        strengthText.className = 'mt-1 text-xs text-yellow-600';
+                    }
+                    bars.slice(0, 3).forEach((bar) => {
+                        if (bar) bar.classList.replace('bg-zinc-200', 'bg-yellow-500');
+                    });
+                } else {
+                    if (strengthText) {
+                        strengthText.textContent = 'Strong password';
+                        strengthText.className = 'mt-1 text-xs text-green-600';
+                    }
+                    bars.forEach((bar) => {
+                        if (bar) bar.classList.replace('bg-zinc-200', 'bg-green-500');
+                    });
+                }
+
+                if (matchText) {
+                    if (!password && !confirm) {
+                        matchText.textContent = '';
+                        matchText.className = 'mt-1 text-xs';
                     } else if (password === confirm) {
-                        matchDiv.textContent = 'Passwords match';
-                        matchDiv.className = 'pt-1 text-xs text-green-500';
+                        matchText.textContent = 'Passwords match';
+                        matchText.className = 'mt-1 text-xs text-green-600';
                     } else {
-                        matchDiv.textContent = 'Passwords do not match';
-                        matchDiv.className = 'pt-1 text-xs text-red-500';
+                        matchText.textContent = 'Passwords do not match';
+                        matchText.className = 'mt-1 text-xs text-red-500';
                     }
                 }
             };
@@ -5194,15 +5382,32 @@ async function initGuardianAbsencePage() {
     setText('guardianAbsencePendingCount', String(requestRows.filter((row) => String(row.status || '').toLowerCase() === 'pending').length));
     setHtml('guardianAbsenceRequestsList', renderGuardianAbsenceRequests(requestRows));
 
-    const studentSelect = document.getElementById('guardianAbsenceStudentId');
-    if (studentSelect) {
-        studentSelect.innerHTML = renderGuardianAbsenceStudentOptions(students);
-    }
+        const studentsList = document.getElementById('guardianStudentsList');
+        if (studentsList) {
+            studentsList.innerHTML = renderGuardianAbsenceStudentCards(students);
+            studentsList.addEventListener('click', (event) => {
+                const card = event.target.closest('.guardian-absence-card');
+                if (!card) return;
+                openAbsenceModal(card.dataset.studentId || '', card.dataset.studentName || '');
+            });
+        }
 
-    const dateInput = document.getElementById('guardianAbsenceSessionDate');
-    if (dateInput && !dateInput.value) {
-        dateInput.value = new Date().toISOString().slice(0, 10);
-    }
+        const absenceModal = document.getElementById('absenceRequestModal');
+        absenceModal?.addEventListener('click', (event) => {
+            if (event.target === absenceModal) {
+                closeAbsenceModal();
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeAbsenceModal();
+            }
+        });
+
+        const dateInput = document.getElementById('guardianAbsenceSessionDate');
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().slice(0, 10);
+        }
 
     const form = document.getElementById('guardianAbsenceForm');
     if (!form || form.dataset.bound === 'true') return;
@@ -5216,7 +5421,7 @@ async function initGuardianAbsencePage() {
         const payload = {
             guardian_email: Auth.getUser()?.email || '',
             guardian_user_id: Auth.getUser()?.user_id || '',
-            student_id: document.getElementById('guardianAbsenceStudentId')?.value || '',
+            student_id: document.getElementById('selectedStudentId')?.value || '',
             session_date: document.getElementById('guardianAbsenceSessionDate')?.value || '',
             reason: document.getElementById('guardianAbsenceReason')?.value || '',
             notes: document.getElementById('guardianAbsenceNotes')?.value.trim() || ''
@@ -5228,7 +5433,7 @@ async function initGuardianAbsencePage() {
                 showMessage(data.message || 'Absence request submitted.', 'success');
                 form.reset();
                 if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
-                if (studentSelect) studentSelect.innerHTML = renderGuardianAbsenceStudentOptions(students);
+                closeAbsenceModal();
 
                 const refreshed = await fetchGuardianAbsenceRequests(Auth.getUser()?.email || '');
                 const rows = Array.isArray(refreshed?.requests) ? refreshed.requests : [];
@@ -6343,14 +6548,6 @@ function renderStudentRegistrationModal(student, portal) {
                                 Enter the student's date of birth above — guardian fields appear automatically for students 18 and under.
                             </div>
                             <div id="guardianInputs" class="space-y-2.5 sm:space-y-3 hidden min-w-0">
-                                <div class="min-w-0">
-                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Guardian Email *</label>
-                                    <div class="flex flex-col sm:flex-row gap-2">
-                                        <input id="guardianEmailInput" type="email" class="flex-1 min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="guardian@email.com" />
-                                        <button type="button" id="guardianFindBtn" class="w-full sm:w-auto px-4 py-2.5 rounded-lg sm:rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-700 dark:text-zinc-200 whitespace-nowrap">Find</button>
-                                    </div>
-                                    <div id="guardianInfoBox" class="hidden mt-1.5 text-xs text-zinc-500 dark:text-zinc-300 break-words"></div>
-                                </div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 min-w-0">
                                     <div class="min-w-0">
                                         <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">First Name *</label>
