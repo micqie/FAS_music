@@ -224,6 +224,30 @@
         rgba(248, 250, 252, 0.9);
 }
 
+.assign-request-slot-picker-popup {
+    border-radius: 1rem !important;
+    padding: 1.25rem !important;
+    max-height: min(72vh, 34rem) !important;
+    overflow: hidden !important;
+}
+
+.assign-request-slot-picker-popup .swal2-title {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.assign-request-slot-picker-popup .swal2-html-container {
+    margin-top: 0.75rem !important;
+    max-height: calc(min(72vh, 34rem) - 5rem) !important;
+    overflow-y: auto !important;
+    padding-right: 0.25rem !important;
+}
+
+.assign-request-slot-picker-popup .swal2-close {
+    color: #94a3b8 !important;
+    box-shadow: none !important;
+}
+
 .desk-modal-btn {
     padding: 0.4375rem 0.875rem;
     font-size: 0.8125rem;
@@ -335,7 +359,7 @@
 }
 
 .assign-request-availability-list .text-sm.font-semibold.text-slate-900 {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -345,8 +369,8 @@
 .assign-request-availability-list .grid.grid-cols-7.gap-2 > button {
     border-radius: 0;
     font-size: 0.625rem;
-    padding: 0.375rem 0.25rem;
-    min-height: 2.5rem;
+    padding: 0.35rem 0.25rem;
+    min-height: 2.25rem;
     border: 1px solid #e2e8f0;
 }
 
@@ -365,6 +389,15 @@
 
 .assign-request-availability-list button:hover {
     transform: none;
+}
+
+.assign-request-availability-list .grid.grid-cols-7.gap-1\.5 > button {
+    border-radius: 0.5rem;
+    min-height: 3.5rem;
+}
+
+.assign-request-availability-list .grid.grid-cols-7.gap-1\.5 > button .rounded-full {
+    min-width: 1.5rem;
 }
 
 /* Instrument tabs with colored dots */
@@ -440,32 +473,64 @@
 }
 
 .desk-modal-panel .assign-request-slot {
-    border-radius: 0.375rem !important;
-    padding: 0.5rem !important;
+    border-radius: 0.875rem !important;
+    padding: 0.75rem !important;
     background: #fff !important;
 }
 
 .assign-request-slot-schedule {
-    min-height: 2rem;
-    padding: 0.375rem 0.5rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.25rem;
-    background: #f8fafc;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    gap: 0.45rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.assign-request-slot-schedule-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.assign-request-slot-schedule-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #dbe3ef;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #0f172a;
+    min-width: 0;
+}
+
+.assign-request-slot-schedule-chip i {
+    font-size: 0.75rem;
+    color: #d4af37;
+    flex-shrink: 0;
+}
+
+.assign-request-slot-schedule-chip-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    flex-shrink: 0;
 }
 
 .assign-request-slot-schedule-title {
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.8rem;
+    font-weight: 700;
     color: #0f172a;
     line-height: 1.2;
+    white-space: nowrap;
 }
 
 .assign-request-slot-schedule-subtitle {
-    margin-top: 0.125rem;
-    font-size: 0.625rem;
+    margin-top: 0;
+    font-size: 0.7rem;
     color: #64748b;
     line-height: 1.2;
 }
@@ -740,6 +805,7 @@
     min-height: 0;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    gap: 0;
 }
 
 #walkinEnrollmentModal .walkin-main-column {
@@ -763,6 +829,10 @@
 
 #walkinEnrollmentModal .walkin-section-card {
     min-width: 0;
+}
+
+#walkinEnrollmentModal .walkin-section-card + .walkin-section-card {
+    padding-top: 0.35rem;
 }
 
 #walkinEnrollmentModal .walkin-step-header {
@@ -944,17 +1014,33 @@
 
 #walkinEnrollmentModal .walkin-learning-card {
     margin-top: 1rem;
-    border: 1px solid #d3dbea;
-    border-radius: 0;
-    background: #fff;
-    padding: 1rem;
+    border: 1px solid #dbe3ef;
+    border-radius: 1.15rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    padding: 1.15rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
 }
 
 #walkinEnrollmentModal .walkin-learning-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
     gap: 1rem;
-    align-items: end;
+    align-items: stretch;
+}
+
+#walkinEnrollmentModal .walkin-learning-field,
+#walkinEnrollmentModal .walkin-learning-sessions {
+    min-width: 0;
+    border: 1px solid #dbe3ef;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 1rem;
+}
+
+#walkinEnrollmentModal .walkin-learning-sessions {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
 #walkinEnrollmentModal .walkin-field-label {
@@ -965,6 +1051,13 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: #475569;
+}
+
+#walkinEnrollmentModal .walkin-field-hint {
+    margin-top: 0.7rem;
+    font-size: 0.86rem;
+    line-height: 1.4;
+    color: #64748b;
 }
 
 #walkinEnrollmentModal .walkin-session-stepper {
@@ -1114,11 +1207,25 @@
 
 @media (min-width: 1024px) {
     #walkinEnrollmentModal .walkin-enrollment-grid {
-        grid-template-columns: minmax(0, 1.65fr) minmax(310px, 0.8fr);
+        grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
     }
 
     #walkinEnrollmentModal .walkin-sidebar-card {
         min-height: 0;
+    }
+
+    #walkinEnrollmentModal .walkin-learning-row {
+        align-items: start;
+    }
+}
+
+@media (max-width: 1023px) {
+    #walkinEnrollmentModal .walkin-learning-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #walkinEnrollmentModal .walkin-learning-sessions {
+        margin-top: 0.25rem;
     }
 }
 

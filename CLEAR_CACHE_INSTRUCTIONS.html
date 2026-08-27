@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Browser Cache - FAS Music</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #b8860b;
+            margin-bottom: 10px;
+        }
+        .version {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        .method {
+            background: #f9f9f9;
+            border-left: 4px solid #b8860b;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .method h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .shortcut {
+            background: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        ol {
+            line-height: 1.8;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Clear Browser Cache</h1>
+        <p class="version">Updated: August 26, 2026 - Version 20260826001</p>
+        
+        <div class="note">
+            <strong>⚠️ Why clear cache?</strong><br>
+            The JavaScript files have been updated with important fixes:
+            <ul>
+                <li>✅ Fixed instrument dropdown default to "Select..." instead of "Bass Guitar"</li>
+                <li>✅ Fixed instrument validation to properly detect selected instruments</li>
+                <li>✅ Fixed payment calculation for Full and Partial payment types</li>
+                <li>✅ Added 30% deposit display for partial payments</li>
+            </ul>
+        </div>
+
+        <div class="method">
+            <h2>Method 1: Hard Refresh (Quickest)</h2>
+            <ol>
+                <li>Go to the enrollment page: <code>http://localhost/FAS_music/pages/desk/desk_enrollment.html</code></li>
+                <li>Press the keyboard shortcut for your browser:
+                    <ul>
+                        <li><strong>Windows (Chrome/Edge/Firefox):</strong> <span class="shortcut">Ctrl + Shift + R</span> or <span class="shortcut">Ctrl + F5</span></li>
+                        <li><strong>Windows (Chrome/Edge):</strong> <span class="shortcut">Shift + F5</span></li>
+                    </ul>
+                </li>
+                <li>Wait for the page to fully reload</li>
+            </ol>
+        </div>
+
+        <div class="method">
+            <h2>Method 2: Clear All Cached Data</h2>
+            <h3>Google Chrome / Microsoft Edge:</h3>
+            <ol>
+                <li>Press <span class="shortcut">Ctrl + Shift + Delete</span></li>
+                <li>Select "All time" from the Time range dropdown</li>
+                <li>Check "Cached images and files"</li>
+                <li>Click "Clear data"</li>
+                <li>Refresh the page with <span class="shortcut">F5</span></li>
+            </ol>
+
+            <h3>Mozilla Firefox:</h3>
+            <ol>
+                <li>Press <span class="shortcut">Ctrl + Shift + Delete</span></li>
+                <li>Select "Everything" from the Time range dropdown</li>
+                <li>Check "Cache"</li>
+                <li>Click "Clear Now"</li>
+                <li>Refresh the page with <span class="shortcut">F5</span></li>
+            </ol>
+        </div>
+
+        <div class="method">
+            <h2>Method 3: Open Developer Tools</h2>
+            <ol>
+                <li>Press <span class="shortcut">F12</span> to open Developer Tools</li>
+                <li>Right-click the refresh button in your browser</li>
+                <li>Select "Empty Cache and Hard Reload"</li>
+            </ol>
+        </div>
+
+        <div class="success">
+            <strong>✅ How to verify the cache is cleared:</strong>
+            <ol>
+                <li>Open the enrollment page</li>
+                <li>Open the Walk-In Enrollment modal</li>
+                <li>Select a student</li>
+                <li>Check that the instrument dropdown shows "Select..." as the first option</li>
+                <li>Press F12 and check the Console tab for debug logs starting with <code>[getResolvedInstrumentIds]</code></li>
+                <li>Change the Payment Type between Full and Partial - you should see "Payable Now (30%)" for partial payments</li>
+            </ol>
+        </div>
+
+        <div class="note" style="margin-top: 30px;">
+            <strong>📝 Technical Details:</strong><br>
+            The page now includes cache-busting parameters (<code>?v=20260826001</code>) on all JavaScript files.
+            Future updates will automatically load the new versions.
+        </div>
+    </div>
+</body>
+</html>

@@ -189,73 +189,148 @@
     </div>
 
     <!-- Payment Confirmation Modal -->
-    <div id="paymentModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-        <div class="relative w-full max-w-md rounded-2xl border border-white/10 bg-gradient-to-b from-black/95 via-black/90 to-black/80 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.6)] ring-1 ring-gold-500/20">
-            <button onclick="closePaymentModal()" class="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white transition">
-                <i class="fas fa-times text-base"></i>
-            </button>
+ <div id="paymentModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
 
-            <div class="mb-6">
-                <p class="text-xs uppercase tracking-[0.2em] text-gold-400/80">Payment</p>
-                <h3 class="text-2xl font-bold text-white">Confirm Payment</h3>
-                <p class="text-zinc-400 text-sm mt-1" id="paymentStudentInfo"></p>
+    <div
+        class="relative w-full max-w-md rounded-2xl border border-gold-500/20 bg-white p-8 shadow-[0_30px_80px_rgba(0,0,0,0.20)] ring-1 ring-gold-500/10">
+
+        <button onclick="closePaymentModal()"
+            class="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-500 hover:bg-gold-50 hover:text-gold-600 hover:border-gold-300 transition">
+            <i class="fas fa-times text-base"></i>
+        </button>
+
+        <div class="mb-6">
+            <p class="text-xs uppercase tracking-[0.2em] text-gold-600">
+                Payment
+            </p>
+
+            <h3 class="text-2xl font-bold text-zinc-900">
+                Confirm Payment
+            </h3>
+
+            <p class="text-zinc-500 text-sm mt-1"
+                id="paymentStudentInfo">
+            </p>
+        </div>
+
+        <div id="paymentMessage"
+            class="hidden mb-4 p-3 rounded-xl text-sm">
+        </div>
+
+        <form id="paymentForm" class="space-y-4">
+
+            <!-- Amount -->
+            <div>
+                <label
+                    class="block text-sm font-semibold text-zinc-700 mb-2">
+                    Amount (PHP) *
+                </label>
+
+                <input type="hidden" id="paymentAmount">
+
+                <div id="paymentAmountDisplay"
+                    class="w-full px-4 py-3 bg-gold-50 border border-gold-200 rounded-xl text-zinc-900 font-semibold">
+                    ₱0.00
+                </div>
+
+                <p id="paymentAmountHint"
+                    class="mt-2 text-xs text-zinc-500">
+                    This amount comes from the student's submitted registration payment request.
+                </p>
             </div>
 
-            <div id="paymentMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
+            <!-- Payment Method -->
+            <div>
+                <label
+                    class="block text-sm font-semibold text-zinc-700 mb-2">
+                    Payment Method *
+                </label>
 
-            <form id="paymentForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-2">Amount (PHP) *</label>
-                    <input type="hidden" id="paymentAmount">
-                    <div id="paymentAmountDisplay"
-                        class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white">
-                        ₱0.00
+                <input type="hidden" id="paymentMethod">
+
+                <!-- Online / Existing Payment Method -->
+                <div id="paymentMethodReadonlyWrap">
+
+                    <div id="paymentMethodDisplay"
+                        class="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-800">
+                        Not available
                     </div>
-                    <p id="paymentAmountHint" class="mt-2 text-xs text-zinc-400">
-                        This amount comes from the student's submitted registration payment request.
+
+                    <p id="paymentMethodReadonlyHint"
+                        class="mt-2 text-xs text-zinc-500">
+                        This method was already selected by the student during registration.
                     </p>
+
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-zinc-300 mb-2">Payment Method *</label>
-                    <input type="hidden" id="paymentMethod">
-                    <div id="paymentMethodReadonlyWrap">
-                        <div id="paymentMethodDisplay"
-                            class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white">
-                            Not available
-                        </div>
-                        <p id="paymentMethodReadonlyHint" class="mt-2 text-xs text-zinc-400">
-                            This method was already selected by the student during registration.
-                        </p>
-                    </div>
-                    <div id="paymentMethodSelectWrap" class="hidden">
-                        <select id="paymentMethodSelect" class="w-full px-4 py-3 bg-zinc-950/70 border border-white/10 rounded-xl text-white focus:outline-none focus:border-gold-400">
-                            <option value="">Select payment method</option>
-                            <option value="Cash">Cash</option>
-                            <option value="GCash">GCash</option>
-                            <option value="Bank Transfer">Bank Transfer</option>
-                            <option value="Other">Other</option>
-                        </select>
-                        <p class="mt-2 text-xs text-zinc-400">
-                            Walk-in registration is being paid directly at the branch, so no proof upload is needed here.
-                        </p>
-                    </div>
+
+                <!-- Walk-in Payment Method -->
+                <div id="paymentMethodSelectWrap" class="hidden">
+
+                    <select id="paymentMethodSelect"
+                        class="w-full px-4 py-3 bg-white border border-zinc-300 rounded-xl text-zinc-800 focus:outline-none focus:ring-2 focus:ring-gold-400/30 focus:border-gold-500 transition">
+
+                        <option value="">
+                            Select payment method
+                        </option>
+
+                        <option value="Cash">
+                            Cash
+                        </option>
+
+                        <option value="GCash">
+                            GCash
+                        </option>
+
+                        <option value="Bank Transfer">
+                            Bank Transfer
+                        </option>
+
+                    </select>
+
+                    <p class="mt-2 text-xs text-zinc-500">
+                        Walk-in registration is being paid directly at the branch, so no proof upload is needed here.
+                    </p>
+
                 </div>
-                <p class="text-xs text-zinc-400">
+            </div>
+
+            <!-- Receipt -->
+            <div
+                class="rounded-xl border border-gold-200 bg-gold-50 px-4 py-3">
+
+                <p class="text-xs text-gold-700">
+                    <i class="fas fa-receipt mr-1"></i>
                     Receipt number is generated automatically by the system.
                 </p>
-                <div class="flex gap-3 pt-2">
-                    <button type="submit" id="confirmPaymentBtn"
-                        class="flex-1 rounded-xl bg-gradient-to-r from-gold-500 to-gold-400 text-black font-bold py-3 shadow-[0_12px_30px_rgba(184,134,11,0.35)] hover:from-gold-400 hover:to-gold-300 transition">
-                        <span id="confirmPaymentBtnText">Confirm Payment</span>
-                    </button>
-                    <button type="button" onclick="closePaymentModal()"
-                        class="px-6 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold py-3 border border-white/10 transition">
-                        Cancel
-                    </button>
-                </div>
-            </form>
-        </div>
+
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex gap-3 pt-2">
+
+                <button type="submit"
+                    id="confirmPaymentBtn"
+                    class="flex-1 rounded-xl bg-gradient-to-r from-gold-500 to-gold-400 text-white font-bold py-3 shadow-[0_10px_25px_rgba(184,134,11,0.25)] hover:from-gold-600 hover:to-gold-500 transition">
+
+                    <span id="confirmPaymentBtnText">
+                        Confirm Payment
+                    </span>
+
+                </button>
+
+                <button type="button"
+                    onclick="closePaymentModal()"
+                    class="px-6 rounded-xl bg-white hover:bg-zinc-50 text-zinc-700 font-semibold py-3 border border-zinc-300 transition">
+
+                    Cancel
+
+                </button>
+
+            </div>
+        </form>
     </div>
+</div>
 
     <!-- Details Modal -->
     <div id="detailsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md overflow-y-auto" onclick="if(event.target===this) closeDetailsModal()">

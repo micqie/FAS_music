@@ -383,6 +383,36 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/intlTelInput.min.js"></script>
     <script src="js/intl-phone-input.js"></script>
+    <script>
+        // Public page - no session required
+        window.isPublicPage = true;
+        
+        // Only declare if not already defined by index.js
+        if (typeof baseApiUrl === 'undefined') {
+            window.baseApiUrl = window.location.hostname === 'localhost' ? 'http://localhost/FAS_music/api' : '/api';
+        }
+        
+        if (typeof escapeHtml === 'undefined') {
+            window.escapeHtml = function(text) {
+                if (text == null) return '';
+                const s = String(text);
+                const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+                return s.replace(/[&<>"']/g, m => map[m] || m);
+            };
+        }
+        
+        if (typeof buildPublicFileUrl === 'undefined') {
+            window.buildPublicFileUrl = function(filePath) {
+                if (!filePath) return '';
+                const raw = String(filePath).trim();
+                if (!raw) return '';
+                if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+                const clean = raw.startsWith('/') ? raw.slice(1) : raw;
+                const base = window.location.hostname === 'localhost' ? 'http://localhost/FAS_music/' : '/';
+                return base + clean;
+            };
+        }
+    </script>
     <script src="js/index.js"></script>
     <script src="js/featured_public.js"></script>
 

@@ -19,11 +19,37 @@
     </style>
 </head>
 <body class="bg-slate-100 text-slate-900 antialiased">
-    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
-        <a href="admin_dashboard.html" class="h-10 flex items-center">
-            <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
-        </a>
-        <div class="text-sm font-semibold text-white">Admin Room Masterfile</div>
+   <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-8">
+            <a href="#" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
+        </div>
+
+                <div class="flex items-center gap-4">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="userNameNav" class="text-sm font-semibold text-white">Administrator</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Portal Access</span>
+            </div>
+            <details class="relative group/profile">
+                <summary class="list-none cursor-pointer">
+                    <div class="h-10 w-10 rounded-full border-2 border-gold-500/30 p-0.5">
+                        <div class="w-full h-full rounded-full bg-darkSlate flex items-center justify-center">
+                            <i class="fas fa-user-tie text-gold-400"></i>
+                        </div>
+                    </div>
+                </summary>
+                <div class="absolute right-0 mt-3 w-56 rounded-xl border border-white/10 bg-obsidian/95 backdrop-blur-md shadow-2xl overflow-hidden opacity-0 pointer-events-none group-open/profile:opacity-100 group-open/profile:pointer-events-auto transition-all">
+                    <div class="px-4 py-3 border-b border-white/10">
+                        <p id="profileMenuName" class="text-sm font-semibold text-white truncate">Administrator</p>
+                        <p class="text-[10px] uppercase tracking-widest text-gold-400 font-bold mt-1">Account</p>
+                    </div>
+                    <button onclick="logout()" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-300 hover:text-red-200 hover:bg-red-400/10 transition-all">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </button>
+                </div>
+            </details>
+        </div>
     </nav>
 
     <aside class="fixed inset-y-0 left-0 w-72 bg-[#0f1115] z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto sidebar-scroll">
@@ -87,7 +113,7 @@
         <div class="max-w-7xl mx-auto space-y-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                    <h1 class="text-3xl font-black tracking-tight mt-8">Rooms</h1>
+                    <h1 class="text-3xl font-black tracking-tight ">Rooms</h1>
                     <div class="h-1 w-12 bg-yellow-500 mt-2 rounded-full"></div>
                     <p class="text-slate-500 mt-2">Add, edit, and keep track of room availability per branch.</p>
                 </div>

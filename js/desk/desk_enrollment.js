@@ -204,8 +204,7 @@
 
         function getInstrumentRowLabel(instrument, index) {
             if (!instrument) return `Slot ${index + 1}`;
-            // Return only the instrument name, without brand/type
-            return `${instrument.instrument_name || 'Instrument'}`;
+            return `Instrument ${index + 1}`;
         }
 
         function getAssignRequestInstrumentForIndex(index) {
@@ -749,26 +748,6 @@
             const typeSelects = Array.from(container.querySelectorAll('select.student-request-instrument-type'));
             if (!typeSelects.length) return;
 
-            const types = typeof getStudentRequestAvailableTypes === 'function'
-                ? getStudentRequestAvailableTypes()
-                : [];
-            const usedTypes = new Set();
-
-            typeSelects.forEach((select) => {
-                const currentValue = String(select.value || '').trim();
-                if (currentValue) {
-                    usedTypes.add(currentValue);
-                    return;
-                }
-
-                const nextType = types.find(type => !usedTypes.has(String(type.type_id)));
-                if (!nextType) return;
-
-                const nextValue = String(nextType.type_id || '');
-                select.value = nextValue;
-                usedTypes.add(nextValue);
-            });
-
             if (typeof _syncStudentRequestTypeDisabledStates === 'function') {
                 _syncStudentRequestTypeDisabledStates();
             }
@@ -785,12 +764,18 @@
             return String(option?.textContent || '').trim();
         }
 
-        function getWalkinSelectedInstrumentIds() {
-            return typeof getStudentRequestSelectedInstrumentIds === 'function'
-                ? getStudentRequestSelectedInstrumentIds()
-                : Array.from(document.querySelectorAll('#walkinInstrumentsContainer select.student-request-instrument'))
-                    .map(el => parseInt(el.value, 10))
-                    .filter(value => !Number.isNaN(value) && value > 0);
+        function getWalkinInstrumentIdsLocal() {
+            // Use the global function from index.js which has the correct selectors
+            if (typeof getResolvedInstrumentIdsFromSelectors === 'function' && typeof studentRequestAvailableInstruments !== 'undefined') {
+                return getResolvedInstrumentIdsFromSelectors(
+                    '#walkinInstrumentsContainer',
+                    'select.student-request-instrument-type',
+                    'select.student-request-instrument',
+                    studentRequestAvailableInstruments
+                );
+            }
+            // Fallback
+            return [];
         }
 
         function syncWalkinPackageCardSelection() {
@@ -946,11 +931,11 @@
             const hasPending = latest && String(latest.status || '') === 'Pending';
             if (statusEl) {
                 if (hasPending) {
-                    statusEl.textContent = 'This student already has a pending enrollment request. Finish that scheduling first before creating another one.';
+                    statusEl.textContent = 'Student has a pending request. Complete that first.';
                 } else if (canAccessExtendedPackages) {
-                    statusEl.textContent = 'Returnee student detected. 20-session and 50-session packages are available.';
+                    statusEl.textContent = 'Returning student - all packages available.';
                 } else {
-                    statusEl.textContent = 'Beginner student selected. Continue with the 12-session package, instrument, and payment details.';
+                    statusEl.textContent = 'Beginner student - 12-session package only.';
                 }
             }
             if (submitBtn) submitBtn.disabled = hasPending;
@@ -1016,15 +1001,15 @@
                 title: 'Add Extra Sessions',
                 html: `
                     <div class="text-left space-y-3">
-                        <p class="text-sm text-slate-600">Add additional sessions to this enrollment at ₱650 per session.</p>
+                        <p class="text-sm text-slate-600">₱650 per session</p>
                         <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1">Number of Sessions to Add</label>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Sessions to Add</label>
                             <input type="number" id="extraSessionsInput" min="1" max="50" value="1" 
                                 class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-gold-500">
                         </div>
                         <div class="bg-gold-50 border border-gold-200 rounded-lg p-3">
                             <div class="flex justify-between text-sm">
-                                <span class="font-semibold">Additional Cost:</span>
+                                <span class="font-semibold">Cost:</span>
                                 <span id="extraSessionsCost" class="font-bold text-gold-700">₱650.00</span>
                             </div>
                         </div>
@@ -1083,6 +1068,7 @@
             const sessionSelect = getWalkinSessionSelect();
             const instrumentsContainer = document.getElementById('walkinInstrumentsContainer');
             const amountEl = document.getElementById('walkinAmountInfo');
+            const paymentTypeEl = document.getElementById('walkinPaymentType');
             if (!packageSelect || !sessionSelect || !instrumentsContainer || !amountEl) return;
 
             const selectedSessionCount = Number(sessionSelect.value || 12);
@@ -1103,14 +1089,21 @@
             const extraCost = extraSessions * 650;
             const totalPrice = basePrice + extraCost;
             
+            // Calculate payable amount based on payment type
+            const paymentType = String(paymentTypeEl?.value || 'Full Payment').trim();
+            const isPartialPayment = paymentType === 'Partial Payment';
+            const depositAmount = Math.ceil(totalPrice * 0.3); // 30% deposit for partial payment
+            const payableNow = isPartialPayment ? depositAmount : totalPrice;
+            const remainingBalance = isPartialPayment ? (totalPrice - depositAmount) : 0;
+            
             syncWalkinPackageCardSelection();
             syncWalkinSessionSelectUI();
-            const paymentTypeEl = document.getElementById('walkinPaymentType');
             if (paymentTypeEl && !String(paymentTypeEl.value || '').trim()) {
                 paymentTypeEl.value = 'Full Payment';
             }
             const instrumentLabel = getWalkinPrimaryInstrumentLabel() || '—';
-            amountEl.innerHTML = `
+            
+            let summaryHtml = `
                 <div class="walkin-summary-line">
                     <span>Instrument</span>
                     <span>${escapeHtml(instrumentLabel || '—')}</span>
@@ -1122,15 +1115,35 @@
                 <div class="walkin-summary-line">
                     <span>Max instruments</span>
                     <span>${maxInst > 0 ? maxInst : '—'}</span>
-                </div>
+                </div>`;
+            
+            if (extraSessions > 0) {
+                summaryHtml += `
                 <div class="walkin-summary-line">
-                    <span>Add-on rate</span>
-                    <span>₱650/session</span>
-                </div>
+                    <span>Extra sessions</span>
+                    <span>${extraSessions} × ₱650</span>
+                </div>`;
+            }
+            
+            summaryHtml += `
                 <div class="walkin-summary-total">
                     <span>Total</span>
                     <span>${formatCurrencyPHP(totalPrice)}</span>
                 </div>`;
+            
+            if (isPartialPayment) {
+                summaryHtml += `
+                <div class="walkin-summary-line" style="margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
+                    <span class="font-semibold text-gold-700">Payable Now (30%)</span>
+                    <span class="font-bold text-gold-700">${formatCurrencyPHP(payableNow)}</span>
+                </div>
+                <div class="walkin-summary-line text-xs text-slate-500">
+                    <span>Remaining Balance</span>
+                    <span>${formatCurrencyPHP(remainingBalance)}</span>
+                </div>`;
+            }
+            
+            amountEl.innerHTML = summaryHtml;
             instrumentsContainer.innerHTML = maxInst > 0
                 ? renderStudentRequestInstrumentSelectors(maxInst, walkinMeta?.instruments || [])
                 : '<div class="text-sm text-slate-500">Select a package first.</div>';
@@ -1176,53 +1189,56 @@
             const packageId = parseInt(packageSelect.value, 10);
             const paymentType = String(paymentTypeEl.value || '').trim();
             const paymentMethod = String(paymentMethodEl.value || '').trim();
-            const instrumentIds = typeof getWalkinSelectedInstrumentIds === 'function'
-                ? getWalkinSelectedInstrumentIds()
-                : Array.from(document.querySelectorAll('#walkinInstrumentsContainer .student-request-instrument'))
-                    .map(el => parseInt(el.value, 10))
-                    .filter(value => !Number.isNaN(value) && value > 0);
+            
+            const instrumentIds = typeof getWalkinInstrumentIdsLocal === 'function'
+                ? getWalkinInstrumentIdsLocal()
+                : typeof getResolvedInstrumentIdsFromSelectors === 'function'
+                    ? getResolvedInstrumentIdsFromSelectors(
+                        '#walkinInstrumentsContainer',
+                        'select.student-request-instrument-type',
+                        'select.student-request-instrument',
+                        studentRequestAvailableInstruments
+                    )
+                    : [];
             const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
 
-            console.log('[Walk-in Enrollment Debug]', {
-                email,
-                studentId,
-                packageId,
-                paymentType,
-                paymentMethod,
-                instrumentIds,
-                uniqueInstrumentIds
-            });
-
+            // Validate required fields
             if (!email || !studentId || !packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
                 const missingFields = [];
                 if (!email || !studentId) missingFields.push('student');
                 if (!packageId) missingFields.push('package');
-                if (uniqueInstrumentIds.length < 1) missingFields.push('instrument(s)');
+                if (uniqueInstrumentIds.length < 1) missingFields.push('instrument');
                 if (!paymentType) missingFields.push('payment type');
                 if (!paymentMethod) missingFields.push('payment method');
-                
-                const fieldList = missingFields.join(', ');
-                showToast(`Please complete: ${fieldList}`, 'error');
-                console.error('[Walk-in Enrollment] Validation failed: missing required fields:', missingFields);
+                showToast(`Missing: ${missingFields.join(', ')}`, 'error');
                 return;
             }
             if (instrumentIds.length !== uniqueInstrumentIds.length) {
-                showToast('Each selected instrument must be unique. Please change the duplicate selection.', 'error');
-                console.error('[Walk-in Enrollment] Validation failed: duplicate instruments');
+                showToast('Duplicate instruments selected', 'error');
                 return;
             }
-
-            // Note: Instrument type/brand is optional, only the main instrument selection is required
 
             const selectedOption = packageSelect.options[packageSelect.selectedIndex];
             const maxInst = getWalkinPackageInstrumentLimitFromOption(selectedOption) || 1;
             if (uniqueInstrumentIds.length > maxInst) {
-                showToast(`You can select up to ${maxInst} instrument(s) for this package.`, 'error');
-                console.error('[Walk-in Enrollment] Validation failed: too many instruments');
+                showToast(`Maximum ${maxInst} instrument(s) allowed`, 'error');
                 return;
             }
 
             console.log('[Walk-in Enrollment] Validation passed, submitting...');
+            
+            // Calculate payment amounts
+            const sessionSelect = getWalkinSessionSelect();
+            const selectedSessionCount = Number(sessionSelect?.value || 12);
+            const basePrice = Number(selectedOption?.getAttribute('data-price') || 0);
+            const baseSessions = Number(selectedOption?.getAttribute('data-sessions') || 12);
+            const extraSessions = Math.max(0, selectedSessionCount - baseSessions);
+            const extraCost = extraSessions * 650;
+            const totalPrice = basePrice + extraCost;
+            const isPartialPayment = paymentType === 'Partial Payment';
+            const depositAmount = Math.ceil(totalPrice * 0.3); // 30% deposit
+            const payableNow = isPartialPayment ? depositAmount : totalPrice;
+            
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
 
@@ -1235,6 +1251,8 @@
                 requestFormData.append('payment_method', paymentMethod);
                 requestFormData.append('instrument_ids_json', JSON.stringify(uniqueInstrumentIds));
                 requestFormData.append('is_walkin_request', '1');
+                requestFormData.append('payable_now', String(payableNow));
+                requestFormData.append('requested_amount', String(totalPrice));
 
                 const response = await postStudentPackageRequest(requestFormData);
                 if (response.success) {
@@ -1247,10 +1265,9 @@
                     window.history.replaceState({}, '', viewUrl.toString());
                     applySessionView();
                 } else {
-                    showToast(response.error || 'Failed to submit walk-in enrollment.', 'error');
+                    showToast(response.error || 'Failed to submit enrollment', 'error');
                 }
             } catch (error) {
-                console.error('[Walk-in Enrollment] Network error:', error);
                 showToast('Network error. Please try again.', 'error');
             } finally {
                 submitBtn.disabled = false;
@@ -1684,6 +1701,19 @@
             return String(getTeacherCandidateById(teacherId)?.teacher_name || '').trim();
         }
 
+        function formatDateCompact(dateString) {
+            const raw = String(dateString || '').trim();
+            if (!raw) return '';
+            const dt = new Date(raw);
+            if (Number.isNaN(dt.getTime())) return raw;
+            return new Intl.DateTimeFormat('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: '2-digit',
+                year: 'numeric'
+            }).format(dt);
+        }
+
         function getAssignRequestRowTeacherId(row) {
             if (!row) return null;
             const hiddenInput = row.querySelector('.assign-request-slot-teacher-id');
@@ -1803,20 +1833,70 @@
             const end = String(endTime || '').trim();
             if (!day || !start || !end) {
                 return {
-                    title: 'Choose from the calendar',
-                    subtitle: 'Select a highlighted slot on the right to fill this row.'
+                    dateLabel: 'Choose from the calendar',
+                    timeLabel: 'Select a slot',
+                    subtitle: 'Pick a highlighted time on the right.'
                 };
             }
             if (date) {
                 return {
-                    title: `${formatDateLong(date) || date} • ${formatTime12Hour(start)} - ${formatTime12Hour(end)}`,
+                    dateLabel: formatDateCompact(date) || formatDateLong(date) || date,
+                    timeLabel: `${formatTime12Hour(start)} - ${formatTime12Hour(end)}`,
                     subtitle: `${day} recurring`
                 };
             }
             return {
-                title: `${formatTime12Hour(start)} - ${formatTime12Hour(end)}`,
-                subtitle: `${day} recurring`
+                dateLabel: day,
+                timeLabel: `${formatTime12Hour(start)} - ${formatTime12Hour(end)}`,
+                subtitle: 'Recurring'
             };
+        }
+
+        function updateAssignRequestSelectionSummary() {
+            const summaryEl = document.getElementById('assignRequestSummary');
+            if (!summaryEl) return;
+
+            const row = activeAssignRequestSlotRow
+                && document.getElementById('assignRequestSlotsContainer')?.contains(activeAssignRequestSlotRow)
+                ? activeAssignRequestSlotRow
+                : getAssignableAssignRequestSlotRow();
+
+            const data = getAssignRequestRowData(row);
+            const teacherName = row ? getAssignRequestRowTeacherName(row) : '';
+            const schedule = formatAssignRequestScheduleLabel(
+                data?.session_date || '',
+                data?.day_of_week || '',
+                data?.start_time || '',
+                data?.end_time || ''
+            );
+
+            if (!data || (!data.session_date && !data.day_of_week && !data.start_time && !data.end_time)) {
+                summaryEl.innerHTML = `
+                    <div class="flex items-center gap-2 text-slate-500">
+                        <i class="fas fa-calendar-day text-gold-500"></i>
+                        <span>Choose a date and time from the calendar.</span>
+                    </div>
+                `;
+                return;
+            }
+
+            summaryEl.innerHTML = `
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-900 shadow-sm">
+                        <i class="fas fa-calendar-day text-[11px] text-gold-500"></i>
+                        <span class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Date</span>
+                        <span class="text-sm font-semibold">${escapeHtml(schedule.dateLabel)}</span>
+                    </span>
+                    <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-900 shadow-sm">
+                        <i class="fas fa-clock text-[11px] text-gold-500"></i>
+                        <span class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Time</span>
+                        <span class="text-sm font-semibold">${escapeHtml(schedule.timeLabel)}</span>
+                    </span>
+                    <span class="text-xs text-slate-500">
+                        ${escapeHtml(teacherName ? `${teacherName} • ${schedule.subtitle}` : schedule.subtitle)}
+                    </span>
+                </div>
+            `;
         }
 
         function updateAssignRequestRowScheduleDisplay(row) {
@@ -1825,12 +1905,17 @@
             const dayEl = row.querySelector('.assign-request-slot-day');
             const startEl = row.querySelector('.assign-request-slot-start');
             const endEl = row.querySelector('.assign-request-slot-end');
-            const titleEl = row.querySelector('.assign-request-slot-schedule-title');
+            const dateValueEl = row.querySelector('.assign-request-slot-schedule-date-value');
+            const timeValueEl = row.querySelector('.assign-request-slot-schedule-time-value');
             const subtitleEl = row.querySelector('.assign-request-slot-schedule-subtitle');
             const schedule = formatAssignRequestScheduleLabel(dateEl?.value || '', dayEl?.value || '', startEl?.value || '', endEl?.value || '');
-            if (titleEl) titleEl.textContent = schedule.title;
+            if (dateValueEl) dateValueEl.textContent = schedule.dateLabel;
+            if (timeValueEl) timeValueEl.textContent = schedule.timeLabel;
             if (subtitleEl) subtitleEl.textContent = schedule.subtitle;
             row.dataset.scheduleSet = (dayEl?.value && startEl?.value && endEl?.value) ? '1' : '0';
+            if (row === activeAssignRequestSlotRow) {
+                updateAssignRequestSelectionSummary();
+            }
         }
 
         function renderAssignRequestSlotRow(slot = {}, index = 0, options = {}) {
@@ -1870,7 +1955,18 @@
                         <div>
                             <label class="block text-xs font-medium text-slate-600 mb-1.5">Schedule</label>
                             <div class="assign-request-slot-schedule">
-                                <div class="assign-request-slot-schedule-title">${escapeHtml(schedule.title)}</div>
+                                <div class="assign-request-slot-schedule-meta">
+                                    <span class="assign-request-slot-schedule-chip">
+                                        <i class="fas fa-calendar-day"></i>
+                                        <span class="assign-request-slot-schedule-chip-label">Date</span>
+                                        <strong class="assign-request-slot-schedule-title assign-request-slot-schedule-date-value">${escapeHtml(schedule.dateLabel)}</strong>
+                                    </span>
+                                    <span class="assign-request-slot-schedule-chip">
+                                        <i class="fas fa-clock"></i>
+                                        <span class="assign-request-slot-schedule-chip-label">Time</span>
+                                        <strong class="assign-request-slot-schedule-title assign-request-slot-schedule-time-value">${escapeHtml(schedule.timeLabel)}</strong>
+                                    </span>
+                                </div>
                                 <div class="assign-request-slot-schedule-subtitle">${escapeHtml(schedule.subtitle)}</div>
                             </div>
                         </div>
@@ -1891,6 +1987,7 @@
                 item.classList.toggle('border-slate-200', !isActive);
                 item.classList.toggle('bg-white', !isActive);
             });
+            updateAssignRequestSelectionSummary();
         }
 
         function openPendingRequestPaymentModal(requestId) {
@@ -2140,6 +2237,73 @@
             renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate);
         }
 
+        function openAssignRequestAvailabilityDatePicker(dateKey) {
+            const normalizedDate = String(dateKey || '').trim();
+            if (!normalizedDate) return;
+
+            selectAssignRequestAvailabilityDate(normalizedDate);
+
+            const groupedSlots = Array.isArray(assignRequestAvailabilitySlots)
+                ? assignRequestAvailabilitySlots
+                    .filter(slot => String(slot.session_date || '').trim() === normalizedDate)
+                    .slice()
+                    .sort((a, b) => String(a.start_time || '').localeCompare(String(b.start_time || '')))
+                : [];
+
+            if (!groupedSlots.length || typeof Swal === 'undefined') {
+                return;
+            }
+
+            const dateLabel = formatDateLong(normalizedDate) || normalizedDate;
+            const slotCount = groupedSlots.length;
+
+            Swal.fire({
+                title: dateLabel,
+                html: `
+                    <div class="text-sm text-slate-500 mb-4">${slotCount} available slot${slotCount > 1 ? 's' : ''}</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+                        ${groupedSlots.map((slot, index) => `
+                            <button
+                                type="button"
+                                class="assign-request-slot-picker-btn rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100"
+                                data-slot-index="${index}"
+                            >
+                                <div class="text-base font-bold text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div>
+                                <div class="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">${escapeHtml(slot.day_of_week || '')}</div>
+                            </button>
+                        `).join('')}
+                    </div>
+                `,
+                showConfirmButton: false,
+                showCloseButton: true,
+                width: '42rem',
+                heightAuto: false,
+                padding: '1.5rem',
+                customClass: {
+                    popup: 'assign-request-slot-picker-popup',
+                    htmlContainer: 'm-0',
+                    title: 'text-lg font-bold text-slate-900'
+                },
+                didOpen: () => {
+                    const popup = Swal.getPopup();
+                    if (!popup) return;
+                    popup.querySelectorAll('.assign-request-slot-picker-btn').forEach((button, index) => {
+                        button.addEventListener('click', () => {
+                            const slot = groupedSlots[index];
+                            if (!slot) return;
+                            applyAssignRequestAvailabilitySlot(
+                                String(slot.session_date || ''),
+                                String(slot.day_of_week || ''),
+                                String(slot.start_time || ''),
+                                String(slot.end_time || '')
+                            );
+                            Swal.close();
+                        });
+                    });
+                }
+            });
+        }
+
         function renderAssignRequestAvailability(slots, selectedDate = '') {
             const listEl = document.getElementById('assignRequestAvailabilityList');
             if (!listEl) return;
@@ -2184,7 +2348,7 @@
             const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
             const cells = [];
             for (let i = 0; i < firstWeekday; i += 1) {
-                cells.push('<div class="h-20 rounded-xl border border-transparent bg-transparent"></div>');
+                cells.push('<div class="h-14 rounded-lg border border-transparent bg-transparent"></div>');
             }
             for (let day = 1; day <= daysInMonth; day += 1) {
                 const dateKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -2197,21 +2361,20 @@
                 cells.push(`
                     <button
                         type="button"
-                        ${hasSlots ? `onclick="selectAssignRequestAvailabilityDate('${dateKey}')"` : 'disabled'}
-                        class="h-20 rounded-xl border p-2 text-left transition ${baseClass} ${hasSlots ? '' : 'cursor-not-allowed'}"
+                        ${hasSlots ? `onclick="openAssignRequestAvailabilityDatePicker('${dateKey}')"` : 'disabled'}
+                        class="h-14 rounded-lg border p-1.5 text-left transition ${baseClass} ${hasSlots ? '' : 'cursor-not-allowed'}"
                     >
                         <div class="flex items-start justify-between gap-2">
-                            <span class="text-sm font-semibold ${hasSlots ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
-                            ${hasSlots ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${daySlots.length} slot${daySlots.length > 1 ? 's' : ''}</span>` : ''}
+                            <span class="text-sm font-semibold leading-none ${hasSlots ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
+                            ${hasSlots ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${daySlots.length}</span>` : ''}
                         </div>
-                        <div class="mt-2 text-[11px] ${hasSlots ? 'text-slate-500' : 'text-slate-400'}">${hasSlots ? escapeHtml(daySlots[0].day_of_week || '') : 'Unavailable'}</div>
+                        <div class="mt-0.5 text-[9px] ${hasSlots ? 'text-slate-500' : 'text-slate-400'} leading-tight">${hasSlots ? escapeHtml(daySlots[0].day_of_week || '') : 'Unavailable'}</div>
                     </button>
                 `);
             }
 
-            const selectedSlots = grouped[resolvedSelectedDate] || [];
             listEl.innerHTML = `
-                <div class="space-y-4">
+                <div class="space-y-3">
                     <div class="flex items-center justify-between gap-3">
                         <button type="button" onclick="setAssignRequestAvailabilityMonth('${shiftAssignAvailabilityMonth(monthKey, -1)}')" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                             <i class="fas fa-chevron-left mr-2 text-[10px]"></i>Prev
@@ -2221,31 +2384,14 @@
                             Next<i class="fas fa-chevron-right ml-2 text-[10px]"></i>
                         </button>
                     </div>
-                    <div class="grid grid-cols-7 gap-2 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    <div class="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
                         <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
                     </div>
-                    <div class="grid grid-cols-7 gap-2">
+                    <div class="grid grid-cols-7 gap-1.5">
                         ${cells.join('')}
                     </div>
-                    <div class="rounded-xl border border-slate-200 bg-white p-3">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <div class="text-sm font-semibold text-slate-900">${escapeHtml(formatDateLong(resolvedSelectedDate) || resolvedSelectedDate)}</div>
-                                <div class="text-xs text-slate-500 mt-1">${selectedSlots.length ? `${selectedSlots.length} available slot${selectedSlots.length > 1 ? 's' : ''}` : 'No available slots on this date.'}</div>
-                            </div>
-                        </div>
-                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            ${selectedSlots.map(slot => `
-                                <button
-                                    type="button"
-                                    class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100"
-                                    onclick="applyAssignRequestAvailabilitySlot('${escapeHtml(String(slot.session_date || ''))}','${escapeHtml(String(slot.day_of_week || ''))}','${escapeHtml(String(slot.start_time || ''))}','${escapeHtml(String(slot.end_time || ''))}')"
-                                >
-                                    <div class="text-sm font-semibold text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div>
-                                    <div class="mt-1 text-xs text-slate-500">${escapeHtml(slot.day_of_week || '')}</div>
-                                </button>
-                            `).join('') || '<div class="text-sm text-slate-500">No available slots on this date.</div>'}
-                        </div>
+                    <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                        Choose a highlighted date to view and pick a time slot.
                     </div>
                 </div>
             `;

@@ -123,9 +123,6 @@
                                 <i class="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                                 <input id="enrollmentSearchInput" type="search" placeholder="Search student, branch, package" class="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                             </div>
-                            <select id="branchFilter" class="w-full sm:w-48 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
-                                <option value="">All branches</option>
-                            </select>
                         </div>
                         <div class="flex flex-wrap items-center gap-3">
                         <button id="openSessionExtensionRequestsModalBtn" type="button" class="inline-flex items-center gap-2 rounded-2xl border border-gold-200 bg-white px-4 py-2.5 text-sm font-bold text-gold-700 shadow-sm hover:bg-gold-50 transition whitespace-nowrap">
@@ -326,11 +323,11 @@
             </div>
 
             <!-- Main content area -->
-            <div class="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-[320px_1fr] min-h-0">
+            <div class="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-[300px_1fr] min-h-0">
 
                 <!-- LEFT SIDEBAR -->
-                <div class="border-r border-slate-200 bg-white overflow-y-auto p-5 space-y-5">
-                    
+                <div class="border-r border-slate-200 bg-white overflow-y-auto p-4 space-y-4">
+
                     <!-- Start date -->
                     <div>
                         <label class="block text-sm font-semibold text-slate-800 mb-2">Start Date</label>
@@ -354,7 +351,7 @@
                 </div>
 
                 <!-- RIGHT - Calendar -->
-                <div class="overflow-y-auto p-5 bg-slate-50">
+                <div class="overflow-y-auto p-4 bg-slate-50">
                     <!-- Calendar -->
                     <div id="assignRequestAvailabilityList" class="assign-request-availability-list">
                         <div class="flex items-center justify-center h-64">
@@ -372,7 +369,7 @@
 
             <!-- Bottom action bar -->
             <div class="flex items-center justify-between px-5 py-4 border-t border-slate-200 bg-white">
-                <div id="assignRequestSummary" class="text-sm text-slate-600">
+                <div id="assignRequestSummary" class="assign-request-summary-strip flex-1 mr-4 rounded-lg px-3 py-2 text-sm text-slate-600 min-h-[3rem] flex items-center">
                     <!-- Summary populated by JS -->
                 </div>
                 <div class="flex gap-3">
@@ -554,8 +551,8 @@
         <div class="desk-modal-panel walkin-enrollment-panel w-full max-w-[1120px] overflow-hidden my-2 sm:my-4">
             <div class="walkin-enrollment-header">
                 <div>
-                    <h3>New walk-in enrollment</h3>
-                    <p>Takes about a minute.</p>
+                    <h3>Walk-In Enrollment</h3>
+                    <p>Choose a student, package details, and payment in one guided flow.</p>
                 </div>
                 <button type="button" id="closeWalkinEnrollmentModalBtn" class="walkin-modal-close" aria-label="Close">
                     <i class="fas fa-times"></i>
@@ -570,11 +567,11 @@
                         <section class="walkin-section-card">
                             <div class="walkin-step-header">
                                 <span class="walkin-step-badge">1</span>
-                                <h2>Who is enrolling?</h2>
+                                <h2>Student</h2>
                             </div>
 
                             <div id="walkinStudentSearchWrap" class="walkin-search-wrap">
-                                <input type="text" id="walkinStudentSearch" placeholder="Type a name or phone number" class="walkin-search-input">
+                                <input type="text" id="walkinStudentSearch" placeholder="Search by name or phone" class="walkin-search-input">
                                 <input type="hidden" id="walkinStudentSelect" value="">
                             </div>
 
@@ -588,7 +585,7 @@
                             </div>
 
                             <div id="walkinStudentResults" class="walkin-results-list">
-                                <div class="walkin-empty-state">Type to search students.</div>
+                                <div class="walkin-empty-state">Search for a student</div>
                             </div>
                             <p id="walkinStatusInfo" class="walkin-status-info"></p>
                         </section>
@@ -596,14 +593,14 @@
                         <section class="walkin-section-card">
                             <div class="walkin-step-header">
                                 <span class="walkin-step-badge">2</span>
-                                <h2>What will they learn?</h2>
+                                <h2>Package Details</h2>
                             </div>
-                            <p class="walkin-section-copy">Beginners start with a 12-session package. Returning students can access 20 or 50-session packages.</p>
+                            <p class="walkin-section-copy">Select the instrument type first, then add sessions if needed. The summary on the right updates automatically.</p>
 
                             <div class="walkin-learning-card">
                                 <div class="walkin-learning-row">
                                     <div class="walkin-learning-field">
-                                        <label class="walkin-field-label">Instrument</label>
+                                        <label class="walkin-field-label">Instrument Type</label>
                                         <div id="walkinInstrumentsContainer" class="walkin-instrument-stack">
                                             <div class="text-sm text-slate-500">Select a student first.</div>
                                         </div>
@@ -619,13 +616,13 @@
                                         <select id="walkinSessionSelect" class="walkin-session-select" disabled>
                                             <option value="">Select student first</option>
                                         </select>
-                                        <p id="walkinSessionHint" class="mt-2 text-xs text-slate-500"></p>
+                                        <p class="walkin-field-hint">Extra sessions are added to the selected package automatically.</p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="walkin-upgrade-packages">
-                                <div class="walkin-upgrade-label">Upgrade packages</div>
+                            <div class="walkin-upgrade-packages hidden">
+                                <div class="walkin-upgrade-label">Recommended upgrades</div>
                                 <div id="walkinPackageCards" class="walkin-package-grid"></div>
                             </div>
 
@@ -638,7 +635,7 @@
 
                     <aside class="walkin-sidebar-card">
                         <div class="walkin-sidebar-section">
-                            <h3>3. How are they paying?</h3>
+                            <h3>3. Payment</h3>
                             <div class="space-y-3">
                                 <div>
                                     <label class="walkin-field-label">Payment Type</label>
@@ -677,7 +674,7 @@
                         </div>
 
                         <div class="walkin-actions">
-                            <button type="submit" id="submitWalkinEnrollmentBtn" class="walkin-enroll-btn">Enroll &amp; collect payment</button>
+                            <button type="submit" id="submitWalkinEnrollmentBtn" class="walkin-enroll-btn">Enroll Student</button>
                             <button type="button" id="cancelWalkinEnrollmentBtn" class="walkin-cancel-btn">Cancel</button>
                         </div>
                     </aside>
@@ -688,9 +685,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../../js/index.js"></script>
-    <script src="../../js/session_timeout.js"></script>
-    <script src="../../js/desk/desk_nav.js"></script>
-    <script src="../../js/desk/desk_enrollment.js"></script>
+<script src="../../js/index.js?v=20260826004"></script>
+    <script src="../../js/session_timeout.js?v=20260826004"></script>
+    <script src="../../js/desk/desk_nav.js?v=20260826004"></script>
+    <script src="../../js/desk/desk_enrollment.js?v=20260826004"></script>
 </body>
 </html>

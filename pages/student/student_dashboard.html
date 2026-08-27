@@ -385,7 +385,7 @@
                                                 <input type="text" id="studentRequestReferenceNumber" placeholder="Transaction / reference no." class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-gold-500">
                                                 <p class="mt-1.5 text-xs text-zinc-400">Enter the reference or transaction number</p>
                                             </div>
-                                            
+
                                             <div>
                                                 <label class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">
                                                     Payment Screenshot
@@ -420,7 +420,7 @@
                         </div>
 
                         <!-- ── Submit ── -->
-                        <div class="sticky bottom-0 z-20 -mx-3 sm:mx-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-zinc-200/80 dark:border-white/10 bg-gradient-to-t from-white via-white/95 to-white/70 dark:from-obsidian dark:via-obsidian/95 dark:to-obsidian/75 backdrop-blur-sm px-3 sm:px-0 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                        <div class="sticky bottom-0 z-20 -mx-3 sm:mx-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-zinc-200/80 dark:border-white/10 bg-gradient-to-t from-white via-white/95 to-white/70 dark:from-obsidian dark:via-obsidian/95 dark:to-obsidian/75 backdrop-blur-sm px-3 sm:px-0 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom)]]">
                             <p class="text-xs text-zinc-400 dark:text-zinc-500">
                                 <i class="fas fa-circle-info mr-1"></i>
                                 Your request will be reviewed by our staff. You'll be notified once it's approved.
@@ -472,7 +472,7 @@
     <script src="../../js/intl-phone-input.js"></script>
     <script src="../../js/portal_sidebar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <script src="../../js/index.js"></script>
+    <script src="../../js/index.js?v=20260827003"></script>
     <script src="../../js/student/student_shell.js"></script>
     <script src="../../js/session_timeout.js"></script>
 
@@ -483,14 +483,14 @@
             const proofInput = document.getElementById('studentRequestPaymentProof');
             const proofLabel = document.getElementById('studentRequestProofFileName');
             const proofViewBtn = document.getElementById('studentRequestProofViewBtn');
-            
+
             if (proofInput && proofLabel) {
                 proofInput.addEventListener('change', () => {
                     const file = proofInput.files?.[0];
                     if (file) {
                         proofLabel.textContent = '✅ ' + file.name;
                         proofLabel.classList.remove('hidden');
-                        
+
                         // Enable view button with modal
                         if (proofViewBtn) {
                             const objectURL = URL.createObjectURL(file);

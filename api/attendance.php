@@ -320,6 +320,7 @@ class AttendanceApi
         if ($this->tableExists('tbl_sessions')) {
             $sessionColumns = [
                 'operation_id' => "ALTER TABLE tbl_sessions ADD COLUMN operation_id INT NULL AFTER room_id",
+                'instrument_id' => "ALTER TABLE tbl_sessions ADD COLUMN instrument_id INT NULL AFTER end_time",
                 'attendance_status' => "ALTER TABLE tbl_sessions ADD COLUMN attendance_status ENUM('Pending','Present','Absent','Late','Excused','CI','Teacher Absent') NOT NULL DEFAULT 'Pending' AFTER status",
                 'absence_notice' => "ALTER TABLE tbl_sessions ADD COLUMN absence_notice ENUM('None','Prior','NoNotice','Teacher') NOT NULL DEFAULT 'None' AFTER attendance_status",
                 'counted_in' => "ALTER TABLE tbl_sessions ADD COLUMN counted_in TINYINT(1) NOT NULL DEFAULT 0 AFTER absence_notice",
@@ -1447,9 +1448,15 @@ class AttendanceApi
             if ($hasSessions && $hasAttendance) {
                 $roomJoin = "";
                 $roomExpr = "NULL";
+                $instrumentJoin = "";
+                $instrumentExpr = "NULL";
                 if ($this->tableExists('tbl_rooms')) {
                     $roomJoin = " LEFT JOIN tbl_rooms rm ON ts.room_id = rm.room_id ";
                     $roomExpr = "rm.room_name";
+                }
+                if ($this->tableExists('tbl_instruments')) {
+                    $instrumentJoin = " LEFT JOIN tbl_instruments inst ON inst.instrument_id = COALESCE(ts.instrument_id, te.instrument_id) ";
+                    $instrumentExpr = "COALESCE(inst.instrument_name, NULL)";
                 }
                 $stmt = $this->conn->prepare("
                     SELECT *
@@ -1462,6 +1469,7 @@ class AttendanceApi
                             ts.start_time,
                             ts.end_time,
                             {$roomExpr} AS room_name,
+                            {$instrumentExpr} AS instrument_name,
                             ts.session_type AS source,
                             COALESCE(ts.attendance_notes, ts.notes) AS notes,
                             CASE
@@ -1475,6 +1483,7 @@ class AttendanceApi
                         FROM tbl_sessions ts
                         INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
                         {$roomJoin}
+                        {$instrumentJoin}
                         WHERE te.student_id = ?
 
                         UNION ALL
@@ -1487,6 +1496,7 @@ class AttendanceApi
                             TIME(ta.attended_at) AS start_time,
                             NULL AS end_time,
                             NULL AS room_name,
+                            NULL AS instrument_name,
                             ta.source,
                             ta.notes,
                             ta.status
@@ -1508,9 +1518,15 @@ class AttendanceApi
             } elseif ($hasSessions) {
                 $roomJoin = "";
                 $roomExpr = "NULL";
+                $instrumentJoin = "";
+                $instrumentExpr = "NULL";
                 if ($this->tableExists('tbl_rooms')) {
                     $roomJoin = " LEFT JOIN tbl_rooms rm ON ts.room_id = rm.room_id ";
                     $roomExpr = "rm.room_name";
+                }
+                if ($this->tableExists('tbl_instruments')) {
+                    $instrumentJoin = " LEFT JOIN tbl_instruments inst ON inst.instrument_id = COALESCE(ts.instrument_id, te.instrument_id) ";
+                    $instrumentExpr = "COALESCE(inst.instrument_name, NULL)";
                 }
                 $stmt = $this->conn->prepare("
                     SELECT
@@ -1521,6 +1537,7 @@ class AttendanceApi
                         ts.start_time,
                         ts.end_time,
                         {$roomExpr} AS room_name,
+                        {$instrumentExpr} AS instrument_name,
                         ts.session_type AS source,
                         COALESCE(ts.attendance_notes, ts.notes) AS notes,
                         CASE
@@ -1534,6 +1551,7 @@ class AttendanceApi
                     FROM tbl_sessions ts
                     INNER JOIN tbl_enrollments te ON te.enrollment_id = ts.enrollment_id
                     {$roomJoin}
+                    {$instrumentJoin}
                     WHERE te.student_id = ?
                     ORDER BY ts.session_date DESC, ts.session_id DESC
                     LIMIT $limit
@@ -1541,7 +1559,7 @@ class AttendanceApi
                 $stmt->execute([$studentId]);
             } else {
                 $stmt = $this->conn->prepare("
-                    SELECT attendance_id, student_id, attended_at, DATE(attended_at) AS session_date, TIME(attended_at) AS start_time, NULL AS end_time, NULL AS room_name, source, notes, status
+                    SELECT attendance_id, student_id, attended_at, DATE(attended_at) AS session_date, TIME(attended_at) AS start_time, NULL AS end_time, NULL AS room_name, NULL AS instrument_name, source, notes, status
                     FROM tbl_attendance
                     WHERE student_id = ?
                     ORDER BY attended_at DESC, attendance_id DESC
@@ -1688,13 +1706,17 @@ class AttendanceApi
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $sessionId = (int)($data['session_id'] ?? 0);
         $roomId = (int)($data['room_id'] ?? 0);
+        $instrumentId = (int)($data['instrument_id'] ?? 0);
         $scopeBranchId = (int)($data['branch_id'] ?? 0);
 
-        if ($sessionId < 1 || $roomId < 1) {
-            $this->sendJSON(['error' => 'session_id and room_id are required'], 400);
+        if ($sessionId < 1 || $roomId < 1 || $instrumentId < 1) {
+            $this->sendJSON(['error' => 'session_id, room_id, and instrument_id are required'], 400);
         }
         if (!$this->tableExists('tbl_sessions') || !$this->tableExists('tbl_rooms')) {
             $this->sendJSON(['error' => 'Session room assignment is unavailable on this schema'], 500);
+        }
+        if (!$this->tableExists('tbl_instruments')) {
+            $this->sendJSON(['error' => 'Instrument selection is unavailable on this schema'], 500);
         }
 
         try {
@@ -1747,6 +1769,25 @@ class AttendanceApi
                 $this->sendJSON(['error' => 'Selected room is not available'], 400);
             }
 
+            $instrumentStmt = $this->conn->prepare("
+                SELECT i.instrument_id, i.instrument_name, i.branch_id, i.status, it.type_name
+                FROM tbl_instruments i
+                LEFT JOIN tbl_instrument_types it ON i.type_id = it.type_id
+                WHERE i.instrument_id = ?
+                LIMIT 1
+            ");
+            $instrumentStmt->execute([$instrumentId]);
+            $instrument = $instrumentStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$instrument) {
+                $this->sendJSON(['error' => 'Instrument not found'], 404);
+            }
+            if ((int)($instrument['branch_id'] ?? 0) !== $sessionBranchId) {
+                $this->sendJSON(['error' => 'Selected instrument does not belong to this branch'], 400);
+            }
+            if (!in_array((string)($instrument['status'] ?? ''), ['Available', 'In Use'], true)) {
+                $this->sendJSON(['error' => 'Selected instrument is not available'], 400);
+            }
+
             if ($this->roomHasScheduleConflict(
                 $roomId,
                 (string)($session['session_date'] ?? ''),
@@ -1757,15 +1798,21 @@ class AttendanceApi
                 $this->sendJSON(['error' => 'Selected room is already assigned for that time'], 400);
             }
 
-            $update = $this->conn->prepare("UPDATE tbl_sessions SET room_id = ? WHERE session_id = ?");
-            $update->execute([$roomId, $sessionId]);
+            $update = $this->conn->prepare("UPDATE tbl_sessions SET room_id = ?, instrument_id = ? WHERE session_id = ?");
+            $update->execute([$roomId, $instrumentId, $sessionId]);
+
+            $instrumentName = trim((string)($instrument['instrument_name'] ?? ''));
+            $instrumentType = trim((string)($instrument['type_name'] ?? ''));
 
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Room assigned successfully.',
                 'session_id' => $sessionId,
                 'room_id' => $roomId,
-                'room_name' => $room['room_name'] ?? ''
+                'room_name' => $room['room_name'] ?? '',
+                'instrument_id' => $instrumentId,
+                'instrument_name' => $instrumentName,
+                'instrument_type_name' => $instrumentType
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);

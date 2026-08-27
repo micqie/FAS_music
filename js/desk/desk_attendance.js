@@ -128,36 +128,23 @@
         function buildTeacherPackageSummary(student) {
             const sessions = Array.isArray(student?.sessions_list) ? student.sessions_list : [];
             const teacherMap = new Map();
-            const studentInstruments = Array.isArray(student?.instruments)
-                ? student.instruments.map((item) => String(item?.instrument_name || '').trim()).filter(Boolean)
-                : [];
-            const fallbackInstrumentText = studentInstruments.length
-                ? studentInstruments.join(', ')
-                : String(student?.instrument_name || '').trim();
 
             sessions.forEach((slot) => {
                 const teacherName = `${String(slot?.teacher_first_name || '').trim()} ${String(slot?.teacher_last_name || '').trim()}`.trim();
                 if (!teacherName) return;
-                const instrumentName = String(slot?.instrument_name || student?.instrument_name || '').trim();
                 if (!teacherMap.has(teacherName)) {
-                    teacherMap.set(teacherName, new Set());
-                }
-                if (instrumentName) {
-                    teacherMap.get(teacherName).add(instrumentName);
+                    teacherMap.set(teacherName, true);
                 }
             });
 
             if (!teacherMap.size) {
                 const teacherName = `${String(student?.teacher_first_name || '').trim()} ${String(student?.teacher_last_name || '').trim()}`.trim();
                 if (teacherName) {
-                    teacherMap.set(teacherName, new Set());
+                    teacherMap.set(teacherName, true);
                 }
             }
 
-            const rows = Array.from(teacherMap.entries()).map(([teacherName, instruments]) => ({
-                teacherName,
-                instruments: Array.from(instruments)
-            }));
+            const rows = Array.from(teacherMap.keys()).map(teacherName => ({ teacherName }));
 
             if (!rows.length) {
                 return [];
@@ -165,7 +152,6 @@
 
             return rows.map((row) => ({
                 teacherName: row.teacherName,
-                instrumentText: row.instruments.length ? row.instruments.join(', ') : (fallbackInstrumentText || String(student?.package_name || '—').trim()),
                 packageText: String(student?.package_name || '—').trim()
             }));
         }
@@ -179,9 +165,7 @@
             return summaryRows.map((row) => `
                 <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                     <div class="text-sm font-semibold text-slate-900">${escapeHtml(row.teacherName)}</div>
-                    <div class="mt-1 text-xs text-slate-500">
-                        ${escapeHtml(row.instrumentText)}<span class="mx-1 text-slate-300">•</span>${escapeHtml(row.packageText)}
-                    </div>
+                    <div class="mt-1 text-xs text-slate-500">${escapeHtml(row.packageText)}</div>
                 </div>
             `).join('');
         }
@@ -217,6 +201,7 @@
                             endTime: String(slot.end_time || ''),
                             roomId: Number(slot.room_id || 0),
                             roomName: String(slot.room_name || '').trim(),
+                            instrumentName: String(slot.instrument_name || '').trim(),
                             branchId: Number(student.branch_id || deskBranchId || 0),
                             teacherName: getTeacherLabel(slot, student),
                             packageName: String(student.package_name || '—'),
@@ -245,6 +230,14 @@
             return attendanceCalendarEvents.filter(event => event.dateKey === dateKey);
         }
 
+        function getFrozenEventsForDate(dateKey) {
+            return getEventsForDate(dateKey).filter(event => isEnrollmentFrozen(event));
+        }
+
+        function getActiveEventsForDate(dateKey) {
+            return getEventsForDate(dateKey).filter(event => !isEnrollmentFrozen(event));
+        }
+
         function getStateClasses(state) {
             const normalized = String(state || '').toLowerCase();
             if (normalized === 'completed') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
@@ -263,12 +256,35 @@
             return '';
         }
 
+        function getSessionRoomInstrumentLabel(event) {
+            if (!event) return '';
+            const roomLabel = getSessionRoomDisplayLabel(event);
+            const instrumentName = String(event.instrumentName || '').trim();
+            if (roomLabel && instrumentName) {
+                return `${roomLabel} • ${instrumentName}`;
+            }
+            return roomLabel || instrumentName || '';
+        }
+
+        async function fetchBranchInstruments(branchId) {
+            const response = await axios.get(`${baseApiUrl}/instruments.php?action=get-instruments&branch_id=${encodeURIComponent(branchId)}`);
+            const data = response?.data || {};
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to load instruments.');
+            }
+            return data;
+        }
+
         function renderSessionRoomControl(event) {
             if (!event || Number(event.sessionId || 0) < 1) {
                 return '';
             }
 
-            const roomLabel = getSessionRoomDisplayLabel(event);
+            if (isEnrollmentFrozen(event)) {
+                return '';
+            }
+
+            const roomLabel = getSessionRoomInstrumentLabel(event);
             if (roomLabel) {
                 return `
                     <span class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">
@@ -301,10 +317,18 @@
                 showMessage('Scheduled session not found.', 'error');
                 return;
             }
+            if (isEnrollmentFrozen(event)) {
+                showMessage('Frozen accounts cannot be assigned a room until the freeze is cleared.', 'error');
+                return;
+            }
 
             try {
-                const roomData = await fetchSessionAvailableRooms(sessionId);
+                const [roomData, instrumentData] = await Promise.all([
+                    fetchSessionAvailableRooms(sessionId),
+                    fetchBranchInstruments(Number(event.branchId || deskBranchId || 0))
+                ]);
                 const rooms = Array.isArray(roomData.rooms) ? roomData.rooms : [];
+                const instruments = Array.isArray(instrumentData.instruments) ? instrumentData.instruments : [];
                 const unavailableRooms = Array.isArray(roomData.unavailable_rooms) ? roomData.unavailable_rooms : [];
                 if (!rooms.length) {
                     const message = unavailableRooms.length
@@ -313,11 +337,10 @@
                     showMessage(message, 'error');
                     return;
                 }
-
-                const inputOptions = {};
-                rooms.forEach(room => {
-                    inputOptions[String(room.room_id)] = room.room_name || `Room #${room.room_id}`;
-                });
+                if (!instruments.length) {
+                    showMessage('No available instruments found for this branch.', 'error');
+                    return;
+                }
 
                 const scheduleDate = event.dateKey ? formatDateShort(event.dateKey) : '';
                 const scheduleTime = event.startTime
@@ -325,22 +348,92 @@
                     : 'Time pending';
                 const scheduleLabel = scheduleDate ? `${scheduleDate} • ${scheduleTime}` : scheduleTime;
 
+                const roomOptionsHtml = rooms.map(room => `
+                    <option value="${escapeHtml(String(room.room_id || ''))}">${escapeHtml(room.room_name || `Room #${room.room_id}`)}</option>
+                `).join('');
+                const instrumentOptionsHtml = instruments.map(item => `
+                    <option value="${escapeHtml(String(item.instrument_id || ''))}">${escapeHtml(item.instrument_name || 'Instrument')}</option>
+                `).join('');
+
                 const result = await Swal.fire({
-                    title: 'Assign Room',
-                    text: `${event.studentName} • ${scheduleLabel}`,
-                    input: 'select',
-                    inputOptions,
-                    inputPlaceholder: 'Choose a room',
+                    title: 'Assign Room & Instrument',
+                    html: `
+                        <div class="text-left space-y-4">
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                                <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Session</div>
+                                <div class="mt-1 text-sm font-semibold text-slate-900">${escapeHtml(event.studentName)}</div>
+                                <div class="mt-1 text-xs text-slate-500">${escapeHtml(scheduleLabel)}</div>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Room</label>
+                                <select id="attendanceRoomSelect" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-500/20">
+                                    <option value="">Choose a room</option>
+                                    ${roomOptionsHtml}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Instrument</label>
+                                <select id="attendanceInstrumentSelect" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-500/20">
+                                    <option value="">Choose an instrument</option>
+                                    ${instrumentOptionsHtml}
+                                </select>
+                                <p class="mt-1 text-xs text-slate-500">Pick the instrument that will be available in the room for this session.</p>
+                            </div>
+                            <div id="attendanceRoomAssignPreview" class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                                Select a room and instrument to continue.
+                            </div>
+                        </div>
+                    `,
                     showCancelButton: true,
-                    confirmButtonText: 'Assign Room',
+                    confirmButtonText: 'Assign Room & Instrument',
                     confirmButtonColor: '#16a34a',
-                    inputValidator: value => value ? null : 'Please choose a room.'
+                    focusConfirm: false,
+                    preConfirm: () => {
+                        const popup = Swal.getPopup();
+                        const selectedRoomId = Number(popup?.querySelector('#attendanceRoomSelect')?.value || 0);
+                        const selectedInstrumentId = Number(popup?.querySelector('#attendanceInstrumentSelect')?.value || instruments[0]?.instrument_id || 0);
+                        if (!selectedRoomId) {
+                            Swal.showValidationMessage('Please choose a room.');
+                            return false;
+                        }
+                        if (!selectedInstrumentId) {
+                            Swal.showValidationMessage('No instrument is available for this branch.');
+                            return false;
+                        }
+                        return { roomId: selectedRoomId, instrumentId: selectedInstrumentId };
+                    },
+                    didOpen: () => {
+                        const popup = Swal.getPopup();
+                        if (!popup) return;
+                        const roomSelect = popup.querySelector('#attendanceRoomSelect');
+                        const instrumentSelect = popup.querySelector('#attendanceInstrumentSelect');
+                        const preview = popup.querySelector('#attendanceRoomAssignPreview');
+                        if (roomSelect && !roomSelect.value && roomSelect.options.length > 1) {
+                            roomSelect.value = roomSelect.options[1].value;
+                        }
+                        if (instrumentSelect && !instrumentSelect.value && instrumentSelect.options.length > 1) {
+                            instrumentSelect.value = instrumentSelect.options[1].value;
+                        }
+                        const updatePreview = () => {
+                            const roomLabel = roomSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
+                            const instrumentLabel = instrumentSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
+                            if (preview) {
+                                preview.textContent = roomLabel && instrumentLabel
+                                    ? `${roomLabel} • ${instrumentLabel}`
+                                    : 'Select a room and instrument to continue.';
+                            }
+                        };
+                        roomSelect?.addEventListener('change', updatePreview);
+                        instrumentSelect?.addEventListener('change', updatePreview);
+                        updatePreview();
+                    }
                 });
                 if (!result.isConfirmed) return;
 
                 const response = await axios.post(`${baseApiUrl}/attendance.php?action=assign-session-room`, {
                     session_id: Number(sessionId),
-                    room_id: Number(result.value),
+                    room_id: Number(result.value?.roomId || 0),
+                    instrument_id: Number(result.value?.instrumentId || 0),
                     branch_id: Number(event.branchId || deskBranchId || 0)
                 });
                 const data = response.data || {};
@@ -350,10 +443,15 @@
                 }
 
                 const assignedRoomName = String(data.room_name || '').trim()
-                    || (rooms.find(room => Number(room.room_id) === Number(result.value))?.room_name || '')
-                    || `Room #${Number(result.value)}`;
-                event.roomId = Number(data.room_id || result.value || 0);
+                    || (rooms.find(room => Number(room.room_id) === Number(result.value?.roomId))?.room_name || '')
+                    || `Room #${Number(result.value?.roomId)}`;
+                const assignedInstrumentName = String(data.instrument_name || '').trim()
+                    || (instruments.find(item => Number(item.instrument_id) === Number(result.value?.instrumentId))?.instrument_name || '')
+                    || 'Instrument';
+                event.roomId = Number(data.room_id || result.value?.roomId || 0);
                 event.roomName = assignedRoomName;
+                event.instrumentId = Number(data.instrument_id || result.value?.instrumentId || 0);
+                event.instrumentName = assignedInstrumentName;
                 renderSelectedDateSchedule();
                 renderAttendanceCalendar();
 
@@ -567,7 +665,7 @@
 
             const todayKey = getTodayDateKey();
             const upcoming = attendanceCalendarEvents
-                .filter(event => event.dateKey >= todayKey && !['Completed', 'Cancelled', 'Absent'].includes(event.state))
+                .filter(event => event.dateKey >= todayKey && !['Completed', 'Cancelled', 'Absent'].includes(event.state) && !isEnrollmentFrozen(event))
                 .slice(0, 6);
 
             if (!upcoming.length) {
@@ -599,7 +697,7 @@
         function openUpcomingSessionsModal() {
             const todayKey = getTodayDateKey();
             const upcoming = attendanceCalendarEvents
-                .filter(event => event.dateKey >= todayKey && !['Completed', 'Cancelled', 'Absent'].includes(event.state))
+                .filter(event => event.dateKey >= todayKey && !['Completed', 'Cancelled', 'Absent'].includes(event.state) && !isEnrollmentFrozen(event))
                 .slice(0, 12);
 
             const content = upcoming.length
@@ -638,17 +736,22 @@
             const listEl = document.getElementById('attendanceSelectedDateList');
             if (!titleEl || !metaEl || !listEl) return;
 
-            const selectedEvents = getEventsForDate(attendanceSelectedDate);
+            const selectedEvents = getActiveEventsForDate(attendanceSelectedDate);
+            const frozenEvents = getFrozenEventsForDate(attendanceSelectedDate);
             setCalendarText('attendanceSelectedDateLabel', formatDateShort(attendanceSelectedDate));
             titleEl.textContent = formatDateLong(attendanceSelectedDate);
             metaEl.textContent = selectedEvents.length
-                ? `${selectedEvents.length} session${selectedEvents.length === 1 ? '' : 's'} scheduled for this branch`
-                : 'No sessions scheduled for this date.';
+                ? `${selectedEvents.length} active session${selectedEvents.length === 1 ? '' : 's'} scheduled for this branch`
+                : frozenEvents.length
+                    ? 'No active sessions scheduled for this date. Frozen sessions are listed in the Frozen Accounts tab.'
+                    : 'No sessions scheduled for this date.';
 
             if (!selectedEvents.length) {
                 listEl.innerHTML = `
                     <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                        No student sessions were scheduled for ${formatDateLong(attendanceSelectedDate)}.
+                        ${frozenEvents.length
+                            ? `No active student sessions were scheduled for ${formatDateLong(attendanceSelectedDate)}.`
+                            : `No student sessions were scheduled for ${formatDateLong(attendanceSelectedDate)}.`}
                     </div>
                 `;
                 return;
@@ -709,12 +812,15 @@
         }
 
         function getDayScheduleModalMarkup(dateKey) {
-            const selectedEvents = getEventsForDate(dateKey);
+            const selectedEvents = getActiveEventsForDate(dateKey);
+            const frozenEvents = getFrozenEventsForDate(dateKey);
 
             if (!selectedEvents.length) {
                 return `
                     <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                        No students are scheduled for ${escapeHtml(formatDateLong(dateKey))}.
+                        ${frozenEvents.length
+                            ? `No active students are scheduled for ${escapeHtml(formatDateLong(dateKey))}.`
+                            : `No students are scheduled for ${escapeHtml(formatDateLong(dateKey))}.`}
                     </div>
                 `;
             }
@@ -781,7 +887,7 @@
             renderAttendanceCalendar();
             renderSelectedDateSchedule();
 
-            const selectedEvents = getEventsForDate(dateKey);
+            const selectedEvents = getActiveEventsForDate(dateKey);
             const title = dateKey === getTodayDateKey() ? "Who's Expected Today" : `Who's Expected on ${formatDateShort(dateKey)}`;
 
             Swal.fire({
@@ -882,6 +988,90 @@
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#b8860b'
             });
+        }
+
+        async function deskWalkinFreezePayment(enrollmentId, studentId) {
+            const student = attendanceRows.find(row => Number(row.enrollment_id || 0) === Number(enrollmentId))
+                || attendanceRows.find(row => Number(row.student_id || 0) === Number(studentId));
+            if (!student) {
+                showMessage('Frozen account not found.', 'error');
+                return;
+            }
+
+            const studentName = `${String(student.first_name || '').trim()} ${String(student.last_name || '').trim()}`.trim() || 'Student';
+            const amount = Number(student.reservation_fee_amount || 100) || 100;
+            const usedAbsences = Number(student.used_absences || 0);
+            const status = String(student.freeze_payment_status || 'None').trim();
+
+            if (status.toLowerCase() === 'paid') {
+                showMessage('This frozen account has already been paid.', 'success');
+                return;
+            }
+
+            const result = await Swal.fire({
+                title: 'Walk-In Freeze Payment',
+                width: 620,
+                showCancelButton: true,
+                confirmButtonText: 'Confirm Payment',
+                confirmButtonColor: '#16a34a',
+                cancelButtonText: 'Cancel',
+                html: `
+                    <div class="text-left space-y-4">
+                        <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                            <div class="text-xs font-bold uppercase tracking-[0.2em] text-rose-600">Frozen Account</div>
+                            <div class="mt-1 text-base font-bold text-slate-900">${escapeHtml(studentName)}</div>
+                            <div class="mt-1 text-sm text-slate-600">${escapeHtml(student.package_name || '—')}</div>
+                            <div class="mt-2 text-sm font-semibold text-rose-700">${usedAbsences} absence${usedAbsences === 1 ? '' : 's'} recorded</div>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div class="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Payment</div>
+                            <div class="mt-1 text-sm text-slate-700">This will record a walk-in payment of <span class="font-bold text-slate-900">₱${amount.toFixed(2)}</span> and immediately unfreeze the account.</div>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Payment Method</label>
+                            <select id="freezeWalkinPaymentMethod" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-500/20">
+                                <option value="Cash" selected>Cash</option>
+                                <option value="GCash">GCash</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                            Tip: this is for desk-confirmed, in-person payment only.
+                        </div>
+                    </div>
+                `,
+                preConfirm: async () => {
+                    const popup = Swal.getPopup();
+                    const paymentMethod = String(popup?.querySelector('#freezeWalkinPaymentMethod')?.value || 'Cash').trim() || 'Cash';
+                    try {
+                        const payload = new FormData();
+                        payload.append('enrollment_id', String(enrollmentId));
+                        payload.append('student_id', String(studentId));
+                        payload.append('payment_method', paymentMethod);
+                        payload.append('reference_number', '');
+                        payload.append('source', 'walkin');
+                        payload.append('notes', 'Desk walk-in freeze payment');
+                        const response = await axios.post(`${baseApiUrl}/students.php?action=submit-freeze-payment`, payload);
+                        const data = response.data || {};
+                        if (!data.success) {
+                            Swal.showValidationMessage(data.error || 'Payment could not be recorded.');
+                            return false;
+                        }
+                        return data;
+                    } catch (error) {
+                        Swal.showValidationMessage(error?.response?.data?.error || 'Failed to record walk-in payment.');
+                        return false;
+                    }
+                }
+            });
+
+            if (!result.isConfirmed || !result.value) {
+                return;
+            }
+
+            showMessage(result.value.message || 'Payment confirmed. Account has been unfrozen.', 'success');
+            await loadAttendanceRows(true);
         }
 
         let activeDayScheduleTab = 'scheduled';
@@ -1128,10 +1318,15 @@
                     const dateText = formatDateShort(slot.session_date);
                     const timeText = slot.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : 'Time pending';
                     const roomText = slot.room_name ? escapeHtml(slot.room_name) : 'Room pending';
+                    const instrumentText = slot.instrument_name ? escapeHtml(slot.instrument_name) : '';
+                    const scheduleMeta = [
+                        roomText,
+                        instrumentText ? `<span class="mx-1 text-slate-300">•</span> ${instrumentText}` : ''
+                    ].join('');
                     return `
                         <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                             <div class="text-sm font-semibold text-slate-900">${escapeHtml(dateText)}</div>
-                            <div class="mt-1 text-xs text-slate-600">${escapeHtml(timeText)} <span class="mx-1 text-slate-300">•</span> ${roomText}</div>
+                            <div class="mt-1 text-xs text-slate-600">${escapeHtml(timeText)} <span class="mx-1 text-slate-300">•</span> ${scheduleMeta}</div>
                         </div>
                     `;
                 }).join('')
@@ -1271,11 +1466,16 @@
                         const dateText = slot.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
                         const timeText = slot.start_time ? `${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}` : '—';
                         const roomText = slot.room_name ? escapeHtml(slot.room_name) : 'Room pending';
+                        const instrumentText = slot.instrument_name ? escapeHtml(slot.instrument_name) : '';
+                        const scheduleMeta = [
+                            roomText,
+                            instrumentText ? `<span class="mx-1 text-slate-300">•</span> ${instrumentText}` : ''
+                        ].join('');
                         return `
                             <div class="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                                 <div class="flex flex-wrap items-center gap-2 mb-1.5">${getStatusBadge(slot.status)}</div>
                                 <div class="text-sm text-slate-700">${escapeHtml(dateText)} <span class="text-slate-300">•</span> ${escapeHtml(timeText)}</div>
-                                <div class="mt-1 text-xs text-slate-500">${roomText}</div>
+                                <div class="mt-1 text-xs text-slate-500">${scheduleMeta}</div>
                             </div>
                         `;
                     }).join('')
@@ -1323,7 +1523,7 @@
                             </div>
                         </div>
                         <div class="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
-                            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Teachers / Instruments</div>
+                            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Teachers</div>
                             <div class="mt-2 space-y-2">${teacherSummaryHtml}</div>
                         </div>
                         <div class="space-y-2 max-h-[52vh] overflow-y-auto pr-1">${rows.join('')}</div>
@@ -1456,6 +1656,7 @@
         window.openAttendanceDetails = openAttendanceDetails;
         window.openAttendanceDayModal = openAttendanceDayModal;
         window.showFrozenAttendanceAlert = showFrozenAttendanceAlert;
+        window.deskWalkinFreezePayment = deskWalkinFreezePayment;
         window.openFrozenAccountsModal = openFrozenAccountsModal;
         window.switchDayScheduleTab = switchDayScheduleTab;
         window.openUpcomingSessionsModal = openUpcomingSessionsModal;

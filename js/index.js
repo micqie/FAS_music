@@ -348,6 +348,11 @@ const Auth = {
     // If the server returns a user record, that becomes the authoritative copy
     // and is pushed to localStorage (and broadcast to other tabs via setUser).
     async validateServerSession(options = {}) {
+        // Skip session validation on public pages
+        if (window.isPublicPage) {
+            return { valid: false, reason: 'public_page_no_session' };
+        }
+
         if (this._sessionValidationPromise) {
             return this._sessionValidationPromise;
         }
@@ -4712,10 +4717,8 @@ async function guardianRegisterNewStudent() {
                                     <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Payment Method *</label>
                                     <select id="guardian-new-payment-method" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                                         <option value="">Select payment method</option>
-                                        <option value="Cash">Cash</option>
                                         <option value="GCash">GCash</option>
                                         <option value="Bank Transfer">Bank Transfer</option>
-                                        <option value="Other">Other</option>
                                     </select>
                                 </div>
                                 <div>
@@ -5507,13 +5510,13 @@ function initStudentRequestSection(student, requestMeta) {
     // - Beginner students: Only 12-session package
     // - Non-beginner (Developing, Proficient, Advanced): 12, 20, and 50-session packages
     const isBeginner = studentSkillLevel === 'beginner' || !studentSkillLevel;
-    const filteredPackages = isBeginner 
+    const filteredPackages = isBeginner
         ? packages.filter(pkg => Number(pkg.sessions || 0) === 12)
         : packages.filter(pkg => {
             const sessions = Number(pkg.sessions || 0);
             return sessions === 12 || sessions === 20 || sessions === 50;
         });
-    
+
     const defaultPackageId = String(requestMeta?.default_package_id || '');
     let selectedPackageId = defaultPackageId;
 
@@ -6399,8 +6402,8 @@ function renderStudentRegistrationModal(student, portal) {
                             <select id="regPayMethod" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                                 <option value="GCash">GCash</option>
                                 <option value="Bank Transfer">Bank Transfer</option>
-                                <option value="Cash">Cash</option>
-                                <option value="Other">Other</option>
+
+
                             </select>
                         </div>
                         <div class="min-w-0">
@@ -6494,7 +6497,7 @@ function studentRegSyncCityOptions() {
     const provinceSelect = document.getElementById('regProvince');
     const citySelect = document.getElementById('regCity');
     if (!provinceSelect || !citySelect) return;
-    
+
     const provinceKey = provinceSelect.value;
     const provinceName = studentRegGetSelectText(provinceSelect);
     const cities = provinceKey
@@ -6503,7 +6506,7 @@ function studentRegSyncCityOptions() {
             .map(row => ({ value: row.name, label: row.name }))
             .sort((a, b) => a.label.localeCompare(b.label))
         : [];
-    
+
     studentRegPopulateSelect(
         citySelect,
         cities,
@@ -6525,19 +6528,19 @@ function studentRegSyncHiddenAddress() {
 
 async function initStudentRegistrationAddressCascade() {
     await loadStudentRegAddressData();
-    
+
     const provinceSelect = document.getElementById('regProvince');
     const citySelect = document.getElementById('regCity');
-    
+
     if (!provinceSelect || !citySelect) return;
-    
+
     // Populate provinces
     studentRegPopulateSelect(
         provinceSelect,
         studentRegPhProvinces.map(r => ({ value: r.key, label: r.name })),
         'Select province'
     );
-    
+
     // Add event listeners
     ['regStreet', 'regBarangay', 'regCity', 'regProvince'].forEach(id => {
         const el = document.getElementById(id);
@@ -6546,14 +6549,14 @@ async function initStudentRegistrationAddressCascade() {
             el.addEventListener('change', studentRegSyncHiddenAddress);
         }
     });
-    
+
     provinceSelect.addEventListener('change', () => {
         studentRegSyncCityOptions();
         studentRegSyncHiddenAddress();
     });
-    
+
     citySelect.addEventListener('change', studentRegSyncHiddenAddress);
-    
+
     // Initial sync
     studentRegSyncCityOptions();
     studentRegSyncHiddenAddress();
@@ -6583,7 +6586,7 @@ function showImageModal(imageUrl, fileName) {
             </div>
         `;
         document.body.appendChild(modal);
-        
+
         // Close on backdrop click
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
@@ -6592,13 +6595,13 @@ function showImageModal(imageUrl, fileName) {
             }
         });
     }
-    
+
     // Update modal content
     const img = document.getElementById('imagePreviewImg');
     const fileNameEl = document.getElementById('imagePreviewFileName');
     if (img) img.src = imageUrl;
     if (fileNameEl) fileNameEl.textContent = fileName;
-    
+
     // Show modal
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -6980,14 +6983,14 @@ function wireStudentOnboardingActions(student, meta, portal) {
         const updateAge = () => {
             const age = computeAgeFromDob(regDob.value || '');
             regAge.value = age === null ? '' : String(age);
-            
+
             // Date validation with red indicator
             const dobValue = regDob.value;
             if (dobValue) {
                 const dobDate = new Date(dobValue);
                 const today = new Date();
                 const minDate = new Date(1900, 0, 1);
-                
+
                 // Check if date is valid and within reasonable range
                 if (isNaN(dobDate.getTime()) || dobDate > today || dobDate < minDate) {
                     regDob.classList.add('!border-red-500', 'dark:!border-red-500');
@@ -7004,7 +7007,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 regDob.classList.remove('!border-red-500', 'dark:!border-red-500');
                 regAge.classList.remove('!border-red-500', 'dark:!border-red-500');
             }
-            
+
             syncGuardianState();
         };
         regDob.addEventListener('change', updateAge);
@@ -7038,7 +7041,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
             const file = regPayProof.files?.[0];
             const link = document.getElementById('regPayProofLink');
             const nameSpan = document.getElementById('regPayProofName');
-            
+
             if (file && link && nameSpan) {
                 const objectURL = URL.createObjectURL(file);
                 link.href = objectURL;
@@ -7049,14 +7052,14 @@ function wireStudentOnboardingActions(student, meta, portal) {
             }
         });
     }
-    
+
     // File link for proof of ID - clickable to view
     if (regAgeProof) {
         regAgeProof.addEventListener('change', () => {
             const file = regAgeProof.files?.[0];
             const link = document.getElementById('regAgeProofLink');
             const nameSpan = document.getElementById('regAgeProofName');
-            
+
             if (file && link && nameSpan) {
                 const objectURL = URL.createObjectURL(file);
                 link.href = objectURL;
@@ -7157,47 +7160,272 @@ function wireStudentOnboardingActions(student, meta, portal) {
                         return;
                     }
 
-                    const customPasswordResult = await Swal.fire({
-                        icon: 'question',
-                        title: 'Create guardian password',
-                        html: `
-                            <div class="text-left text-sm leading-6">
-                                <p>Enter a new password for the guardian account.</p>
-                                <p class="mt-2 text-xs text-zinc-500">Use at least 8 characters with uppercase, lowercase, a number, and a special character.</p>
-                            </div>
-                            <input id="guardian-custom-password" class="swal2-input" type="password" placeholder="New password">
-                            <input id="guardian-custom-password-confirm" class="swal2-input" type="password" placeholder="Confirm password">
-                        `,
-                        focusConfirm: false,
-                        showCancelButton: true,
-                        confirmButtonText: 'Create Password',
-                        cancelButtonText: 'Go Back',
-                        confirmButtonColor: '#b8860b',
-                        cancelButtonColor: '#6b7280',
-                        preConfirm: () => {
-                            const pass1 = document.getElementById('guardian-custom-password')?.value || '';
-                            const pass2 = document.getElementById('guardian-custom-password-confirm')?.value || '';
-                            if (!pass1 || !pass2) {
-                                Swal.showValidationMessage('Please fill in both password fields.');
-                                return false;
-                            }
-                            if (pass1 !== pass2) {
-                                Swal.showValidationMessage('Passwords do not match.');
-                                return false;
-                            }
-                            if (
-                                pass1.length < 8 ||
-                                !/[A-Z]/.test(pass1) ||
-                                !/[a-z]/.test(pass1) ||
-                                !/[0-9]/.test(pass1) ||
-                                !/[!@#$%^&*]/.test(pass1)
-                            ) {
-                                Swal.showValidationMessage('Password does not meet the requirements.');
-                                return false;
-                            }
-                            return pass1;
-                        }
-                    });
+             const customPasswordResult = await Swal.fire({
+    icon: 'question',
+    title: 'Create guardian password',
+    html: `
+        <div class="text-left text-sm leading-6">
+            <p>Enter a new password for the guardian account.</p>
+            <p class="mt-2 text-xs text-zinc-500">
+                Use at least 8 characters with uppercase, lowercase, a number, and a special character.
+            </p>
+        </div>
+
+        <!-- New Password -->
+        <div class="relative mt-4">
+            <input
+                id="guardian-custom-password"
+                class="swal2-input !m-0 !w-full !pr-12"
+                type="password"
+                placeholder="New password"
+            >
+
+            <button
+                type="button"
+                id="toggle-guardian-password"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
+            >
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+
+        <!-- Password Strength -->
+        <div class="mt-2 text-left">
+            <div class="flex gap-1">
+                <div id="strength-bar-1" class="h-1 flex-1 rounded bg-zinc-200"></div>
+                <div id="strength-bar-2" class="h-1 flex-1 rounded bg-zinc-200"></div>
+                <div id="strength-bar-3" class="h-1 flex-1 rounded bg-zinc-200"></div>
+                <div id="strength-bar-4" class="h-1 flex-1 rounded bg-zinc-200"></div>
+            </div>
+
+            <p
+                id="password-strength-text"
+                class="mt-1 text-xs text-zinc-500"
+            >
+                Password strength
+            </p>
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="relative mt-3">
+            <input
+                id="guardian-custom-password-confirm"
+                class="swal2-input !m-0 !w-full !pr-12"
+                type="password"
+                placeholder="Confirm password"
+            >
+
+            <button
+                type="button"
+                id="toggle-guardian-password-confirm"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
+            >
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+
+        <!-- Password Match Status -->
+        <p
+            id="password-match-text"
+            class="mt-2 text-left text-xs"
+        ></p>
+    `,
+
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Create Password',
+    cancelButtonText: 'Go Back',
+    confirmButtonColor: '#b8860b',
+    cancelButtonColor: '#6b7280',
+
+    didOpen: () => {
+        const passwordInput = document.getElementById(
+            'guardian-custom-password'
+        );
+
+        const confirmInput = document.getElementById(
+            'guardian-custom-password-confirm'
+        );
+
+        const strengthText = document.getElementById(
+            'password-strength-text'
+        );
+
+        const matchText = document.getElementById(
+            'password-match-text'
+        );
+
+        const bars = [
+            document.getElementById('strength-bar-1'),
+            document.getElementById('strength-bar-2'),
+            document.getElementById('strength-bar-3'),
+            document.getElementById('strength-bar-4')
+        ];
+
+        // Password visibility toggle
+        const setupPasswordToggle = (inputId, buttonId) => {
+            const input = document.getElementById(inputId);
+            const button = document.getElementById(buttonId);
+            const icon = button.querySelector('i');
+
+            button.addEventListener('click', () => {
+                const isPassword = input.type === 'password';
+
+                input.type = isPassword ? 'text' : 'password';
+
+                icon.classList.toggle('fa-eye', !isPassword);
+                icon.classList.toggle('fa-eye-slash', isPassword);
+            });
+        };
+
+        setupPasswordToggle(
+            'guardian-custom-password',
+            'toggle-guardian-password'
+        );
+
+        setupPasswordToggle(
+            'guardian-custom-password-confirm',
+            'toggle-guardian-password-confirm'
+        );
+
+        // Password strength checker
+        const checkStrength = () => {
+            const password = passwordInput.value;
+
+            let score = 0;
+
+            if (password.length >= 8) score++;
+            if (/[A-Z]/.test(password)) score++;
+            if (/[a-z]/.test(password)) score++;
+            if (/[0-9]/.test(password)) score++;
+            if (/[!@#$%^&*]/.test(password)) score++;
+
+            // Reset bars
+            bars.forEach(bar => {
+                bar.className =
+                    'h-1 flex-1 rounded bg-zinc-200';
+            });
+
+            if (!password) {
+                strengthText.textContent = 'Password strength';
+                strengthText.className =
+                    'mt-1 text-xs text-zinc-500';
+                return;
+            }
+
+            if (score <= 2) {
+                strengthText.textContent = 'Weak password';
+                strengthText.className =
+                    'mt-1 text-xs text-red-500';
+
+                bars[0].classList.replace(
+                    'bg-zinc-200',
+                    'bg-red-500'
+                );
+
+            } else if (score <= 4) {
+                strengthText.textContent = 'Medium password';
+                strengthText.className =
+                    'mt-1 text-xs text-yellow-600';
+
+                bars.slice(0, 3).forEach(bar => {
+                    bar.classList.replace(
+                        'bg-zinc-200',
+                        'bg-yellow-500'
+                    );
+                });
+
+            } else {
+                strengthText.textContent = 'Strong password';
+                strengthText.className =
+                    'mt-1 text-xs text-green-600';
+
+                bars.forEach(bar => {
+                    bar.classList.replace(
+                        'bg-zinc-200',
+                        'bg-green-500'
+                    );
+                });
+            }
+        };
+
+        // Password match checker
+        const checkMatch = () => {
+            const password = passwordInput.value;
+            const confirmPassword = confirmInput.value;
+
+            if (!confirmPassword) {
+                matchText.textContent = '';
+                return;
+            }
+
+            if (password === confirmPassword) {
+                matchText.innerHTML = `
+                    <i class="fas fa-check-circle"></i>
+                    Passwords match
+                `;
+
+                matchText.className =
+                    'mt-2 text-left text-xs text-green-600';
+
+            } else {
+                matchText.innerHTML = `
+                    <i class="fas fa-times-circle"></i>
+                    Passwords do not match
+                `;
+
+                matchText.className =
+                    'mt-2 text-left text-xs text-red-500';
+            }
+        };
+
+        passwordInput.addEventListener('input', () => {
+            checkStrength();
+            checkMatch();
+        });
+
+        confirmInput.addEventListener('input', checkMatch);
+    },
+
+    preConfirm: () => {
+        const pass1 =
+            document.getElementById('guardian-custom-password')?.value || '';
+
+        const pass2 =
+            document.getElementById(
+                'guardian-custom-password-confirm'
+            )?.value || '';
+
+        if (!pass1 || !pass2) {
+            Swal.showValidationMessage(
+                'Please fill in both password fields.'
+            );
+            return false;
+        }
+
+        if (pass1 !== pass2) {
+            Swal.showValidationMessage(
+                'Passwords do not match.'
+            );
+            return false;
+        }
+
+        if (
+            pass1.length < 8 ||
+            !/[A-Z]/.test(pass1) ||
+            !/[a-z]/.test(pass1) ||
+            !/[0-9]/.test(pass1) ||
+            !/[!@#$%^&*]/.test(pass1)
+        ) {
+            Swal.showValidationMessage(
+                'Password does not meet the requirements.'
+            );
+            return false;
+        }
+
+        return pass1;
+    }
+});
 
                     if (!customPasswordResult.isConfirmed) {
                         return;
@@ -7226,33 +7454,28 @@ function wireStudentOnboardingActions(student, meta, portal) {
                         const guardianPasswordText = resGuardian.guardian_temporary_password || 'Not available';
                         await Swal.fire({
                             icon: 'info',
-                            title: 'Please write these details down',
-                            width: 700,
-                            confirmButtonText: 'OK',
+                            title: 'Login Credentials',
+                            width: 500,
+                            confirmButtonText: 'Got it',
                             confirmButtonColor: '#b8860b',
                             html: `
-                                <div class="text-left text-sm leading-6" style="color:#1f2937;">
-                                    <p class="mb-3">These are the login details for the student and the guardian. Keep them safe.</p>
+                                <div class="text-left text-sm" style="color:#1f2937;">
+                                    <p style="color:#64748b;margin-bottom:12px;font-size:13px;">Save these details to sign in later.</p>
 
-                                    <div style="background:#f8fafc;border:1px solid #dbe4f0;border-radius:16px;padding:16px 18px;margin-bottom:12px;">
-                                        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;font-weight:700;">Student ID</div>
-                                        <div style="font-size:26px;font-weight:800;color:#0f172a;margin-top:4px;">${escapeHtml(studentLoginId)}</div>
-                                        <div style="margin-top:6px;color:#475569;">Use this to sign in to the <strong>Student Dashboard</strong>.</div>
+                                    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+                                        <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#0369a1;font-weight:700;">Student ID</div>
+                                        <div style="font-size:18px;font-weight:800;color:#0c4a6e;margin-top:2px;">${escapeHtml(studentLoginId)}</div>
                                     </div>
 
-                                    <div style="background:#f8fafc;border:1px solid #dbe4f0;border-radius:16px;padding:16px 18px;margin-bottom:12px;">
-                                        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;font-weight:700;">Guardian ID</div>
-                                        <div style="font-size:20px;font-weight:800;color:#0f172a;margin-top:4px;word-break:break-word;">${escapeHtml(guardianLogin)}</div>
-                                        <div style="margin-top:6px;color:#475569;">Use this to sign in to the <strong>Guardian Module</strong>.</div>
+                                    <div style="background:#fef3c7;border:1px solid #fde047;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+                                        <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#a16207;font-weight:700;">Guardian Login</div>
+                                        <div style="font-size:14px;font-weight:700;color:#713f12;margin-top:2px;word-break:break-all;">${escapeHtml(guardianLogin)}</div>
                                     </div>
 
-                                    <div style="background:#f8fafc;border:1px solid #dbe4f0;border-radius:16px;padding:16px 18px;">
-                                        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;font-weight:700;">Guardian Password</div>
-                                        <div style="font-size:20px;font-weight:800;color:#0f172a;margin-top:4px;word-break:break-word;">${escapeHtml(guardianPasswordText)}</div>
-                                        <div style="margin-top:6px;color:#475569;">This is the password the guardian will use to sign in.</div>
+                                    <div style="background:#fef3c7;border:1px solid #fde047;border-radius:8px;padding:10px 12px;">
+                                        <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#a16207;font-weight:700;">Guardian Password</div>
+                                        <div style="font-size:14px;font-weight:700;color:#713f12;margin-top:2px;word-break:break-all;">${escapeHtml(guardianPasswordText)}</div>
                                     </div>
-
-                                    <p class="mt-3" style="color:#475569;">Please keep these details safe. The guardian will use the login shown above together with the password shown here.</p>
                                 </div>
                             `,
                         });
@@ -9668,25 +9891,25 @@ function renderRegistrationsTable() {
         const sourceLabel = registrationSource === 'walkin' ? 'Walk-In' : 'Online';
         const studentLoginId = getRegistrationStudentLoginId(reg);
 
-        // Create button-style proof links
+        // Create button-style proof links that open in modal
         const registrationProofLink = reg.registration_proof_path
-            ? `<a href="${buildPublicFileUrl(reg.registration_proof_path)}" target="_blank" rel="noopener"
-                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700
-                         hover:bg-blue-100 border border-blue-200 text-[10px] font-semibold transition-colors mt-1">
+            ? `<button type="button" class="view-proof-btn inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700
+                         hover:bg-blue-100 border border-blue-200 text-[10px] font-semibold transition-colors mt-1"
+                         data-proof-url="${buildPublicFileUrl(reg.registration_proof_path)}" data-proof-title="Payment Proof">
                   <i class="fas fa-receipt"></i>
                   <span>Payment proof</span>
-               </a>`
+               </button>`
             : (registrationSource === 'walkin'
                 ? '<div class="text-[10px] text-slate-400 mt-1 italic">Walk-in payment handled at branch</div>'
                 : '<div class="text-[10px] text-slate-400 mt-1 italic">No proof uploaded</div>');
 
         const ageProofLink = reg.age_verification_proof_path
-            ? `<a href="${buildPublicFileUrl(reg.age_verification_proof_path)}" target="_blank" rel="noopener"
-                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700
-                         hover:bg-emerald-100 border border-emerald-200 text-[10px] font-semibold transition-colors mt-1">
+            ? `<button type="button" class="view-proof-btn inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700
+                         hover:bg-emerald-100 border border-emerald-200 text-[10px] font-semibold transition-colors mt-1"
+                         data-proof-url="${buildPublicFileUrl(reg.age_verification_proof_path)}" data-proof-title="ID Proof">
                   <i class="fas fa-id-card"></i>
                   <span>Proof ID</span>
-               </a>`
+               </button>`
             : (registrationSource === 'walkin'
                 ? '<div class="text-[10px] text-slate-400 mt-1 italic">Proof ID not required for walk-in</div>'
                 : '<div class="text-[10px] text-slate-400 mt-1 italic">No proof ID uploaded</div>');
@@ -9762,6 +9985,25 @@ function renderRegistrationsTable() {
             </tr>
         `;
     }).join('');
+    
+    // Add event delegation for proof view buttons in table
+    setTimeout(() => {
+        if (!tbody.dataset.proofListenerAdded) {
+            tbody.addEventListener('click', (e) => {
+                const proofBtn = e.target.closest('.view-proof-btn');
+                if (proofBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const proofUrl = proofBtn.getAttribute('data-proof-url');
+                    const proofTitle = proofBtn.getAttribute('data-proof-title') || 'Proof';
+                    if (proofUrl) {
+                        openProofViewerModal(proofUrl, proofTitle);
+                    }
+                }
+            });
+            tbody.dataset.proofListenerAdded = 'true';
+        }
+    }, 100);
 }
 
 // Display Registrations
@@ -9840,10 +10082,10 @@ async function viewDetails(studentId) {
                 </div>
             `;
             const paymentProofValue = student?.registration_proof_path
-                ? `<a class="text-amber-700 underline decoration-amber-300/60 underline-offset-4 hover:text-amber-900" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.registration_proof_path)}">View file</a>`
+                ? `<button type="button" class="view-proof-btn text-amber-700 underline decoration-amber-300/60 underline-offset-4 hover:text-amber-900 cursor-pointer" data-proof-url="${buildPublicFileUrl(student.registration_proof_path)}" data-proof-title="Payment Proof">View file</button>`
                 : escapeHtml(String(student?.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A');
             const proofIdValue = student?.age_verification_proof_path
-                ? `<a class="text-amber-700 underline decoration-amber-300/60 underline-offset-4 hover:text-amber-900" target="_blank" rel="noopener" href="${buildPublicFileUrl(student.age_verification_proof_path)}">View file</a>`
+                ? `<button type="button" class="view-proof-btn text-amber-700 underline decoration-amber-300/60 underline-offset-4 hover:text-amber-900 cursor-pointer" data-proof-url="${buildPublicFileUrl(student.age_verification_proof_path)}" data-proof-title="ID Proof">View file</button>`
                 : escapeHtml(String(student?.registration_source || 'online').toLowerCase() === 'walkin' ? 'Not required for walk-in' : 'N/A');
             const detailsHTML = `
                 <div class="space-y-5">
@@ -9954,9 +10196,112 @@ async function viewDetails(studentId) {
             document.getElementById('detailsModal').classList.remove('hidden');
             document.getElementById('detailsModal').classList.add('flex');
             document.body.classList.add('overflow-hidden');
+            
+            // Add event delegation for proof viewing buttons
+            setTimeout(() => {
+                const detailsContent = document.getElementById('detailsContent');
+                if (detailsContent) {
+                    detailsContent.addEventListener('click', (e) => {
+                        const proofBtn = e.target.closest('.view-proof-btn');
+                        if (proofBtn) {
+                            e.preventDefault();
+                            const proofUrl = proofBtn.getAttribute('data-proof-url');
+                            const proofTitle = proofBtn.getAttribute('data-proof-title') || 'Proof';
+                            if (proofUrl) {
+                                openProofViewerModal(proofUrl, proofTitle);
+                            }
+                        }
+                    });
+                }
+            }, 100);
         }
     } catch (error) {
         showMessage('Failed to load details: ' + (error.message || error), 'error');
+    }
+}
+
+// Open Proof Viewer Modal
+function openProofViewerModal(proofUrl, title) {
+    const modal = document.getElementById('proofViewerModal');
+    
+    if (!modal) {
+        // Create compact modal with higher z-index
+        const modalHTML = `
+            <div id="proofViewerModal" class="fixed inset-0 z-[1300] hidden items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                <div class="relative w-full max-w-2xl max-h-[80vh] flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white">
+                        <h3 id="proofViewerTitle" class="text-sm font-bold text-slate-900">Proof</h3>
+                        <button type="button" onclick="closeProofViewerModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="flex-1 min-h-0 bg-slate-100 flex items-center justify-center p-4">
+                        <img id="proofViewerImage" class="max-w-full max-h-full object-contain" style="display: none;" />
+                        <iframe id="proofViewerIframe" class="w-full h-full border-0" style="display: none; min-height: 400px;"></iframe>
+                        <div id="proofViewerLoading" class="text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    }
+    
+    const actualModal = document.getElementById('proofViewerModal');
+    const actualIframe = document.getElementById('proofViewerIframe');
+    const actualImage = document.getElementById('proofViewerImage');
+    const actualTitle = document.getElementById('proofViewerTitle');
+    const loadingEl = document.getElementById('proofViewerLoading');
+    
+    if (actualTitle) actualTitle.textContent = title;
+    
+    // Check if it's an image or PDF
+    const isImage = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(proofUrl);
+    
+    if (isImage && actualImage) {
+        // Display as image for better fitting
+        actualImage.style.display = 'block';
+        if (actualIframe) actualIframe.style.display = 'none';
+        if (loadingEl) loadingEl.style.display = 'flex';
+        
+        actualImage.onload = () => {
+            if (loadingEl) loadingEl.style.display = 'none';
+        };
+        actualImage.onerror = () => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            // Fallback to iframe if image fails
+            if (actualIframe) {
+                actualIframe.style.display = 'block';
+                actualIframe.src = proofUrl;
+            }
+            actualImage.style.display = 'none';
+        };
+        actualImage.src = proofUrl;
+    } else if (actualIframe) {
+        // Display PDF in iframe
+        actualImage.style.display = 'none';
+        actualIframe.style.display = 'block';
+        if (loadingEl) loadingEl.style.display = 'none';
+        actualIframe.src = proofUrl;
+    }
+    
+    if (actualModal) {
+        actualModal.classList.remove('hidden');
+        actualModal.classList.add('flex');
+    }
+}
+
+// Close Proof Viewer Modal
+function closeProofViewerModal() {
+    const modal = document.getElementById('proofViewerModal');
+    const iframe = document.getElementById('proofViewerIframe');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+    if (iframe) {
+        iframe.src = '';
     }
 }
 
@@ -10589,6 +10934,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // all tabs in the same browser).  Only redirect if we get a confirmed
         // user — never redirect back to index.html to avoid loops.
         (async () => {
+            // Skip session check on public pages
+            if (window.isPublicPage) {
+                return;
+            }
+
             const localUser = Auth.getUser();
             if (localUser && _getDashboardUrl(localUser.role_name)) {
                 window.location.href = _getDashboardUrl(localUser.role_name);
