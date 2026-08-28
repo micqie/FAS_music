@@ -1600,6 +1600,49 @@ class AttendanceApi
         return (int)$conflictStmt->fetchColumn() > 0;
     }
 
+    private function getStudentInstrumentTypes($studentId, $fallbackInstrumentId = 0)
+    {
+        $studentId = (int)$studentId;
+        $fallbackInstrumentId = (int)$fallbackInstrumentId;
+        $types = [];
+
+        if ($studentId > 0 && $this->tableExists('tbl_student_instruments') && $this->tableExists('tbl_instruments')) {
+            $stmt = $this->conn->prepare("
+                SELECT DISTINCT i.type_id, COALESCE(it.type_name, 'Other') AS type_name
+                FROM tbl_student_instruments si
+                INNER JOIN tbl_instruments i ON i.instrument_id = si.instrument_id
+                LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
+                WHERE si.student_id = ?
+                  AND i.type_id IS NOT NULL
+                ORDER BY type_name ASC
+            ");
+            $stmt->execute([$studentId]);
+            $types = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+
+        if (empty($types) && $fallbackInstrumentId > 0 && $this->tableExists('tbl_instruments')) {
+            $stmt = $this->conn->prepare("
+                SELECT DISTINCT i.type_id, COALESCE(it.type_name, 'Other') AS type_name
+                FROM tbl_instruments i
+                LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
+                WHERE i.instrument_id = ?
+                  AND i.type_id IS NOT NULL
+                LIMIT 1
+            ");
+            $stmt->execute([$fallbackInstrumentId]);
+            $types = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+
+        return array_values(array_filter(array_map(function ($type) {
+            $typeId = (int)($type['type_id'] ?? 0);
+            if ($typeId < 1) return null;
+            return [
+                'type_id' => $typeId,
+                'type_name' => trim((string)($type['type_name'] ?? '')) ?: 'Other'
+            ];
+        }, $types)));
+    }
+
     public function getSessionAvailableRooms()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -1623,6 +1666,7 @@ class AttendanceApi
                     ts.end_time,
                     ts.status,
                     e.student_id,
+                    e.instrument_id AS enrollment_instrument_id,
                     s.branch_id,
                     s.first_name AS student_first_name,
                     s.last_name AS student_last_name
@@ -1639,6 +1683,10 @@ class AttendanceApi
             }
 
             $branchId = (int)($session['branch_id'] ?? 0);
+            $allowedInstrumentTypes = $this->getStudentInstrumentTypes(
+                (int)($session['student_id'] ?? 0),
+                (int)($session['enrollment_instrument_id'] ?? 0)
+            );
             $sessionDate = (string)($session['session_date'] ?? '');
             $startTime = (string)($session['start_time'] ?? '');
             $endTime = (string)($session['end_time'] ?? '');
@@ -1689,7 +1737,11 @@ class AttendanceApi
                     'start_time' => $startTime,
                     'end_time' => $endTime,
                     'branch_id' => $branchId,
-                    'student_name' => $studentName
+                    'student_name' => $studentName,
+                    'allowed_instrument_types' => $allowedInstrumentTypes,
+                    'allowed_instrument_type_ids' => array_values(array_map(function ($type) {
+                        return (int)$type['type_id'];
+                    }, $allowedInstrumentTypes))
                 ]
             ]);
         } catch (PDOException $e) {
@@ -1728,6 +1780,7 @@ class AttendanceApi
                     ts.end_time,
                     ts.status,
                     e.student_id,
+                    e.instrument_id AS enrollment_instrument_id,
                     s.branch_id
                 FROM tbl_sessions ts
                 INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
@@ -1770,7 +1823,7 @@ class AttendanceApi
             }
 
             $instrumentStmt = $this->conn->prepare("
-                SELECT i.instrument_id, i.instrument_name, i.branch_id, i.status, it.type_name
+                SELECT i.instrument_id, i.instrument_name, i.branch_id, i.type_id, i.status, it.type_name
                 FROM tbl_instruments i
                 LEFT JOIN tbl_instrument_types it ON i.type_id = it.type_id
                 WHERE i.instrument_id = ?
@@ -1786,6 +1839,22 @@ class AttendanceApi
             }
             if (!in_array((string)($instrument['status'] ?? ''), ['Available', 'In Use'], true)) {
                 $this->sendJSON(['error' => 'Selected instrument is not available'], 400);
+            }
+
+            $allowedInstrumentTypes = $this->getStudentInstrumentTypes(
+                (int)($session['student_id'] ?? 0),
+                (int)($session['enrollment_instrument_id'] ?? 0)
+            );
+            $allowedInstrumentTypeIds = array_values(array_map(function ($type) {
+                return (int)$type['type_id'];
+            }, $allowedInstrumentTypes));
+            if (!empty($allowedInstrumentTypeIds) && !in_array((int)($instrument['type_id'] ?? 0), $allowedInstrumentTypeIds, true)) {
+                $allowedLabels = implode(', ', array_map(function ($type) {
+                    return (string)$type['type_name'];
+                }, $allowedInstrumentTypes));
+                $this->sendJSON([
+                    'error' => 'Selected instrument must match the student\'s enrolled instrument type' . (count($allowedInstrumentTypes) > 1 ? 's' : '') . ': ' . $allowedLabels
+                ], 400);
             }
 
             if ($this->roomHasScheduleConflict(

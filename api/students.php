@@ -5063,6 +5063,7 @@ class StudentsApi
         $data = $isMultipart ? ($_POST ?: []) : (json_decode(file_get_contents('php://input'), true) ?: []);
         $studentId = (int) ($data['student_id'] ?? 0);
         $packageId = (int) ($data['package_id'] ?? 0);
+        $requestedSessionCount = (int) ($data['requested_session_count'] ?? 0);
         $paymentRaw = $data['payment_type'] ?? ($data['payment_mode'] ?? '');
         $paymentType = $this->normalizeEnrollmentPaymentType($paymentRaw);
         $paymentMethodRaw = $data['payment_method'] ?? '';
@@ -5177,6 +5178,14 @@ class StudentsApi
 
             $maxInstruments = (int) ($package['max_instruments'] ?? 1);
             $packageSessions = max(1, (int)($package['sessions'] ?? 1));
+            $totalSessions = $requestedSessionCount > 0 ? $requestedSessionCount : $packageSessions;
+            if ($totalSessions < $packageSessions) {
+                $this->sendJSON(['error' => 'Session count cannot be lower than the selected package.'], 400);
+            }
+            if ($totalSessions > min(100, $packageSessions + 50)) {
+                $this->sendJSON(['error' => 'You can add up to 50 extra sessions.'], 400);
+            }
+            $extraSessionCount = max(0, $totalSessions - $packageSessions);
             if ($isInitialEnrollment) {
                 if ($packageSessions !== 12) {
                     $this->sendJSON(['error' => 'Initial enrollment must use the 12-session package.'], 400);
@@ -5211,8 +5220,9 @@ class StudentsApi
                 $this->sendJSON(['error' => 'tbl_enrollments table not found'], 500);
             }
             $primaryInstrumentId = !empty($instrumentIds) ? (int)$instrumentIds[0] : null;
-            $packagePrice = (float)($package['price'] ?? 0);
-            $payableNow = $this->computeEnrollmentPayableNow($packagePrice, $packageSessions, $paymentType);
+            $basePackagePrice = (float)($package['price'] ?? 0);
+            $packagePrice = $basePackagePrice + ($extraSessionCount * 650.00);
+            $payableNow = $this->computeEnrollmentPayableNow($packagePrice, $totalSessions, $paymentType);
             if ($payableNow <= 0) {
                 $this->sendJSON(['error' => 'Unable to compute the enrollment payment amount. Please contact desk/admin.'], 400);
             }
@@ -5228,6 +5238,11 @@ class StudentsApi
                 'payment_method' => $paymentMethod,
                 'payable_now' => $payableNow,
                 'package_total_amount' => $packagePrice,
+                'base_package_amount' => $basePackagePrice,
+                'base_package_sessions' => $packageSessions,
+                'requested_session_count' => $totalSessions,
+                'extra_session_count' => $extraSessionCount,
+                'extra_session_amount' => $extraSessionCount * 650.00,
                 'instrument_ids' => array_values($instrumentIds),
                 'payment_proof_path' => $paymentProofPath,
                 'is_walkin_request' => $isWalkinRequest ? 1 : 0,
@@ -5254,7 +5269,7 @@ class StudentsApi
                 $primaryInstrumentId,
                 ($preferredSchedule !== '' ? $preferredSchedule : null),
                 $requestMeta,
-                $packageSessions
+                $totalSessions
             ]);
             $requestId = (int)$this->conn->lastInsertId();
 
@@ -6694,6 +6709,18 @@ class StudentsApi
                 }
             }
 
+            $basePackagePrice = $packagePrice;
+            $basePackageSessions = $packageSessions;
+            $requestMeta = [];
+            if (!empty($req['request_notes'])) {
+                $decoded = json_decode((string)$req['request_notes'], true);
+                if (is_array($decoded)) $requestMeta = $decoded;
+            }
+            $requestedSessionCount = max($basePackageSessions, (int)($requestMeta['requested_session_count'] ?? $basePackageSessions));
+            $extraSessionCount = max(0, $requestedSessionCount - $basePackageSessions);
+            $packageSessions = $requestedSessionCount;
+            $packagePrice = (float)($requestMeta['package_total_amount'] ?? ($basePackagePrice + ($extraSessionCount * 650.00)));
+
             $stmtUpdateStudent = $this->conn->prepare("
                 UPDATE tbl_students
                 SET session_package_id = ?
@@ -6739,11 +6766,6 @@ class StudentsApi
                 $endDate = date('Y-m-d', strtotime($assignedDate . ' +' . max(0, $weeksNeeded * 7) . ' days'));
             }
 
-            $requestMeta = [];
-            if (!empty($req['request_notes'])) {
-                $decoded = json_decode((string)$req['request_notes'], true);
-                if (is_array($decoded)) $requestMeta = $decoded;
-            }
             $enrollmentMode = strtolower(trim((string)($requestMeta['enrollment_mode'] ?? 'extension')));
             $isInitialEnrollment = $enrollmentMode === 'initial';
             $paymentType = $this->normalizeEnrollmentPaymentType($requestMeta['payment_type'] ?? 'Partial Payment');
@@ -6766,7 +6788,7 @@ class StudentsApi
                 $this->sendJSON(['error' => 'The enrollment payment amount is invalid.'], 400);
             }
             if ($isInitialEnrollment) {
-                if ($packageSessions !== 12) {
+                if ($basePackageSessions !== 12) {
                     $this->conn->rollBack();
                     $this->sendJSON(['error' => 'Initial enrollment must use the 12-session package.'], 400);
                 }

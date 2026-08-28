@@ -69,11 +69,7 @@
             const params = new URLSearchParams(window.location.search);
             const requestId = Number(params.get('assign_request_id') || 0);
             if (!requestId) return;
-
-            // Ensure pending requests are loaded so we can open the modal
-            await loadPendingRequests();
-
-            openAssignRequestModal(requestId);
+            window.location.replace(`admin_enrollments.html?view=pending&assign_request_id=${encodeURIComponent(requestId)}`);
         }
 
         async function loadBranches() {
@@ -1155,6 +1151,11 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
+            const legacyAssignRequestId = Number(new URLSearchParams(window.location.search).get('assign_request_id') || 0);
+            if (legacyAssignRequestId) {
+                window.location.replace(`admin_enrollments.html?view=pending&assign_request_id=${encodeURIComponent(legacyAssignRequestId)}`);
+                return;
+            }
             const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
             const assignRequestDateEl = document.getElementById('assignRequestDate');
             if (assignRequestDateEl) assignRequestDateEl.min = todayYmd;

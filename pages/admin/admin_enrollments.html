@@ -55,6 +55,29 @@
         td { padding: 0.75rem 1rem; }
         .table-compact th { padding: 0.5rem 0.75rem; }
         .table-compact td { padding: 0.5rem 0.75rem; }
+        .enrollment-table tbody button { padding: .4rem .65rem !important; font-size: .75rem !important; border-radius: .375rem !important; white-space: nowrap; }
+        #walkinEnrollmentModal .walkin-enrollment-panel {
+            width: min(94vw, 48rem);
+            max-width: min(94vw, 48rem);
+            height: auto;
+            max-height: min(90vh, 42rem);
+            border-radius: .75rem;
+        }
+        #walkinEnrollmentModal .admin-package-card {
+            min-height: 5.25rem;
+            border: 1px solid #cbd5e1;
+            border-radius: .5rem;
+            background: #fff;
+            padding: .65rem;
+            text-align: left;
+            transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+        }
+        #walkinEnrollmentModal .admin-package-card:hover { border-color: #d4af37; }
+        #walkinEnrollmentModal .admin-package-card.is-selected {
+            border-color: #b8860b;
+            background: #fdfaf1;
+            box-shadow: 0 0 0 1px #d4af37;
+        }
     </style>
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
@@ -161,14 +184,14 @@
         </div>
     </aside>
 
-    <main class="lg:ml-72 pt-12 px-4 sm:px-6 md:px-8 py-5">
-        <div class="max-w-7xl mx-auto">
-            <div class=" flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+    <main class="lg:ml-72 px-3 pb-4 pt-20 sm:px-4 lg:px-5">
+        <div class="mx-auto max-w-[1680px]">
+            <div class="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 id="sessionsPageTitle" class="text-3xl font-black text-slate-900 tracking-tight">Enrollment</h1>
-                    <p id="sessionsPageSubtitle" class="text-slate-500 mt-2">Review portal sign-ups, approve add-on sessions, and keep active students on schedule.</p>
+                    <h1 id="sessionsPageTitle" class="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Enrollments</h1>
+                    <p id="sessionsPageSubtitle" class="mt-0.5 text-xs text-slate-500 sm:text-sm">All enrollment activity across branches.</p>
                 </div>
-                <div class="text-sm text-slate-500 xl:text-right">
+                <div class="text-xs text-slate-500 sm:text-sm">
                     <span id="itemsNeedActionCount" class="font-bold text-slate-900">0</span> items need action
                 </div>
             </div>
@@ -176,65 +199,50 @@
             <!-- Messages -->
             <div id="message" class="hidden mt-4 mb-4 p-3 rounded text-sm"></div>
 
-            <div class="mt-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div class="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm w-fit">
-                    <button id="enrollNavPending" class="px-5 py-2.5 text-sm font-semibold rounded-xl text-slate-800 hover:bg-slate-100 transition">
+            <div class="mt-2.5 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div class="inline-flex w-fit rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
+                    <button id="enrollNavPending" class="rounded-md px-3 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-100 sm:text-sm">
                         Pending (<span id="pendingTabCount">0</span>)
                     </button>
-                    <button id="enrollNavActive" class="px-5 py-2.5 text-sm font-semibold rounded-xl text-slate-800 hover:bg-slate-100 transition">
+                    <button id="enrollNavActive" class="rounded-md px-3 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-100 sm:text-sm">
                         Active (<span id="activeTabCount">0</span>)
                     </button>
                 </div>
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-end w-full xl:w-auto">
-                    <div class="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
-                        <div class="relative w-full sm:w-[380px]">
-                            <i class="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                            <input id="enrollmentSearchInput" type="search" placeholder="Search student, branch, package" class="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto lg:justify-end">
+                    <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                        <div class="relative w-full sm:w-[280px]">
+                            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+                            <input id="enrollmentSearchInput" type="search" placeholder="Search enrollments" class="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-sm text-slate-900 shadow-sm focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20">
                         </div>
-                        <select id="branchFilter" class="w-full sm:w-52 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition">
+                        <select id="branchFilter" class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm transition focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20 sm:w-48">
                             <option value="">All branches</option>
                         </select>
                     </div>
-                    <button id="openWalkinEnrollmentModalBtn" class="inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-2xl shadow-lg shadow-gold-500/25 transition-all duration-200 whitespace-nowrap">
-                        <i class="fas fa-list-check mr-2"></i>
-                        Walk-In Enrollment
+                    <button id="openSessionExtensionRequestsModalBtn" type="button" class="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gold-200 bg-white px-3 text-xs font-semibold text-gold-700 shadow-sm hover:bg-gold-50 sm:text-sm">
+                        <i class="fas fa-calendar-plus"></i> Extension Requests
+                        <span id="sessionExtensionRequestCount" class="rounded-full bg-gold-100 px-1.5 py-0.5 text-[10px] font-black">0</span>
+                    </button>
+                    <button id="openWalkinEnrollmentModalBtn" class="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg bg-gradient-to-r from-gold-500 to-gold-400 px-3 text-xs font-bold text-black shadow-sm hover:from-gold-400 hover:to-gold-500 sm:text-sm">
+                        <i class="fas fa-list-check mr-1.5"></i> Walk-In
                     </button>
                 </div>
             </div>
 
-            <section class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="flex items-center justify-between gap-4 px-4 py-3 border-b border-slate-200">
-                    <div>
-                        <h2 class="text-base font-bold text-slate-900">Session extension requests only</h2>
-                        <p class="text-xs text-slate-500">Turn on to focus on add-on session requests.</p>
-                    </div>
-                    <label class="inline-flex cursor-pointer items-center gap-3">
-                        <input id="extensionOnlyToggle" type="checkbox" class="peer sr-only">
-                        <span class="relative h-7 w-12 rounded-full border-2 border-gold-500 bg-gold-500/20 transition peer-checked:bg-gold-500 peer-checked:border-gold-500">
-                            <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
-                        </span>
-                    </label>
-                </div>
-            </section>
-
-            <div class="mt-6">
+            <div class="mt-3">
                 <!-- Pending Enrollments -->
-                <div id="pendingSessionsSection" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-4">
-                    <div class="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-base font-bold text-slate-800"><i class="fas fa-calendar-plus mr-2 text-gold-500"></i>Pending Session Extension Requests</h3>
-                            <p class="text-xs text-slate-500 mt-1">₱650 per 1-hour add-on session from the student portal.</p>
-                        </div>
+                <div id="pendingSessionsSection" class="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-3 py-2">
+                        <h3 class="text-sm font-bold text-slate-800 sm:text-base"><i class="fas fa-inbox mr-1.5 text-gold-500"></i>Pending Enrollments</h3>
                         <span class="text-xs text-slate-500" id="pendingRequestCount">Loading...</span>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full table-compact">
+                        <table class="enrollment-table table-compact w-full">
                             <thead class="bg-slate-50">
                                 <tr>
                                     <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
                                     <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
-                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Schedule</th>
-                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Add-on</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                                    <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
                                     <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
                                     <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                                 </tr>
@@ -252,16 +260,13 @@
                 </div>
 
                 <!-- Active Enrollments -->
-                <div id="activeEnrollmentsSection" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-base font-bold text-slate-800"><i class="fas fa-user-check mr-2 text-gold-500"></i>Active Enrollments</h3>
-                            <p class="text-xs text-slate-500 mt-1">Students currently working through their session packages.</p>
-                        </div>
+                <div id="activeEnrollmentsSection" class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-3 py-2">
+                        <h3 class="text-sm font-bold text-slate-800 sm:text-base"><i class="fas fa-user-check mr-1.5 text-gold-500"></i>Active Enrollments</h3>
                         <span class="text-xs text-slate-500" id="activeEnrollmentCount">Loading...</span>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full table-compact">
+                        <table class="enrollment-table table-compact w-full">
                             <thead class="bg-slate-50">
                                 <tr>
                                     <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
@@ -287,139 +292,196 @@
         </div>
     </main>
 
-    <!-- Walk-in Enrollment Modal -->
-    <div id="walkinEnrollmentModal" class="desk-modal fixed inset-0 z-[1100] hidden items-start justify-center bg-[#1f2430]/70 backdrop-blur-[2px] overflow-y-auto p-3 sm:p-4">
-        <div class="desk-modal-panel walkin-enrollment-panel w-full max-w-[1120px] overflow-hidden my-2 sm:my-4">
-            <div class="walkin-enrollment-header">
+    <!-- Pending enrollment scheduling modal (same availability flow used by desk/manager) -->
+    <div id="assignRequestModal" class="desk-modal desk-modal-readable fixed inset-0 z-[1200] hidden items-center justify-center bg-[#1f2430]/70 p-3 backdrop-blur-[2px] sm:p-4">
+        <div class="desk-modal-panel flex max-h-[92vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
                 <div>
-                    <h3>New walk-in enrollment</h3>
-                    <p>Admin can enroll students across all branches.</p>
+                    <h3 class="text-lg font-bold text-slate-900">Schedule enrollment</h3>
+                    <p class="text-xs text-slate-500">Choose a teacher, then pick an available one-hour slot.</p>
                 </div>
-                <button type="button" id="closeWalkinEnrollmentModalBtn" class="walkin-modal-close" aria-label="Close">
+                <button type="button" id="closeAssignRequestModalBtn" class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
 
-            <div id="walkinEnrollmentMessage" class="hidden mx-5 mt-4 p-3 rounded-xl text-sm border"></div>
+            <div class="border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+                <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs sm:text-sm">
+                    <div><b class="text-slate-600">Student:</b> <span id="assignRequestStudentName" class="ml-1 text-slate-900">—</span></div>
+                    <div><b class="text-slate-600">Branch:</b> <span id="assignRequestStudentBranch" class="ml-1 text-slate-900">—</span></div>
+                    <div><b class="text-slate-600">Package:</b> <span id="assignRequestStudentPackage" class="ml-1 text-slate-900">—</span></div>
+                    <div><b class="text-slate-600">Instrument:</b> <span id="assignRequestStudentInstrument" class="ml-1 text-slate-900">—</span></div>
+                </div>
+            </div>
 
-            <form id="walkinEnrollmentForm" class="walkin-enrollment-body flex-1 min-h-0">
-                <div class="walkin-enrollment-grid">
-                    <div class="walkin-main-column">
-                        <section class="walkin-section-card">
-                            <div class="walkin-step-header">
-                                <span class="walkin-step-badge">1</span>
-                                <h2>Who is enrolling?</h2>
-                            </div>
-
-                            <div id="walkinStudentSearchWrap" class="walkin-search-wrap">
-                                <input type="text" id="walkinStudentSearch" placeholder="Type a name or phone number" class="walkin-search-input">
-                                <input type="hidden" id="walkinStudentSelect" value="">
-                            </div>
-
-                            <div id="walkinSelectedStudentCard" class="hidden walkin-selected-student-card">
-                                <div class="walkin-selected-avatar" id="walkinSelectedStudentAvatar">--</div>
-                                <div class="min-w-0 flex-1">
-                                    <div id="walkinSelectedStudentName" class="walkin-selected-name">—</div>
-                                    <div id="walkinSelectedStudentMeta" class="walkin-selected-meta">—</div>
-                                </div>
-                                <button type="button" id="walkinClearStudentBtn" class="walkin-change-btn">Change</button>
-                            </div>
-
-                            <div id="walkinStudentResults" class="walkin-results-list">
-                                <div class="walkin-empty-state">Type to search students.</div>
-                            </div>
-                            <p id="walkinStatusInfo" class="walkin-status-info"></p>
-                        </section>
-
-                        <section class="walkin-section-card">
-                            <div class="walkin-step-header">
-                                <span class="walkin-step-badge">2</span>
-                                <h2>Select Branch & Package</h2>
-                            </div>
-                            <p class="walkin-section-copy">Choose the branch for this enrollment.</p>
-
-                            <div class="walkin-learning-card mb-4">
-                                <div class="walkin-learning-row">
-                                    <div class="walkin-learning-field flex-1">
-                                        <label class="walkin-field-label">Branch *</label>
-                                        <select id="walkinBranchSelect" class="walkin-session-select">
-                                            <option value="">Loading branches...</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="walkin-learning-card">
-                                <div class="walkin-learning-row">
-                                    <div class="walkin-learning-field">
-                                        <label class="walkin-field-label">Instrument</label>
-                                        <div id="walkinInstrumentsContainer" class="walkin-instrument-stack">
-                                            <div class="text-sm text-slate-500">Select a student first.</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="walkin-learning-sessions">
-                                        <label class="walkin-field-label">Sessions</label>
-                                        <select id="walkinSessionSelect" class="walkin-session-select">
-                                            <option value="12">12 Sessions</option>
-                                            <option value="20">20 Sessions</option>
-                                            <option value="50">50 Sessions</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="walkin-upgrade-packages">
-                                <div class="walkin-upgrade-label">Upgrade packages</div>
-                                <div id="walkinPackageCards" class="walkin-package-grid"></div>
-                            </div>
-
-                            <select id="walkinPackageSelect" class="hidden">
-                                <option value="">Select package...</option>
-                            </select>
-
-                            <div id="walkinPaymentTypeCards" class="hidden"></div>
-                            <select id="walkinPaymentType" class="hidden">
-                                <option value="Full Payment" selected>Full Payment</option>
-                                <option value="Partial Payment">Partial Payment</option>
-                            </select>
-                        </section>
+            <div class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[320px_1fr]">
+                <div class="overflow-y-auto border-b border-slate-200 bg-white p-4 lg:border-b-0 lg:border-r">
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-bold text-slate-600">Start date *</span>
+                        <input type="date" id="assignRequestDate" class="h-9 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20">
+                    </label>
+                    <div class="mt-4 flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-700">Teacher & weekly slot</span>
+                        <span id="assignRequestSlotCount" class="text-[11px] font-semibold text-slate-500">0 scheduled</span>
                     </div>
+                    <div id="assignRequestSlotsContainer" class="mt-2 space-y-2"></div>
+                    <input type="hidden" id="assignRequestId" value="">
+                    <input type="hidden" id="assignRequestNotes" value="">
+                </div>
 
-                    <aside class="walkin-sidebar-card">
-                        <div class="walkin-sidebar-section">
-                            <h3>3. How are they paying?</h3>
-                            <select id="walkinPaymentMethod" class="walkin-payment-select">
-                                <option value="">Choose a method</option>
-                                <option value="Cash">Cash</option>
-                                <option value="GCash">GCash</option>
-                                <option value="Bank Transfer">Bank Transfer</option>
-                                <option value="Other">Other</option>
-                            </select>
+                <div class="min-h-[360px] overflow-y-auto bg-slate-50 p-4">
+                    <div id="assignRequestAvailabilityList">
+                        <div class="grid min-h-[320px] place-items-center text-center text-sm text-slate-500">
+                            <div><i class="fas fa-calendar-days mb-2 text-2xl text-slate-300"></i><p>Select a teacher to view availability.</p></div>
                         </div>
+                    </div>
+                </div>
+            </div>
 
-                        <div class="walkin-summary-divider"></div>
+            <div class="flex flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div id="assignRequestSummary" class="min-w-0 text-xs text-slate-500">No schedule selected.</div>
+                <div class="flex shrink-0 justify-end gap-2">
+                    <button type="button" id="cancelAssignRequestBtn" class="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="button" id="submitAssignRequestBtn" class="h-9 rounded-md bg-gold-500 px-4 text-sm font-bold text-black hover:bg-gold-400 disabled:cursor-not-allowed disabled:opacity-60">Assign schedule</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                        <div id="walkinAmountInfo" class="walkin-summary-content">
-                            <div class="walkin-summary-line">
-                                <span>Instrument</span>
-                                <span>—</span>
-                            </div>
-                            <div class="walkin-summary-line">
-                                <span>Sessions</span>
-                                <span>—</span>
-                            </div>
-                            <div class="walkin-summary-total">
-                                <span>Total</span>
-                                <span>₱0.00</span>
-                            </div>
+    <div id="sessionExtensionRequestsModal" class="desk-modal fixed inset-0 z-[1100] hidden items-center justify-center bg-[#1f2430]/70 p-3 backdrop-blur-[2px] sm:p-4">
+        <div class="desk-modal-panel flex max-h-[calc(100vh-2rem)] w-full max-w-[1100px] flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Session Extension Requests</h3>
+                    <p class="text-xs text-slate-500">Pending add-on sessions across all branches.</p>
+                </div>
+                <button type="button" id="closeSessionExtensionRequestsModalBtn" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-slate-500 hover:bg-slate-50" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-auto">
+                <table class="enrollment-table table-compact w-full">
+                    <thead class="sticky top-0 bg-slate-50">
+                        <tr>
+                            <th class="text-left uppercase text-slate-500">Student</th>
+                            <th class="text-left uppercase text-slate-500">Branch</th>
+                            <th class="text-left uppercase text-slate-500">Schedule</th>
+                            <th class="text-left uppercase text-slate-500">Add-on</th>
+                            <th class="text-left uppercase text-slate-500">Payment</th>
+                            <th class="text-left uppercase text-slate-500">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessionExtensionRequestsTable" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Walk-in Enrollment Modal -->
+    <div id="walkinEnrollmentModal" class="fixed inset-0 z-[1100] hidden items-center justify-center overflow-y-auto bg-[#1f2430]/70 p-3 backdrop-blur-[2px]">
+        <div class="walkin-enrollment-panel flex w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <h3 class="text-lg font-bold text-slate-900">Walk-in enrollment</h3>
+                <button type="button" id="closeWalkinEnrollmentModalBtn" class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div id="walkinEnrollmentMessage" class="mx-4 mt-3 hidden rounded-md border p-2.5 text-sm"></div>
+
+            <form id="walkinEnrollmentForm" class="min-h-0 flex-1 overflow-y-auto p-4">
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-bold text-slate-600">Branch *</span>
+                        <select id="walkinBranchSelect" required class="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20">
+                            <option value="">Loading branches...</option>
+                        </select>
+                    </label>
+
+                    <label id="walkinStudentSearchWrap" class="block">
+                        <span class="mb-1 block text-xs font-bold text-slate-600">Student *</span>
+                        <div class="relative">
+                            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+                            <input type="search" id="walkinStudentSearch" disabled placeholder="Select a branch first" autocomplete="off" class="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20">
+                            <input type="hidden" id="walkinStudentSelect" value="">
                         </div>
+                    </label>
+                </div>
 
-                        <div class="walkin-actions">
-                            <button type="submit" id="submitWalkinEnrollmentBtn" class="walkin-enroll-btn">Enroll &amp; collect payment</button>
-                            <button type="button" id="cancelWalkinEnrollmentBtn" class="walkin-cancel-btn">Cancel</button>
+                <div id="walkinStudentResults" class="mt-2 max-h-44 overflow-y-auto rounded-lg border border-slate-200">
+                    <div class="p-4 text-center text-sm text-slate-500">Select a branch to view students.</div>
+                </div>
+
+                <div id="walkinSelectedStudentCard" class="mt-2 hidden items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5">
+                    <div class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700" id="walkinSelectedStudentAvatar">--</div>
+                    <div class="min-w-0 flex-1">
+                        <div id="walkinSelectedStudentName" class="truncate text-sm font-bold text-slate-900">—</div>
+                        <div id="walkinSelectedStudentMeta" class="truncate text-xs text-slate-500">—</div>
+                    </div>
+                    <button type="button" id="walkinClearStudentBtn" class="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">Change</button>
+                </div>
+                <p id="walkinStatusInfo" class="mt-1 text-xs text-rose-600"></p>
+
+                <div class="my-3 border-t border-slate-200"></div>
+
+                <div>
+                    <div class="mb-1 text-xs font-bold text-slate-600">Package *</div>
+                    <div id="walkinPackageCards" class="grid gap-2 sm:grid-cols-3">
+                        <div class="col-span-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">Select a student first.</div>
+                    </div>
+                    <select id="walkinPackageSelect" required disabled class="hidden"><option value="">Select a student first</option></select>
+                    <div class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                        <div>
+                            <div class="text-xs font-bold text-slate-700">Sessions</div>
+                            <div class="text-[11px] text-slate-500">Extra sessions cost ₱650 each.</div>
                         </div>
-                    </aside>
+                        <div class="flex items-center gap-1">
+                            <button type="button" id="walkinSessionDecreaseBtn" disabled class="grid h-8 w-8 place-items-center rounded-md border border-slate-300 bg-white text-slate-600 disabled:opacity-40" aria-label="Remove one session"><i class="fas fa-minus text-xs"></i></button>
+                            <input id="walkinSessionCount" type="number" min="1" max="100" disabled class="h-8 w-16 rounded-md border border-slate-300 bg-white text-center text-sm font-bold text-slate-900 disabled:bg-slate-100" aria-label="Total sessions">
+                            <button type="button" id="walkinSessionIncreaseBtn" disabled class="grid h-8 w-8 place-items-center rounded-md border border-slate-300 bg-white text-slate-600 disabled:opacity-40" aria-label="Add one session"><i class="fas fa-plus text-xs"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-bold text-slate-600">Payment type *</span>
+                        <select id="walkinPaymentType" required class="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm focus:border-gold-500 focus:outline-none">
+                            <option value="Full Payment">Full Payment</option>
+                            <option value="Partial Payment">Partial Payment</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-bold text-slate-600">Payment method *</span>
+                        <select id="walkinPaymentMethod" required class="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm focus:border-gold-500 focus:outline-none">
+                            <option value="">Select method</option>
+                            <option value="Cash">Cash</option>
+                            <option value="GCash">GCash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="mt-3">
+                    <div class="mb-1 text-xs font-bold text-slate-600">Instrument *</div>
+                    <div id="walkinInstrumentsContainer" class="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                        <div class="text-xs text-slate-500">Select a student and package.</div>
+                    </div>
+                </div>
+
+                <label id="walkinPaymentProofWrap" class="mt-3 hidden">
+                    <span class="mb-1 block text-xs font-bold text-slate-600">Payment proof *</span>
+                    <input id="walkinPaymentProof" type="file" accept="image/*,.pdf" class="block w-full rounded-lg border border-slate-300 bg-white p-2 text-xs">
+                </label>
+
+                <div id="walkinPaymentTypeCards" class="hidden"></div>
+
+                <div class="mt-3 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div id="walkinAmountInfo" class="text-sm text-slate-600">Select a package to view the total.</div>
+                    <div class="flex items-center justify-end gap-2">
+                        <button type="button" id="cancelWalkinEnrollmentBtn" class="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+                        <button type="submit" id="submitWalkinEnrollmentBtn" class="h-9 rounded-md bg-gold-500 px-4 text-sm font-bold text-black hover:bg-gold-400">Enroll</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -429,7 +491,8 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/admin/admin_responsive.js"></script>
     <script src="../../js/index.js?v=20260329a"></script>
-    <script src="../../js/admin/admin_enrollments.js?v=20260329b"></script>
+    <script src="../../js/admin/admin_enrollments.js?v=20260828005"></script>
     <script src="../../js/session_timeout.js"></script>
+        <script src="../../js/admin/admin_enrollments.js"></script>
 </body>
 </html>

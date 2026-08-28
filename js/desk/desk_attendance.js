@@ -328,7 +328,16 @@
                     fetchBranchInstruments(Number(event.branchId || deskBranchId || 0))
                 ]);
                 const rooms = Array.isArray(roomData.rooms) ? roomData.rooms : [];
-                const instruments = Array.isArray(instrumentData.instruments) ? instrumentData.instruments : [];
+                const branchInstruments = Array.isArray(instrumentData.instruments) ? instrumentData.instruments : [];
+                const allowedInstrumentTypes = Array.isArray(roomData.session?.allowed_instrument_types)
+                    ? roomData.session.allowed_instrument_types
+                    : [];
+                const allowedInstrumentTypeIds = new Set(
+                    allowedInstrumentTypes.map(type => Number(type.type_id || 0)).filter(typeId => typeId > 0)
+                );
+                const instruments = allowedInstrumentTypeIds.size
+                    ? branchInstruments.filter(item => allowedInstrumentTypeIds.has(Number(item.type_id || 0)))
+                    : branchInstruments;
                 const unavailableRooms = Array.isArray(roomData.unavailable_rooms) ? roomData.unavailable_rooms : [];
                 if (!rooms.length) {
                     const message = unavailableRooms.length
@@ -338,7 +347,10 @@
                     return;
                 }
                 if (!instruments.length) {
-                    showMessage('No available instruments found for this branch.', 'error');
+                    const selectedTypes = allowedInstrumentTypes.map(type => type.type_name).filter(Boolean).join(', ');
+                    showMessage(selectedTypes
+                        ? `No ${selectedTypes} instruments are available in this branch.`
+                        : 'No available instruments found for this branch.', 'error');
                     return;
                 }
 
@@ -351,9 +363,18 @@
                 const roomOptionsHtml = rooms.map(room => `
                     <option value="${escapeHtml(String(room.room_id || ''))}">${escapeHtml(room.room_name || `Room #${room.room_id}`)}</option>
                 `).join('');
-                const instrumentOptionsHtml = instruments.map(item => `
-                    <option value="${escapeHtml(String(item.instrument_id || ''))}">${escapeHtml(item.instrument_name || 'Instrument')}</option>
+                const instrumentsByType = instruments.reduce((groups, item) => {
+                    const typeName = String(item.type_name || 'Other').trim() || 'Other';
+                    if (!groups[typeName]) groups[typeName] = [];
+                    groups[typeName].push(item);
+                    return groups;
+                }, {});
+                const instrumentOptionsHtml = Object.entries(instrumentsByType).map(([typeName, items]) => `
+                    <optgroup label="${escapeHtml(typeName)}">
+                        ${items.map(item => `<option value="${escapeHtml(String(item.instrument_id || ''))}">${escapeHtml(item.instrument_name || 'Instrument')}</option>`).join('')}
+                    </optgroup>
                 `).join('');
+                const allowedTypesLabel = allowedInstrumentTypes.map(type => type.type_name).filter(Boolean).join(', ');
 
                 const result = await Swal.fire({
                     title: 'Assign Room & Instrument',
@@ -377,7 +398,7 @@
                                     <option value="">Choose an instrument</option>
                                     ${instrumentOptionsHtml}
                                 </select>
-                                <p class="mt-1 text-xs text-slate-500">Pick the instrument that will be available in the room for this session.</p>
+                                <p class="mt-1 text-xs text-slate-500">Showing ${escapeHtml(allowedTypesLabel || 'the student\'s selected instrument types')} only.</p>
                             </div>
                             <div id="attendanceRoomAssignPreview" class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
                                 Select a room and instrument to continue.
@@ -766,28 +787,28 @@
                        </div>`
                     : '';
                 return `
-                <article class="rounded-3xl border ${frozen ? 'border-rose-200 bg-rose-50/40' : 'border-slate-200 bg-slate-50/70'} p-3.5 shadow-sm">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
+                <article class="rounded-xl border ${frozen ? 'border-rose-200 bg-rose-50/40' : 'border-slate-200 bg-slate-50/70'} p-3 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
                         <div class="min-w-0">
-                            <div class="text-lg font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
-                            <div class="mt-1 text-sm text-slate-500">${escapeHtml(event.email || 'No email on file')}</div>
+                            <div class="text-base font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
+                            <div class="text-xs text-slate-500">${escapeHtml(event.email || 'No email on file')}</div>
                             ${frozenBanner}
                         </div>
                         <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${getStateClasses(event.state)}">${escapeHtml(event.state)}</span>
                     </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2">
-                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Session</div>
-                            <div class="mt-2 text-sm font-semibold text-slate-900">${event.startTime ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}` : 'Time pending'}</div>
+                    <div class="mt-2 grid gap-2 md:grid-cols-2">
+                        <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                            <div class="text-[10px] uppercase tracking-[0.16em] text-slate-400 font-bold">Session</div>
+                            <div class="mt-1 text-sm font-semibold text-slate-900">${event.startTime ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}` : 'Time pending'}</div>
                             <div class="mt-1 text-xs text-slate-500">Session ${event.sessionNumber || '—'} • ${escapeHtml(getSessionRoomDisplayLabel(event) || 'Room pending')}</div>
                         </div>
-                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Teacher & Package</div>
-                            <div class="mt-2 text-sm font-semibold text-slate-900">${escapeHtml(event.teacherName)}</div>
+                        <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                            <div class="text-[10px] uppercase tracking-[0.16em] text-slate-400 font-bold">Teacher & Package</div>
+                            <div class="mt-1 text-sm font-semibold text-slate-900">${escapeHtml(event.teacherName)}</div>
                             <div class="mt-1 text-xs text-slate-500">${escapeHtml(event.packageName)}</div>
                         </div>
                     </div>
-                    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
                         <div class="flex flex-wrap gap-2 text-xs">
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 border border-slate-200">Completed ${event.completedCount}/${event.totalSessions || '—'}</span>
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-rose-600 border border-rose-100">Absences ${event.absences}</span>
@@ -932,12 +953,12 @@
                 const isSelected = dateKey === attendanceSelectedDate;
 
                 cells.push(`
-                    <button type="button" onclick="openAttendanceDayModal('${escapeHtml(dateKey)}')" class="min-h-[5.8rem] rounded-2xl border px-2 py-2 text-left transition ${isSelected ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'} ${!isCurrentMonth ? 'opacity-45' : ''}">
+                    <button type="button" onclick="selectAttendanceCalendarDate('${escapeHtml(dateKey)}')" aria-label="View schedule for ${escapeHtml(formatDateLong(dateKey))}" aria-pressed="${isSelected ? 'true' : 'false'}" class="attendance-calendar-cell rounded-lg border px-2 py-1.5 text-left transition ${isSelected ? 'border-blue-500 bg-blue-50 shadow-sm ring-1 ring-blue-200' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50'} ${!isCurrentMonth ? 'opacity-45' : ''}">
                         <div class="flex items-center justify-between gap-2">
                             <span class="text-sm font-bold ${isToday ? 'text-blue-700' : 'text-slate-800'}">${current.getDate()}</span>
                             ${isToday ? '<span class="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">Today</span>' : ''}
                         </div>
-                        <div class="mt-2 space-y-1">
+                        <div class="attendance-event-preview mt-1 space-y-1">
                             ${dayEvents.slice(0, 2).map(event => `
                                 <div class="truncate rounded-lg px-2 py-1 text-[10px] font-semibold ${getStateClasses(event.state)}">
                                     ${escapeHtml(event.startTime ? formatTime12Hour(event.startTime) : 'Time')} • ${escapeHtml(event.studentName)}
@@ -945,6 +966,9 @@
                             `).join('')}
                             ${dayEvents.length > 2 ? `<div class="text-[10px] font-semibold text-slate-500">+${dayEvents.length - 2} more</div>` : ''}
                             ${!dayEvents.length ? '<div class="text-[10px] text-slate-400">No sessions</div>' : ''}
+                        </div>
+                        <div class="attendance-event-count mt-1 hidden text-[10px] font-semibold ${dayEvents.length ? 'text-blue-700' : 'text-slate-400'}">
+                            ${dayEvents.length ? `${dayEvents.length} session${dayEvents.length === 1 ? '' : 's'}` : 'No sessions'}
                         </div>
                     </button>
                 `);

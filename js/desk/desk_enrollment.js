@@ -75,7 +75,8 @@
 
         function getEnrollmentBranchId() {
             const branchFilter = document.getElementById('branchFilter');
-            return Number(branchFilter?.value || 0);
+            const selectedBranchId = Number(branchFilter?.value || 0);
+            return selectedBranchId > 0 ? selectedBranchId : Number(managerBranchId || 0);
         }
 
         function matchesEnrollmentSearch(values) {
@@ -234,8 +235,8 @@
         function setSessionNavState(view) {
             const topPending = document.getElementById('viewNavPending');
             const topActive = document.getElementById('viewNavActive');
-            const topBase = 'px-5 py-2.5 text-base font-semibold rounded-lg text-slate-700 hover:bg-slate-100 transition';
-            const topActiveClass = 'px-5 py-2.5 text-base font-semibold rounded-lg bg-gold-500 text-black shadow';
+            const topBase = 'rounded-md px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition';
+            const topActiveClass = 'rounded-md bg-gold-500 px-3 py-1.5 text-xs sm:text-sm font-semibold text-black shadow-sm';
             if (topPending) topPending.className = (view === 'pending') ? topActiveClass : topBase;
             if (topActive) topActive.className = (view === 'active') ? topActiveClass : topBase;
 
@@ -1253,6 +1254,7 @@
                 requestFormData.append('is_walkin_request', '1');
                 requestFormData.append('payable_now', String(payableNow));
                 requestFormData.append('requested_amount', String(totalPrice));
+                requestFormData.append('requested_session_count', String(selectedSessionCount));
 
                 const response = await postStudentPackageRequest(requestFormData);
                 if (response.success) {
@@ -1396,30 +1398,30 @@
                     : '—';
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-4 py-3">
-                            <div class="font-semibold text-sm sm:text-base text-slate-900">${studentName || 'Student'}</div>
-                            <div class="text-sm sm:text-base text-slate-600">${escapeHtml(r.email || '')}</div>
-                            <div class="text-sm text-slate-500">${escapeHtml(r.branch_name || '')}</div>
+                        <td class="px-3 py-2.5">
+                            <div class="font-semibold text-sm text-slate-900">${studentName || 'Student'}</div>
+                            <div class="text-xs text-slate-600">${escapeHtml(r.email || '')}</div>
+                            <div class="text-xs text-slate-500">${escapeHtml(r.branch_name || '')}</div>
                         </td>
-                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${pkg}</td>
-                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${instruments}</td>
-                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">Based on instructor availability</td>
-                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">
-                            <div class="space-y-2">
-                                <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 transition">
+                        <td class="px-3 py-2.5 text-sm text-slate-700">${pkg}</td>
+                        <td class="px-3 py-2.5 text-sm text-slate-700">${instruments}</td>
+                        <td class="px-3 py-2.5 text-sm text-slate-700">Instructor availability</td>
+                        <td class="px-3 py-2.5 text-sm text-slate-700">
+                            <div>
+                                <button type="button" onclick="openPendingRequestPaymentModal(${Number(r.request_id)})" class="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition">
                                     Payment Info
                                 </button>
                             </div>
                         </td>
-                        <td class="px-4 py-3">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-bold">
+                        <td class="px-3 py-2.5">
+                            <div class="flex flex-nowrap items-center gap-1.5">
+                                <button onclick="openPendingRequestViewModal(${Number(r.request_id)})" class="rounded-md bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
                                     View
                                 </button>
-                                <button onclick="handleScheduleClick(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-sm font-bold">
+                                <button onclick="handleScheduleClick(${Number(r.request_id)})" class="rounded-md bg-green-100 px-2.5 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200">
                                     ${window.pendingRequestActionLabel || 'Assign & Approve'}
                                 </button>
-                                <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 text-sm font-bold">
+                                <button onclick="rejectStudentRequest(${Number(r.request_id)})" class="rounded-md bg-red-100 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200">
                                     Reject
                                 </button>
                             </div>
@@ -2853,17 +2855,17 @@
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-4 py-3">
-                            <div class="font-semibold text-sm sm:text-base text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
-                            <div class="text-sm sm:text-base text-slate-600">${escapeHtml(student.email || '')}</div>
+                        <td class="px-3 py-2.5">
+                            <div class="font-semibold text-sm text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
+                            <div class="text-xs text-slate-600">${escapeHtml(student.email || '')}</div>
                         </td>
-                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${escapeHtml(packageName)}</td>
-                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700 font-semibold">${formatCurrencyPHP(totalAmount)}</td>
-                        <td class="px-4 py-3 text-sm sm:text-base text-emerald-700 font-semibold">${formatCurrencyPHP(paidAmount)}</td>
-                        <td class="px-4 py-3 text-sm sm:text-base ${balance > 0 ? 'text-red-600' : 'text-slate-700'} font-semibold">${formatCurrencyPHP(balance)}</td>
-                        <td class="px-4 py-3">
-                            <button type="button" class="px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-sm font-bold" onclick="openEnrollmentDetailsModal(${Number(student.enrollment_id)})">
-                                More Details
+                        <td class="px-3 py-2.5 text-sm text-slate-700">${escapeHtml(packageName)}</td>
+                        <td class="px-3 py-2.5 text-sm text-slate-700 font-semibold">${formatCurrencyPHP(totalAmount)}</td>
+                        <td class="px-3 py-2.5 text-sm text-emerald-700 font-semibold">${formatCurrencyPHP(paidAmount)}</td>
+                        <td class="px-3 py-2.5 text-sm ${balance > 0 ? 'text-red-600' : 'text-slate-700'} font-semibold">${formatCurrencyPHP(balance)}</td>
+                        <td class="px-3 py-2.5">
+                            <button type="button" class="rounded-md bg-blue-100 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200" onclick="openEnrollmentDetailsModal(${Number(student.enrollment_id)})">
+                                Details
                             </button>
                         </td>
                     </tr>
@@ -3132,15 +3134,18 @@
 
                 managerBranchId = Number(user.branch_id || 0);
                 managerBranchName = user.branch_name || '';
+                const displayName = `${String(user.first_name || '').trim()} ${String(user.last_name || '').trim()}`.trim()
+                    || user.username || user.email || (isDesk ? 'Front Desk' : 'Manager');
                 if (typeof syncDeskNavUser === 'function') {
                     syncDeskNavUser();
                 } else {
                     const userNameNav = document.getElementById('userNameNav');
                     const profileMenuName = document.getElementById('profileMenuName');
-                    const displayName = `${String(user.first_name || '').trim()} ${String(user.last_name || '').trim()}`.trim()
-                        || user.username || user.email || (isDesk ? 'Front Desk' : 'Manager');
                     if (userNameNav) userNameNav.textContent = displayName;
                     if (profileMenuName) profileMenuName.textContent = displayName;
+                }
+                if (!isDesk && typeof window.syncManagerShell === 'function') {
+                    window.syncManagerShell(displayName, managerBranchName, user.email || user.username || '');
                 }
 
                 // Swap dashboard links for desk users.
