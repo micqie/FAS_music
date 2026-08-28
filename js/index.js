@@ -1633,9 +1633,9 @@ async function loadSessionPackages() {
         const data = response.data;
 
         if (data.success && data.packages) {
-            sessionPackages = data.packages;
+            sessionPackages = data.packages.filter(pkg => Number(pkg.sessions || 0) === 12);
             select.innerHTML = '<option value="">Select Package</option>';
-            data.packages.forEach(pkg => {
+            sessionPackages.forEach(pkg => {
                 const option = document.createElement('option');
                 option.value = pkg.package_id;
                 option.textContent = `${pkg.package_name} (${pkg.sessions} sessions, ${pkg.max_instruments} instrument${pkg.max_instruments > 1 ? 's' : ''})`;
@@ -1649,13 +1649,11 @@ async function loadSessionPackages() {
         console.error('Failed to load session packages:', error);
         // Fallback to default packages
         sessionPackages = [
-            { package_id: 1, sessions: 12, max_instruments: 1, price: 7450 },
-            { package_id: 2, sessions: 20, max_instruments: 2, price: 11800 }
+            { package_id: 1, sessions: 12, max_instruments: 1, price: 7450 }
         ];
         select.innerHTML = `
             <option value="">Select Package</option>
             <option value="1" data-sessions="12" data-max-instruments="1" data-price="7450">Basic (12 Sessions, 1 instrument)</option>
-            <option value="2" data-sessions="20" data-max-instruments="2" data-price="11800">Standard (20 Sessions, 2 instruments)</option>
         `;
     }
 }
@@ -2565,6 +2563,22 @@ async function handleStudentRegistrationReset(portal, fallbackMessage) {
 
 function buildStudentPerformanceMetrics(rows) {
     const rubricRows = Array.isArray(rows) ? rows.filter(row => Number(row?.progress_id || 0) > 0) : [];
+    const dynamic = new Map();
+    rubricRows.forEach(row => {
+        (Array.isArray(row?.criteria_scores) ? row.criteria_scores : []).forEach(item => {
+            const label = String(item?.name || '').trim();
+            const score = Number(item?.score || 0);
+            if (!label || score < 1 || score > 5) return;
+            if (!dynamic.has(label)) dynamic.set(label, []);
+            dynamic.get(label).push(score);
+        });
+    });
+    if (dynamic.size) {
+        return Array.from(dynamic.entries()).map(([label, values]) => {
+            const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+            return { label, helper:'Instructor-defined lesson criterion', average, percent:Math.round((average / 5) * 100) };
+        });
+    }
     const rubricDefinitions = [
         { label: 'Rhythm', source: 'rhythm_score', helper: 'Timing and pulse' },
         { label: 'Technique', source: 'technique_score', helper: 'Hand control and accuracy' },
@@ -2735,6 +2749,7 @@ function renderStudentPerformanceRadar(metrics) {
 function getStudentCertificateState(portal) {
     const enrollment = portal?.current_enrollment || null;
     const student = portal?.student || {};
+    const certificate = portal?.certificate || {};
     const packageSessions = Number(enrollment?.package_sessions || student?.package_sessions || 0);
     const completedSessionsRaw = Number(enrollment?.completed_sessions || 0);
     const gradedSessions = Array.isArray(portal?.current_session_grades)
@@ -2742,8 +2757,7 @@ function getStudentCertificateState(portal) {
         : 0;
     const completedSessions = Math.max(completedSessionsRaw, gradedSessions);
     const enrollmentStatus = String(enrollment?.status || '').trim().toLowerCase();
-    const isAvailable = enrollmentStatus === 'completed'
-        || (packageSessions > 0 && completedSessions >= packageSessions);
+    const isAvailable = certificate?.available === true || Number(certificate?.certificate_id || 0) > 0;
 
     return {
         isAvailable,
@@ -2752,14 +2766,21 @@ function getStudentCertificateState(portal) {
         enrollmentStatus,
         studentName: `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || 'Student',
         packageName: enrollment?.package_name || student?.package_name || 'Lesson Package',
-        teacherName: `${enrollment?.teacher_first_name || ''} ${enrollment?.teacher_last_name || ''}`.trim() || 'Teacher',
-        issueDate: enrollment?.end_date || enrollment?.updated_at || enrollment?.created_at || new Date().toISOString().slice(0, 10),
+        achievedLevel: certificate?.achieved_level || 'Achieved Level',
+        instrumentName: certificate?.instrument_name || 'Music',
+        certificateNumber: certificate?.certificate_number || '',
+        teacherName: certificate?.teacher_name || `${enrollment?.teacher_first_name || ''} ${enrollment?.teacher_last_name || ''}`.trim() || 'Teacher',
+        issueDate: certificate?.issue_date || '',
         branchName: student?.branch_name || enrollment?.branch_name || 'Father & Sons Music'
     };
 }
 
 function isStudentEnrollmentCompleted(portal) {
-    return Boolean(getStudentCertificateState(portal).isAvailable);
+    const enrollment = portal?.current_enrollment || null;
+    const purchased = Number(enrollment?.package_sessions || portal?.student?.package_sessions || 0);
+    const used = Number(enrollment?.completed_sessions || 0);
+    return String(enrollment?.status || '').trim().toLowerCase() === 'completed'
+        || (purchased > 0 && used >= purchased);
 }
 
 function renderStudentCertificateCard(portal) {
@@ -2777,10 +2798,10 @@ function renderStudentCertificateCard(portal) {
                         <i class="fas fa-certificate text-2xl"></i>
                     </div>
                     <div class="min-w-0">
-                        <p class="text-xs font-black uppercase tracking-[0.3em] text-gold-600 dark:text-gold-300">Certificate Unlocked</p>
-                        <h2 class="mt-1 text-2xl font-black text-zinc-900 dark:text-white">Completion Certificate Ready</h2>
+                        <p class="text-xs font-black uppercase tracking-[0.3em] text-gold-600 dark:text-gold-300">Certificate Issued</p>
+                        <h2 class="mt-1 text-2xl font-black text-zinc-900 dark:text-white">Achievement Certificate Ready</h2>
                         <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300 max-w-2xl">
-                            You finished ${escapeHtml(String(state.completedSessions))} of ${escapeHtml(String(state.packageSessions || state.completedSessions))} sessions for ${escapeHtml(state.packageName)}.
+                            The academy recognized your ${escapeHtml(state.achievedLevel)} achievement in ${escapeHtml(state.instrumentName)} after formal assessment.
                         </p>
                         <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold text-zinc-600 dark:text-zinc-300">
                             <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-3 py-1.5 dark:border-gold-500/20 dark:bg-white/5">
@@ -2810,7 +2831,7 @@ function renderStudentCertificateCard(portal) {
 
 function renderStudentCompletedSessionsPanel(portal) {
     const state = getStudentCertificateState(portal);
-    if (!state.isAvailable) {
+    if (!isStudentEnrollmentCompleted(portal)) {
         return '';
     }
 
@@ -2886,7 +2907,7 @@ function renderStudentCompletedSessionsPanel(portal) {
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="portal-section-title text-zinc-900 dark:text-white">Session History</h2>
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Your completed lesson packages.</p>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Purchased lessons that have been used. This does not indicate a passed level.</p>
                 </div>
                 <span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-4 py-2 text-sm font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-300 self-start sm:self-auto">
                     Completed
@@ -2913,7 +2934,7 @@ function ensureStudentCertificateModal() {
                     <div class="flex items-center justify-between gap-4 px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-white/10">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-gold-600 dark:text-gold-300 font-bold">Certificate</div>
-                            <div class="text-lg font-extrabold text-zinc-900 dark:text-white mt-1">Completion Certificate Preview</div>
+                            <div class="text-lg font-extrabold text-zinc-900 dark:text-white mt-1">Achievement Certificate Preview</div>
                         </div>
                         <button type="button" onclick="closeStudentCertificatePreview()" class="h-10 w-10 rounded-full border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 transition" aria-label="Close certificate preview">
                             <i class="fas fa-times"></i>
@@ -2948,7 +2969,7 @@ function buildStudentCertificateMarkup(portal) {
                 <div class="flex items-start justify-between gap-4">
                     <div>
                         <p class="text-[11px] font-black uppercase tracking-[0.45em] text-gold-600">Father & Sons Music</p>
-                        <h3 class="mt-2 text-3xl sm:text-5xl font-black text-zinc-900">Certificate of Completion</h3>
+                        <h3 class="mt-2 text-3xl sm:text-5xl font-black text-zinc-900">Certificate of Achievement</h3>
                     </div>
                     <div class="h-16 w-16 rounded-2xl bg-gold-500 text-black grid place-items-center shadow-lg shadow-gold-500/20 shrink-0">
                         <i class="fas fa-award text-3xl"></i>
@@ -2959,19 +2980,20 @@ function buildStudentCertificateMarkup(portal) {
                     <p class="text-sm font-bold uppercase tracking-[0.3em] text-zinc-500">This certifies that</p>
                     <div class="mt-4 text-3xl sm:text-5xl font-black text-zinc-900">${escapeHtml(state.studentName)}</div>
                     <p class="mt-4 text-base sm:text-lg text-zinc-600">
-                        has successfully completed the <span class="font-bold text-zinc-900">${escapeHtml(state.packageName)}</span> lesson package
+                        has achieved <span class="font-bold text-zinc-900">${escapeHtml(state.achievedLevel)}</span>
+                        in <span class="font-bold text-zinc-900">${escapeHtml(state.instrumentName)}</span>
                         at <span class="font-bold text-zinc-900">${escapeHtml(state.branchName)}</span>.
                     </p>
                 </div>
 
                 <div class="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div class="rounded-3xl border border-zinc-200 bg-white/80 px-5 py-4 text-center">
-                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Sessions Completed</div>
-                        <div class="mt-2 text-3xl font-black text-zinc-900">${escapeHtml(String(state.completedSessions))}</div>
+                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Level Achieved</div>
+                        <div class="mt-2 text-xl font-black text-zinc-900">${escapeHtml(state.achievedLevel)}</div>
                     </div>
                     <div class="rounded-3xl border border-zinc-200 bg-white/80 px-5 py-4 text-center">
-                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Required Sessions</div>
-                        <div class="mt-2 text-3xl font-black text-zinc-900">${escapeHtml(String(state.packageSessions || state.completedSessions))}</div>
+                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Instrument</div>
+                        <div class="mt-2 text-xl font-black text-zinc-900">${escapeHtml(state.instrumentName)}</div>
                     </div>
                     <div class="rounded-3xl border border-zinc-200 bg-white/80 px-5 py-4 text-center">
                         <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Issued On</div>
@@ -2987,7 +3009,7 @@ function buildStudentCertificateMarkup(portal) {
                     </div>
                     <div class="text-right">
                         <div class="text-xs uppercase tracking-[0.3em] text-zinc-500 font-bold">Status</div>
-                        <div class="mt-2 text-lg font-black text-emerald-600">Completed</div>
+                        <div class="mt-2 text-lg font-black text-emerald-600">Achieved</div>
                         <div class="text-sm text-zinc-500">Ready for print</div>
                     </div>
                 </div>
@@ -3021,7 +3043,7 @@ function openStudentCertificatePreview() {
     }
     const state = getStudentCertificateState(portal);
     if (!state.isAvailable) {
-        showMessage('Your certificate will unlock after all sessions are completed.', 'error');
+        showMessage('A certificate becomes available only after the academy issues it for a level achievement.', 'error');
         return;
     }
     renderStudentCertificatePreview(portal);
@@ -3035,7 +3057,7 @@ function printStudentCertificate() {
     }
     const state = getStudentCertificateState(portal);
     if (!state.isAvailable) {
-        showMessage('Your certificate will unlock after all sessions are completed.', 'error');
+        showMessage('A certificate becomes available only after the academy issues it for a level achievement.', 'error');
         return;
     }
 
@@ -3082,7 +3104,7 @@ function printStudentCertificate() {
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Completion Certificate</title>
+    <title>Achievement Certificate</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -4435,6 +4457,10 @@ function renderGuardianStudentModal(item, index) {
     const paymentState = enrollment?.payment_status || s.registration_status || 'Pending';
     const instrumentsLabel = getGuardianInstrumentLabel(item);
     const sessionRows = getGuardianSessionRows(item);
+    const additionalRequest = item?.latest_session_extension_request || null;
+    const hasPendingAdditionalRequest = String(additionalRequest?.status || '') === 'Pending';
+    const learningProgress = Array.isArray(item?.learning_progress) ? item.learning_progress : [];
+    const learningHistory = Array.isArray(item?.learning_history) ? item.learning_history : [];
 
     return `
         <div class="space-y-6">
@@ -4471,6 +4497,12 @@ function renderGuardianStudentModal(item, index) {
                     <div class="text-sm text-zinc-600 dark:text-zinc-300">Sessions: <span class="text-zinc-900 dark:text-white font-semibold">${pkgSessions ? `${pkgSessions} sessions` : '—'}</span></div>
                     <div class="text-sm text-zinc-600 dark:text-zinc-300">Paid: <span class="text-zinc-900 dark:text-white font-semibold">${formatCurrencyPHP(pkgPaid)}</span></div>
                     <div class="text-sm text-zinc-600 dark:text-zinc-300">Balance: <span class="text-gold-500 font-semibold">${formatCurrencyPHP(pkgBalance)}</span></div>
+                    ${enrollment && ['Active', 'Completed'].includes(String(enrollment.status || '')) ? `
+                        <button type="button" onclick="openGuardianAdditionalSessions(${index})" ${hasPendingAdditionalRequest ? 'disabled' : ''} class="mt-4 w-full rounded-xl bg-gold-500 px-3 py-2.5 text-xs font-extrabold text-black transition hover:bg-gold-400 disabled:cursor-not-allowed disabled:opacity-50">
+                            ${hasPendingAdditionalRequest ? 'Additional Sessions Pending' : 'Request Additional Sessions'}
+                        </button>
+                        <div class="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">₱650 each · purchased lessons do not reset learning progress</div>
+                    ` : ''}
                 </div>
                 <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
                     <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Attendance</div>
@@ -4501,6 +4533,39 @@ function renderGuardianStudentModal(item, index) {
                     <div><span class="text-zinc-500 dark:text-zinc-400">Room:</span> <span class="text-zinc-900 dark:text-white font-semibold">${escapeHtml(scheduleRoom)}</span></div>
                     <div><span class="text-zinc-500 dark:text-zinc-400">Instruments:</span> <span class="text-zinc-900 dark:text-white font-semibold">${escapeHtml(instrumentsLabel)}</span></div>
                 </div>
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+                <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Formal Learning Progress</div>
+                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Instructor-managed by instrument; independent from purchased sessions and optional songs.</div>
+                <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    ${learningProgress.length ? learningProgress.map((row) => `
+                        <div class="rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <div class="text-xs font-bold uppercase tracking-widest text-gold-600">${escapeHtml(row.instrument_name || 'Instrument')}</div>
+                                    <div class="mt-1 text-lg font-black text-zinc-900 dark:text-white">${escapeHtml(row.level_name || 'Level not set')}</div>
+                                    <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(row.book_material || 'No book/material recorded')}</div>
+                                </div>
+                                <span class="rounded-full border border-zinc-200 dark:border-white/10 px-2.5 py-1 text-[10px] font-bold text-zinc-600 dark:text-zinc-300">${escapeHtml(row.assessment_readiness || 'Not Ready')}</span>
+                            </div>
+                            ${row.current_topic ? `<div class="mt-3 text-sm text-zinc-600 dark:text-zinc-300"><span class="font-bold">Current topic:</span> ${escapeHtml(row.current_topic)}</div>` : ''}
+                        </div>
+                    `).join('') : '<div class="lg:col-span-2 rounded-xl border border-dashed border-zinc-200 dark:border-white/10 px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">The instructor has not created a formal learning record yet.</div>'}
+                </div>
+                ${learningHistory.length ? `
+                    <div class="mt-5 border-t border-zinc-200 dark:border-white/10 pt-4">
+                        <div class="text-xs font-bold uppercase tracking-widest text-zinc-500">Level / Book History</div>
+                        <div class="mt-3 space-y-2">
+                            ${learningHistory.map((row) => `
+                                <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white dark:bg-white/5 px-4 py-3 text-sm">
+                                    <div><span class="font-bold text-zinc-900 dark:text-white">${escapeHtml(row.instrument_name || 'Instrument')} · ${escapeHtml(row.level_name || 'Level')}</span><span class="text-zinc-500 dark:text-zinc-400"> · ${escapeHtml(row.book_material || 'No book recorded')}</span></div>
+                                    <div class="text-xs font-bold text-emerald-600">Achieved${row.achieved_at ? ` · ${escapeHtml(formatDateShort(row.achieved_at))}` : ''}${row.certificate_id ? ' · Certificate Issued' : ''}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
             </div>
 
             <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
@@ -5629,8 +5694,9 @@ function onStudentRequestInstrumentDropdownChange(changedSlot = null) {
     _syncStudentRequestTypeDisabledStates();
 }
 
-async function fetchStudentRequestMetaByEmail(email) {
-    const url = `${baseApiUrl}/students.php?action=get-student-request-meta&email=${encodeURIComponent(email)}`;
+async function fetchStudentRequestMetaByEmail(email, options = {}) {
+    const staffContext = options?.staffContext ? '&staff_context=1' : '';
+    const url = `${baseApiUrl}/students.php?action=get-student-request-meta&email=${encodeURIComponent(email)}${staffContext}`;
     const res = await axios.get(url);
     return res.data;
 }
@@ -5709,18 +5775,10 @@ function initStudentRequestSection(student, requestMeta) {
     const requestStatus = String(latest?.status || '');
     const isFormDisabled = requestStatus === 'Pending' || requestStatus === 'Approved';
     const packageScope = String(requestMeta?.package_scope || '').toLowerCase();
-    const studentSkillLevel = String(requestMeta?.student_skill_level || '').toLowerCase();
 
-    // Filter packages based on student skill level:
-    // - Beginner students: Only 12-session package
-    // - Non-beginner (Developing, Proficient, Advanced): 12, 20, and 50-session packages
-    const isBeginner = studentSkillLevel === 'beginner' || !studentSkillLevel;
-    const filteredPackages = isBeginner
-        ? packages.filter(pkg => Number(pkg.sessions || 0) === 12)
-        : packages.filter(pkg => {
-            const sessions = Number(pkg.sessions || 0);
-            return sessions === 12 || sessions === 20 || sessions === 50;
-        });
+    // Promotions are selected only by desk/admin/manager. Student and guardian
+    // online enrollment always starts with the basic 12-session package.
+    const filteredPackages = packages.filter(pkg => Number(pkg.sessions || 0) === 12);
 
     const defaultPackageId = String(requestMeta?.default_package_id || '');
     let selectedPackageId = defaultPackageId;
@@ -6834,13 +6892,13 @@ function renderStudentActionBanner(student, meta, portal) {
     `;
 
     if (enrollmentCompleted) {
-        title = 'Ready for your next lesson package?';
-        text = 'Continue your music journey with a new enrollment.';
+        title = 'Your purchased lessons have been used';
+        text = 'Your level and learning progress stay unchanged. Request additional sessions from Enrollment Details when you are ready to continue.';
         actions = `
-            <button type="button" onclick="openStudentRequestModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition flex items-center gap-2">
-                <i class="fas fa-rotate-right"></i>Enroll Again?
-            </button>
-            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white/90 dark:bg-white/5 border border-gold-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">View History</a>
+            <a href="student_profile.html#studentAdditionalSessionsCard" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition flex items-center gap-2">
+                <i class="fas fa-calendar-plus"></i>Request Additional Sessions
+            </a>
+            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white/90 dark:bg-white/5 border border-gold-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">View Used Lessons</a>
         `;
     } else if (reservationNotice) {
         title = 'Your account is frozen';
@@ -7769,12 +7827,12 @@ async function initStudentDashboardPage() {
         });
     }
     if (overviewGrid) {
-        overviewGrid.classList.toggle('hidden', isNewStudent || enrollmentCompleted);
+        overviewGrid.classList.toggle('hidden', isNewStudent);
     }
     const welcomeNote = document.getElementById('studentWelcomeNote');
     if (welcomeNote) {
         if (enrollmentCompleted) {
-            welcomeNote.textContent = 'Your previous package is complete. View your certificate or start a new enrollment.';
+            welcomeNote.textContent = 'Your purchased sessions have been used. Request additional sessions from Enrollment Details if you want to continue.';
         } else if (isEnrolledStudent) {
             welcomeNote.textContent = 'View your upcoming class, open your QR code, and keep your profile updated.';
         } else if (isNewStudent) {
@@ -7784,8 +7842,8 @@ async function initStudentDashboardPage() {
         }
     }
     if (overviewCard) overviewCard.classList.toggle('hidden', isEnrolledStudent || enrollmentCompleted);
-    if (performanceCard) performanceCard.classList.toggle('hidden', !isEnrolledStudent || enrollmentCompleted);
-    if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent || !regPaid || enrollmentCompleted);
+    if (performanceCard) performanceCard.classList.toggle('hidden', !isEnrolledStudent);
+    if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent || !regPaid);
     if (upcomingCard) upcomingCard.classList.toggle('hidden', !isEnrolledStudent || enrollmentCompleted);
     if (qrCard) qrCard.classList.toggle('hidden', true);
     if (completedState) {
@@ -8017,7 +8075,6 @@ async function initStudentSessionsPage() {
     setText('currentGradeAverage', '—');
 
     const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
-    let summaryRes = null;
     if (!enrollmentApproved) {
         setHtml('attendanceTableBody', `
             <tr>
@@ -8122,17 +8179,8 @@ async function initStudentSessionsPage() {
         }
     }
 
-    // Next session action
-    try {
-        const meta = await fetchStudentRequestMetaByEmail(user.email);
-        if (enrollmentApproved) {
-            summaryRes = await fetchAttendanceSummary(s.student_id);
-        }
-        initStudentAdditionalSessionAction(s, portal, meta?.success ? meta : null, summaryRes?.success ? summaryRes : null);
-    } catch (e) {
-        const statusEl = document.getElementById('studentAdditionalSessionStatus');
-        if (statusEl) statusEl.textContent = 'Unable to check session eligibility right now.';
-    }
+    // Purchased-session requests live under Enrollment Details. This page only
+    // displays actual scheduled/attended lesson sessions.
 }
 
 function renderAttendanceStatusBadge(status) {
@@ -8168,26 +8216,68 @@ function buildStudentGradeDetailsMarkup(row) {
     const timeLabel = row.start_time && row.end_time
         ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
         : (row.start_time ? formatTime12Hour(row.start_time) : 'Time pending');
-    const hasGrade = Number(row.progress_id || 0) > 0 && Number(row.average_score || 0) > 0;
+    const hasGrade = Number(row.progress_id || 0) > 0;
     const averageScore = hasGrade ? Number(row.average_score).toFixed(2) : null;
-    const remarksText = cleanSessionNoteText(row.teacher_remarks || row.remarks, 'No remarks recorded for this session.');
-    const remarks = escapeHtml(remarksText);
-    const scorePills = [
-        ['Perf', row.performance_score],
-        ['Tech', row.technique_score],
-        ['Rhythm', row.rhythm_score],
-        ['Focus', row.focus_score],
-        ['Assign', row.assignment_score]
-    ].map(([label, value]) => `
-        <div class="rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm">
-            <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.16em]">${escapeHtml(label)}</div>
-            <div class="mt-0.5 text-sm font-black text-zinc-900">${value ? `${escapeHtml(String(value))}/5` : '—'}</div>
+    const sessionEndValue = row.session_date
+        ? `${row.session_date}T${row.end_time || row.start_time || '23:59:59'}`
+        : '';
+    const sessionEnd = sessionEndValue ? new Date(sessionEndValue) : null;
+    const isFutureSession = sessionEnd && !Number.isNaN(sessionEnd.getTime()) && sessionEnd.getTime() > Date.now();
+    const remarksText = cleanSessionNoteText(row.teacher_remarks || row.remarks, '');
+    const savedCriteria = hasGrade && Array.isArray(row.criteria_scores) && row.criteria_scores.length
+        ? row.criteria_scores.map(item => [item.name || 'Criterion', Number(item.score || 0)])
+        : (hasGrade ? [
+            ['Performance', row.performance_score],
+            ['Technique', row.technique_score],
+            ['Rhythm', row.rhythm_score],
+            ['Focus', row.focus_score],
+            ['Assignment', row.assignment_score]
+        ] : []);
+    const ratedCriteria = savedCriteria.filter(([, value]) => Number(value) >= 1 && Number(value) <= 5);
+    const gradedDate = formatDateLong(row.assessment_date || row.updated_at || row.session_date || '') || 'Date not recorded';
+    const scoreMeaning = (value) => ({ 1:'Needs attention', 2:'Developing', 3:'Good', 4:'Very good', 5:'Excellent' }[Number(value)] || 'Rated');
+    const overallMeaning = scoreMeaning(Math.max(1, Math.min(5, Math.round(Number(averageScore || 0)))));
+    const scorePills = ratedCriteria.map(([label, value]) => `
+        <div class="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3.5">
+            <div class="min-h-[2.5rem] text-sm font-bold leading-5 text-zinc-800">${escapeHtml(label)}</div>
+            <div class="mt-2 flex items-end justify-between gap-3">
+                <div class="text-2xl font-black leading-none text-zinc-900">${escapeHtml(String(value))}<span class="text-sm font-semibold text-zinc-400">/5</span></div>
+                <span class="text-[11px] font-bold text-zinc-500">${escapeHtml(scoreMeaning(value))}</span>
+            </div>
+            <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-200"><div class="h-full rounded-full bg-[#bd9525]" style="width:${Math.max(0, Math.min(100, Number(value) * 20))}%"></div></div>
         </div>
     `).join('');
+    const resultSection = hasGrade ? `
+        <section class="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50">
+            <div class="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-start gap-3">
+                    <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-emerald-600 shadow-sm"><i class="fas fa-check"></i></div>
+                    <div>
+                        <div class="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Evaluation complete</div>
+                        <div class="mt-1 font-bold text-zinc-900">${escapeHtml(overallMeaning)}</div>
+                        <div class="mt-0.5 text-xs text-emerald-800">Recorded ${escapeHtml(gradedDate)}</div>
+                    </div>
+                </div>
+                <div class="rounded-xl bg-white px-5 py-2.5 text-center shadow-sm">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Overall</div>
+                    <div class="text-2xl font-black text-zinc-900">${escapeHtml(averageScore)}<span class="text-sm text-zinc-400">/5</span></div>
+                </div>
+            </div>
+        </section>
+        ${remarksText ? `<section class="mt-5"><h4 class="text-sm font-bold text-zinc-900">Instructor’s note</h4><div class="mt-2 flex gap-3 rounded-2xl border border-gold-200 bg-gold-50/70 px-4 py-3.5"><i class="fas fa-quote-left mt-1 text-gold-500"></i><p class="text-sm leading-6 text-zinc-700">${escapeHtml(remarksText)}</p></div></section>` : ''}
+        ${ratedCriteria.length ? `<section class="mt-6"><div class="flex flex-wrap items-end justify-between gap-2"><div><h4 class="text-base font-black text-zinc-900">Lesson evaluation</h4><p class="mt-1 text-xs leading-5 text-zinc-500">Only the areas used by the instructor for this session are shown.</p></div><span class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">${ratedCriteria.length} ${ratedCriteria.length === 1 ? 'area' : 'areas'} evaluated</span></div><div class="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">${scorePills}</div></section>` : ''}
+    ` : `
+        <section class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+            <div class="flex items-start gap-3">
+                <div class="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-amber-600"><i class="far ${isFutureSession ? 'fa-calendar' : 'fa-clock'}"></i></div>
+                <div><div class="font-bold text-zinc-900">${isFutureSession ? 'This lesson is scheduled' : 'Waiting for instructor evaluation'}</div><p class="mt-1 text-sm leading-6 text-zinc-600">${isFutureSession ? `This session is on ${escapeHtml(dateLabel)}. Scores will appear here only after the lesson is completed and graded.` : 'No grade has been submitted for this session yet. There is no score breakdown to show.'}</p></div>
+            </div>
+        </section>
+    `;
 
     return `
-        <div class="text-left overflow-hidden rounded-[1.25rem] bg-[#f8f4ea] max-w-[94vw] sm:max-w-none max-h-[calc(100vh-1rem)] flex flex-col">
-            <div class="flex items-start justify-between gap-3 bg-[#bd9525] px-4 py-3.5 text-white">
+        <div class="text-left overflow-hidden rounded-[1.5rem] bg-[#f8f4ea] max-w-[96vw] sm:max-w-none max-h-[calc(100vh-2rem)] flex flex-col shadow-2xl">
+            <div class="flex items-start justify-between gap-3 bg-[#bd9525] px-5 py-4 text-white">
                 <div>
                     <div class="text-[10px] font-black uppercase tracking-[0.22em] text-white/90">Session ${escapeHtml(String(row.session_number || ''))}</div>
                     <h3 class="mt-1 text-base sm:text-lg font-black leading-tight">${escapeHtml(row.instrument_name || 'Instrument Session')}</h3>
@@ -8196,18 +8286,18 @@ function buildStudentGradeDetailsMarkup(row) {
                     <i class="fas fa-times text-xs"></i>
                 </button>
             </div>
-            <div class="px-4 py-4 bg-white overflow-y-auto">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-3">
+            <div class="px-5 py-5 bg-white overflow-y-auto">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5">
                         <div class="h-9 w-9 rounded-xl bg-white border border-zinc-200 grid place-items-center text-gold-500 shrink-0">
                             <i class="far fa-calendar text-sm"></i>
                         </div>
-                        <div>
+                        <div class="min-w-0">
                             <div class="text-[11px] text-zinc-400 font-medium">Date</div>
                             <div class="text-sm font-extrabold text-zinc-900">${escapeHtml(dateLabel)}</div>
                         </div>
                     </div>
-                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-3">
+                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5">
                         <div class="h-9 w-9 rounded-xl bg-white border border-zinc-200 grid place-items-center text-gold-500 shrink-0">
                             <i class="far fa-clock text-sm"></i>
                         </div>
@@ -8216,53 +8306,29 @@ function buildStudentGradeDetailsMarkup(row) {
                             <div class="text-sm font-extrabold text-zinc-900">${escapeHtml(timeLabel)}</div>
                         </div>
                     </div>
-                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-3">
+                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5">
                         <div class="h-9 w-9 rounded-xl bg-white border border-zinc-200 grid place-items-center text-gold-500 shrink-0">
                             <i class="far fa-circle-dot text-sm"></i>
                         </div>
                         <div>
                             <div class="text-[11px] text-zinc-400 font-medium">Location</div>
-                            <div class="text-sm font-extrabold text-zinc-900">${escapeHtml(row.room_name || 'To be confirmed')}</div>
+                            <div class="text-sm font-extrabold text-zinc-900 break-words">${escapeHtml(row.room_name || 'To be confirmed')}</div>
                         </div>
                     </div>
-                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-3">
+                    <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5">
                         <div class="h-9 w-9 rounded-xl bg-white border border-zinc-200 grid place-items-center text-gold-500 shrink-0">
                             <i class="far fa-user text-sm"></i>
                         </div>
                         <div>
-                            <div class="text-[11px] text-zinc-400 font-medium">Coach</div>
-                            <div class="text-sm font-extrabold text-zinc-900">${escapeHtml(row.teacher_name || 'Not assigned')}</div>
+                            <div class="text-[11px] text-zinc-400 font-medium">Instructor</div>
+                            <div class="text-sm font-extrabold text-zinc-900 break-words">${escapeHtml(row.teacher_name || 'Not assigned')}</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="mt-3 flex flex-wrap items-center gap-2">
-                    ${renderStudentGradeBadge(row.average_score, row.progress_id)}
-                </div>
+                ${resultSection}
 
-                <div class="mt-4 rounded-xl border border-zinc-100 bg-[#faf8f2] px-4 py-3">
-                    <div class="text-sm font-bold text-zinc-900">${hasGrade ? `Score ${escapeHtml(averageScore)}/5` : 'Not graded yet'}</div>
-                    <div class="mt-1 text-sm leading-6 text-zinc-600">
-                        ${hasGrade ? 'Feedback below.' : 'Coach will grade after the session.'}
-                    </div>
-                </div>
-
-                <div class="mt-4">
-                    <div class="rounded-xl border border-zinc-100 bg-white px-4 py-3 text-sm leading-6 text-zinc-600 shadow-sm">
-                        ${remarks}
-                    </div>
-                </div>
-
-                <div class="mt-4">
-                    <div class="flex items-center gap-2 text-sm font-bold text-zinc-900">
-                        <i class="fas fa-chart-pie text-gold-500"></i> Breakdown
-                    </div>
-                    <div class="mt-2 grid grid-cols-2 gap-2">
-                        ${scorePills}
-                    </div>
-                </div>
-
-                <div class="mt-4">
+                <div class="sticky bottom-0 mt-6 border-t border-zinc-100 bg-white/95 pt-4 backdrop-blur">
                     <button type="button" onclick="Swal.close()" class="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#12192a] px-5 py-2.5 text-sm text-white font-extrabold shadow-lg shadow-[#12192a]/20 hover:bg-[#0d1322] transition">
                         Close
                     </button>
@@ -8279,7 +8345,7 @@ function openStudentGradeDetails(index) {
     const row = rows[Number(index)];
     if (!row) return;
     Swal.fire({
-        width: 390,
+        width: 720,
         showConfirmButton: false,
         showCloseButton: false,
         background: 'transparent',
@@ -8316,6 +8382,7 @@ async function initStudentGradesPage() {
         applyStudentPortalIdentity(user, portal);
         studentDashboardPortalState = portal;
         studentDashboardMetaState = portal;
+        renderStudentFormalLearningProgress(portal);
         const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
         const rows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
         const gradedRows = rows.filter(row => Number(row.progress_id || 0) > 0);
@@ -8337,7 +8404,7 @@ async function initStudentGradesPage() {
         setText(
             'studentGradesSessionsLeft',
             packageSessions > 0
-                ? `${remainingSessions} session${remainingSessions === 1 ? '' : 's'} left to go`
+                ? `${remainingSessions} purchased session${remainingSessions === 1 ? '' : 's'} remaining. Session usage does not determine level mastery.`
                 : 'Session total not available yet'
         );
         setText('studentGradesAverage', averageValue ? `${averageValue}/5` : 'Pending');
@@ -8641,6 +8708,13 @@ async function initStudentProfilePage() {
     setText('profileEnrollmentTitle', enrollment?.package_name || 'No active package yet');
     setHtml('profileEnrollmentMeta', renderStudentProfileEnrollmentMeta(enrollment, portal.instruments || [], s.branch_name || '—'));
 
+    try {
+        const requestMeta = await fetchStudentRequestMetaByEmail(user.email);
+        bindStudentAdditionalSessionsForm(s, enrollment, requestMeta?.success ? requestMeta : null);
+    } catch (error) {
+        bindStudentAdditionalSessionsForm(s, enrollment, null);
+    }
+
     const enrollmentHint = document.getElementById('profileEnrollmentHint');
     if (enrollmentHint) {
         if (isActiveEnrollment) {
@@ -8705,6 +8779,215 @@ async function initStudentProfilePage() {
         } catch (err) {
             console.error('Profile update error:', err);
             showMessage('Network error. Please try again.', 'error');
+        }
+    });
+}
+
+function renderStudentFormalLearningProgress(portal) {
+    const currentEl = document.getElementById('studentFormalLearningProgress');
+    const historyEl = document.getElementById('studentLearningHistory');
+    if (!currentEl || !historyEl) return;
+    const current = Array.isArray(portal?.learning_progress) ? portal.learning_progress : [];
+    const history = Array.isArray(portal?.learning_history) ? portal.learning_history : [];
+    const exams = Array.isArray(portal?.promotional_exams) ? portal.promotional_exams : [];
+
+    currentEl.innerHTML = current.length ? current.map(row => `
+        <article class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5">
+            <div class="flex items-start justify-between gap-3">
+                <div><div class="text-xs font-bold uppercase tracking-widest text-gold-600 dark:text-gold-300">${escapeHtml(row.instrument_name || 'Instrument')}</div><h3 class="mt-1 text-xl font-black text-zinc-900 dark:text-white">${escapeHtml(row.level_name || 'Level not set')}</h3></div>
+                <span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">In Progress</span>
+            </div>
+            <div class="mt-4 space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
+                <div><span class="text-zinc-500">Book / material:</span> <strong class="text-zinc-900 dark:text-white">${escapeHtml(row.book_material || 'Not set')}</strong></div>
+                <div><span class="text-zinc-500">Current topic:</span> <strong class="text-zinc-900 dark:text-white">${escapeHtml(row.current_topic || 'Not set')}</strong></div>
+                <div><span class="text-zinc-500">Skills:</span> ${escapeHtml(row.skills_developing || 'Not set')}</div>
+                <div><span class="text-zinc-500">Areas to improve:</span> ${escapeHtml(row.areas_for_improvement || 'Not set')}</div>
+            </div>
+            <div class="mt-4 rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3"><div class="text-xs uppercase tracking-widest text-zinc-500">Assessment readiness</div><div class="mt-1 font-bold text-zinc-900 dark:text-white">${escapeHtml(row.assessment_readiness || 'Not Ready')}</div></div>
+            ${row.instructor_notes ? `<div class="mt-3 text-sm text-zinc-600 dark:text-zinc-300"><span class="font-semibold">Instructor note:</span> ${escapeHtml(row.instructor_notes)}</div>` : ''}
+        </article>
+    `).join('') : '<div class="lg:col-span-2 rounded-2xl border border-dashed border-zinc-300 dark:border-white/10 px-5 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">Your instructor has not created a formal learning-progress record yet.</div>';
+
+    historyEl.innerHTML = history.length ? history.map(row => {
+        const exam = exams.find(item => Number(item.exam_id || 0) === Number(row.achieved_exam_id || 0));
+        return `<article class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div><div class="font-extrabold text-zinc-900 dark:text-white">${escapeHtml(row.instrument_name || 'Instrument')} · ${escapeHtml(row.level_name || 'Level')}</div><div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(row.book_material || 'No book recorded')} · Achieved ${escapeHtml(formatDateLong(row.achieved_at || row.issued_at || '') || 'date not set')}</div>${exam ? `<div class="mt-1 text-xs text-zinc-500">Exam rating: ${escapeHtml(exam.grade_rating || '—')} · ${escapeHtml(exam.result || 'Passed')}</div>` : ''}</div>
+            <div class="mt-3 flex flex-wrap gap-2 sm:mt-0"><span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">Passed</span>${row.certificate_id ? '<span class="rounded-full bg-gold-100 px-3 py-1 text-xs font-bold text-gold-700">Certificate Issued</span>' : ''}</div>
+        </article>`;
+    }).join('') : '<div class="rounded-2xl border border-dashed border-zinc-300 dark:border-white/10 px-5 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">No achieved levels yet. Current records remain in progress until a promotional exam is passed.</div>';
+}
+
+async function openGuardianAdditionalSessions(index) {
+    const item = guardianPortalStudents[Number(index)];
+    const student = item?.student || {};
+    const enrollment = item?.current_enrollment || null;
+    if (!student.student_id || !enrollment || !['Active', 'Completed'].includes(String(enrollment.status || ''))) {
+        showMessage('This student needs an approved enrollment first.', 'error');
+        return;
+    }
+    if (String(item?.latest_session_extension_request?.status || '') === 'Pending') {
+        showMessage('An additional-session request is already pending for this student.', 'error');
+        return;
+    }
+
+    const result = await Swal.fire({
+        title: 'Request Additional Sessions',
+        width: 560,
+        confirmButtonText: 'Submit Request',
+        showCancelButton: true,
+        confirmButtonColor: '#d4a62a',
+        html: `
+            <div class="text-left space-y-4">
+                <p class="text-sm text-zinc-600">For <strong>${escapeHtml(`${student.first_name || ''} ${student.last_name || ''}`.trim() || 'student')}</strong>. Each additional session costs ₱650. Scheduling remains separate.</p>
+                <div><label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Number of sessions</label><input id="guardianAdditionalQuantity" type="number" min="1" max="50" value="1" class="swal2-input !m-0 !w-full"></div>
+                <div><label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Payment method</label><select id="guardianAdditionalPaymentMethod" class="swal2-select !m-0 !w-full"><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option><option value="Cash">Cash</option></select></div>
+                <div><label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Payment proof</label><input id="guardianAdditionalProof" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="block w-full text-sm"><div class="mt-1 text-xs text-zinc-500">Required for GCash and Bank Transfer.</div></div>
+                <div><label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Notes (optional)</label><textarea id="guardianAdditionalNotes" class="swal2-textarea !m-0 !w-full" rows="2"></textarea></div>
+                <div class="rounded-xl bg-amber-50 px-4 py-3"><span class="text-sm text-zinc-600">Request total:</span> <strong id="guardianAdditionalTotal" class="float-right">₱650.00</strong></div>
+            </div>`,
+        didOpen: () => {
+            const quantity = document.getElementById('guardianAdditionalQuantity');
+            quantity?.addEventListener('input', () => {
+                const count = Math.min(50, Math.max(1, Number(quantity.value || 1)));
+                const total = document.getElementById('guardianAdditionalTotal');
+                if (total) total.textContent = formatCurrencyPHP(count * 650);
+            });
+        },
+        preConfirm: () => {
+            const quantity = Math.min(50, Math.max(1, Number(document.getElementById('guardianAdditionalQuantity')?.value || 1)));
+            const paymentMethod = document.getElementById('guardianAdditionalPaymentMethod')?.value || '';
+            const proof = document.getElementById('guardianAdditionalProof')?.files?.[0] || null;
+            if (paymentMethod !== 'Cash' && !proof) {
+                Swal.showValidationMessage('Upload proof of payment for this payment method.');
+                return false;
+            }
+            return { quantity, paymentMethod, proof, notes: document.getElementById('guardianAdditionalNotes')?.value.trim() || '' };
+        }
+    });
+    if (!result.isConfirmed || !result.value) return;
+
+    const payload = new FormData();
+    payload.append('action', 'submit-session-extension-request');
+    payload.append('student_id', String(student.student_id));
+    payload.append('requested_sessions', String(result.value.quantity));
+    payload.append('payment_method', result.value.paymentMethod);
+    payload.append('notes', result.value.notes);
+    if (result.value.proof) payload.append('session_payment_proof_file', result.value.proof);
+    try {
+        const response = await axios.post(`${baseApiUrl}/students.php`, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+        if (!response.data?.success) throw new Error(response.data?.error || 'Unable to submit request.');
+        item.latest_session_extension_request = {
+            status: 'Pending',
+            requested_sessions: result.value.quantity,
+            requested_amount: result.value.quantity * 650
+        };
+        showMessage(response.data.message || 'Additional-session request submitted.', 'success');
+        closeGuardianStudentModal();
+        setHtml('guardianStudentsList', renderGuardianStudentsList(guardianPortalStudents));
+    } catch (error) {
+        showMessage(error?.response?.data?.error || error.message || 'Unable to submit request.', 'error');
+    }
+}
+
+window.openGuardianAdditionalSessions = openGuardianAdditionalSessions;
+
+function renderAdditionalSessionRequestStatus(request) {
+    if (!request) {
+        return '<div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">No additional-session request is currently under review.</div>';
+    }
+    const status = String(request.status || 'Pending');
+    const quantity = Number(request.requested_sessions || 0);
+    const color = status === 'Approved'
+        ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+        : status === 'Rejected'
+            ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200'
+            : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200';
+    return `<div class="rounded-2xl border px-4 py-3 text-sm ${color}">
+        <div class="font-bold">Latest request: ${escapeHtml(status)}</div>
+        <div class="mt-1">${escapeHtml(String(quantity))} session${quantity === 1 ? '' : 's'} · ${formatCurrencyPHP(request.requested_amount || quantity * 650)}</div>
+        ${request.admin_notes ? `<div class="mt-1 text-xs">Staff note: ${escapeHtml(request.admin_notes)}</div>` : ''}
+    </div>`;
+}
+
+function bindStudentAdditionalSessionsForm(student, enrollment, requestMeta) {
+    const card = document.getElementById('studentAdditionalSessionsCard');
+    const form = document.getElementById('studentAdditionalSessionsForm');
+    if (!card || !form) return;
+
+    const approvedEnrollment = enrollment && ['Active', 'Completed'].includes(String(enrollment.status || ''));
+    card.classList.toggle('hidden', !approvedEnrollment);
+    if (!approvedEnrollment) return;
+
+    const total = Number(enrollment.package_sessions || 0);
+    const base = Number(enrollment.base_package_sessions || total || 0);
+    const additional = Math.max(0, total - base);
+    const used = Math.max(0, Number(enrollment.completed_sessions || 0));
+    const remaining = Math.max(0, total - used);
+    const balanceEl = document.getElementById('studentAdditionalSessionBalance');
+    if (balanceEl) {
+        balanceEl.innerHTML = [
+            ['Base sessions', base],
+            ['Additional', additional],
+            ['Used', used],
+            ['Remaining', remaining]
+        ].map(([label, value]) => `<div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3"><div class="text-xs text-zinc-500">${label}</div><div class="mt-1 text-xl font-black text-zinc-900 dark:text-white">${value}</div></div>`).join('');
+    }
+
+    const latest = requestMeta?.latest_session_extension_request || null;
+    setHtml('studentAdditionalSessionRequestStatus', renderAdditionalSessionRequestStatus(latest));
+    const hasPending = String(latest?.status || '') === 'Pending';
+    const quantityEl = document.getElementById('studentAdditionalSessionsQuantity');
+    const paymentMethodEl = document.getElementById('studentAdditionalSessionsPaymentMethod');
+    const proofEl = document.getElementById('studentAdditionalSessionsProof');
+    const proofHint = document.getElementById('studentAdditionalSessionsProofHint');
+    const totalEl = document.getElementById('studentAdditionalSessionsTotal');
+    const submitBtn = document.getElementById('studentAdditionalSessionsSubmit');
+
+    const refreshPrice = () => {
+        const quantity = Math.min(50, Math.max(1, Number(quantityEl?.value || 1)));
+        if (totalEl) totalEl.textContent = formatCurrencyPHP(quantity * 650);
+    };
+    const refreshProof = () => {
+        const required = String(paymentMethodEl?.value || '') !== 'Cash';
+        if (proofEl) proofEl.required = required;
+        if (proofHint) proofHint.textContent = required ? 'Required for this payment method.' : 'Not required for a cash payment.';
+    };
+    quantityEl?.addEventListener('input', refreshPrice);
+    paymentMethodEl?.addEventListener('change', refreshProof);
+    refreshPrice();
+    refreshProof();
+
+    Array.from(form.elements).forEach(control => { control.disabled = hasPending; });
+    if (submitBtn) submitBtn.disabled = hasPending;
+    if (form.dataset.bound === 'true') return;
+    form.dataset.bound = 'true';
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const quantity = Math.min(50, Math.max(1, Number(quantityEl?.value || 1)));
+        const paymentMethod = String(paymentMethodEl?.value || '');
+        if (paymentMethod !== 'Cash' && !proofEl?.files?.length) {
+            showMessage('Upload proof of payment before submitting.', 'error');
+            return;
+        }
+        const payload = new FormData();
+        payload.append('action', 'submit-session-extension-request');
+        payload.append('student_id', String(student.student_id || ''));
+        payload.append('requested_sessions', String(quantity));
+        payload.append('payment_method', paymentMethod);
+        payload.append('notes', document.getElementById('studentAdditionalSessionsNotes')?.value.trim() || '');
+        if (proofEl?.files?.[0]) payload.append('session_payment_proof_file', proofEl.files[0]);
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+            const response = await axios.post(`${baseApiUrl}/students.php`, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+            if (!response.data?.success) throw new Error(response.data?.error || 'Unable to submit request.');
+            showMessage(response.data.message || 'Additional-session request submitted.', 'success');
+            setHtml('studentAdditionalSessionRequestStatus', renderAdditionalSessionRequestStatus({
+                status: 'Pending', requested_sessions: quantity, requested_amount: quantity * 650
+            }));
+            Array.from(form.elements).forEach(control => { control.disabled = true; });
+        } catch (error) {
+            showMessage(error?.response?.data?.error || error.message || 'Unable to submit request.', 'error');
+            if (submitBtn) submitBtn.disabled = false;
         }
     });
 }

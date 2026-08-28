@@ -12,23 +12,59 @@ let _trendChartInstance     = null;
 const DEFAULT_CRITERIA = ['Performance','Technique','Rhythm & Timing','Focus & Discipline','Assignment & Practice'];
 const CRITERIA_STORAGE_KEY = 'fas_grade_criteria';
 let isEditingCriteria = false;
+let instructorCriteria = null;
+function criteriaStorageKey() {
+    const userId = (typeof Auth !== 'undefined' && Auth.getUser) ? Number(Auth.getUser()?.user_id || 0) : 0;
+    return userId > 0 ? `${CRITERIA_STORAGE_KEY}_${userId}` : CRITERIA_STORAGE_KEY;
+}
 
 function loadCriteria() {
+    if (Array.isArray(instructorCriteria) && instructorCriteria.length) return [...instructorCriteria];
     try {
-        const s = localStorage.getItem(CRITERIA_STORAGE_KEY);
+        const s = localStorage.getItem(criteriaStorageKey()) || localStorage.getItem(CRITERIA_STORAGE_KEY);
         if (s) { const p = JSON.parse(s); if (Array.isArray(p) && p.length) return p; }
     } catch(e) {}
     return [...DEFAULT_CRITERIA];
 }
-function saveCriteria(c) { try { localStorage.setItem(CRITERIA_STORAGE_KEY, JSON.stringify(c)); } catch(e) {} }
+function saveCriteria(c) {
+    instructorCriteria = [...c];
+    try { localStorage.setItem(criteriaStorageKey(), JSON.stringify(c)); } catch(e) {}
+}
+async function loadServerCriteria() {
+    const user = Auth.getUser();
+    if (!user?.user_id) return;
+    const locallySaved = loadCriteria();
+    try {
+        const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-grading-criteria&user_id=${encodeURIComponent(user.user_id)}`);
+        if (res.data?.success && Array.isArray(res.data.criteria) && res.data.criteria.length) {
+            if (!res.data.customized && JSON.stringify(locallySaved) !== JSON.stringify(DEFAULT_CRITERIA)) {
+                await persistCriteria(locallySaved);
+            } else {
+                saveCriteria(res.data.criteria);
+            }
+        }
+    } catch (e) { console.warn('Using locally cached grading criteria.', e); }
+}
+async function persistCriteria(criteria) {
+    const user = Auth.getUser();
+    const res = await axios.post(`${baseApiUrl}/teachers.php`, { action:'save-grading-criteria', user_id:Number(user.user_id), criteria });
+    if (!res.data?.success) throw new Error(res.data?.error || 'Unable to save criteria.');
+    saveCriteria(res.data.criteria);
+    try { localStorage.removeItem(CRITERIA_STORAGE_KEY); } catch (e) {}
+}
 
 // ── Score fields ───────────────────────────────────────────────────
 function buildScoreFields() {
     const criteria = loadCriteria();
     const keys     = ['performance_score','technique_score','rhythm_score','focus_score','assignment_score'];
-    const labelIds = ['perfLabel','techLabel','rhythmLabel','focusLabel','assignLabel'];
     const icons    = ['fa-music','fa-hands','fa-drum','fa-brain','fa-book-open'];
-    return keys.map((key, i) => ({ key, label: criteria[i] || DEFAULT_CRITERIA[i], icon: icons[i], labelId: labelIds[i] }));
+    return criteria.map((label, i) => ({ key: keys[i] || `criterion_${i}`, label, icon: icons[i] || 'fa-star', labelId: `criterionLabel${i}`, inputId: `criterionScore${i}Input`, index:i }));
+}
+function getCriterionScore(record, field) {
+    const saved = Array.isArray(record?.criteria_scores) ? record.criteria_scores : [];
+    const matched = saved.find(item => String(item?.name || '') === field.label) || saved[field.index] || null;
+    if (matched) return Number(matched.score || 0);
+    return field.index < 5 ? Number(record?.[field.key] || 0) : 0;
 }
 const SCORE_FIELDS = buildScoreFields();
 const SCORE_WORDS  = ['','Poor','Fair','Good','Very Good','Excellent'];
@@ -46,8 +82,8 @@ function renderScoreCriteria() {
     const container = document.getElementById('scoreCriteriaContainer');
     if (!container) return;
     const criteria    = loadCriteria();
-    const fieldKeys   = ['performanceScoreInput','techniqueScoreInput','rhythmScoreInput','focusScoreInput','assignmentScoreInput'];
-    const labelIds    = ['perfLabel','techLabel','rhythmLabel','focusLabel','assignLabel'];
+    const preservedScores = {};
+    container.querySelectorAll('.criterion-score-input').forEach(input => { preservedScores[input.dataset.criterionName || ''] = input.value; });
 
     if (isEditingCriteria) {
         container.innerHTML = `
@@ -73,9 +109,9 @@ function renderScoreCriteria() {
     }
 
     container.innerHTML = criteria.map((name, i) => {
-        const fieldId    = fieldKeys[i] || `extraScore${i}Input`;
-        const labelId    = labelIds[i]  || `extraLabel${i}`;
-        const currentVal = document.getElementById(fieldId)?.value || '';
+        const fieldId    = `criterionScore${i}Input`;
+        const labelId    = `criterionLabel${i}`;
+        const currentVal = preservedScores[name] || '';
         const activeWord = currentVal ? (SCORE_WORDS[Number(currentVal)] || '—') : '—';
         const wordBtns   = ['1','2','3','4','5'].map((word, wi) => {
             const val = String(wi + 1);
@@ -83,9 +119,10 @@ function renderScoreCriteria() {
             const activeCls = ['bg-red-100 border-red-400 text-red-700','bg-orange-100 border-orange-400 text-orange-700','bg-yellow-100 border-yellow-400 text-yellow-700','bg-green-100 border-green-400 text-green-700','bg-emerald-100 border-emerald-400 text-emerald-700'][wi];
             return `<button type="button"
                 class="score-btn score-btn-${val} py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${isActive ? activeCls : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}"
-                data-field="${fieldId}" data-val="${val}">${word}</button>`;
+                data-field="${fieldId}" data-label-id="${labelId}" data-val="${val}">${word}</button>`;
         }).join('');
         return `<div class="criterion-row">
+            <input type="hidden" id="${fieldId}" class="criterion-score-input" data-criterion-name="${escapeHtml(name)}" value="${escapeHtml(currentVal)}">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-sm font-semibold text-gray-700">${escapeHtml(name)}</span>
                 <span id="${labelId}" class="text-xs font-medium text-gray-400">${activeWord}</span>
@@ -93,14 +130,16 @@ function renderScoreCriteria() {
             <div class="grid grid-cols-5 gap-1.5">${wordBtns}</div>
         </div>`;
     }).join('');
+    setGradeText('criteriaTotalLabel', `${criteria.length} active ${criteria.length === 1 ? 'criterion' : 'criteria'}.`);
     initScoreButtons();
 }
 
-function toggleEditCriteria() {
+async function toggleEditCriteria() {
     if (isEditingCriteria) {
         const inputs = document.querySelectorAll('.criteria-name-input');
         const newC   = Array.from(inputs).map(inp => inp.value.trim()).filter(Boolean);
-        if (newC.length) saveCriteria(newC);
+        if (!newC.length) return showGradeMessage('Keep at least one grading criterion.', 'error');
+        try { await persistCriteria(newC); } catch (e) { return showGradeMessage(e?.response?.data?.error || e.message, 'error'); }
         isEditingCriteria = false;
     } else { isEditingCriteria = true; }
     const btn = document.getElementById('editCriteriaBtn');
@@ -113,10 +152,16 @@ function toggleEditCriteria() {
             : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-indigo-600 text-xs font-semibold hover:bg-indigo-50 transition';
     }
     renderScoreCriteria();
+    if (!isEditingCriteria) {
+        const selected = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
+        syncScoreButtons(selected);
+        updateScorePreview();
+    }
 }
 function addCriterion() {
     const inputs = document.querySelectorAll('.criteria-name-input');
     const c = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+    if (c.length >= 20) return showGradeMessage('A maximum of 20 grading criteria is supported.', 'error');
     c.push('New Criterion'); saveCriteria(c); renderScoreCriteria();
 }
 function deleteCriterion(index) {
@@ -221,7 +266,7 @@ function isTodaySession(session) {
 //   graded (progress_id > 0)          → read-only "Present — Graded" badge
 //   att = present / late              → read-only desk-confirmed badge, grading unlocked
 //   att = absent / excused / ci / etc → read-only badge, grading locked
-//   att = pending / not set           → "End Session" button (instructor override)
+//   att = pending / not set           → "Session Done" action on the student row
 function renderAttendanceControl(session) {
     const container = document.getElementById('attendanceControl');
     const descEl    = document.getElementById('attendanceSectionDesc');
@@ -267,25 +312,26 @@ function renderAttendanceControl(session) {
         return;
     }
 
-    // Pending / Scheduled — instructor can end the session
+    // Pending / Scheduled — completion is handled directly on the student row.
     container.innerHTML = `
         <div class="flex flex-wrap items-center gap-3">
             <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
                 <i class="fas fa-clock text-gray-400 text-xs"></i>Not yet marked by desk
             </span>
-            <button type="button" id="markPresentBtn"
-                onclick="instructorMarkPresent()"
-                class="inline-flex items-center gap-2 rounded-xl border border-teal-300 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-700 hover:bg-teal-100 transition">
-                <i class="fas fa-circle-check text-sm"></i>End Session
-            </button>
         </div>`;
-    if (descEl) descEl.textContent = 'Not yet confirmed by desk. End the session once the lesson is finished.';
+    if (descEl) descEl.textContent = 'Use Session Done on the student row once the lesson is finished.';
+}
+function markGradeDirty() {
+    const status = document.getElementById('gradeSaveStatus');
+    if (status) { status.classList.add('hidden'); status.classList.remove('flex'); }
+    const btn = document.getElementById('saveGradeBtn');
+    if (btn && !btn.disabled) btn.innerHTML = '<i class="fas fa-save text-xs"></i> Save Grade';
 }
 
-async function instructorMarkPresent() {
-    const session = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
+async function instructorMarkPresent(sessionId = selectedGradeSessionId, triggerButton = null) {
+    const session = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(sessionId || 0)) || null;
     if (!session) return;
-    const btn  = document.getElementById('markPresentBtn');
+    const btn = triggerButton || document.querySelector(`[data-session-done-id="${Number(sessionId)}"]`);
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs mr-2"></i>Ending…'; }
     const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
     try {
@@ -296,17 +342,19 @@ async function instructorMarkPresent() {
         const data = res.data || {};
         if (!data.success) {
             showGradeMessage(data.error || 'Could not mark attendance. Please try again.', 'error');
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-circle-check text-sm"></i>End Session'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-circle-check text-sm"></i>Session Done'; }
             return;
         }
         await loadGradeSessions(currentGradeFilter);
+        showGradeMessage(data.message || 'Session marked done. You can now save the grade.', 'success');
+        if (typeof showMessage === 'function') showMessage(data.message || 'Session marked done. You can now save the grade.', 'success');
         const refreshed = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
-        populateGradeForm(refreshed);
+        if (refreshed) populateGradeForm(refreshed);
         renderGradeSessions();
     } catch (e) {
         console.error('Mark present failed:', e);
-        showGradeMessage('Network error — please try again.', 'error');
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-circle-check text-sm"></i>End Session'; }
+        showGradeMessage(e?.response?.data?.error || 'Network error — please try again.', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-circle-check text-sm"></i>Session Done'; }
     }
 }
 window.instructorMarkPresent = instructorMarkPresent;
@@ -322,9 +370,9 @@ function initScoreButtons() {
             input.value = val;
             document.querySelectorAll(`.score-btn[data-field="${field}"]`).forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            const sf = buildScoreFields().find(f => f.key.replace('_score','ScoreInput') === field || field === f.key.replace('_score','ScoreInput'));
-            const labelEl = sf?.labelId ? document.getElementById(sf.labelId) : null;
+            const labelEl = document.getElementById(btn.dataset.labelId || '');
             if (labelEl) labelEl.textContent = SCORE_WORDS[Number(val)] || val;
+            markGradeDirty();
             updateScorePreview();
         });
     });
@@ -335,8 +383,10 @@ function getFieldInputId(key) {
 }
 function syncScoreButtons(session) {
     buildScoreFields().forEach(field => {
-        const inputId = getFieldInputId(field.key);
-        const val     = session ? String(session[field.key] || '') : '';
+        const inputId = field.inputId;
+        const saved = Array.isArray(session?.criteria_scores) ? session.criteria_scores : [];
+        const matched = saved.find(item => String(item?.name || '') === field.label) || saved[field.index] || null;
+        const val = matched ? String(matched.score || '') : (field.index < 5 && session ? String(session[field.key] || '') : '');
         const input   = document.getElementById(inputId);
         if (input) input.value = val;
         document.querySelectorAll(`.score-btn[data-field="${inputId}"]`).forEach(btn => {
@@ -357,11 +407,7 @@ function setScoreButtonsDisabled(disabled) {
 
 // ── Average preview ────────────────────────────────────────────────
 function computeAverageFromInputs() {
-    // Only count the criteria the instructor has defined (may be fewer than 5)
-    const activeCriteria = loadCriteria();
-    const fieldKeys = ['performanceScoreInput','techniqueScoreInput','rhythmScoreInput','focusScoreInput','assignmentScoreInput'];
-    // Use only as many field IDs as there are active criteria
-    const ids    = fieldKeys.slice(0, activeCriteria.length);
+    const ids = buildScoreFields().map(field => field.inputId);
     const values = ids.map(id => Number(document.getElementById(id)?.value || 0)).filter(v => v >= 1 && v <= 5);
     if (!values.length || values.length !== ids.length) return null;
     return Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(2));
@@ -371,6 +417,10 @@ function updateScorePreview() {
     const badgeEl    = document.getElementById('gradeAverageBadge');
     const previewBox = document.getElementById('avgPreviewBox');
     const avg        = computeAverageFromInputs();
+    const fields = buildScoreFields();
+    const rated = fields.filter(field => Number(document.getElementById(field.inputId)?.value || 0) > 0).length;
+    setGradeText('criteriaTotalLabel', `${rated} of ${fields.length} ${fields.length === 1 ? 'criterion' : 'criteria'} rated.`);
+    setGradeText('criteriaRemainingCount', `${Math.max(0, fields.length - rated)} ${fields.length - rated === 1 ? 'criterion' : 'criteria'} still to rate.`);
     if (!previewEl) return;
     if (avg === null) {
         previewEl.textContent = '—';
@@ -393,15 +443,15 @@ function getAnalyticsPreviewSession(session) {
     if (!session) return null;
     const preview = { ...session };
     let has = false;
-    const activeCriteria   = loadCriteria();
-    const activeFields     = buildScoreFields().slice(0, activeCriteria.length);
+    const activeFields = buildScoreFields();
+    const criteriaScores = [];
     activeFields.forEach(f => {
-        const v = Number(document.getElementById(getFieldInputId(f.key))?.value || 0);
+        const v = Number(document.getElementById(f.inputId)?.value || 0);
         preview[f.key] = v > 0 ? v : 0;
+        criteriaScores.push({ name:f.label, score:v });
         if (v > 0) has = true;
     });
-    // Zero out unused criteria so they don't skew averages
-    buildScoreFields().slice(activeCriteria.length).forEach(f => { preview[f.key] = 0; });
+    preview.criteria_scores = criteriaScores;
     preview.skill_level    = document.getElementById('skillLevelInput')?.value || preview.skill_level || '';
     preview.remarks        = document.getElementById('remarksInput')?.value    || preview.remarks     || '';
     preview.average_score  = computeAverageFromInputs();
@@ -438,6 +488,8 @@ window.openProgressModal  = openProgressModal;
 function populateGradeForm(session) {
     selectedGradeSessionId = Number(session?.session_id || 0);
     document.getElementById('sessionIdInput').value = selectedGradeSessionId ? String(selectedGradeSessionId) : '';
+    const saveStatus = document.getElementById('gradeSaveStatus');
+    if (saveStatus) { saveStatus.classList.add('hidden'); saveStatus.classList.remove('flex'); }
 
     const studentName = session ? `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student' : 'Select a session';
     const instrument = session?.instrument_name || 'Instrument';
@@ -470,11 +522,8 @@ function populateGradeForm(session) {
     if (hidSub)  hidSub.value  = sessionMeta;
 
     // Pre-fill score inputs then render criteria
-    buildScoreFields().forEach(field => {
-        const inputEl = document.getElementById(getFieldInputId(field.key));
-        if (inputEl) inputEl.value = session ? String(session[field.key] || '') : '';
-    });
     renderScoreCriteria();
+    syncScoreButtons(session);
 
     const skillEl   = document.getElementById('skillLevelInput');
     const remarksEl = document.getElementById('remarksInput');
@@ -519,7 +568,7 @@ function populateGradeForm(session) {
             } else if (['absent','excused','ci','teacher absent'].includes(att)) {
                 lockMsg.textContent = 'Student is not present — grading is not available for this session.';
             } else {
-                lockMsg.textContent = 'Desk hasn\'t marked attendance yet. Use the End Session button above if the student is here.';
+                lockMsg.textContent = 'Desk hasn\'t marked attendance yet. Use Session Done on the student row if the lesson is finished.';
             }
         }
         setScoreButtonsDisabled(true);
@@ -592,13 +641,17 @@ function renderGradeSessions() {
         const time       = formatTime12Hour(session.start_time);
         const graded     = Number(session.progress_id || 0) > 0;
         const score      = graded && session.average_score ? Number(session.average_score).toFixed(1) : null;
+        const attendance = String(session.attendance_status || 'Pending').toLowerCase();
+        const sessionCompleted = String(session.status || '').toLowerCase() === 'completed' && ['present','late'].includes(attendance);
+        const cannotComplete = ['absent','excused','ci','teacher absent'].includes(attendance)
+            || ['cancelled','cancelled_by_teacher','rescheduled','no show'].includes(String(session.status || '').toLowerCase());
         
         // Get initials for avatar
         const initials   = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
-        return `<button type="button" data-session-id="${sid}"
-            class="session-card w-full text-left px-5 py-4 rounded-2xl border-2 ${isSelected ? 'selected border-teal-500' : 'border-gray-100'}">
-            <div class="flex items-start gap-3">
+        return `<div class="session-card w-full px-4 py-3 rounded-2xl border-2 ${isSelected ? 'selected border-teal-500' : 'border-gray-100'}">
+            <div class="flex items-center gap-3">
+              <button type="button" data-session-id="${sid}" class="flex min-w-0 flex-1 items-start gap-3 text-left rounded-xl p-1 focus:outline-none focus:ring-2 focus:ring-teal-300">
                 <div class="flex-shrink-0">
                     <p class="text-base font-semibold text-gray-900">${escapeHtml(time)}</p>
                 </div>
@@ -611,12 +664,18 @@ function renderGradeSessions() {
                     </div>
                     <p class="text-sm text-gray-500">${escapeHtml(instrument)} · ${escapeHtml(duration)} · ${escapeHtml(room)}</p>
                 </div>
-                ${score ? `<div class="flex-shrink-0 flex items-center gap-1 text-teal-600">
+                ${score ? `<div class="flex-shrink-0 flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-teal-700">
                     <i class="fas fa-check text-xs"></i>
-                    <span class="text-sm font-semibold">${score}</span>
+                    <span class="text-xs font-bold">Graded · ${score}/5</span>
                 </div>` : '<div class="flex-shrink-0 text-sm text-gray-400">Not graded</div>'}
+              </button>
+              ${sessionCompleted
+                ? '<span class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"><i class="fas fa-circle-check"></i>Session Done</span>'
+                : cannotComplete
+                    ? `<span class="inline-flex shrink-0 items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-500">${escapeHtml(session.attendance_status || session.status || 'Unavailable')}</span>`
+                : `<button type="button" data-session-done-id="${sid}" onclick="event.stopPropagation(); instructorMarkPresent(${sid}, this)" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-teal-300 bg-teal-50 px-3 py-2 text-xs font-bold text-teal-700 hover:bg-teal-100 transition"><i class="fas fa-circle-check"></i>Session Done</button>`}
             </div>
-        </button>`;
+        </div>`;
     }).join('');
 
     document.querySelectorAll('[data-session-id]').forEach(btn => {
@@ -740,27 +799,27 @@ async function saveSessionGrade(event) {
         showGradeMessage('Attendance must be marked Present before grading.', 'error'); return;
     }
 
-    // Build score payload dynamically — only use active criteria, zero unused ones
-    const activeCriteria = loadCriteria();
-    const allScoreKeys = ['performance_score','technique_score','rhythm_score','focus_score','assignment_score'];
-    const allInputIds  = ['performanceScoreInput','techniqueScoreInput','rhythmScoreInput','focusScoreInput','assignmentScoreInput'];
-    const scorePayload = {};
-    allScoreKeys.forEach((key, i) => {
-        const isActive = i < activeCriteria.length;
-        scorePayload[key] = isActive ? Number(document.getElementById(allInputIds[i])?.value || 0) : 0;
-    });
+    const criteriaScores = buildScoreFields().map(field => ({
+        name: field.label,
+        score: Number(document.getElementById(field.inputId)?.value || 0)
+    }));
+    if (criteriaScores.some(item => item.score < 1 || item.score > 5)) {
+        showGradeMessage('Rate every active criterion from 1 to 5.', 'error');
+        return;
+    }
 
     const payload = {
         action: 'save-session-grade',
         user_id: Number(user.user_id),
         session_id: sessionId,
         skill_level: document.getElementById('skillLevelInput').value,
-        ...scorePayload,
+        criteria_scores: criteriaScores,
         remarks: document.getElementById('remarksInput').value.trim()
     };
 
     const btn = document.getElementById('saveGradeBtn');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Saving…'; }
+    let savedSuccessfully = false;
 
     try {
         const res  = await axios.post(`${baseApiUrl}/teachers.php?action=save-session-grade`, payload);
@@ -771,11 +830,19 @@ async function saveSessionGrade(event) {
         const refreshed = instructorGradeSessions.find(s => Number(s.session_id || 0) === sessionId) || null;
         populateGradeForm(refreshed);
         renderGradeSessions();
+        savedSuccessfully = true;
+        const status = document.getElementById('gradeSaveStatus');
+        if (status) { status.classList.remove('hidden'); status.classList.add('flex'); }
     } catch (e) {
         console.error('Save failed:', e);
-        showGradeMessage('Network error — please try again.', 'error');
+        showGradeMessage(e?.response?.data?.error || 'Network error — please try again.', 'error');
     } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check text-xs"></i> Session done'; }
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = savedSuccessfully
+                ? '<i class="fas fa-circle-check text-xs"></i> Grade Saved'
+                : '<i class="fas fa-save text-xs"></i> Save Grade';
+        }
     }
 }
 
@@ -797,13 +864,12 @@ function renderAnalytics(session) {
     if (!session) return;
 
     // Only use the criteria the instructor has actually defined
-    const activeCriteria   = loadCriteria();
-    const SCORE_FIELDS_NOW = buildScoreFields().slice(0, activeCriteria.length);
+    const SCORE_FIELDS_NOW = buildScoreFields();
     const preview          = getAnalyticsPreviewSession(session);
     const studentId        = Number(session.student_id || 0);
     const history          = getStudentGradedHistory(studentId);
     const isGraded         = Number(session.progress_id || 0) > 0;
-    const hasPreview       = SCORE_FIELDS_NOW.some(f => Number(preview?.[f.key] || 0) > 0);
+    const hasPreview       = SCORE_FIELDS_NOW.some(f => getCriterionScore(preview, f) > 0);
     const radarSource      = hasPreview ? preview : (isGraded ? session : null);
     const trendHistory     = history.slice();
     if (!isGraded && preview?.average_score !== null) trendHistory.push(preview);
@@ -825,7 +891,7 @@ function renderAnalytics(session) {
             _radarChartInstance = new Chart(radarCanvas, {
                 type: 'radar',
                 data: { labels: SCORE_FIELDS_NOW.map(f => f.label), datasets: [{
-                    data: SCORE_FIELDS_NOW.map(f => Number(radarSource[f.key] || 0)),
+                    data: SCORE_FIELDS_NOW.map(f => getCriterionScore(radarSource, f)),
                     backgroundColor: 'rgba(13,148,136,0.12)', borderColor: '#0d9488',
                     pointBackgroundColor: '#0d9488', pointBorderColor: '#fff', pointRadius: 4, borderWidth: 2
                 }]},
@@ -871,7 +937,7 @@ function renderAnalytics(session) {
             barsEl.innerHTML = '<p class="text-sm text-gray-400 text-center py-2">No data yet.</p>';
         } else {
             barsEl.innerHTML = SCORE_FIELDS_NOW.map(field => {
-                const vals  = trendHistory.map(s => Number(s[field.key] || 0)).filter(v => v > 0);
+                const vals  = trendHistory.map(s => getCriterionScore(s, field)).filter(v => v > 0);
                 const mean  = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
                 const pct   = (mean / 5) * 100;
                 const color = mean <= 2 ? 'bg-rose-400' : mean <= 3 ? 'bg-amber-400' : 'bg-teal-500';
@@ -897,7 +963,7 @@ function renderAnalytics(session) {
         if (!source) {
             tipsEl.innerHTML = '<p class="text-sm text-gray-400 text-center py-2">Grade this session to see tips.</p>';
         } else {
-            const sorted = SCORE_FIELDS_NOW.map(f => ({ ...f, score: Number(source[f.key] || 0) }))
+            const sorted = SCORE_FIELDS_NOW.map(f => ({ ...f, score: getCriterionScore(source, f) }))
                 .filter(f => f.score > 0).sort((a, b) => a.score - b.score);
             tipsEl.innerHTML = sorted.length ? sorted.map(f => {
                 const style = getTipStyle(f.score);
@@ -918,12 +984,13 @@ function renderAnalytics(session) {
 
 // ── Init ───────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+    await loadServerCriteria();
     renderScoreCriteria();
     await loadGradeSessions('all');
     document.getElementById('gradeSearch')?.addEventListener('input',   () => renderGradeSessions());
     document.getElementById('gradingForm')?.addEventListener('submit',  saveSessionGrade);
-    document.getElementById('skillLevelInput')?.addEventListener('change', updateScorePreview);
-    document.getElementById('remarksInput')?.addEventListener('input',  updateScorePreview);
+    document.getElementById('skillLevelInput')?.addEventListener('change', () => { markGradeDirty(); updateScorePreview(); });
+    document.getElementById('remarksInput')?.addEventListener('input',  () => { markGradeDirty(); updateScorePreview(); });
     // Close progress modal on backdrop click
     document.getElementById('progressModal')?.addEventListener('click', e => {
         if (e.target === document.getElementById('progressModal')) closeProgressModal();

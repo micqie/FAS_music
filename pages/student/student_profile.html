@@ -211,6 +211,56 @@
                 </div>
             </section>
 
+            <section id="studentAdditionalSessionsCard" class="mt-6 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40 scroll-mt-6">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div class="portal-stat-label">My Enrollment / Enrollment Details</div>
+                        <h3 class="mt-2 text-lg font-extrabold text-zinc-900 dark:text-white">Request Additional Sessions</h3>
+                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Add purchased lessons without resetting your learning progress. Actual lesson dates are managed separately in Sessions.</p>
+                    </div>
+                    <div class="rounded-2xl border border-gold-500/20 bg-amber-50 dark:bg-gold-500/10 px-4 py-3 text-right">
+                        <div class="text-xs font-bold uppercase tracking-widest text-gold-700 dark:text-gold-300">Price</div>
+                        <div class="mt-1 text-xl font-black text-zinc-900 dark:text-white">₱650 <span class="text-sm font-semibold text-zinc-500">each</span></div>
+                    </div>
+                </div>
+
+                <div id="studentAdditionalSessionBalance" class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4"></div>
+                <div id="studentAdditionalSessionRequestStatus" class="mt-4"></div>
+
+                <form id="studentAdditionalSessionsForm" class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                        <label for="studentAdditionalSessionsQuantity" class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Number of Sessions</label>
+                        <input id="studentAdditionalSessionsQuantity" name="requested_sessions" type="number" min="1" max="50" value="1" required class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                    </div>
+                    <div>
+                        <label for="studentAdditionalSessionsPaymentMethod" class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Payment Method</label>
+                        <select id="studentAdditionalSessionsPaymentMethod" name="payment_method" required class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
+                            <option value="GCash">GCash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cash">Cash</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="studentAdditionalSessionsProof" class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Payment Proof</label>
+                        <input id="studentAdditionalSessionsProof" name="session_payment_proof_file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-sm text-zinc-600 dark:text-zinc-300">
+                        <p id="studentAdditionalSessionsProofHint" class="mt-2 text-xs text-zinc-500">Required for GCash and Bank Transfer.</p>
+                    </div>
+                    <div>
+                        <label for="studentAdditionalSessionsNotes" class="block text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">Notes (Optional)</label>
+                        <textarea id="studentAdditionalSessionsNotes" name="notes" rows="2" class="w-full px-4 py-3 bg-white dark:bg-zinc-950/60 border border-zinc-300 dark:border-white/10 rounded-2xl text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Message for desk/admin"></textarea>
+                    </div>
+                    <div class="md:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-zinc-200 dark:border-white/10 pt-4">
+                        <div>
+                            <div class="text-xs uppercase tracking-widest text-zinc-500">Request Total</div>
+                            <div id="studentAdditionalSessionsTotal" class="mt-1 text-2xl font-black text-zinc-900 dark:text-white">₱650.00</div>
+                        </div>
+                        <button id="studentAdditionalSessionsSubmit" type="submit" class="px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                            <i class="fas fa-paper-plane mr-2"></i>Submit Request
+                        </button>
+                    </div>
+                </form>
+            </section>
+
             <div class="mt-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6">
                 <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
                     <div class="flex items-center justify-between gap-3">

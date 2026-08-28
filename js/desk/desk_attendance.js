@@ -1481,7 +1481,10 @@
             const absenceCount = getAbsenceCount(student);
             const nextSessionLabel = getNextSessionLabel(student);
             const rows = [];
-            const teacherSummaryHtml = renderTeacherPackageSummary(student);
+            const teacherRows = buildTeacherPackageSummary(student);
+            const teacherSummaryHtml = teacherRows.length
+                ? teacherRows.map(row => `<span class="inline-flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"><i class="fas fa-user-tie text-gold-500"></i><strong class="truncate text-slate-800">${escapeHtml(row.teacherName)}</strong><span class="hidden text-slate-400 sm:inline">${escapeHtml(row.packageText)}</span></span>`).join('')
+                : '<span class="text-xs text-slate-500">No instructor assigned yet.</span>';
 
             for (let sessionNumber = 1; sessionNumber <= totalSessions; sessionNumber += 1) {
                 const slots = sessionsList.filter(slot => Number(slot.session_number) === sessionNumber);
@@ -1496,61 +1499,59 @@
                             instrumentText ? `<span class="mx-1 text-slate-300">•</span> ${instrumentText}` : ''
                         ].join('');
                         return `
-                            <div class="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                                <div class="flex flex-wrap items-center gap-2 mb-1.5">${getStatusBadge(slot.status)}</div>
-                                <div class="text-sm text-slate-700">${escapeHtml(dateText)} <span class="text-slate-300">•</span> ${escapeHtml(timeText)}</div>
-                                <div class="mt-1 text-xs text-slate-500">${scheduleMeta}</div>
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600"><span class="font-semibold text-slate-800">${escapeHtml(dateText)}</span><span>${escapeHtml(timeText)}</span>${getStatusBadge(slot.status)}</div>
+                                <div class="mt-1 truncate text-[11px] text-slate-500">${scheduleMeta}</div>
                             </div>
                         `;
                     }).join('')
                     : '<div class="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-sm text-slate-400">No date scheduled yet</div>';
 
                 rows.push(`
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <div class="flex items-center justify-between gap-3 mb-2">
-                            <div class="text-sm font-semibold text-slate-800">Session ${sessionNumber}</div>
-                            <div class="text-xs text-slate-500">${slots.length ? `${slots.length} item${slots.length === 1 ? '' : 's'}` : 'No schedule'}</div>
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                        <div class="mb-1.5 flex items-center justify-between gap-3">
+                            <div class="text-xs font-black uppercase tracking-wide text-slate-700">Session ${sessionNumber}</div>
+                            ${slots.length > 1 ? `<div class="text-[10px] text-slate-400">${slots.length} schedules</div>` : ''}
                         </div>
-                        <div class="space-y-2">${slotHtml}</div>
+                        <div class="space-y-1.5">${slotHtml}</div>
                     </div>
                 `);
             }
 
             Swal.fire({
                 title: `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Attendance Details',
-                width: 760,
+                width: 680,
                 confirmButtonText: 'Close',
+                customClass: { popup: 'attendance-details-compact' },
                 html: `
-                    <div class="text-left px-1 pb-1">
-                        <div class="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                            <div class="flex flex-wrap items-center gap-2">
-                                ${getStatusBadge(student.status || 'Active')}
-                                <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Active Enrollment</span>
+                    <div class="text-left">
+                        <div class="mb-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">${getStatusBadge(student.status || 'Active')}<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Active Enrollment</span></div>
+                                <div class="text-xs text-slate-500">Next: <strong class="text-slate-700">${escapeHtml(nextSessionLabel)}</strong></div>
                             </div>
-                            <div class="mt-2 text-sm text-slate-600">
+                            <div class="mt-1.5 text-sm text-slate-600">
                                 Package: <span class="font-semibold text-slate-900">${escapeHtml(student.package_name || '—')}</span>
                             </div>
-                            <div class="mt-2 text-xs text-slate-500">Completed ${getCompletedCount(student)} of ${Number(student.sessions || 0)} sessions. Next: ${escapeHtml(nextSessionLabel)}</div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 mb-3 text-sm">
-                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                                <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Completed</div>
-                                <div class="mt-1 text-lg font-black text-slate-900">${getCompletedCount(student)}<span class="text-sm font-semibold text-slate-400">/${Number(student.sessions || 0)}</span></div>
+                        <div class="mb-2.5 grid grid-cols-3 gap-2 text-sm">
+                            <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                <div class="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Completed</div>
+                                <div class="text-base font-black text-slate-900">${getCompletedCount(student)}<span class="text-xs font-semibold text-slate-400">/${Number(student.sessions || 0)}</span></div>
                             </div>
-                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                                <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Remaining</div>
-                                <div class="mt-1 text-lg font-black text-slate-900">${getRemainingCount(student)}</div>
+                            <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                <div class="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Remaining</div>
+                                <div class="text-base font-black text-slate-900">${getRemainingCount(student)}</div>
                             </div>
-                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                                <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold">Absences</div>
-                                <div class="mt-1 text-lg font-black ${absenceCount > 0 ? 'text-rose-600' : 'text-slate-900'}">${absenceCount}</div>
+                            <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                <div class="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Absences</div>
+                                <div class="text-base font-black ${absenceCount > 0 ? 'text-rose-600' : 'text-slate-900'}">${absenceCount}</div>
                             </div>
                         </div>
-                        <div class="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
-                            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Teachers</div>
-                            <div class="mt-2 space-y-2">${teacherSummaryHtml}</div>
+                        <div class="mb-2.5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                            <span class="mr-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">Instructors</span>${teacherSummaryHtml}
                         </div>
-                        <div class="space-y-2 max-h-[52vh] overflow-y-auto pr-1">${rows.join('')}</div>
+                        <div class="grid max-h-[46vh] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">${rows.join('')}</div>
                     </div>
                 `
             });

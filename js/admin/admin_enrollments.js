@@ -11,6 +11,9 @@
         let adminAssignSelectedDate = '';
         let adminAssignCalendarMonth = '';
         let adminAssignAvailabilityToken = 0;
+        let adminAssignAvailabilityTimer = null;
+        let adminAssignAvailabilityController = null;
+        const adminAssignAvailabilityCache = new Map();
 
         function getEnrollmentSearchTerm() {
             const input = document.getElementById('enrollmentSearchInput');
@@ -164,9 +167,7 @@
                 const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
                 const email = escapeHtml(req.email || '');
                 const branchName = escapeHtml(req.branch_name || '—');
-                const schedule = req.preferred_day_of_week
-                    ? `${escapeHtml(req.preferred_day_of_week)} • ${escapeHtml(formatTime12Hour(req.preferred_start_time || ''))}`
-                    : 'Based on instructor availability';
+                const schedule = 'Managed separately in Sessions';
                 const addOn = `${Number(req.requested_sessions || 1)} session${Number(req.requested_sessions || 1) > 1 ? 's' : ''}`;
                 const paymentMethod = escapeHtml(req.payment_method || 'Cash');
                 const amount = formatCurrencyPHP(req.requested_amount || 650);
@@ -419,9 +420,10 @@
             }
 
             const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
-            const schedule = req.preferred_day_of_week
-                ? `${escapeHtml(req.preferred_day_of_week)} ${escapeHtml(formatTime12Hour(req.preferred_start_time || ''))}`
-                : 'Based on instructor availability';
+            const schedule = 'Managed separately in Sessions';
+            const proof = req.payment_proof_path
+                ? `<a href="${escapeHtml(buildPublicFileUrl(req.payment_proof_path))}" target="_blank" rel="noopener" class="font-semibold text-blue-600 underline">View payment proof</a>`
+                : '<span class="text-slate-500">No proof uploaded</span>';
 
             Swal.fire({
                 title: 'Session Extension Request',
@@ -431,8 +433,9 @@
                     <div class="text-left space-y-3 text-sm text-slate-700">
                         <div><span class="font-semibold text-slate-900">Student:</span> ${studentName}</div>
                         <div><span class="font-semibold text-slate-900">Branch:</span> ${escapeHtml(req.branch_name || '—')}</div>
-                        <div><span class="font-semibold text-slate-900">Schedule:</span> ${schedule}</div>
+                        <div><span class="font-semibold text-slate-900">Scheduling:</span> ${schedule}</div>
                         <div><span class="font-semibold text-slate-900">Payment:</span> ${escapeHtml(req.payment_method || 'Cash')} • ${formatCurrencyPHP(req.requested_amount || 650)}</div>
+                        <div><span class="font-semibold text-slate-900">Proof:</span> ${proof}</div>
                         <div><span class="font-semibold text-slate-900">Notes:</span> ${escapeHtml(req.notes || '—')}</div>
                     </div>
                 `
@@ -445,7 +448,7 @@
             const result = await Swal.fire({
                 icon: 'question',
                 title: 'Approve session extension?',
-                text: 'This confirms the paid add-on session request.',
+                text: `This adds ${Number(req.requested_sessions || 1)} purchased session${Number(req.requested_sessions || 1) === 1 ? '' : 's'} to the enrollment without changing learning progress.`,
                 showCancelButton: true,
                 confirmButtonText: 'Approve',
                 confirmButtonColor: '#059669'
@@ -851,7 +854,7 @@
 
             updateWalkinSelectedStudentCard(selectedStudent);
 
-            const meta = await fetchStudentRequestMetaByEmail(email);
+            const meta = await fetchStudentRequestMetaByEmail(email, { staffContext: true });
             if (!meta?.success) {
                 if (statusEl) statusEl.textContent = meta?.error || 'Failed to load student request meta.';
                 walkinMeta = null;
@@ -919,13 +922,33 @@
             if (countEl) countEl.textContent = `${completed.length} of ${rows.length} scheduled`;
             if (!summaryEl) return;
             if (!completed.length) {
-                summaryEl.textContent = 'Select a teacher and an available time for each instrument.';
+                summaryEl.innerHTML = '<i class="fas fa-calendar-day mr-2 text-gold-600"></i><span>Choose a date and time from the calendar.</span>';
                 return;
             }
-            summaryEl.textContent = completed.map(slot => {
-                const teacher = getAdminAssignTeacherName(slot.teacher_id) || 'Teacher';
-                return `${teacher}: ${slot.day_of_week}, ${formatTime12Hour(slot.start_time)}–${formatTime12Hour(slot.end_time)}`;
-            }).join(' • ');
+            summaryEl.innerHTML = `<button type="button" onclick="openAdminAssignScheduleReview()" class="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"><i class="fas fa-list-check"></i> Review final schedule <span class="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] text-white">${completed.length}</span></button>`;
+        }
+
+        function getAdminAssignSlotKey(slot) {
+            return `${String(slot?.day_of_week || '').toLowerCase()}|${String(slot?.start_time || '').slice(0, 5)}|${String(slot?.end_time || '').slice(0, 5)}`;
+        }
+
+        function isAdminAssignSlotSelected(slot, ignoredRow = null) {
+            return Array.from(document.querySelectorAll('#assignRequestSlotsContainer .admin-assign-row')).some(row =>
+                row !== ignoredRow && getAdminAssignSlotKey(getAdminAssignRowData(row)) === getAdminAssignSlotKey(slot)
+            );
+        }
+
+        function openAdminAssignScheduleReview() {
+            const rows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .admin-assign-row'));
+            const slots = rows.map(row => ({ row, slot: getAdminAssignRowData(row) })).filter(item => item.slot?.teacher_id && item.slot.day_of_week && item.slot.start_time && item.slot.end_time);
+            if (!slots.length || typeof Swal === 'undefined') return;
+            Swal.fire({
+                title: 'Final weekly schedule',
+                html: `<div class="space-y-2 text-left">${slots.map(({ row, slot }, index) => `<div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><div class="text-xs font-bold uppercase tracking-wide text-slate-400">Schedule ${index + 1}</div><div class="mt-1 font-bold text-slate-900">${escapeHtml(row.querySelector('.assign-request-slot-title')?.textContent || 'Instrument')}</div><div class="mt-1 text-sm text-slate-600">${escapeHtml(getAdminAssignTeacherName(slot.teacher_id) || 'Teacher')} • ${escapeHtml(slot.day_of_week)}, ${escapeHtml(formatTime12Hour(slot.start_time))}–${escapeHtml(formatTime12Hour(slot.end_time))}</div></div>`).join('')}</div>`,
+                confirmButtonText: 'Looks good',
+                confirmButtonColor: '#2563eb',
+                width: '38rem'
+            });
         }
 
         function updateAdminAssignRow(row) {
@@ -947,7 +970,24 @@
             if (!row) return;
             adminAssignActiveRow = row;
             document.querySelectorAll('#assignRequestSlotsContainer .admin-assign-row').forEach(updateAdminAssignRow);
-            void loadAdminAssignAvailability();
+            queueAdminAssignAvailability();
+        }
+
+        function getAdminAssignAvailabilityCacheKey(slot) {
+            return [
+                Number(slot?.teacher_id || 0),
+                Number(adminAssignRequest?.branch_id || 0),
+                Number(adminAssignRequest?.student_id || 0),
+                document.getElementById('assignRequestDate')?.value || ''
+            ].join('|');
+        }
+
+        function queueAdminAssignAvailability(delay = 80) {
+            if (adminAssignAvailabilityTimer) clearTimeout(adminAssignAvailabilityTimer);
+            adminAssignAvailabilityTimer = setTimeout(() => {
+                adminAssignAvailabilityTimer = null;
+                void loadAdminAssignAvailability();
+            }, delay);
         }
 
         function getAdminAssignTeachersForInstrument(instrument) {
@@ -981,28 +1021,38 @@
                 const matchingTeachers = getAdminAssignTeachersForInstrument(instrument);
                 const defaultTeacherId = matchingTeachers.length === 1 ? Number(matchingTeachers[0].teacher_id) : '';
                 return `
-                <div class="admin-assign-row cursor-pointer rounded-lg border border-slate-200 bg-white p-2.5 transition" data-instrument-id="${Number(instrument.instrument_id || 0)}">
-                    <div class="mb-2 flex items-center justify-between gap-2">
-                        <span class="text-xs font-bold text-slate-800">${escapeHtml(instrument.type_name || instrument.instrument_name || `Instrument ${index + 1}`)}</span>
+                <div class="admin-assign-row assign-request-slot cursor-pointer transition" data-instrument-id="${Number(instrument.instrument_id || 0)}" data-remove-locked="1">
+                    <div class="assign-request-slot-header">
+                        <span class="assign-request-slot-title text-slate-800">${escapeHtml(instrument.type_name || instrument.instrument_name || `Instrument ${index + 1}`)}</span>
                         <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">${index + 1}</span>
                     </div>
-                    <select class="admin-assign-teacher h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs focus:border-gold-500 focus:outline-none">
+                    <label class="desk-modal-label">Teacher</label>
+                    <select class="admin-assign-teacher desk-modal-input w-full">
                         ${getAdminAssignTeacherOptions(instrument, defaultTeacherId)}
                     </select>
                     <input type="hidden" class="admin-assign-session-date" value="">
                     <input type="hidden" class="admin-assign-day" value="">
                     <input type="hidden" class="admin-assign-start" value="">
                     <input type="hidden" class="admin-assign-end" value="">
-                    <div class="mt-2 rounded-md bg-slate-50 px-2.5 py-2">
-                        <div class="admin-assign-date-label text-xs font-semibold text-slate-700">Choose from calendar</div>
-                        <div class="admin-assign-time-label mt-0.5 text-[11px] text-slate-500">No time selected</div>
+                    <div class="assign-request-slot-schedule mt-3">
+                        <div class="assign-request-slot-schedule-meta">
+                            <span class="assign-request-slot-schedule-chip"><i class="fas fa-calendar-day text-gold-500"></i><span><span class="assign-request-slot-schedule-chip-label">Date</span><strong class="admin-assign-date-label assign-request-slot-schedule-title">Choose from the calendar</strong></span></span>
+                            <span class="assign-request-slot-schedule-chip"><i class="fas fa-clock text-gold-500"></i><span><span class="assign-request-slot-schedule-chip-label">Time</span><strong class="admin-assign-time-label assign-request-slot-schedule-title">Select a slot</strong></span></span>
+                        </div>
+                        <div class="assign-request-slot-schedule-subtitle">Pick a highlighted time on the right.</div>
                     </div>
                 </div>
             `;
             }).join('');
 
             const rows = Array.from(container.querySelectorAll('.admin-assign-row'));
-            rows.forEach(row => {
+            rows.forEach(bindAdminAssignRow);
+            if (rows[0]) setAdminAssignActiveRow(rows[0]);
+        }
+
+        function bindAdminAssignRow(row) {
+            if (!row || row.dataset.bound === '1') return;
+            row.dataset.bound = '1';
                 row.addEventListener('click', event => {
                     if (event.target.closest('select')) return;
                     setAdminAssignActiveRow(row);
@@ -1014,10 +1064,50 @@
                     row.querySelector('.admin-assign-start').value = '';
                     row.querySelector('.admin-assign-end').value = '';
                     document.querySelectorAll('#assignRequestSlotsContainer .admin-assign-row').forEach(updateAdminAssignRow);
-                    void loadAdminAssignAvailability();
+                    queueAdminAssignAvailability();
                 });
+            row.querySelector('.admin-assign-remove')?.addEventListener('click', event => {
+                event.stopPropagation();
+                if (row.dataset.removeLocked === '1') return;
+                const container = document.getElementById('assignRequestSlotsContainer');
+                const wasActive = adminAssignActiveRow === row;
+                row.remove();
+                if (wasActive) setAdminAssignActiveRow(container?.querySelector('.admin-assign-row') || null);
+                updateAdminAssignSummary();
             });
-            if (rows[0]) setAdminAssignActiveRow(rows[0]);
+        }
+
+        function addAdminAssignDay() {
+            const container = document.getElementById('assignRequestSlotsContainer');
+            const source = adminAssignActiveRow && container?.contains(adminAssignActiveRow)
+                ? adminAssignActiveRow
+                : container?.querySelector('.admin-assign-row');
+            if (!container || !source) return;
+            const instrumentId = Number(source.dataset.instrumentId || 0);
+            const sameInstrumentDays = Array.from(container.querySelectorAll('.admin-assign-row')).filter(row =>
+                Number(row.dataset.instrumentId || 0) === instrumentId
+            ).length;
+            if (sameInstrumentDays >= 7) {
+                showMessage('All seven weekly days are already available for this instrument.', 'error');
+                return;
+            }
+            const row = source.cloneNode(true);
+            row.dataset.bound = '0';
+            row.dataset.removeLocked = '0';
+            row.classList.remove('border-gold-400', 'ring-1', 'ring-gold-400/30');
+            const header = row.querySelector('.assign-request-slot-header');
+            header?.querySelector('.admin-assign-remove')?.remove();
+            header?.insertAdjacentHTML('beforeend', '<button type="button" class="admin-assign-remove assign-request-slot-trash" aria-label="Remove day"><i class="fas fa-trash-can"></i></button>');
+            row.querySelector('.admin-assign-session-date').value = '';
+            row.querySelector('.admin-assign-day').value = '';
+            row.querySelector('.admin-assign-start').value = '';
+            row.querySelector('.admin-assign-end').value = '';
+            row.querySelector('.admin-assign-date-label').textContent = 'Choose from the calendar';
+            row.querySelector('.admin-assign-time-label').textContent = 'Select a slot';
+            container.appendChild(row);
+            bindAdminAssignRow(row);
+            setAdminAssignActiveRow(row);
+            row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         function shiftAdminAssignMonth(monthKey, delta) {
@@ -1039,14 +1129,57 @@
         function applyAdminAssignAvailabilitySlot(slotIndex) {
             const slot = adminAssignAvailability[Number(slotIndex)] || null;
             if (!slot || !adminAssignActiveRow) return;
+            const candidate = {
+                ...slot,
+                day_of_week: String(slot.day_of_week || getDayNameFromDate(slot.session_date || '')),
+                start_time: String(slot.start_time || '').slice(0, 5),
+                end_time: String(slot.end_time || '').slice(0, 5)
+            };
+            if (isAdminAssignSlotSelected(candidate, adminAssignActiveRow)) {
+                showMessage('That weekly time is already selected for this student.', 'error');
+                return;
+            }
             adminAssignActiveRow.querySelector('.admin-assign-session-date').value = String(slot.session_date || '');
-            adminAssignActiveRow.querySelector('.admin-assign-day').value = String(slot.day_of_week || getDayNameFromDate(slot.session_date || ''));
-            adminAssignActiveRow.querySelector('.admin-assign-start').value = String(slot.start_time || '').slice(0, 5);
-            adminAssignActiveRow.querySelector('.admin-assign-end').value = String(slot.end_time || '').slice(0, 5);
+            adminAssignActiveRow.querySelector('.admin-assign-day').value = candidate.day_of_week;
+            adminAssignActiveRow.querySelector('.admin-assign-start').value = candidate.start_time;
+            adminAssignActiveRow.querySelector('.admin-assign-end').value = candidate.end_time;
             const startDate = document.getElementById('assignRequestDate');
             if (startDate && slot.session_date) startDate.value = String(slot.session_date);
             updateAdminAssignRow(adminAssignActiveRow);
             renderAdminAssignAvailability();
+        }
+
+        function openAdminAssignAvailabilityDatePicker(dateValue) {
+            const date = String(dateValue || '').trim();
+            if (!date || typeof Swal === 'undefined') return;
+            selectAdminAssignAvailabilityDate(date);
+            const slots = adminAssignAvailability
+                .map((slot, index) => ({ slot, index }))
+                .filter(item => String(item.slot.session_date || '') === date)
+                .filter(item => !isAdminAssignSlotSelected(item.slot))
+                .sort((a, b) => String(a.slot.start_time || '').localeCompare(String(b.slot.start_time || '')));
+            if (!slots.length) return;
+            Swal.fire({
+                title: formatAdminAssignDate(date),
+                html: `<div class="text-sm text-slate-500 mb-4">${slots.length} available slot${slots.length === 1 ? '' : 's'}</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+                        ${slots.map(({ slot, index }) => `<button type="button" class="admin-assign-slot-picker-btn assign-request-slot-picker-btn rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100" data-slot-index="${index}"><div class="text-base font-bold text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">${escapeHtml(slot.day_of_week || '')}</div></button>`).join('')}
+                    </div>`,
+                showConfirmButton: false,
+                showCloseButton: true,
+                width: '42rem',
+                heightAuto: false,
+                padding: '1.5rem',
+                customClass: { popup: 'assign-request-slot-picker-popup', htmlContainer: 'm-0', title: 'text-lg font-bold text-slate-900' },
+                didOpen: () => {
+                    Swal.getPopup()?.querySelectorAll('.admin-assign-slot-picker-btn').forEach(button => {
+                        button.addEventListener('click', () => {
+                            applyAdminAssignAvailabilitySlot(Number(button.dataset.slotIndex));
+                            Swal.close();
+                        });
+                    });
+                }
+            });
         }
 
         function renderAdminAssignAvailability() {
@@ -1070,30 +1203,25 @@
             const [year, month] = adminAssignCalendarMonth.split('-').map(Number);
             const first = new Date(year, month - 1, 1);
             const days = new Date(year, month, 0).getDate();
-            const cells = Array(first.getDay()).fill('<div class="h-12"></div>');
+            const cells = Array(first.getDay()).fill('<div class="h-14 rounded-lg border border-transparent bg-transparent"></div>');
             for (let day = 1; day <= days; day += 1) {
                 const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const count = grouped[date]?.length || 0;
+                const availableItems = (grouped[date] || []).filter(item => !isAdminAssignSlotSelected(item.slot));
+                const count = availableItems.length;
                 const selected = date === adminAssignSelectedDate;
-                cells.push(`<button type="button" ${count ? `onclick="selectAdminAssignAvailabilityDate('${date}')"` : 'disabled'} class="h-12 rounded-md border p-1 text-left text-xs transition ${count ? (selected ? 'border-gold-500 bg-gold-50 text-slate-900 ring-1 ring-gold-400' : 'border-emerald-200 bg-white text-slate-800 hover:bg-emerald-50') : 'cursor-not-allowed border-slate-100 bg-slate-100 text-slate-300'}"><span class="font-bold">${day}</span>${count ? `<span class="float-right rounded-full bg-emerald-100 px-1.5 text-[9px] font-bold text-emerald-700">${count}</span>` : ''}</button>`);
+                cells.push(`<button type="button" ${count ? `onclick="openAdminAssignAvailabilityDatePicker('${date}')"` : 'disabled'} class="h-14 rounded-lg border p-1.5 text-left transition ${count ? (selected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-200 bg-white hover:border-emerald-300 hover:bg-emerald-50') : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300'}"><div class="flex items-start justify-between gap-2"><span class="text-sm font-semibold leading-none ${count ? 'text-slate-900' : 'text-slate-400'}">${day}</span>${count ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${count}</span>` : ''}</div><div class="mt-0.5 text-[9px] leading-tight ${count ? 'text-slate-500' : 'text-slate-400'}">${count ? escapeHtml(availableItems[0]?.slot?.day_of_week || '') : 'Unavailable'}</div></button>`);
             }
             const monthLabel = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-            const selectedSlots = grouped[adminAssignSelectedDate] || [];
-            const selectedData = getAdminAssignRowData(adminAssignActiveRow);
             listEl.innerHTML = `
-                <div class="flex items-center justify-between gap-2">
-                    <button type="button" onclick="setAdminAssignCalendarMonth('${shiftAdminAssignMonth(adminAssignCalendarMonth, -1)}')" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><i class="fas fa-chevron-left"></i></button>
+                <div class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <button type="button" onclick="setAdminAssignCalendarMonth('${shiftAdminAssignMonth(adminAssignCalendarMonth, -1)}')" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><i class="fas fa-chevron-left mr-2 text-[10px]"></i>Prev</button>
                     <div class="text-sm font-bold text-slate-800">${escapeHtml(monthLabel)}</div>
-                    <button type="button" onclick="setAdminAssignCalendarMonth('${shiftAdminAssignMonth(adminAssignCalendarMonth, 1)}')" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><i class="fas fa-chevron-right"></i></button>
+                    <button type="button" onclick="setAdminAssignCalendarMonth('${shiftAdminAssignMonth(adminAssignCalendarMonth, 1)}')" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Next<i class="fas fa-chevron-right ml-2 text-[10px]"></i></button>
                 </div>
-                <div class="mt-3 grid grid-cols-7 gap-1 text-center text-[9px] font-bold uppercase tracking-wide text-slate-400"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
-                <div class="mt-1 grid grid-cols-7 gap-1">${cells.join('')}</div>
-                <div class="mt-3 border-t border-slate-200 pt-3">
-                    <div class="mb-2 text-xs font-bold text-slate-700">${escapeHtml(formatAdminAssignDate(adminAssignSelectedDate))}</div>
-                    <div class="flex flex-wrap gap-2">${selectedSlots.length ? selectedSlots.map(({ slot, index }) => {
-                        const selected = selectedData?.session_date === slot.session_date && String(selectedData?.start_time).slice(0, 5) === String(slot.start_time).slice(0, 5);
-                        return `<button type="button" onclick="applyAdminAssignAvailabilitySlot(${index})" class="rounded-md border px-3 py-2 text-xs font-semibold transition ${selected ? 'border-gold-500 bg-gold-50 text-gold-700' : 'border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50'}">${escapeHtml(formatTime12Hour(slot.start_time))} – ${escapeHtml(formatTime12Hour(slot.end_time))}</button>`;
-                    }).join('') : '<span class="text-xs text-slate-500">No slots on this date.</span>'}</div>
+                <div class="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+                <div class="grid grid-cols-7 gap-1.5">${cells.join('')}</div>
+                <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">Choose a highlighted date to view and pick a time slot.</div>
                 </div>`;
         }
 
@@ -1105,8 +1233,18 @@
                 if (listEl) listEl.innerHTML = '<div class="grid min-h-[320px] place-items-center text-center text-sm text-slate-500"><div><i class="fas fa-user-tie mb-2 text-2xl text-slate-300"></i><p>Select a teacher to view availability.</p></div></div>';
                 return;
             }
+            const cacheKey = getAdminAssignAvailabilityCacheKey(slot);
+            if (adminAssignAvailabilityCache.has(cacheKey)) {
+                adminAssignAvailability = adminAssignAvailabilityCache.get(cacheKey);
+                adminAssignSelectedDate = adminAssignAvailability[0]?.session_date || '';
+                adminAssignCalendarMonth = String(adminAssignSelectedDate).slice(0, 7);
+                renderAdminAssignAvailability();
+                return;
+            }
             listEl.innerHTML = '<div class="grid min-h-[320px] place-items-center text-sm text-slate-500"><span><i class="fas fa-spinner fa-spin mr-2 text-gold-500"></i>Loading teacher availability...</span></div>';
             const token = ++adminAssignAvailabilityToken;
+            if (adminAssignAvailabilityController) adminAssignAvailabilityController.abort();
+            adminAssignAvailabilityController = new AbortController();
             const params = new URLSearchParams({
                 action: 'get-teacher-available-slots',
                 teacher_id: String(slot.teacher_id),
@@ -1115,16 +1253,23 @@
                 start_date: document.getElementById('assignRequestDate')?.value || ''
             });
             try {
-                const response = await axios.get(`${baseApiUrl}/students.php?${params.toString()}`, { timeout: 30000 });
+                const response = await axios.get(`${baseApiUrl}/students.php?${params.toString()}`, {
+                    timeout: 30000,
+                    signal: adminAssignAvailabilityController.signal
+                });
                 if (token !== adminAssignAvailabilityToken) return;
                 adminAssignAvailability = response.data?.success && Array.isArray(response.data.slots) ? response.data.slots : [];
+                adminAssignAvailabilityCache.set(cacheKey, adminAssignAvailability);
                 adminAssignSelectedDate = adminAssignAvailability[0]?.session_date || '';
                 adminAssignCalendarMonth = String(adminAssignSelectedDate).slice(0, 7);
                 renderAdminAssignAvailability();
             } catch (error) {
                 if (token !== adminAssignAvailabilityToken) return;
+                if (error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') return;
                 console.error('Failed to load admin scheduling availability:', error);
                 listEl.innerHTML = '<div class="grid min-h-[320px] place-items-center text-center text-sm text-rose-600"><div><i class="fas fa-triangle-exclamation mb-2 text-2xl"></i><p>Unable to load availability.</p><button type="button" onclick="loadAdminAssignAvailability()" class="mt-2 rounded-md border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold">Retry</button></div></div>';
+            } finally {
+                if (token === adminAssignAvailabilityToken) adminAssignAvailabilityController = null;
             }
         }
 
@@ -1168,6 +1313,14 @@
             adminAssignRequest = null;
             adminAssignActiveRow = null;
             adminAssignAvailabilityToken += 1;
+            if (adminAssignAvailabilityTimer) {
+                clearTimeout(adminAssignAvailabilityTimer);
+                adminAssignAvailabilityTimer = null;
+            }
+            if (adminAssignAvailabilityController) {
+                adminAssignAvailabilityController.abort();
+                adminAssignAvailabilityController = null;
+            }
         }
 
         async function submitAdminAssignRequest() {
@@ -1183,6 +1336,9 @@
                 return ((eh * 60 + em) - (sh * 60 + sm)) !== 60;
             });
             if (invalid) return showMessage('Every class slot must be exactly one hour.', 'error');
+            if (new Set(slots.map(getAdminAssignSlotKey)).size !== slots.length) {
+                return showMessage('The same weekly time cannot be selected more than once.', 'error');
+            }
             const submitBtn = document.getElementById('submitAssignRequestBtn');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Assigning...';
@@ -1201,6 +1357,7 @@
                     admin_notes: ''
                 });
                 if (!response.data?.success) throw new Error(response.data?.error || 'Failed to assign schedule.');
+                adminAssignAvailabilityCache.clear();
                 closeAdminAssignRequestModal();
                 await Promise.all([loadPendingEnrollmentSummary(), loadActiveEnrollments()]);
                 showMessage(response.data.message || 'Enrollment scheduled successfully.', 'success');
@@ -1208,13 +1365,15 @@
                 showMessage(error?.response?.data?.error || error.message || 'Unable to assign this schedule.', 'error');
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Assign schedule';
+                submitBtn.textContent = 'Assign Schedule';
             }
         }
 
         window.openAdminAssignRequestModal = openAdminAssignRequestModal;
         window.setAdminAssignCalendarMonth = setAdminAssignCalendarMonth;
         window.selectAdminAssignAvailabilityDate = selectAdminAssignAvailabilityDate;
+        window.openAdminAssignAvailabilityDatePicker = openAdminAssignAvailabilityDatePicker;
+        window.openAdminAssignScheduleReview = openAdminAssignScheduleReview;
         window.applyAdminAssignAvailabilitySlot = applyAdminAssignAvailabilitySlot;
         window.loadAdminAssignAvailability = loadAdminAssignAvailability;
 
@@ -1365,7 +1524,8 @@
             document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', closeAdminAssignRequestModal);
             document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', closeAdminAssignRequestModal);
             document.getElementById('submitAssignRequestBtn')?.addEventListener('click', submitAdminAssignRequest);
-            document.getElementById('assignRequestDate')?.addEventListener('change', () => void loadAdminAssignAvailability());
+            document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', addAdminAssignDay);
+            document.getElementById('assignRequestDate')?.addEventListener('change', () => queueAdminAssignAvailability(120));
             document.getElementById('assignRequestModal')?.addEventListener('click', event => {
                 if (event.target?.id === 'assignRequestModal') closeAdminAssignRequestModal();
             });

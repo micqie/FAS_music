@@ -505,42 +505,42 @@
                 const pendingCount = getPendingMakeupSessions(student).length;
                 return `
                     <tr class="hover:bg-rose-50/40 transition">
-                        <td class="px-6 py-4">
+                        <td class="px-3 py-2.5 min-w-[170px]">
                             <button type="button"
                                 onclick="openMakeupRescheduleFlow(${Number(student.enrollment_id)})"
                                 class="text-left group">
                                 <div class="font-semibold text-slate-900 group-hover:text-blue-700 transition">${studentName}</div>
-                                <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
-                                ${pendingCount > 0 ? `<div class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700"><i class="fas fa-calendar-plus text-[9px]"></i> ${pendingCount} make-up${pendingCount === 1 ? '' : 's'} pending</div>` : ''}
+                                <div class="text-xs text-slate-500 truncate max-w-[210px]">${escapeHtml(student.email || '')}</div>
+                                ${pendingCount > 0 ? `<div class="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700"><i class="fas fa-calendar-plus text-[9px]"></i> ${pendingCount} pending</div>` : ''}
                             </button>
                         </td>
-                        <td class="px-6 py-4 text-slate-700">${escapeHtml(student.package_name || '—')}</td>
-                        <td class="px-6 py-4 text-slate-700 font-medium">${getCompletedCount(student)} / ${Number(student.sessions || 0)}</td>
-                        <td class="px-6 py-4 font-semibold text-rose-600">${getAbsenceCount(student)}</td>
-                        <td class="px-6 py-4 font-medium text-amber-600">${getRemainingCount(student)}</td>
-                        <td class="px-6 py-4 text-slate-600">${getMakeupThreshold(student)} absence${getMakeupThreshold(student) === 1 ? '' : 's'}</td>
-                        <td class="px-6 py-4">
-                            <button type="button" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left hover:bg-slate-100 transition" onclick="openUpcomingSessionsModal(${Number(student.enrollment_id)})">
+                        <td class="px-3 py-2.5 text-slate-700 whitespace-nowrap">${escapeHtml(student.package_name || '—')}</td>
+                        <td class="px-3 py-2.5 text-slate-700 font-medium whitespace-nowrap">${getCompletedCount(student)} / ${Number(student.sessions || 0)}</td>
+                        <td class="px-3 py-2.5 font-semibold text-rose-600">${getAbsenceCount(student)}</td>
+                        <td class="px-3 py-2.5 font-medium text-amber-600">${getRemainingCount(student)}</td>
+                        <td class="px-3 py-2.5 text-slate-600 whitespace-nowrap">${getMakeupThreshold(student)} absence${getMakeupThreshold(student) === 1 ? '' : 's'}</td>
+                        <td class="px-3 py-2.5">
+                            <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-left hover:bg-slate-100 transition" onclick="openUpcomingSessionsModal(${Number(student.enrollment_id)})">
                                 <i class="fas fa-calendar-days text-blue-600"></i>
                                 <span>
-                                    <span class="block text-sm font-semibold text-slate-800">${escapeHtml(sessionSummary.label)}</span>
-                                    <span class="block text-xs text-slate-500">${escapeHtml(sessionSummary.meta)}</span>
+                                    <span class="block text-xs font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(sessionSummary.label)}</span>
+                                    <span class="block text-[10px] text-slate-500 whitespace-nowrap">${escapeHtml(sessionSummary.meta)}</span>
                                 </span>
                             </button>
                         </td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-2 flex-wrap">
+                        <td class="px-3 py-2.5 min-w-[190px]">
+                            <div class="flex items-center gap-1.5 flex-wrap">
                                 ${getStatusBadge(student)}
                                 <button type="button"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 text-xs font-bold transition"
+                                    class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 text-[11px] font-bold transition whitespace-nowrap"
                                     onclick="openMakeupRescheduleFlow(${Number(student.enrollment_id)})">
                                     <i class="fas fa-calendar-plus text-[11px]"></i>
-                                    Schedule Make-Up
+                                    Schedule
                                 </button>
                                 <button type="button"
-                                    class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold transition"
+                                    class="px-2 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-[11px] font-bold transition whitespace-nowrap"
                                     onclick="openMakeupDetails(${Number(student.enrollment_id)})">
-                                    View Details
+                                    Details
                                 </button>
                             </div>
                         </td>

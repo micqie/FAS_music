@@ -123,9 +123,23 @@
                 </div>
             </div>
 
-                     <span id="studentsSummaryBar" class="text-slate-500 mt-7 mr-70 text-sm">
+            <span id="studentsSummaryBar" class="text-slate-500 mt-7 mr-70 text-sm">
                         Loading...
                     </span>
+
+            <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 soft-shadow">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-[0.18em] text-gold-600">Instructor Evaluation</div>
+                        <h2 class="mt-1 text-xl font-black text-slate-900">Learning Progress &amp; Promotional Exams</h2>
+                        <p class="mt-1 text-sm text-slate-500">Manage level, book, topic, skills, improvement areas, and assessment readiness independently from session purchases.</p>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500">Songs remain optional practice material and do not change levels.</div>
+                </div>
+                <div id="instructorLearningProgressList" class="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-2">
+                    <div class="xl:col-span-2 py-8 text-center text-sm text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading learning records...</div>
+                </div>
+            </section>
 
             <!-- Student list table (works on all screen sizes) -->
             <div id="studentsTableWrap" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden soft-shadow">
@@ -167,6 +181,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/index.js"></script>
     <script src="../../js/instructor/instructor_nav.js"></script>
+    <script src="../../js/instructor/learning_progress.js"></script>
     <script>
         let instructorStudents = [];
         let allSessions = [];

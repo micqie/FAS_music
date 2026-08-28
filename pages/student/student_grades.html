@@ -179,13 +179,13 @@
 
                         <div>
                             <div class="flex items-center justify-between gap-3 mb-3">
-                                <div class="text-base font-semibold text-zinc-700 dark:text-zinc-200">Sessions done</div>
+                                <div class="text-base font-semibold text-zinc-700 dark:text-zinc-200">Purchased-session usage</div>
                                 <div class="text-sm font-black text-zinc-900 dark:text-white"><span id="studentGradesSessionsDone">0</span> of <span id="studentGradesSessionsTotal">0</span></div>
                             </div>
                             <div class="h-3 rounded-full bg-zinc-100 dark:bg-white/10 overflow-hidden">
                                 <div id="studentGradesProgressBar" class="h-full rounded-full bg-gradient-to-r from-amber-400 via-gold-500 to-amber-600 transition-all duration-500 ease-out" style="width:0%"></div>
                             </div>
-                            <div id="studentGradesSessionsLeft" class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">— sessions left to go</div>
+                            <div id="studentGradesSessionsLeft" class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">— purchased sessions remaining. This does not measure level mastery.</div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -217,6 +217,19 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <section class="mt-6 rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40">
+                <div>
+                    <div class="portal-stat-label">Formal Learning Progress</div>
+                    <h2 class="mt-2 text-xl font-extrabold text-zinc-900 dark:text-white">Current Level &amp; Learning History</h2>
+                    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Instructor-managed progress for each instrument. Purchased sessions and optional songs do not advance this record.</p>
+                </div>
+                <div id="studentFormalLearningProgress" class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2"></div>
+                <div class="mt-6 border-t border-zinc-200 dark:border-white/10 pt-5">
+                    <h3 class="text-sm font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Level / Book History</h3>
+                    <div id="studentLearningHistory" class="mt-3 space-y-3"></div>
                 </div>
             </section>
 

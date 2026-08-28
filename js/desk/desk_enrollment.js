@@ -881,7 +881,7 @@
                 return;
             }
 
-            const meta = await fetchStudentRequestMetaByEmail(hidden.value);
+            const meta = await fetchStudentRequestMetaByEmail(hidden.value, { staffContext: true });
             if (!meta?.success) {
                 if (statusEl) statusEl.textContent = meta?.error || 'Failed to load student request details.';
                 walkinMeta = null;
@@ -1535,9 +1535,7 @@
 
             tableBody.innerHTML = rows.map(req => {
                 const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
-                const schedule = req.preferred_day_of_week
-                    ? `${escapeHtml(req.preferred_day_of_week)} • ${formatTime12Hour(req.preferred_start_time || '')} - ${formatTime12Hour(req.preferred_end_time || '')}`
-                    : '—';
+                const purchasedSessions = `${Number(req.requested_sessions || 1)} session${Number(req.requested_sessions || 1) === 1 ? '' : 's'}`;
                 const amount = formatCurrencyPHP(req.requested_amount || 650);
                 const paymentMethod = escapeHtml(req.payment_method || 'Cash');
                 const proofLink = req.payment_proof_path
@@ -1550,7 +1548,7 @@
                             <div class="text-sm text-slate-500">${escapeHtml(req.email || '')}</div>
                         </td>
                         <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${escapeHtml(req.branch_name || '')}</td>
-                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${schedule}</td>
+                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700"><div class="font-semibold">${purchasedSessions}</div><div class="text-xs text-slate-400">Schedule separately</div></td>
                         <td class="px-4 py-3 text-sm sm:text-base text-slate-700">
                             <div>${paymentMethod}</div>
                             <div class="mt-1">${proofLink}</div>
@@ -1563,6 +1561,7 @@
                             <button type="button" onclick="approveSessionExtensionRequest(${Number(req.request_id)})" class="px-4 py-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-sm font-bold">
                                 Approve
                             </button>
+                            <button type="button" onclick="rejectSessionExtensionRequest(${Number(req.request_id)})" class="ml-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-sm font-bold">Reject</button>
                         </td>
                     </tr>`;
             }).join('');
@@ -1701,6 +1700,36 @@
 
         function getTeacherNameById(teacherId) {
             return String(getTeacherCandidateById(teacherId)?.teacher_name || '').trim();
+        }
+
+        async function rejectSessionExtensionRequest(requestId) {
+            const request = pendingSessionExtensionRequestsById[String(requestId)]
+                || allSessionExtensionRequests.find(row => String(row.request_id) === String(requestId));
+            if (!request) return showMessage('Session extension request not found.', 'error');
+            const result = await Swal.fire({
+                icon: 'warning',
+                title: 'Reject additional sessions?',
+                input: 'text',
+                inputPlaceholder: 'Reason (optional)',
+                showCancelButton: true,
+                confirmButtonText: 'Reject',
+                confirmButtonColor: '#dc2626'
+            });
+            if (!result.isConfirmed) return;
+            try {
+                const response = await axios.post(`${baseApiUrl}/students.php`, {
+                    action: 'reject-session-extension-request',
+                    request_id: Number(requestId),
+                    branch_id: Number(request.branch_id || managerBranchId || 0),
+                    admin_notes: result.value || ''
+                });
+                const data = response.data || {};
+                if (!data.success) return showMessage(data.error || 'Failed to reject request.', 'error');
+                showMessage(data.message || 'Additional-session request rejected.', 'success');
+                await loadPendingSessionExtensionRequests();
+            } catch (error) {
+                showMessage(error?.response?.data?.error || 'Network error while rejecting request.', 'error');
+            }
         }
 
         function formatDateCompact(dateString) {
@@ -1857,48 +1886,35 @@
         function updateAssignRequestSelectionSummary() {
             const summaryEl = document.getElementById('assignRequestSummary');
             if (!summaryEl) return;
+            const slots = collectAssignRequestSlots();
+            summaryEl.innerHTML = slots.length
+                ? `<button type="button" onclick="openAssignRequestScheduleReview()" class="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"><i class="fas fa-list-check"></i> Review final schedule <span class="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] text-white">${slots.length}</span></button>`
+                : '<div class="flex items-center gap-2 text-slate-500"><i class="fas fa-calendar-day text-gold-500"></i><span>Choose a date and time from the calendar.</span></div>';
+        }
 
-            const row = activeAssignRequestSlotRow
-                && document.getElementById('assignRequestSlotsContainer')?.contains(activeAssignRequestSlotRow)
-                ? activeAssignRequestSlotRow
-                : getAssignableAssignRequestSlotRow();
+        function getAssignRequestSlotKey(slot) {
+            return `${String(slot?.day_of_week || '').toLowerCase()}|${String(slot?.start_time || '').slice(0, 5)}|${String(slot?.end_time || '').slice(0, 5)}`;
+        }
 
-            const data = getAssignRequestRowData(row);
-            const teacherName = row ? getAssignRequestRowTeacherName(row) : '';
-            const schedule = formatAssignRequestScheduleLabel(
-                data?.session_date || '',
-                data?.day_of_week || '',
-                data?.start_time || '',
-                data?.end_time || ''
+        function isAssignRequestSlotSelected(slot, ignoredRow = null) {
+            return Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot')).some(row =>
+                row !== ignoredRow && getAssignRequestSlotKey(getAssignRequestRowData(row)) === getAssignRequestSlotKey(slot)
             );
+        }
 
-            if (!data || (!data.session_date && !data.day_of_week && !data.start_time && !data.end_time)) {
-                summaryEl.innerHTML = `
-                    <div class="flex items-center gap-2 text-slate-500">
-                        <i class="fas fa-calendar-day text-gold-500"></i>
-                        <span>Choose a date and time from the calendar.</span>
-                    </div>
-                `;
-                return;
-            }
-
-            summaryEl.innerHTML = `
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-900 shadow-sm">
-                        <i class="fas fa-calendar-day text-[11px] text-gold-500"></i>
-                        <span class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Date</span>
-                        <span class="text-sm font-semibold">${escapeHtml(schedule.dateLabel)}</span>
-                    </span>
-                    <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-900 shadow-sm">
-                        <i class="fas fa-clock text-[11px] text-gold-500"></i>
-                        <span class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Time</span>
-                        <span class="text-sm font-semibold">${escapeHtml(schedule.timeLabel)}</span>
-                    </span>
-                    <span class="text-xs text-slate-500">
-                        ${escapeHtml(teacherName ? `${teacherName} • ${schedule.subtitle}` : schedule.subtitle)}
-                    </span>
-                </div>
-            `;
+        function openAssignRequestScheduleReview() {
+            const slots = collectAssignRequestSlots();
+            if (!slots.length || typeof Swal === 'undefined') return;
+            Swal.fire({
+                title: 'Final weekly schedule',
+                html: `<div class="space-y-2 text-left">${slots.map((slot, index) => {
+                    const instrument = assignRequestInstruments.find(item => Number(item.instrument_id) === Number(slot.instrument_id));
+                    return `<div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><div class="text-xs font-bold uppercase tracking-wide text-slate-400">Schedule ${index + 1}</div><div class="mt-1 font-bold text-slate-900">${escapeHtml(instrument ? getInstrumentRowLabel(instrument, index) : 'Instrument')}</div><div class="mt-1 text-sm text-slate-600">${escapeHtml(getTeacherNameById(slot.teacher_id) || 'Teacher')} • ${escapeHtml(slot.day_of_week)}, ${escapeHtml(formatTime12Hour(slot.start_time))}–${escapeHtml(formatTime12Hour(slot.end_time))}</div></div>`;
+                }).join('')}</div>`,
+                confirmButtonText: 'Looks good',
+                confirmButtonColor: '#2563eb',
+                width: '38rem'
+            });
         }
 
         function updateAssignRequestRowScheduleDisplay(row) {
@@ -2059,6 +2075,7 @@
                     row.remove();
                     if (wasActive) setActiveAssignRequestSlot(container.querySelector('.assign-request-slot'));
                     updateAssignRequestRecurringSummary();
+                    updateAssignRequestSelectionSummary();
                     renderAssignRequestAvailability(assignRequestAvailabilitySlots, assignRequestAvailabilitySelectedDate);
                 });
             });
@@ -2074,6 +2091,14 @@
             const instrument = slot.instrument_id
                 ? assignRequestInstruments.find(item => Number(item.instrument_id) === Number(slot.instrument_id)) || null
                 : (activeRowInstrumentId ? assignRequestInstruments.find(item => Number(item.instrument_id) === Number(activeRowInstrumentId)) || null : getAssignRequestInstrumentForIndex(index));
+            const instrumentId = Number(instrument?.instrument_id || slot.instrument_id || 0);
+            const sameInstrumentDays = Array.from(container.querySelectorAll('.assign-request-slot')).filter(row =>
+                Number(row.querySelector('.assign-request-slot-instrument')?.value || row.dataset.instrumentId || 0) === instrumentId
+            ).length;
+            if (sameInstrumentDays >= 7) {
+                showMessage('All seven weekly days are already available for this instrument.', 'error');
+                return;
+            }
             const teacherCandidates = getTeachersForInstrument(instrument);
             const teacherId = Number(slot.teacher_id || activeRowTeacherId || (teacherCandidates.length === 1 ? teacherCandidates[0]?.teacher_id : 0) || 0) || null;
             const teacherLocked = Boolean(slot.lock_teacher || (teacherCandidates.length === 1));
@@ -2248,6 +2273,7 @@
             const groupedSlots = Array.isArray(assignRequestAvailabilitySlots)
                 ? assignRequestAvailabilitySlots
                     .filter(slot => String(slot.session_date || '').trim() === normalizedDate)
+                    .filter(slot => !isAssignRequestSlotSelected(slot))
                     .slice()
                     .sort((a, b) => String(a.start_time || '').localeCompare(String(b.start_time || '')))
                 : [];
@@ -2354,7 +2380,7 @@
             }
             for (let day = 1; day <= daysInMonth; day += 1) {
                 const dateKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const daySlots = grouped[dateKey] || [];
+                const daySlots = (grouped[dateKey] || []).filter(slot => !isAssignRequestSlotSelected(slot));
                 const isSelected = dateKey === resolvedSelectedDate;
                 const hasSlots = daySlots.length > 0;
                 const baseClass = hasSlots
@@ -2406,6 +2432,11 @@
             const targetRow = activeAssignRequestSlotRow && container?.contains(activeAssignRequestSlotRow)
                 ? activeAssignRequestSlotRow
                 : container?.querySelector('.assign-request-slot');
+            const candidate = { session_date: sessionDate, day_of_week: dayOfWeek, start_time: startTime, end_time: endTime };
+            if (isAssignRequestSlotSelected(candidate, targetRow)) {
+                showMessage('That weekly time is already selected for this student.', 'error');
+                return;
+            }
             if (targetRow) {
                 setActiveAssignRequestSlot(targetRow);
                 const dateInput = targetRow.querySelector('.assign-request-slot-session-date');
@@ -2717,6 +2748,11 @@
                 showMessage('Each weekly slot needs a valid day and must be exactly 1 hour.', 'error');
                 return;
             }
+            const uniqueSlotKeys = new Set(assignedSlots.map(getAssignRequestSlotKey));
+            if (uniqueSlotKeys.size !== assignedSlots.length) {
+                showMessage('The same weekly time cannot be selected more than once.', 'error');
+                return;
+            }
             const primarySlot = assignedSlots[0];
 
             await approveStudentRequest({
@@ -2736,6 +2772,7 @@
         window.openAssignRequestModal = openAssignRequestModal;
         window.closeAssignRequestModal = closeAssignRequestModal;
         window.setAssignRequestTeacherSelection = setAssignRequestTeacherSelection;
+        window.openAssignRequestScheduleReview = openAssignRequestScheduleReview;
 
         async function rejectStudentRequest(requestId) {
             if (!requestId) return;

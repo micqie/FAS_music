@@ -906,7 +906,7 @@ async function submitSongForm(event) {
             return;
         }
         form.reset();
-        showSongMessage('songFormMessage', 'Song added to the library.', 'success');
+        showSongMessage('songFormMessage', 'Song added to the masterfile.', 'success');
         setSongModalVisibility('createSongModal', false);
         await loadSongLibrary();
         renderInstructorSongView();

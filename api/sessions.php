@@ -59,7 +59,7 @@ class SessionPackages
                     INSERT INTO tbl_session_packages (branch_id, package_name, sessions, max_instruments, price, description) VALUES
                     (?, 'Basic (12 Sessions)', 12, 1, 7450.00, '1 instrument only'),
                     (?, 'Standard (20 Sessions)', 20, 2, 11800.00, '2 instruments'),
-                    (?, 'Premium (20+ Sessions)', 24, 3, 14200.00, '3 instruments')
+                    (?, 'Premium (50 Sessions)', 50, 3, 29500.00, 'Up to 3 instruments')
                 ");
                 $stmtInsert->execute([$defaultBranchId, $defaultBranchId, $defaultBranchId]);
             } else {
@@ -67,7 +67,7 @@ class SessionPackages
                     INSERT INTO tbl_session_packages (package_name, sessions, max_instruments, price, description) VALUES
                     ('Basic (12 Sessions)', 12, 1, 7450.00, '1 instrument only'),
                     ('Standard (20 Sessions)', 20, 2, 11800.00, '2 instruments'),
-                    ('Premium (20+ Sessions)', 24, 3, 14200.00, '3 instruments')
+                    ('Premium (50 Sessions)', 50, 3, 29500.00, 'Up to 3 instruments')
                 ");
             }
         }

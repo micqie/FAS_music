@@ -38,6 +38,7 @@ class TeachersApi
     public function __construct($pdo)
     {
         $this->conn = $pdo;
+        $this->ensureTeacherSchema();
     }
 
     private function ensureTeacherSchema()
@@ -45,6 +46,7 @@ class TeachersApi
         ensure_specialization_instrument_link($this->conn);
         $this->ensureSessionRescheduleWorkflow();
         $this->ensureStudentProgressTable();
+        $this->ensureLearningProgressWorkflow();
     }
 
     public function sendJSON($data, $status = 200)
@@ -283,6 +285,7 @@ class TeachersApi
             'rhythm_score' => "ALTER TABLE tbl_student_progress ADD COLUMN rhythm_score TINYINT UNSIGNED NULL AFTER technique_score",
             'focus_score' => "ALTER TABLE tbl_student_progress ADD COLUMN focus_score TINYINT UNSIGNED NULL AFTER rhythm_score",
             'assignment_score' => "ALTER TABLE tbl_student_progress ADD COLUMN assignment_score TINYINT UNSIGNED NULL AFTER focus_score",
+            'criteria_scores' => "ALTER TABLE tbl_student_progress ADD COLUMN criteria_scores TEXT NULL AFTER assignment_score",
             'updated_at' => "ALTER TABLE tbl_student_progress ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"
         ];
 
@@ -298,6 +301,181 @@ class TeachersApi
 
         try { $this->conn->exec("CREATE INDEX idx_student_progress_session ON tbl_student_progress(session_id)"); } catch (PDOException $e) {}
         try { $this->conn->exec("CREATE INDEX idx_student_progress_student ON tbl_student_progress(student_id)"); } catch (PDOException $e) {}
+
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_teacher_grading_criteria (
+                    criterion_id INT AUTO_INCREMENT PRIMARY KEY,
+                    teacher_id INT NOT NULL,
+                    criterion_name VARCHAR(100) NOT NULL,
+                    sort_order INT NOT NULL DEFAULT 0,
+                    status ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_teacher_grading_criteria (teacher_id, status, sort_order)
+                )
+            ");
+        } catch (PDOException $e) {}
+    }
+
+    private function decodeCriteriaScores($value)
+    {
+        if (is_array($value)) return $value;
+        $decoded = json_decode((string)$value, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function normalizeCriteriaScores($value)
+    {
+        $items = $this->decodeCriteriaScores($value);
+        if (count($items) < 1 || count($items) > 20) {
+            return [];
+        }
+        $normalized = [];
+        foreach ($items as $item) {
+            $name = trim((string)($item['name'] ?? ''));
+            $score = $this->normalizeProgressScore($item['score'] ?? null);
+            if ($name === '' || mb_strlen($name) > 100 || $score === null) return [];
+            $normalized[] = ['name' => $name, 'score' => $score];
+        }
+        return $normalized;
+    }
+
+    public function getTeacherGradingCriteria()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') $this->sendJSON(['error' => 'Method not allowed'], 405);
+        $teacherId = $this->resolveLearningWorkflowTeacherId((int)($_GET['teacher_id'] ?? 0), (int)($_GET['user_id'] ?? 0));
+        if ($teacherId < 1) $this->sendJSON(['error' => 'Instructor account not found'], 404);
+        try {
+            $stmt = $this->conn->prepare("SELECT criterion_name FROM tbl_teacher_grading_criteria WHERE teacher_id=? AND status='Active' ORDER BY sort_order, criterion_id");
+            $stmt->execute([$teacherId]);
+            $criteria = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            $customized = !empty($criteria);
+            if (!$criteria) $criteria = ['Performance','Technique','Rhythm & Timing','Focus & Discipline','Assignment & Practice'];
+            $this->sendJSON(['success' => true, 'criteria' => $criteria, 'customized' => $customized]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function saveTeacherGradingCriteria()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->sendJSON(['error' => 'Method not allowed'], 405);
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = $this->resolveLearningWorkflowTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $criteria = array_values(array_filter(array_map(function ($name) {
+            return trim((string)$name);
+        }, is_array($data['criteria'] ?? null) ? $data['criteria'] : []), function ($name) {
+            return $name !== '';
+        }));
+        if ($teacherId < 1) $this->sendJSON(['error' => 'Instructor account not found'], 404);
+        if (count($criteria) < 1 || count($criteria) > 20) $this->sendJSON(['error' => 'Use between 1 and 20 grading criteria'], 400);
+        foreach ($criteria as $name) if (mb_strlen($name) > 100) $this->sendJSON(['error' => 'Criterion names may contain up to 100 characters'], 400);
+        $uniqueCriteria = array_unique(array_map(function ($name) { return mb_strtolower($name); }, $criteria));
+        if (count($uniqueCriteria) !== count($criteria)) $this->sendJSON(['error' => 'Each grading criterion must have a unique name'], 400);
+        try {
+            $this->conn->beginTransaction();
+            $this->conn->prepare("DELETE FROM tbl_teacher_grading_criteria WHERE teacher_id=?")->execute([$teacherId]);
+            $insert = $this->conn->prepare("INSERT INTO tbl_teacher_grading_criteria (teacher_id,criterion_name,sort_order,status) VALUES (?,?,?,'Active')");
+            foreach ($criteria as $index => $name) $insert->execute([$teacherId, $name, $index]);
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'criteria' => $criteria, 'message' => 'Grading criteria saved.']);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    private function resolveLearningWorkflowTeacherId($teacherId, $userId)
+    {
+        $authenticatedUser = fas_require_authenticated_user($this->conn, ['instructor']);
+        $roleCategory = fas_normalize_role_category($authenticatedUser['role_name'] ?? '');
+
+        // Instructors may only manage their own assigned students. Admin users
+        // retain their existing API oversight behavior.
+        if ($roleCategory === 'instructor') {
+            return $this->resolveTeacherId(0, (int)($authenticatedUser['user_id'] ?? 0));
+        }
+
+        return $this->resolveTeacherId($teacherId, $userId);
+    }
+
+    private function ensureLearningProgressWorkflow()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_learning_levels (
+                    learning_level_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    instrument_id INT NOT NULL,
+                    teacher_id INT NULL,
+                    level_name VARCHAR(100) NOT NULL,
+                    book_material VARCHAR(255) NULL,
+                    current_topic VARCHAR(255) NULL,
+                    instructor_notes TEXT NULL,
+                    skills_developing TEXT NULL,
+                    areas_for_improvement TEXT NULL,
+                    assessment_readiness ENUM('Not Ready','Developing','Improving','Ready for Assessment') NOT NULL DEFAULT 'Not Ready',
+                    status ENUM('In Progress','Achieved') NOT NULL DEFAULT 'In Progress',
+                    started_at DATE NOT NULL,
+                    achieved_at DATE NULL,
+                    achieved_exam_id INT NULL,
+                    previous_learning_level_id INT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ");
+            try { $this->conn->exec("CREATE INDEX idx_learning_levels_student_instrument ON tbl_student_learning_levels(student_id, instrument_id, status)"); } catch (PDOException $e) {}
+
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_promotional_exams (
+                    exam_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    instrument_id INT NOT NULL,
+                    learning_level_id INT NOT NULL,
+                    teacher_id INT NOT NULL,
+                    assessed_level VARCHAR(100) NOT NULL,
+                    exam_date DATE NOT NULL,
+                    grade_rating VARCHAR(100) NULL,
+                    result ENUM('Pending','Passed','Retake') NOT NULL DEFAULT 'Pending',
+                    examiner_notes TEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ");
+            $examColumns = [
+                'learning_level_id' => "ALTER TABLE tbl_promotional_exams ADD COLUMN learning_level_id INT NULL AFTER instrument_id",
+                'teacher_id' => "ALTER TABLE tbl_promotional_exams ADD COLUMN teacher_id INT NULL AFTER learning_level_id",
+                'grade_rating' => "ALTER TABLE tbl_promotional_exams ADD COLUMN grade_rating VARCHAR(100) NULL AFTER exam_date"
+            ];
+            foreach ($examColumns as $column => $sql) {
+                if (!$this->tableHasColumn('tbl_promotional_exams', $column)) $this->conn->exec($sql);
+            }
+            try { $this->conn->exec("ALTER TABLE tbl_promotional_exams MODIFY result ENUM('Pending','Passed','Failed','Retake') NOT NULL DEFAULT 'Pending'"); } catch (PDOException $e) {}
+            try { $this->conn->exec("UPDATE tbl_promotional_exams SET result = 'Retake' WHERE result = 'Failed'"); } catch (PDOException $e) {}
+            try { $this->conn->exec("ALTER TABLE tbl_promotional_exams MODIFY result ENUM('Pending','Passed','Retake') NOT NULL DEFAULT 'Pending'"); } catch (PDOException $e) {}
+
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_certificates (
+                    certificate_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    promotional_exam_id INT NOT NULL,
+                    learning_level_id INT NULL,
+                    instrument_id INT NOT NULL,
+                    achieved_level VARCHAR(100) NOT NULL,
+                    certificate_number VARCHAR(100) NULL,
+                    issued_at DATE NOT NULL,
+                    issued_by INT NULL,
+                    status ENUM('Issued','Revoked') NOT NULL DEFAULT 'Issued',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+            if (!$this->tableHasColumn('tbl_student_certificates', 'learning_level_id')) {
+                $this->conn->exec("ALTER TABLE tbl_student_certificates ADD COLUMN learning_level_id INT NULL AFTER promotional_exam_id");
+            }
+        } catch (PDOException $e) {
+            // Keep existing teacher features usable if migration permissions are restricted.
+        }
     }
 
     private function normalizeProgressSkillLevel($value)
@@ -1716,6 +1894,7 @@ class TeachersApi
                     prog.rhythm_score,
                     prog.focus_score,
                     prog.assignment_score,
+                    prog.criteria_scores,
                     prog.remarks,
                     prog.assessment_date,
                     prog.updated_at
@@ -1747,7 +1926,11 @@ class TeachersApi
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
             foreach ($rows as &$row) {
-                $scores = [
+                $criteriaScores = $this->decodeCriteriaScores($row['criteria_scores'] ?? null);
+                $scores = array_values(array_filter(array_map(function ($item) {
+                    return isset($item['score']) ? $this->normalizeProgressScore($item['score']) : null;
+                }, $criteriaScores), function ($value) { return $value !== null; }));
+                if (!$scores) $scores = [
                     $row['performance_score'] !== null ? (int)$row['performance_score'] : null,
                     $row['technique_score'] !== null ? (int)$row['technique_score'] : null,
                     $row['rhythm_score'] !== null ? (int)$row['rhythm_score'] : null,
@@ -1760,6 +1943,7 @@ class TeachersApi
                 $row['average_score'] = !empty($validScores)
                     ? round(array_sum($validScores) / count($validScores), 2)
                     : null;
+                $row['criteria_scores'] = $criteriaScores;
             }
             unset($row);
 
@@ -1784,6 +1968,7 @@ class TeachersApi
         $rhythmScore = $this->normalizeProgressScore($data['rhythm_score'] ?? null);
         $focusScore = $this->normalizeProgressScore($data['focus_score'] ?? null);
         $assignmentScore = $this->normalizeProgressScore($data['assignment_score'] ?? null);
+        $criteriaScores = $this->normalizeCriteriaScores($data['criteria_scores'] ?? []);
         $remarks = trim((string)($data['remarks'] ?? ''));
         $assessmentDate = trim((string)($data['assessment_date'] ?? date('Y-m-d')));
 
@@ -1793,9 +1978,16 @@ class TeachersApi
         if ($skillLevel === '') {
             $this->sendJSON(['error' => 'A valid skill level is required'], 400);
         }
-        if ($performanceScore === null || $techniqueScore === null || $rhythmScore === null || $focusScore === null || $assignmentScore === null) {
-            $this->sendJSON(['error' => 'All five grading scores must be between 1 and 5'], 400);
+        if (!$criteriaScores) {
+            $this->sendJSON(['error' => 'Provide between 1 and 20 named criteria with scores from 1 to 5'], 400);
         }
+        $legacyScores = array_column($criteriaScores, 'score');
+        $performanceScore = $legacyScores[0] ?? null;
+        $techniqueScore = $legacyScores[1] ?? null;
+        $rhythmScore = $legacyScores[2] ?? null;
+        $focusScore = $legacyScores[3] ?? null;
+        $assignmentScore = $legacyScores[4] ?? null;
+        $criteriaScoresJson = json_encode($criteriaScores, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($assessmentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $assessmentDate)) {
             $this->sendJSON(['error' => 'assessment_date must be in YYYY-MM-DD format'], 400);
         }
@@ -1850,6 +2042,7 @@ class TeachersApi
                         rhythm_score = ?,
                         focus_score = ?,
                         assignment_score = ?,
+                        criteria_scores = ?,
                         remarks = ?,
                         assessment_date = ?
                     WHERE progress_id = ?
@@ -1863,6 +2056,7 @@ class TeachersApi
                     $rhythmScore,
                     $focusScore,
                     $assignmentScore,
+                    $criteriaScoresJson,
                     ($remarks !== '' ? $remarks : null),
                     $assessmentDate,
                     $progressId
@@ -1879,9 +2073,10 @@ class TeachersApi
                         rhythm_score,
                         focus_score,
                         assignment_score,
+                        criteria_scores,
                         remarks,
                         assessment_date
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmtInsert->execute([
                     $studentId,
@@ -1893,13 +2088,14 @@ class TeachersApi
                     $rhythmScore,
                     $focusScore,
                     $assignmentScore,
+                    $criteriaScoresJson,
                     ($remarks !== '' ? $remarks : null),
                     $assessmentDate
                 ]);
                 $progressId = (int)$this->conn->lastInsertId();
             }
 
-            $scores = [$performanceScore, $techniqueScore, $rhythmScore, $focusScore, $assignmentScore];
+            $scores = array_column($criteriaScores, 'score');
             $averageScore = round(array_sum($scores) / count($scores), 2);
 
             $this->sendJSON([
@@ -1910,6 +2106,223 @@ class TeachersApi
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    private function teacherCanManageStudentInstrument($teacherId, $studentId, $instrumentId)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT 1
+            FROM tbl_sessions ts
+            INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+            WHERE ts.teacher_id = ?
+              AND e.student_id = ?
+              AND COALESCE(ts.instrument_id, e.instrument_id) = ?
+            LIMIT 1
+        ");
+        $stmt->execute([(int)$teacherId, (int)$studentId, (int)$instrumentId]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    public function getTeacherLearningProgress()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') $this->sendJSON(['error' => 'Method not allowed'], 405);
+        $teacherId = $this->resolveLearningWorkflowTeacherId((int)($_GET['teacher_id'] ?? 0), (int)($_GET['user_id'] ?? 0));
+        if ($teacherId < 1) $this->sendJSON(['error' => 'teacher_id or user_id is required'], 400);
+        $this->ensureLearningProgressWorkflow();
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT DISTINCT s.student_id, s.first_name, s.last_name,
+                       i.instrument_id, i.instrument_name,
+                       ll.learning_level_id, ll.level_name, ll.book_material,
+                       ll.current_topic, ll.instructor_notes, ll.skills_developing,
+                       ll.areas_for_improvement, ll.assessment_readiness,
+                       ll.status, ll.started_at, ll.updated_at
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                INNER JOIN tbl_instruments i ON i.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
+                LEFT JOIN tbl_student_learning_levels ll
+                  ON ll.learning_level_id = (
+                      SELECT ll2.learning_level_id
+                      FROM tbl_student_learning_levels ll2
+                      WHERE ll2.student_id = s.student_id
+                        AND ll2.instrument_id = i.instrument_id
+                        AND ll2.status = 'In Progress'
+                      ORDER BY ll2.started_at DESC, ll2.learning_level_id DESC
+                      LIMIT 1
+                  )
+                WHERE ts.teacher_id = ?
+                ORDER BY s.last_name, s.first_name, i.instrument_name
+            ");
+            $stmt->execute([$teacherId]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            $historyStmt = $this->conn->prepare("
+                SELECT ll.learning_level_id, ll.level_name, ll.book_material, ll.status,
+                       ll.started_at, ll.achieved_at, ll.assessment_readiness,
+                       pe.exam_id, pe.exam_date, pe.grade_rating, pe.result,
+                       c.certificate_id, c.certificate_number, c.issued_at
+                FROM tbl_student_learning_levels ll
+                LEFT JOIN tbl_promotional_exams pe ON pe.exam_id = ll.achieved_exam_id
+                LEFT JOIN tbl_student_certificates c
+                  ON c.learning_level_id = ll.learning_level_id AND c.status = 'Issued'
+                WHERE ll.student_id = ? AND ll.instrument_id = ?
+                ORDER BY ll.started_at DESC, ll.learning_level_id DESC
+            ");
+            foreach ($rows as &$row) {
+                $historyStmt->execute([(int)$row['student_id'], (int)$row['instrument_id']]);
+                $row['learning_history'] = $historyStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            }
+            unset($row);
+            $this->sendJSON(['success' => true, 'learning_progress' => $rows]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function saveTeacherLearningProgress()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->sendJSON(['error' => 'Method not allowed'], 405);
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = $this->resolveLearningWorkflowTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $studentId = (int)($data['student_id'] ?? 0);
+        $instrumentId = (int)($data['instrument_id'] ?? 0);
+        $levelName = trim((string)($data['level_name'] ?? ''));
+        $bookMaterial = trim((string)($data['book_material'] ?? ''));
+        $topic = trim((string)($data['current_topic'] ?? ''));
+        $notes = trim((string)($data['instructor_notes'] ?? ''));
+        $skills = trim((string)($data['skills_developing'] ?? ''));
+        $improvement = trim((string)($data['areas_for_improvement'] ?? ''));
+        $readiness = trim((string)($data['assessment_readiness'] ?? 'Not Ready'));
+        $validReadiness = ['Not Ready','Developing','Improving','Ready for Assessment'];
+        if ($teacherId < 1 || $studentId < 1 || $instrumentId < 1 || $levelName === '') {
+            $this->sendJSON(['error' => 'Teacher, student, instrument, and current level are required'], 400);
+        }
+        if (!in_array($readiness, $validReadiness, true)) $this->sendJSON(['error' => 'Invalid assessment readiness'], 400);
+        if (!$this->teacherCanManageStudentInstrument($teacherId, $studentId, $instrumentId)) {
+            $this->sendJSON(['error' => 'This student/instrument is not assigned to this instructor'], 403);
+        }
+
+        try {
+            $this->conn->beginTransaction();
+            $stmt = $this->conn->prepare("
+                SELECT learning_level_id FROM tbl_student_learning_levels
+                WHERE student_id = ? AND instrument_id = ? AND status = 'In Progress'
+                ORDER BY learning_level_id DESC LIMIT 1 FOR UPDATE
+            ");
+            $stmt->execute([$studentId, $instrumentId]);
+            $learningId = (int)($stmt->fetchColumn() ?: 0);
+            if ($learningId > 0) {
+                $update = $this->conn->prepare("
+                    UPDATE tbl_student_learning_levels
+                    SET teacher_id=?, level_name=?, book_material=?, current_topic=?, instructor_notes=?,
+                        skills_developing=?, areas_for_improvement=?, assessment_readiness=?
+                    WHERE learning_level_id=? AND status='In Progress'
+                ");
+                $update->execute([$teacherId, $levelName, $bookMaterial ?: null, $topic ?: null, $notes ?: null, $skills ?: null, $improvement ?: null, $readiness, $learningId]);
+            } else {
+                $insert = $this->conn->prepare("
+                    INSERT INTO tbl_student_learning_levels
+                    (student_id,instrument_id,teacher_id,level_name,book_material,current_topic,instructor_notes,skills_developing,areas_for_improvement,assessment_readiness,status,started_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,'In Progress',CURDATE())
+                ");
+                $insert->execute([$studentId,$instrumentId,$teacherId,$levelName,$bookMaterial ?: null,$topic ?: null,$notes ?: null,$skills ?: null,$improvement ?: null,$readiness]);
+                $learningId = (int)$this->conn->lastInsertId();
+            }
+            $this->conn->commit();
+            $this->sendJSON(['success'=>true,'message'=>'Learning progress saved.','learning_level_id'=>$learningId]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            $this->sendJSON(['error'=>'Database error: '.$e->getMessage()],500);
+        }
+    }
+
+    public function recordPromotionalExam()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->sendJSON(['error' => 'Method not allowed'], 405);
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = $this->resolveLearningWorkflowTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $learningId = (int)($data['learning_level_id'] ?? 0);
+        $result = trim((string)($data['result'] ?? ''));
+        $rating = trim((string)($data['grade_rating'] ?? ''));
+        $examDate = trim((string)($data['exam_date'] ?? date('Y-m-d')));
+        $notes = trim((string)($data['examiner_notes'] ?? ''));
+        $nextLevel = trim((string)($data['next_level_name'] ?? ''));
+        $nextBook = trim((string)($data['next_book_material'] ?? ''));
+        if ($teacherId < 1 || $learningId < 1 || !in_array($result, ['Passed','Retake'], true)) {
+            $this->sendJSON(['error'=>'Teacher, learning record, and a Passed/Retake result are required'],400);
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $examDate)) $this->sendJSON(['error'=>'Invalid exam date'],400);
+        if ($rating === '') $this->sendJSON(['error'=>'Record the formal exam grade or rating'],400);
+        if ($result === 'Passed' && ($nextLevel === '' || $nextBook === '')) {
+            $this->sendJSON(['error'=>'Next level and next book/material are required after a passing result'],400);
+        }
+
+        try {
+            $this->conn->beginTransaction();
+            $stmt = $this->conn->prepare("SELECT * FROM tbl_student_learning_levels WHERE learning_level_id=? LIMIT 1 FOR UPDATE");
+            $stmt->execute([$learningId]);
+            $learning = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$learning || $learning['status'] !== 'In Progress') {
+                $this->conn->rollBack();
+                $this->sendJSON(['error'=>'Current in-progress learning record not found'],404);
+            }
+            $studentId = (int)$learning['student_id'];
+            $instrumentId = (int)$learning['instrument_id'];
+            if (!$this->teacherCanManageStudentInstrument($teacherId,$studentId,$instrumentId)) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error'=>'This student/instrument is not assigned to this instructor'],403);
+            }
+            if ($learning['assessment_readiness'] !== 'Ready for Assessment') {
+                $this->conn->rollBack();
+                $this->sendJSON(['error'=>'Mark the student Ready for Assessment before recording a promotional exam'],400);
+            }
+
+            $exam = $this->conn->prepare("
+                INSERT INTO tbl_promotional_exams
+                (student_id,instrument_id,learning_level_id,teacher_id,assessed_level,exam_date,grade_rating,result,examiner_notes)
+                VALUES (?,?,?,?,?,?,?,?,?)
+            ");
+            $exam->execute([$studentId,$instrumentId,$learningId,$teacherId,$learning['level_name'],$examDate,$rating,$result,$notes ?: null]);
+            $examId = (int)$this->conn->lastInsertId();
+
+            if ($result === 'Retake') {
+                $this->conn->prepare("UPDATE tbl_student_learning_levels SET assessment_readiness='Developing', instructor_notes=COALESCE(?,instructor_notes) WHERE learning_level_id=?")
+                    ->execute([$notes ?: null,$learningId]);
+                $this->conn->commit();
+                $this->sendJSON(['success'=>true,'message'=>'Retake recorded. The student remains at the current level and book.','exam_id'=>$examId,'result'=>$result]);
+            }
+
+            $this->conn->prepare("UPDATE tbl_student_learning_levels SET status='Achieved', achieved_at=?, achieved_exam_id=? WHERE learning_level_id=?")
+                ->execute([$examDate,$examId,$learningId]);
+            $certificateNumber = 'FAS-' . date('Y', strtotime($examDate)) . '-' . str_pad((string)$studentId, 5, '0', STR_PAD_LEFT) . '-' . str_pad((string)$examId, 5, '0', STR_PAD_LEFT);
+            $certificate = $this->conn->prepare("
+                INSERT INTO tbl_student_certificates
+                (student_id,promotional_exam_id,learning_level_id,instrument_id,achieved_level,certificate_number,issued_at,issued_by,status)
+                VALUES (?,?,?,?,?,?,?,?, 'Issued')
+            ");
+            $certificate->execute([$studentId,$examId,$learningId,$instrumentId,$learning['level_name'],$certificateNumber,$examDate,$teacherId]);
+            $certificateId = (int)$this->conn->lastInsertId();
+
+            $next = $this->conn->prepare("
+                INSERT INTO tbl_student_learning_levels
+                (student_id,instrument_id,teacher_id,level_name,book_material,assessment_readiness,status,started_at,previous_learning_level_id)
+                VALUES (?,?,?,?,?,'Not Ready','In Progress',?,?)
+            ");
+            $next->execute([$studentId,$instrumentId,$teacherId,$nextLevel,$nextBook,$examDate,$learningId]);
+            $nextLearningId = (int)$this->conn->lastInsertId();
+            $this->conn->commit();
+            $this->sendJSON([
+                'success'=>true,
+                'message'=>'Passed. Achievement and certificate recorded; the next level is now in progress.',
+                'exam_id'=>$examId,'result'=>$result,'certificate_id'=>$certificateId,
+                'certificate_number'=>$certificateNumber,'next_learning_level_id'=>$nextLearningId
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            $this->sendJSON(['error'=>'Database error: '.$e->getMessage()],500);
         }
     }
 
@@ -1996,6 +2409,21 @@ switch ($action) {
         break;
     case 'save-session-grade':
         $api->saveTeacherSessionGrade();
+        break;
+    case 'get-grading-criteria':
+        $api->getTeacherGradingCriteria();
+        break;
+    case 'save-grading-criteria':
+        $api->saveTeacherGradingCriteria();
+        break;
+    case 'get-learning-progress':
+        $api->getTeacherLearningProgress();
+        break;
+    case 'save-learning-progress':
+        $api->saveTeacherLearningProgress();
+        break;
+    case 'record-promotional-exam':
+        $api->recordPromotionalExam();
         break;
     case 'cancel-session':
         $api->cancelSessionByTeacher();

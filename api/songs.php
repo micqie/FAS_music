@@ -399,6 +399,47 @@ class SongsApi
         return false;
     }
 
+    private function teacherCanCreateSongForCategory($teacherId, $category)
+    {
+        $teacherId = (int)$teacherId;
+        $category = $this->normalizeSongCategory($category);
+        if ($teacherId < 1 || $category === '') return false;
+
+        try {
+            if ($this->tableExists('tbl_teacher_specializations') && $this->tableExists('tbl_specialization')) {
+                $stmt = $this->conn->prepare("
+                    SELECT COALESCE(it.type_name, sp.specialization_name) AS instrument_type
+                    FROM tbl_teacher_specializations ts
+                    INNER JOIN tbl_specialization sp ON sp.specialization_id = ts.specialization_id
+                    LEFT JOIN tbl_instrument_types it ON it.type_id = sp.type_id
+                    WHERE ts.teacher_id = ? AND COALESCE(sp.status, 'Active') = 'Active'
+                ");
+                $stmt->execute([$teacherId]);
+                $types = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                foreach ($types as $type) {
+                    $normalized = $this->normalizeSongCategory($type);
+                    if ($normalized === $category) return true;
+                    if (in_array($normalized, ['all around','all-around','all instruments','general'], true)) return true;
+                }
+                if ($types) return false;
+            }
+
+            // Legacy fallback for instructors not yet linked through the
+            // specialization master table.
+            $stmt = $this->conn->prepare("SELECT specialization FROM tbl_teachers WHERE teacher_id=? LIMIT 1");
+            $stmt->execute([$teacherId]);
+            $legacy = preg_split('/\s*,\s*/', (string)($stmt->fetchColumn() ?: ''), -1, PREG_SPLIT_NO_EMPTY);
+            foreach ($legacy as $type) {
+                $normalized = $this->normalizeSongCategory($type);
+                if ($normalized === $category) return true;
+                if (in_array($normalized, ['all around','all-around','all instruments','general'], true)) return true;
+            }
+        } catch (PDOException $e) {
+            return false;
+        }
+        return false;
+    }
+
     private function getStudentSongEligibility($studentId)
     {
         $studentId = (int)$studentId;
@@ -511,7 +552,6 @@ class SongsApi
         $tags = trim((string)($_POST['tags'] ?? ''));
         $youtubeLink = trim((string)($_POST['youtube_link'] ?? ''));
         $spotifyLink = trim((string)($_POST['spotify_link'] ?? ''));
-        $notes = trim((string)($_POST['notes'] ?? ''));
 
         if ($teacherId < 1) {
             $this->sendJSON(['error' => 'teacher_id or user_id is required'], 400);
@@ -522,6 +562,9 @@ class SongsApi
         if (!$this->isKnownSongCategory($category)) {
             $this->sendJSON(['error' => 'Category must match one of the current instrument types in the database.'], 400);
         }
+        if (!$this->teacherCanCreateSongForCategory($teacherId, $category)) {
+            $this->sendJSON(['error' => 'Choose an instrument under your instructor specialization.'], 403);
+        }
 
         try {
             $sheetPath = $this->storeSongAssetUpload($_FILES['sheet_music_file'] ?? null, 'sheets', ['pdf'], 'sheet music');
@@ -531,7 +574,7 @@ class SongsApi
                 INSERT INTO tbl_song_library (
                     teacher_id, title, artist, genre, category, difficulty_level, vocal_range,
                     tags, youtube_link, spotify_link, sheet_music_path, accompaniment_audio_path, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
             ");
             $stmt->execute([
                 $teacherId,
@@ -545,13 +588,12 @@ class SongsApi
                 ($youtubeLink !== '' ? $youtubeLink : null),
                 ($spotifyLink !== '' ? $spotifyLink : null),
                 $sheetPath,
-                $audioPath,
-                ($notes !== '' ? $notes : null)
+                $audioPath
             ]);
 
             $this->sendJSON([
                 'success' => true,
-                'message' => 'Song added to the library.',
+                'message' => 'Song added to the masterfile.',
                 'song_id' => (int)$this->conn->lastInsertId()
             ]);
         } catch (Exception $e) {

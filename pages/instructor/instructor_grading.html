@@ -276,7 +276,7 @@
                     <div class="flex items-center justify-between mb-4">
                         <div>
                             <h3 class="text-base font-semibold text-gray-900">2. Performance scores</h3>
-                            <p class="text-sm text-gray-500 mt-0.5">0 of 5 criteria rated.</p>
+                            <p id="criteriaTotalLabel" class="text-sm text-gray-500 mt-0.5">Loading instructor criteria…</p>
                         </div>
                         <button type="button" id="editCriteriaBtn"
                             onclick="toggleEditCriteria()"
@@ -334,7 +334,7 @@
 
                 <!-- Criteria still to rate -->
                 <div class="text-sm text-gray-500">
-                    <span id="criteriaRemainingCount">5 criteria still to rate.</span>
+                    <span id="criteriaRemainingCount">Select a session to begin rating.</span>
                 </div>
             </form>
         </div>
@@ -342,13 +342,16 @@
         <!-- Panel Footer -->
         <div class="border-t border-gray-100 px-8 py-4 bg-gray-50">
             <div class="flex items-center justify-end gap-3">
+                <span id="gradeSaveStatus" class="hidden items-center gap-2 text-sm font-semibold text-emerald-700">
+                    <i class="fas fa-circle-check"></i>Grade saved successfully
+                </span>
                 <button type="button" onclick="closeGradingPanel()"
                     class="px-5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
                     Cancel
                 </button>
                 <button type="submit" form="gradingForm" id="saveGradeBtn"
                     class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                    <i class="fas fa-check text-xs"></i> Session done
+                    <i class="fas fa-save text-xs"></i> Save Grade
                 </button>
             </div>
         </div>

@@ -181,7 +181,7 @@
                                 <p id="songLibrarySubtitle" class="text-sm text-slate-500 mt-0.5">Browse the whole library, or choose a student first.</p>
                             </div>
                             <button type="button" data-open-song-modal="createSongModal" class="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-semibold text-slate-700 transition">
-                                <i class="fas fa-plus text-slate-500 text-xs"></i> Add song
+                                <i class="fas fa-plus text-slate-500 text-xs"></i> Add to masterfile
                             </button>
                         </div>
 
@@ -301,7 +301,7 @@
     </div>
 
     <!-- ══════════════════════════════════════
-         CREATE SONG MODAL (keep unchanged)
+         CREATE SONG MASTERFILE MODAL
          ══════════════════════════════════════ -->
     <div id="createSongModal" class="song-modal fixed inset-0 z-[80] px-0 py-0 sm:px-4 sm:py-6" aria-hidden="true">
         <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" data-close-song-modal></div>
@@ -309,8 +309,8 @@
             <section class="flex h-full w-full flex-col overflow-hidden border border-[#d9a81f] bg-[#fffaf0] sm:h-auto sm:max-h-[94vh] sm:max-w-4xl sm:rounded-2xl">
                 <div class="flex items-center justify-between gap-4 border-b border-[#ecd99b] px-5 py-4">
                     <div>
-                        <h2 class="text-lg font-bold text-slate-900">Add a song to your library</h2>
-                        <p class="mt-0.5 text-sm text-slate-600">It will be saved under the instrument you choose.</p>
+                        <h2 class="text-lg font-bold text-slate-900">Add song to masterfile</h2>
+                        <p class="mt-0.5 text-sm text-slate-600">Create a reusable song entry. You can assign it to students later.</p>
                     </div>
                     <button type="button" data-close-song-modal class="grid h-9 w-9 place-items-center rounded-xl bg-white text-slate-500 transition hover:bg-slate-100">
                         <i class="fas fa-times"></i>
@@ -329,7 +329,7 @@
                             <input name="artist" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20" placeholder="Artist name">
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold text-slate-800 mb-1.5">Instrument</label>
+                            <label class="block text-sm font-semibold text-slate-800 mb-1.5">Instrument specialization</label>
                             <select id="songCategorySelect" name="category" required class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20">
                                 <option value="">Select instrument...</option>
                             </select>
@@ -342,10 +342,6 @@
                             <label class="block text-sm font-semibold text-slate-800 mb-1.5">Genre <span class="font-normal text-slate-400">(optional)</span></label>
                             <input name="genre" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20" placeholder="e.g. Classical, Pop">
                         </div>
-                        <div class="sm:col-span-2">
-                            <label class="block text-sm font-semibold text-slate-800 mb-1.5">Teaching notes <span class="font-normal text-slate-400">(optional)</span></label>
-                            <textarea name="notes" rows="3" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 resize-none" placeholder="Key points, tricky sections, fingering tips..."></textarea>
-                        </div>
                         <div>
                             <label class="block text-sm font-semibold text-slate-800 mb-1.5">YouTube link <span class="font-normal text-slate-400">(optional)</span></label>
                             <input name="youtube_link" type="url" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20" placeholder="https://youtube.com/...">
@@ -356,15 +352,15 @@
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-slate-800 mb-1.5">Sheet music <span class="font-normal text-slate-400">(PDF)</span></label>
-                            <input name="sheet_music" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/15 file:text-gold-600 file:text-xs file:font-semibold">
+                            <input name="sheet_music_file" type="file" accept=".pdf" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/15 file:text-gold-600 file:text-xs file:font-semibold">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-slate-800 mb-1.5">Accompaniment audio <span class="font-normal text-slate-400">(optional)</span></label>
-                            <input name="accompaniment_audio" type="file" accept=".mp3,.wav,.m4a,.ogg" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/15 file:text-gold-600 file:text-xs file:font-semibold">
+                            <input name="accompaniment_audio_file" type="file" accept=".mp3,.wav,.m4a,.ogg" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/15 file:text-gold-600 file:text-xs file:font-semibold">
                         </div>
                         <div class="sm:col-span-2 flex justify-end gap-3 pt-2">
                             <button type="button" data-close-song-modal class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">Cancel</button>
-                            <button type="submit" class="px-6 py-2.5 rounded-xl bg-[#0f172a] text-sm font-bold text-white hover:bg-slate-800 transition">Save to library</button>
+                            <button type="submit" class="px-6 py-2.5 rounded-xl bg-[#0f172a] text-sm font-bold text-white hover:bg-slate-800 transition">Save to masterfile</button>
                         </div>
                     </form>
                 </div>

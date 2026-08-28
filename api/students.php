@@ -46,6 +46,9 @@ class StudentsApi
         $this->ensureEnrollmentScheduleSlotsTable();
         $this->ensureSessionSchedulingColumns();
         $this->ensureStudentProgressTable();
+        $this->ensureStudentSessionExtensionRequestsTable();
+        $this->ensurePromotionalAssessmentTables();
+        $this->ensureLearningProgressTable();
         $this->ensureScheduleOperationLookupTable();
         $this->ensureSessionRescheduleWorkflow();
     }
@@ -526,7 +529,7 @@ class StudentsApi
             return (int)($package['sessions'] ?? 0) === 12;
         }));
 
-        return !empty($initialPackages) ? $initialPackages : array_values($packages);
+        return $initialPackages;
     }
 
     /** Pick the package to preselect in the enrollment UI. */
@@ -686,6 +689,7 @@ class StudentsApi
                     request_id INT AUTO_INCREMENT PRIMARY KEY,
                     student_id INT NOT NULL,
                     branch_id INT NOT NULL,
+                    enrollment_id INT NULL,
                     requested_sessions INT NOT NULL DEFAULT 1,
                     requested_amount DECIMAL(10,2) NOT NULL DEFAULT 650.00,
                     preferred_day_of_week ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NULL,
@@ -700,11 +704,101 @@ class StudentsApi
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
             ");
+            if (!$this->tableHasColumn('tbl_student_session_extension_requests', 'enrollment_id')) {
+                $this->conn->exec("ALTER TABLE tbl_student_session_extension_requests ADD COLUMN enrollment_id INT NULL AFTER branch_id");
+            }
             try { $this->conn->exec("CREATE INDEX idx_student_session_extension_requests_student ON tbl_student_session_extension_requests(student_id)"); } catch (PDOException $e) {}
             try { $this->conn->exec("CREATE INDEX idx_student_session_extension_requests_status ON tbl_student_session_extension_requests(status)"); } catch (PDOException $e) {}
             try { $this->conn->exec("CREATE INDEX idx_student_session_extension_requests_created ON tbl_student_session_extension_requests(created_at)"); } catch (PDOException $e) {}
         } catch (PDOException $e) {
             // Do not break API
+        }
+    }
+
+    /** Formal academic assessments and awards, separate from lesson purchases. */
+    private function ensurePromotionalAssessmentTables()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_promotional_exams (
+                    exam_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    instrument_id INT NULL,
+                    learning_level_id INT NULL,
+                    teacher_id INT NULL,
+                    assessed_level VARCHAR(100) NOT NULL,
+                    exam_date DATE NULL,
+                    grade_rating VARCHAR(100) NULL,
+                    result ENUM('Pending','Passed','Retake') NOT NULL DEFAULT 'Pending',
+                    examiner_notes TEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ");
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_certificates (
+                    certificate_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    promotional_exam_id INT NULL,
+                    learning_level_id INT NULL,
+                    instrument_id INT NULL,
+                    achieved_level VARCHAR(100) NOT NULL,
+                    certificate_number VARCHAR(100) NULL,
+                    issued_at DATE NOT NULL,
+                    issued_by INT NULL,
+                    status ENUM('Issued','Revoked') NOT NULL DEFAULT 'Issued',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+            $examColumns = [
+                'learning_level_id' => "ALTER TABLE tbl_promotional_exams ADD COLUMN learning_level_id INT NULL AFTER instrument_id",
+                'teacher_id' => "ALTER TABLE tbl_promotional_exams ADD COLUMN teacher_id INT NULL AFTER learning_level_id",
+                'grade_rating' => "ALTER TABLE tbl_promotional_exams ADD COLUMN grade_rating VARCHAR(100) NULL AFTER exam_date"
+            ];
+            foreach ($examColumns as $column => $sql) {
+                if (!$this->tableHasColumn('tbl_promotional_exams', $column)) $this->conn->exec($sql);
+            }
+            try { $this->conn->exec("ALTER TABLE tbl_promotional_exams MODIFY result ENUM('Pending','Passed','Failed','Retake') NOT NULL DEFAULT 'Pending'"); } catch (PDOException $e) {}
+            try { $this->conn->exec("UPDATE tbl_promotional_exams SET result = 'Retake' WHERE result = 'Failed'"); } catch (PDOException $e) {}
+            try { $this->conn->exec("ALTER TABLE tbl_promotional_exams MODIFY result ENUM('Pending','Passed','Retake') NOT NULL DEFAULT 'Pending'"); } catch (PDOException $e) {}
+            if (!$this->tableHasColumn('tbl_student_certificates', 'learning_level_id')) {
+                $this->conn->exec("ALTER TABLE tbl_student_certificates ADD COLUMN learning_level_id INT NULL AFTER promotional_exam_id");
+            }
+            try { $this->conn->exec("CREATE INDEX idx_promotional_exams_student ON tbl_promotional_exams(student_id)"); } catch (PDOException $e) {}
+            try { $this->conn->exec("CREATE INDEX idx_student_certificates_student ON tbl_student_certificates(student_id)"); } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+            // Keep the portal available if a restricted database user cannot migrate.
+        }
+    }
+
+    private function ensureLearningProgressTable()
+    {
+        try {
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_student_learning_levels (
+                    learning_level_id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id INT NOT NULL,
+                    instrument_id INT NOT NULL,
+                    teacher_id INT NULL,
+                    level_name VARCHAR(100) NOT NULL,
+                    book_material VARCHAR(255) NULL,
+                    current_topic VARCHAR(255) NULL,
+                    instructor_notes TEXT NULL,
+                    skills_developing TEXT NULL,
+                    areas_for_improvement TEXT NULL,
+                    assessment_readiness ENUM('Not Ready','Developing','Improving','Ready for Assessment') NOT NULL DEFAULT 'Not Ready',
+                    status ENUM('In Progress','Achieved') NOT NULL DEFAULT 'In Progress',
+                    started_at DATE NOT NULL,
+                    achieved_at DATE NULL,
+                    achieved_exam_id INT NULL,
+                    previous_learning_level_id INT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ");
+            try { $this->conn->exec("CREATE INDEX idx_learning_levels_student_instrument ON tbl_student_learning_levels(student_id, instrument_id, status)"); } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+            // Keep portal reads available if schema migration is restricted.
         }
     }
 
@@ -720,6 +814,7 @@ class StudentsApi
                     request_id,
                     student_id,
                     branch_id,
+                    enrollment_id,
                     requested_sessions,
                     requested_amount,
                     preferred_day_of_week,
@@ -1038,6 +1133,7 @@ class StudentsApi
                     slot_id INT AUTO_INCREMENT PRIMARY KEY,
                     enrollment_id INT NOT NULL,
                     teacher_id INT NOT NULL,
+                    instrument_id INT NULL,
                     day_of_week ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NOT NULL,
                     start_time TIME NOT NULL,
                     end_time TIME NOT NULL,
@@ -1049,6 +1145,9 @@ class StudentsApi
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
             ");
+            if (!$this->tableHasColumn('tbl_enrollment_schedule_slots', 'instrument_id')) {
+                $this->conn->exec("ALTER TABLE tbl_enrollment_schedule_slots ADD COLUMN instrument_id INT NULL AFTER teacher_id");
+            }
             try { $this->conn->exec("CREATE INDEX idx_enrollment_schedule_slots_enrollment ON tbl_enrollment_schedule_slots(enrollment_id, status, sort_order)"); } catch (PDOException $e) {}
             try { $this->conn->exec("CREATE INDEX idx_enrollment_schedule_slots_teacher ON tbl_enrollment_schedule_slots(teacher_id, day_of_week, start_time, end_time)"); } catch (PDOException $e) {}
         } catch (PDOException $e) {
@@ -1107,6 +1206,7 @@ class StudentsApi
             'rhythm_score' => "ALTER TABLE tbl_student_progress ADD COLUMN rhythm_score TINYINT UNSIGNED NULL AFTER technique_score",
             'focus_score' => "ALTER TABLE tbl_student_progress ADD COLUMN focus_score TINYINT UNSIGNED NULL AFTER rhythm_score",
             'assignment_score' => "ALTER TABLE tbl_student_progress ADD COLUMN assignment_score TINYINT UNSIGNED NULL AFTER focus_score",
+            'criteria_scores' => "ALTER TABLE tbl_student_progress ADD COLUMN criteria_scores TEXT NULL AFTER assignment_score",
             'updated_at' => "ALTER TABLE tbl_student_progress ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"
         ];
 
@@ -1160,7 +1260,7 @@ class StudentsApi
                     ts.notes AS lesson_focus,
                     {$roomExpr} AS room_name,
                     {$packageNameExpr} AS package_name,
-                    COALESCE(inst.instrument_name, CONCAT('Instrument #', COALESCE(ts.instrument_id, e.instrument_id))) AS instrument_name,
+                    COALESCE(NULLIF(TRIM(inst_type.type_name), ''), inst.instrument_name, CONCAT('Instrument #', COALESCE(ts.instrument_id, e.instrument_id))) AS instrument_name,
                     CONCAT_WS(' ', t.first_name, t.last_name) AS teacher_name,
                     prog.progress_id,
                     prog.skill_level,
@@ -1169,6 +1269,7 @@ class StudentsApi
                     prog.rhythm_score,
                     prog.focus_score,
                     prog.assignment_score,
+                    prog.criteria_scores,
                     prog.remarks,
                     COALESCE(
                         NULLIF(TRIM(prog.remarks), ''),
@@ -1180,6 +1281,7 @@ class StudentsApi
                 FROM tbl_sessions ts
                 INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
                 LEFT JOIN tbl_instruments inst ON inst.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
+                LEFT JOIN tbl_instrument_types inst_type ON inst_type.type_id = inst.type_id
                 LEFT JOIN tbl_teachers t ON t.teacher_id = ts.teacher_id
                 {$packageJoin}
                 {$roomJoin}
@@ -1194,7 +1296,13 @@ class StudentsApi
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
             foreach ($rows as &$row) {
-                $scores = [
+                $criteriaScores = json_decode((string)($row['criteria_scores'] ?? ''), true);
+                if (!is_array($criteriaScores)) $criteriaScores = [];
+                $scores = array_values(array_filter(array_map(function ($item) {
+                    $score = (int)($item['score'] ?? 0);
+                    return ($score >= 1 && $score <= 5) ? $score : null;
+                }, $criteriaScores), function ($value) { return $value !== null; }));
+                if (!$scores) $scores = [
                     $row['performance_score'] !== null ? (int)$row['performance_score'] : null,
                     $row['technique_score'] !== null ? (int)$row['technique_score'] : null,
                     $row['rhythm_score'] !== null ? (int)$row['rhythm_score'] : null,
@@ -1207,6 +1315,7 @@ class StudentsApi
                 $row['average_score'] = !empty($validScores)
                     ? round(array_sum($validScores) / count($validScores), 2)
                     : null;
+                $row['criteria_scores'] = $criteriaScores;
             }
             unset($row);
 
@@ -1546,6 +1655,7 @@ class StudentsApi
                     slot_id,
                     enrollment_id,
                     teacher_id,
+                    instrument_id,
                     day_of_week,
                     start_time,
                     end_time,
@@ -1624,7 +1734,7 @@ class StudentsApi
 
             $slotKey = $day . '|' . $start . '|' . $end;
             if (isset($rows[$slotKey])) {
-                continue;
+                throw new InvalidArgumentException("The {$day} {$start}-{$end} weekly time was selected more than once");
             }
 
             $roomId = null;
@@ -1677,6 +1787,7 @@ class StudentsApi
 
             $rows[$slotKey] = [
                 'teacher_id' => $slotTeacherId,
+                'instrument_id' => $slotInstrumentId > 0 ? $slotInstrumentId : null,
                 'day_of_week' => $day,
                 'start_time' => $start,
                 'end_time' => $end,
@@ -1705,14 +1816,15 @@ class StudentsApi
 
         $stmtInsert = $this->conn->prepare("
             INSERT INTO tbl_enrollment_schedule_slots (
-                enrollment_id, teacher_id, day_of_week, start_time, end_time, room_id, room_name, sort_order, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+                enrollment_id, teacher_id, instrument_id, day_of_week, start_time, end_time, room_id, room_name, sort_order, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
         ");
 
         foreach ($slots as $slot) {
             $stmtInsert->execute([
                 $enrollmentId,
                 (int)($slot['teacher_id'] ?? 0),
+                !empty($slot['instrument_id']) ? (int)$slot['instrument_id'] : null,
                 $slot['day_of_week'] ?? '',
                 $slot['start_time'] ?? '',
                 $slot['end_time'] ?? '',
@@ -1908,6 +2020,7 @@ class StudentsApi
             });
             $slot = $slotQueue[0];
             $slotTeacherId = (int)($slot['teacher_id'] ?? $teacherId);
+            $slotInstrumentId = (int)($slot['instrument_id'] ?? $instrumentId);
             if ($slotTeacherId < 1) {
                 $slotTeacherId = $teacherId;
             }
@@ -1936,7 +2049,7 @@ class StudentsApi
                         $sessionDate,
                         $startTime,
                         $endTime,
-                        $instrumentId > 0 ? $instrumentId : null,
+                        $slotInstrumentId > 0 ? $slotInstrumentId : null,
                         $roomId,
                         $roomName,
                         $operationId,
@@ -1951,7 +2064,7 @@ class StudentsApi
                         $sessionDate,
                         $startTime,
                         $endTime,
-                        $instrumentId > 0 ? $instrumentId : null,
+                        $slotInstrumentId > 0 ? $slotInstrumentId : null,
                         $roomId,
                         $roomName,
                         $operationId
@@ -3572,6 +3685,7 @@ class StudentsApi
         $currentEnrollment = null;
         $enrollmentHistory = [];
         $currentSessionGrades = [];
+        $issuedCertificate = null;
         try {
             $paymentsHasType = $this->tableExists('tbl_payments') && $this->tableHasColumn('tbl_payments', 'payment_type');
             $paySummaryPaymentTypeSelect = $paymentsHasType
@@ -3579,11 +3693,15 @@ class StudentsApi
                 : "'Partial Payment' AS payment_type";
             $packageNameExpr = "CONCAT('Package #', e.package_id)";
             $packageSessionsExpr = "e.total_sessions";
+            $basePackageSessionsExpr = "e.total_sessions";
             $packagePriceExpr = "0";
             $packageJoin = "";
             if ($this->tableExists('tbl_session_packages')) {
                 $packageNameExpr = "COALESCE(sp.package_name, CONCAT('Package #', e.package_id))";
-                $packageSessionsExpr = "COALESCE(sp.sessions, e.total_sessions, 0)";
+                // The enrollment owns the purchased entitlement. The package row
+                // is only the base product and must not hide approved add-ons.
+                $packageSessionsExpr = "COALESCE(e.total_sessions, sp.sessions, 0)";
+                $basePackageSessionsExpr = "COALESCE(sp.sessions, e.total_sessions, 0)";
                 $packagePriceExpr = "COALESCE(sp.price, 0)";
                 $packageJoin = "LEFT JOIN tbl_session_packages sp ON e.package_id = sp.package_id";
             }
@@ -3670,6 +3788,7 @@ class StudentsApi
                         END, 1)
                     THEN 100 ELSE 0 END AS reservation_fee_amount,
                     {$packageSessionsExpr} AS package_sessions,
+                    {$basePackageSessionsExpr} AS base_package_sessions,
                     1 AS package_max_instruments,
                     t.first_name AS teacher_first_name,
                     t.last_name AS teacher_last_name
@@ -3718,21 +3837,95 @@ class StudentsApi
                         }
                     }
                 }
-                $certificateCompletedSessions = max($completedSessions, $gradedSessions);
-                $certificateAvailable = strtolower((string)($currentEnrollment['status'] ?? '')) === 'completed'
-                    || ($packageSessions > 0 && $certificateCompletedSessions >= $packageSessions);
-                $currentEnrollment['certificate_available'] = $certificateAvailable ? 1 : 0;
-                $currentEnrollment['certificate_completed_sessions'] = $certificateCompletedSessions;
-                $currentEnrollment['certificate_required_sessions'] = $packageSessions;
+                $currentEnrollment['certificate_available'] = 0;
                 foreach ($allEnrollments as $idx => $row) {
                     if ($idx === $currentIndex) continue;
                     $enrollmentHistory[] = $row;
                 }
             }
+
+            // Certificates come only from explicitly issued achievement records,
+            // never from enrollment status or the number of lessons used.
+            if ($this->tableExists('tbl_student_certificates')) {
+                try {
+                    $stmtCertificate = $this->conn->prepare("
+                        SELECT c.certificate_id, c.certificate_number, c.achieved_level,
+                               c.issued_at, c.instrument_id,
+                               COALESCE(NULLIF(TRIM(it.type_name), ''), i.instrument_name) AS instrument_name,
+                               pe.exam_id AS promotional_exam_id, pe.exam_date, pe.result AS exam_result,
+                               CONCAT(COALESCE(ct.first_name, ''), ' ', COALESCE(ct.last_name, '')) AS issuing_teacher_name
+                        FROM tbl_student_certificates c
+                        LEFT JOIN tbl_instruments i ON i.instrument_id = c.instrument_id
+                        LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
+                        LEFT JOIN tbl_promotional_exams pe ON pe.exam_id = c.promotional_exam_id
+                        LEFT JOIN tbl_teachers ct ON ct.teacher_id = c.issued_by
+                        WHERE c.student_id = ? AND c.status = 'Issued' AND pe.result = 'Passed'
+                        ORDER BY c.issued_at DESC, c.certificate_id DESC
+                        LIMIT 1
+                    ");
+                    $stmtCertificate->execute([(int)$student['student_id']]);
+                    $issuedCertificate = $stmtCertificate->fetch(PDO::FETCH_ASSOC) ?: null;
+                } catch (PDOException $e) {
+                    $issuedCertificate = null;
+                }
+            }
+            if ($currentEnrollment) {
+                $currentEnrollment['certificate_available'] = $issuedCertificate ? 1 : 0;
+            }
         } catch (PDOException $e) {
             $currentEnrollment = null;
             $enrollmentHistory = [];
             $currentSessionGrades = [];
+        }
+
+        $learningProgress = [];
+        $learningHistory = [];
+        $promotionalExams = [];
+        try {
+            if ($this->tableExists('tbl_student_learning_levels')) {
+                $stmtLearning = $this->conn->prepare("
+                    SELECT ll.learning_level_id, ll.student_id, ll.instrument_id,
+                           COALESCE(NULLIF(TRIM(it.type_name), ''), i.instrument_name) AS instrument_name,
+                           ll.teacher_id, ll.level_name,
+                           ll.book_material, ll.current_topic, ll.instructor_notes,
+                           ll.skills_developing, ll.areas_for_improvement,
+                           ll.assessment_readiness, ll.status, ll.started_at,
+                           ll.achieved_at, ll.achieved_exam_id,
+                           c.certificate_id, c.certificate_number, c.issued_at
+                    FROM tbl_student_learning_levels ll
+                    LEFT JOIN tbl_instruments i ON i.instrument_id = ll.instrument_id
+                    LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
+                    LEFT JOIN tbl_student_certificates c
+                      ON c.learning_level_id = ll.learning_level_id AND c.status = 'Issued'
+                    WHERE ll.student_id = ?
+                    ORDER BY ll.instrument_id, ll.started_at DESC, ll.learning_level_id DESC
+                ");
+                $stmtLearning->execute([(int)$student['student_id']]);
+                $learningRows = $stmtLearning->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                foreach ($learningRows as $row) {
+                    if (($row['status'] ?? '') === 'In Progress') $learningProgress[] = $row;
+                    else $learningHistory[] = $row;
+                }
+            }
+            if ($this->tableExists('tbl_promotional_exams')) {
+                $stmtExams = $this->conn->prepare("
+                    SELECT pe.exam_id, pe.instrument_id,
+                           COALESCE(NULLIF(TRIM(it.type_name), ''), i.instrument_name) AS instrument_name,
+                           pe.learning_level_id, pe.assessed_level, pe.exam_date,
+                           pe.grade_rating, pe.result, pe.examiner_notes
+                    FROM tbl_promotional_exams pe
+                    LEFT JOIN tbl_instruments i ON i.instrument_id = pe.instrument_id
+                    LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
+                    WHERE pe.student_id = ?
+                    ORDER BY pe.exam_date DESC, pe.exam_id DESC
+                ");
+                $stmtExams->execute([(int)$student['student_id']]);
+                $promotionalExams = $stmtExams->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (PDOException $e) {
+            $learningProgress = [];
+            $learningHistory = [];
+            $promotionalExams = [];
         }
 
         return [
@@ -3743,15 +3936,22 @@ class StudentsApi
             'current_enrollment' => $currentEnrollment,
             'enrollment_history' => $enrollmentHistory,
             'current_session_grades' => $currentSessionGrades,
+            'learning_progress' => $learningProgress,
+            'learning_history' => $learningHistory,
+            'promotional_exams' => $promotionalExams,
+            'latest_session_extension_request' => $this->getLatestStudentSessionExtensionRequest((int)$student['student_id']),
             'certificate' => [
-                'available' => !empty($currentEnrollment['certificate_available']) ? true : false,
-                'completed_sessions' => isset($currentEnrollment['certificate_completed_sessions']) ? (int)$currentEnrollment['certificate_completed_sessions'] : 0,
-                'required_sessions' => isset($currentEnrollment['certificate_required_sessions']) ? (int)$currentEnrollment['certificate_required_sessions'] : 0,
-                'enrollment_status' => $currentEnrollment['status'] ?? null,
-                'package_name' => $currentEnrollment['package_name'] ?? null,
+                'available' => $issuedCertificate !== null,
+                'certificate_id' => $issuedCertificate['certificate_id'] ?? null,
+                'certificate_number' => $issuedCertificate['certificate_number'] ?? null,
+                'achieved_level' => $issuedCertificate['achieved_level'] ?? null,
+                'instrument_name' => $issuedCertificate['instrument_name'] ?? null,
+                'promotional_exam_id' => $issuedCertificate['promotional_exam_id'] ?? null,
+                'exam_date' => $issuedCertificate['exam_date'] ?? null,
+                'exam_result' => $issuedCertificate['exam_result'] ?? null,
                 'student_name' => trim((string)($student['first_name'] ?? '') . ' ' . (string)($student['last_name'] ?? '')),
-                'teacher_name' => trim((string)($currentEnrollment['teacher_first_name'] ?? '') . ' ' . (string)($currentEnrollment['teacher_last_name'] ?? '')),
-                'issue_date' => $currentEnrollment['end_date'] ?? date('Y-m-d')
+                'teacher_name' => trim((string)($issuedCertificate['issuing_teacher_name'] ?? '')),
+                'issue_date' => $issuedCertificate['issued_at'] ?? null
             ]
         ];
     }
@@ -4607,7 +4807,8 @@ class StudentsApi
                 $this->conn->exec("
                     INSERT INTO tbl_session_packages (package_name, sessions, max_instruments, price, description) VALUES
                     ('Basic (12 Sessions)', 12, 1, 7450.00, '1 instrument only'),
-                    ('Standard (20 Sessions)', 20, 2, 11800.00, '2 instruments')
+                    ('Standard (20 Sessions)', 20, 2, 11800.00, 'Up to 2 instruments'),
+                    ('Premium (50 Sessions)', 50, 3, 29500.00, 'Up to 3 instruments')
                 ");
             }
         } catch (PDOException $e) {
@@ -4623,6 +4824,7 @@ class StudentsApi
         }
 
         $email = trim($_GET['email'] ?? '');
+        $staffContext = !empty($_GET['staff_context']);
         if ($email === '') {
             $this->sendJSON(['error' => 'Email is required'], 400);
         }
@@ -4778,10 +4980,12 @@ class StudentsApi
                 $packages = [];
             }
 
-            if ($isInitialEnrollment) {
+            // Normal online enrollment always exposes the basic 12-session,
+            // one-instrument product. Promotions remain staff-controlled.
+            if (!$staffContext) {
                 $packages = $this->filterInitialEnrollmentPackages($packages);
             }
-            $defaultPackageId = $this->getDefaultEnrollmentPackageId($packages, $isInitialEnrollment);
+            $defaultPackageId = $this->getDefaultEnrollmentPackageId($packages, !$staffContext);
 
             // Instruments for student's branch
             try {
@@ -4916,21 +5120,16 @@ class StudentsApi
         $isMultipart = $this->isMultipartRequest();
         $data = $isMultipart ? ($_POST ?: []) : (json_decode(file_get_contents('php://input'), true) ?: []);
         $studentId = (int)($data['student_id'] ?? 0);
-        $preferredDay = trim((string)($data['preferred_day_of_week'] ?? ''));
-        $preferredStartTime = trim((string)($data['preferred_start_time'] ?? ''));
+        $requestedSessions = (int)($data['requested_sessions'] ?? 0);
         $paymentMethod = $this->normalizeEnrollmentPaymentMethod((string)($data['payment_method'] ?? 'Cash'));
         $notes = trim((string)($data['notes'] ?? ''));
-        $requestedAmount = 650.00;
-        $validDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+        $requestedAmount = $requestedSessions * 650.00;
 
         if ($studentId < 1) {
             $this->sendJSON(['error' => 'student_id is required'], 400);
         }
-        if ($preferredDay === '' || !in_array($preferredDay, $validDays, true)) {
-            $this->sendJSON(['error' => 'Please choose a valid preferred day.'], 400);
-        }
-        if ($preferredStartTime === '') {
-            $this->sendJSON(['error' => 'Please choose a preferred start time.'], 400);
+        if ($requestedSessions < 1 || $requestedSessions > 50) {
+            $this->sendJSON(['error' => 'Choose between 1 and 50 additional sessions.'], 400);
         }
         if (!in_array($paymentMethod, ['Cash', 'GCash', 'Bank Transfer', 'Other'], true)) {
             $paymentMethod = 'Cash';
@@ -4962,6 +5161,19 @@ class StudentsApi
             }
             if (strcasecmp((string)($student['status'] ?? ''), 'Active') !== 0) {
                 $this->sendJSON(['error' => 'Student account is not active yet'], 400);
+            }
+
+            $stmtEnrollment = $this->conn->prepare("
+                SELECT enrollment_id, status
+                FROM tbl_enrollments
+                WHERE student_id = ? AND status IN ('Active','Completed')
+                ORDER BY enrollment_id DESC
+                LIMIT 1
+            ");
+            $stmtEnrollment->execute([$studentId]);
+            $enrollment = $stmtEnrollment->fetch(PDO::FETCH_ASSOC);
+            if (!$enrollment) {
+                $this->sendJSON(['error' => 'An approved enrollment is required before requesting additional sessions.'], 400);
             }
 
             $this->ensureStudentSessionExtensionRequestsTable();
@@ -5006,35 +5218,25 @@ class StudentsApi
                 }
             }
 
-            $start = DateTime::createFromFormat('H:i:s', $preferredStartTime) ?: DateTime::createFromFormat('H:i', $preferredStartTime);
-            if (!$start) {
-                $this->sendJSON(['error' => 'Please choose a valid preferred start time.'], 400);
-            }
-            $end = clone $start;
-            $end->modify('+1 hour');
-
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_student_session_extension_requests (
                     student_id,
                     branch_id,
+                    enrollment_id,
                     requested_sessions,
                     requested_amount,
-                    preferred_day_of_week,
-                    preferred_start_time,
-                    preferred_end_time,
                     payment_method,
                     payment_proof_path,
                     notes,
                     status
-                ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, 'Pending')
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
             ");
             $stmt->execute([
                 $studentId,
                 (int)($student['branch_id'] ?? 0),
+                (int)$enrollment['enrollment_id'],
+                $requestedSessions,
                 $requestedAmount,
-                $preferredDay,
-                $start->format('H:i:s'),
-                $end->format('H:i:s'),
                 $paymentMethod,
                 $paymentProofPath,
                 $notes !== '' ? $notes : null
@@ -5043,8 +5245,9 @@ class StudentsApi
             $requestId = (int)$this->conn->lastInsertId();
             $this->sendJSON([
                 'success' => true,
-                'message' => 'Your 1-hour session request has been submitted for review.',
+                'message' => "Your request for {$requestedSessions} additional session" . ($requestedSessions === 1 ? '' : 's') . ' has been submitted for review.',
                 'request_id' => $requestId,
+                'requested_sessions' => $requestedSessions,
                 'requested_amount' => $requestedAmount
             ]);
         } catch (PDOException $e) {
@@ -5186,6 +5389,14 @@ class StudentsApi
                 $this->sendJSON(['error' => 'You can add up to 50 extra sessions.'], 400);
             }
             $extraSessionCount = max(0, $totalSessions - $packageSessions);
+            if (!$isWalkinRequest) {
+                if ($packageSessions !== 12 || $totalSessions !== 12) {
+                    $this->sendJSON(['error' => 'Normal online enrollment is limited to the 12-session basic package. Additional sessions must be requested from Enrollment Details after approval.'], 400);
+                }
+                if (count($instrumentIds) !== 1) {
+                    $this->sendJSON(['error' => 'Normal online enrollment includes one instrument.'], 400);
+                }
+            }
             if ($isInitialEnrollment) {
                 if ($packageSessions !== 12) {
                     $this->sendJSON(['error' => 'Initial enrollment must use the 12-session package.'], 400);
@@ -5358,7 +5569,8 @@ class StudentsApi
             $this->conn->beginTransaction();
 
             $stmt = $this->conn->prepare("
-                SELECT r.request_id, r.student_id, r.branch_id, r.status, r.notes
+                SELECT r.request_id, r.student_id, r.branch_id, r.enrollment_id,
+                       r.requested_sessions, r.requested_amount, r.status, r.notes
                 FROM tbl_student_session_extension_requests r
                 WHERE r.request_id = ?
                 LIMIT 1
@@ -5379,6 +5591,37 @@ class StudentsApi
             if ($branchId > 0 && (int)($request['branch_id'] ?? 0) !== $branchId) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Request does not belong to your branch'], 403);
+            }
+
+            $enrollmentId = (int)($request['enrollment_id'] ?? 0);
+            if ($enrollmentId < 1) {
+                $stmtEnrollment = $this->conn->prepare("
+                    SELECT enrollment_id
+                    FROM tbl_enrollments
+                    WHERE student_id = ? AND status IN ('Active','Completed')
+                    ORDER BY enrollment_id DESC LIMIT 1
+                    FOR UPDATE
+                ");
+                $stmtEnrollment->execute([(int)$request['student_id']]);
+                $enrollmentId = (int)$stmtEnrollment->fetchColumn();
+            }
+            if ($enrollmentId < 1) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'The approved enrollment for this request no longer exists.'], 400);
+            }
+
+            $additionalSessions = max(1, (int)($request['requested_sessions'] ?? 1));
+            $stmtEnrollmentUpdate = $this->conn->prepare("
+                UPDATE tbl_enrollments
+                SET total_sessions = COALESCE(total_sessions, 0) + ?,
+                    status = CASE WHEN status = 'Completed' THEN 'Active' ELSE status END,
+                    schedule_status = CASE WHEN schedule_status = 'Ended' THEN 'Active' ELSE schedule_status END
+                WHERE enrollment_id = ? AND student_id = ? AND status IN ('Active','Completed')
+            ");
+            $stmtEnrollmentUpdate->execute([$additionalSessions, $enrollmentId, (int)$request['student_id']]);
+            if ($stmtEnrollmentUpdate->rowCount() === 0) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Unable to update the purchased session balance.'], 400);
             }
 
             $meta = [];
@@ -5406,7 +5649,7 @@ class StudentsApi
             $this->conn->commit();
             $this->sendJSON([
                 'success' => true,
-                'message' => 'Session extension request approved successfully.'
+                'message' => "Approved {$additionalSessions} additional session" . ($additionalSessions === 1 ? '' : 's') . '. The learning progress record was preserved.'
             ]);
         } catch (PDOException $e) {
             if ($this->conn->inTransaction()) {
@@ -5514,7 +5757,7 @@ class StudentsApi
                     s.email,
                     b.branch_name,
                     COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
-                    COALESCE(sp.sessions, e.total_sessions, 0) AS sessions,
+                    COALESCE(e.total_sessions, sp.sessions, 0) AS sessions,
                     COALESCE(sp.max_instruments, 1) AS max_instruments,
                     COALESCE(sp.price, 0) AS requested_amount
                 FROM tbl_enrollments e
@@ -5640,7 +5883,7 @@ class StudentsApi
                     COALESCE(inst.instrument_name, CONCAT('Instrument #', e.instrument_id)) AS instrument_name,
                     COALESCE(it.type_name, 'Other') AS type_name,
                     COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
-                    COALESCE(sp.sessions, e.total_sessions, 0) AS sessions,
+                    COALESCE(e.total_sessions, sp.sessions, 0) AS sessions,
                     COALESCE(sp.price, 0) AS total_amount,
                     COALESCE(pay.paid_amount, 0) AS paid_amount,
                     COALESCE(pay.payment_type, '—') AS payment_type,
