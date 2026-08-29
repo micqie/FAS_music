@@ -3581,6 +3581,7 @@ class StudentsApi
     {
         $this->ensureStudentRegistrationFeesTable();
         $this->ensureStudentInstrumentsTable();
+        $this->ensureFreezePaymentsTable();
         $this->ensureStudentRegistrationFeesTable();
         $this->ensureStudentAgeVerificationProofColumn();
         $hasRegistrationReferenceColumn = $this->tableHasColumn('tbl_registration_payments', 'reference_number');
@@ -3775,6 +3776,14 @@ class StudentsApi
                     e.allowed_absences,
                     e.used_absences,
                     e.consecutive_absences,
+                    e.schedule_status,
+                    COALESCE((
+                        SELECT fp.status
+                        FROM tbl_freeze_payments fp
+                        WHERE fp.enrollment_id = e.enrollment_id
+                        ORDER BY fp.created_at DESC, fp.freeze_payment_id DESC
+                        LIMIT 1
+                    ), 'None') AS __freeze_payment_status,
                     CASE WHEN COALESCE(e.used_absences, 0) >= GREATEST(
                         CASE
                             WHEN COALESCE(e.allowed_absences, 0) > 0 THEN e.allowed_absences
@@ -4651,6 +4660,14 @@ class StudentsApi
         $email = trim($_GET['email'] ?? '');
         if ($email === '') {
             $this->sendJSON(['error' => 'Email is required'], 400);
+        }
+
+        $actor = fas_require_authenticated_user($this->conn);
+        if (fas_normalize_role_category($actor['role_name'] ?? '') === 'guardian') {
+            $actorEmail = trim((string)($actor['email'] ?? ''));
+            if ($actorEmail === '' || strcasecmp($actorEmail, $email) !== 0) {
+                $this->sendJSON(['error' => 'You can only view students linked to your guardian account'], 403);
+            }
         }
 
         try {
@@ -6106,9 +6123,6 @@ class StudentsApi
                     );
 
                     $isFrozen = strcasecmp((string)($row['schedule_status'] ?? 'Active'), 'Frozen') === 0;
-                    if (strcasecmp((string)($row['freeze_payment_status'] ?? 'None'), 'Paid') === 0) {
-                        $isFrozen = false;
-                    }
                     $row['schedule_freeze_required'] = $isFrozen ? 1 : 0;
                     $row['reservation_fee_amount'] = $isFrozen ? 100 : 0;
                 }
@@ -7562,6 +7576,14 @@ class StudentsApi
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
             ");
         } catch (PDOException $e) { /* table may already exist */ }
+
+        // Preserve old attendance records while starting a new absence cycle
+        // whenever the reservation/freeze payment is settled.
+        try {
+            if ($this->tableExists('tbl_enrollments') && !$this->tableHasColumn('tbl_enrollments', 'absence_reset_at')) {
+                $this->conn->exec("ALTER TABLE tbl_enrollments ADD COLUMN absence_reset_at DATETIME NULL AFTER consecutive_absences");
+            }
+        } catch (PDOException $e) { /* keep payment endpoints available */ }
     }
 
     // ── Student submits freeze payment (online or walkin intent) ──
@@ -7581,6 +7603,65 @@ class StudentsApi
 
         if ($enrollmentId < 1 || $studentId < 1) {
             $this->sendJSON(['error' => 'enrollment_id and student_id are required'], 400);
+        }
+
+        $actor = fas_require_authenticated_user($this->conn);
+        $roleCategory = fas_normalize_role_category($actor['role_name'] ?? '');
+        $staffRoles = ['admin', 'owner', 'manager', 'staff'];
+
+        $stmtEnrollmentOwner = $this->conn->prepare("
+            SELECT 1 FROM tbl_enrollments
+            WHERE enrollment_id = ? AND student_id = ?
+            LIMIT 1
+        ");
+        $stmtEnrollmentOwner->execute([$enrollmentId, $studentId]);
+        if (!$stmtEnrollmentOwner->fetchColumn()) {
+            $this->sendJSON(['error' => 'Enrollment does not belong to this student'], 400);
+        }
+
+        if ($roleCategory === 'guardian') {
+            $stmtGuardianAccess = $this->conn->prepare("
+                SELECT 1
+                FROM tbl_student_guardians sg
+                INNER JOIN tbl_guardians g ON g.guardian_id = sg.guardian_id
+                WHERE sg.student_id = ?
+                  AND (g.guardian_user_id = ? OR sg.guardian_user_id = ? OR (g.guardian_user_id IS NULL AND g.email = ?))
+                LIMIT 1
+            ");
+            $stmtGuardianAccess->execute([
+                $studentId,
+                (int)($actor['user_id'] ?? 0),
+                (int)($actor['user_id'] ?? 0),
+                trim((string)($actor['email'] ?? ''))
+            ]);
+            if (!$stmtGuardianAccess->fetchColumn()) {
+                $this->sendJSON(['error' => 'You are not authorized to pay for this student'], 403);
+            }
+        } elseif ($roleCategory === 'student') {
+            $stmtStudentAccess = $this->conn->prepare("
+                SELECT 1 FROM tbl_students
+                WHERE student_id = ? AND (student_user_id = ? OR email = ?)
+                LIMIT 1
+            ");
+            $stmtStudentAccess->execute([
+                $studentId,
+                (int)($actor['user_id'] ?? 0),
+                trim((string)($actor['email'] ?? ''))
+            ]);
+            if (!$stmtStudentAccess->fetchColumn()) {
+                $this->sendJSON(['error' => 'You can only pay for your own account'], 403);
+            }
+        } elseif (!in_array($roleCategory, $staffRoles, true)) {
+            $this->sendJSON(['error' => 'You are not authorized to submit this payment'], 403);
+        }
+
+        // Student and guardian portals are online-only. Walk-in confirmation is
+        // reserved for authorized staff at the branch.
+        if (!in_array($roleCategory, $staffRoles, true)) {
+            $source = 'online';
+            if ($paymentMethod === 'Cash') {
+                $this->sendJSON(['error' => 'Student and guardian payments must use an online payment method'], 400);
+            }
         }
 
         // Cancel any previous Pending entries so there is only one active request
@@ -7880,10 +7961,16 @@ class StudentsApi
                 UPDATE tbl_enrollments
                 SET schedule_status      = 'Active',
                     used_absences        = 0,
-                    consecutive_absences = 0
+                    consecutive_absences = 0,
+                    absence_reset_at     = NOW(),
+                    current_operation_id = NULL
                 WHERE enrollment_id = ?
             ")->execute([$enrollmentId]);
-        } catch (PDOException $e) { /* non-fatal */ }
+        } catch (PDOException $e) {
+            // Payment approval must not succeed unless the account and counters
+            // were actually restored.
+            throw $e;
+        }
     }
 
     // ── Admin: Record a payment against an active enrollment ─────────

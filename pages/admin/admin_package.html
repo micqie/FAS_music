@@ -211,70 +211,70 @@
     </main>
 
     <!-- Add/Edit Package Modal -->
-    <div id="packageModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <div class="bg-black/90 border border-gold-500/30 rounded-lg shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto p-6 md:p-8 relative">
-            <button id="closePackageModalBtn" class="absolute top-4 right-4 text-zinc-400 hover:text-white">
+    <div id="packageModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto p-6 md:p-8 relative">
+            <button id="closePackageModalBtn" type="button" aria-label="Close package form" class="absolute top-4 right-4 grid h-9 w-9 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition">
                 <i class="fas fa-times text-xl"></i>
             </button>
 
-            <h3 class="text-2xl font-bold text-white mb-2" id="packageModalTitle">Add Session Package</h3>
-            <p class="text-zinc-400 text-xs mb-4">Define sessions and how many instruments the student can pick for this package.</p>
+            <h3 class="text-2xl font-bold text-slate-900 mb-2 pr-12" id="packageModalTitle">Add Session Package</h3>
+            <p class="text-slate-500 text-sm mb-5">Define the session allowance and number of instruments included.</p>
 
             <div id="packageMessage" class="hidden mb-4 p-3 rounded text-sm"></div>
 
             <form id="packageForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                 <input type="hidden" id="packageId" value="">
                 <div class="md:col-span-1">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Branch *</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Branch *</label>
                     <select id="packageBranchId" required
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/15">
                         <option value="">Select branch...</option>
                     </select>
-                    <p class="text-xs text-zinc-500 mt-1">Branch is required. Packages are managed per branch.</p>
+                    <p class="text-xs text-slate-500 mt-1">Packages are managed per branch.</p>
                 </div>
                 <div class="md:col-span-1">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Package Name *</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Package Name *</label>
                     <input type="text" id="packageName" required
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/15"
                         placeholder="Package name">
                 </div>
                 <div class="md:col-span-1">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Number of Sessions *</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Number of Sessions *</label>
                     <input type="number" id="packageSessions" min="1" required
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/15"
                         placeholder="Number of sessions">
                 </div>
                 <div class="md:col-span-1">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Max Instruments *</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Max Instruments *</label>
                     <select id="packageMaxInstruments" required
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400">
+                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/15">
                         <option value="1">1 instrument</option>
                         <option value="2">2 instruments</option>
                         <option value="3">3 instruments</option>
                     </select>
-                    <p class="text-xs text-zinc-500 mt-1">12 sessions → 1, 20 sessions → 2, 20+ → 3</p>
+                    <p class="text-xs text-slate-500 mt-1">12 sessions → 1, 20 sessions → 2, 20+ → 3</p>
                 </div>
                 <div class="md:col-span-1">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Price (PHP) *</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Price (PHP) *</label>
                     <input type="number" id="packagePrice" min="0" step="0.01" required
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/15"
                         placeholder="0.00">
-                    <p class="text-xs text-zinc-500 mt-1">Used for student payment calculations</p>
+                    <p class="text-xs text-slate-500 mt-1">Used for student payment calculations.</p>
                 </div>
 
                 <div class="md:col-span-1">
-                    <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Description</label>
                     <textarea id="packageDescription" rows="3"
-                        class="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-gold-400"
+                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/15"
                         placeholder="Optional"></textarea>
                 </div>
                 <div class="md:col-span-2 flex items-center justify-end gap-3 pt-2">
                     <button type="button" id="cancelPackageBtn"
-                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-lg transition">
+                        class="px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition">
                         Cancel
                     </button>
                     <button type="submit" id="submitPackageBtn"
-                        class="inline-flex items-center px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-lg shadow transition">
+                        class="inline-flex items-center px-6 py-2.5 bg-gold-500 hover:bg-gold-400 text-black text-sm font-semibold rounded-xl shadow-sm transition">
                         <span id="submitPackageBtnText">Save Package</span>
                     </button>
                 </div>

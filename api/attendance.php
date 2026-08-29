@@ -303,6 +303,7 @@ class AttendanceApi
                 'allowed_absences' => "ALTER TABLE tbl_enrollments ADD COLUMN allowed_absences INT NOT NULL DEFAULT 0 AFTER total_sessions",
                 'used_absences' => "ALTER TABLE tbl_enrollments ADD COLUMN used_absences INT NOT NULL DEFAULT 0 AFTER allowed_absences",
                 'consecutive_absences' => "ALTER TABLE tbl_enrollments ADD COLUMN consecutive_absences INT NOT NULL DEFAULT 0 AFTER used_absences",
+                'absence_reset_at' => "ALTER TABLE tbl_enrollments ADD COLUMN absence_reset_at DATETIME NULL AFTER consecutive_absences",
                 'schedule_status' => "ALTER TABLE tbl_enrollments ADD COLUMN schedule_status ENUM('Active','Frozen','Ended') NOT NULL DEFAULT 'Active' AFTER status",
                 'current_operation_id' => "ALTER TABLE tbl_enrollments ADD COLUMN current_operation_id INT NULL AFTER fixed_schedule_locked"
             ];
@@ -828,7 +829,7 @@ class AttendanceApi
         }
 
         $stmtEnrollment = $this->conn->prepare("
-            SELECT enrollment_id, total_sessions, allowed_absences, status
+            SELECT enrollment_id, total_sessions, allowed_absences, absence_reset_at, status
             FROM tbl_enrollments
             WHERE enrollment_id = ?
             LIMIT 1
@@ -839,6 +840,34 @@ class AttendanceApi
             return;
         }
 
+        // Backfill the reset boundary for payments approved before this column
+        // existed. This repairs already-paid accounts without deleting history.
+        if (empty($enrollment['absence_reset_at']) && $this->tableExists('tbl_freeze_payments')) {
+            try {
+                $stmtPaidReset = $this->conn->prepare("
+                    SELECT COALESCE(reviewed_at, CONCAT(payment_date, ' 23:59:59'), created_at)
+                    FROM tbl_freeze_payments
+                    WHERE enrollment_id = ? AND status = 'Paid'
+                    ORDER BY COALESCE(reviewed_at, created_at) DESC, freeze_payment_id DESC
+                    LIMIT 1
+                ");
+                $stmtPaidReset->execute([$enrollmentId]);
+                $paidResetAt = trim((string)($stmtPaidReset->fetchColumn() ?: ''));
+                if ($paidResetAt !== '') {
+                    $this->conn->prepare("
+                        UPDATE tbl_enrollments
+                        SET absence_reset_at = ?, used_absences = 0,
+                            consecutive_absences = 0, schedule_status = 'Active',
+                            current_operation_id = NULL
+                        WHERE enrollment_id = ? AND absence_reset_at IS NULL
+                    ")->execute([$paidResetAt, $enrollmentId]);
+                    $enrollment['absence_reset_at'] = $paidResetAt;
+                }
+            } catch (PDOException $e) {
+                // Continue with the stored policy state if legacy repair fails.
+            }
+        }
+
         $allowedAbsences  = $this->getAllowedAbsencesForEnrollment($enrollment);
         $freezeThreshold  = $allowedAbsences > 0 ? $allowedAbsences : 3; // use policy-based limit; fallback to 3
         $freezeTriggered = false;
@@ -846,7 +875,7 @@ class AttendanceApi
         $usedAbsences = 0;
 
         $stmtSessions = $this->conn->prepare("
-            SELECT session_date, session_number, status, attendance_status, absence_notice
+            SELECT session_date, start_time, session_number, status, attendance_status, absence_notice
             FROM tbl_sessions
             WHERE enrollment_id = ?
             ORDER BY session_date ASC, session_number ASC, session_id ASC
@@ -854,11 +883,21 @@ class AttendanceApi
         $stmtSessions->execute([$enrollmentId]);
         $sessions = $stmtSessions->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $todayYmd = date('Y-m-d');
+        $absenceResetAt = trim((string)($enrollment['absence_reset_at'] ?? ''));
 
         foreach ($sessions as $session) {
             $sessionDate = (string)($session['session_date'] ?? '');
             if ($sessionDate === '' || $sessionDate > $todayYmd) {
                 continue;
+            }
+
+            // Payment starts a fresh policy cycle without deleting attendance history.
+            if ($absenceResetAt !== '') {
+                $sessionTime = trim((string)($session['start_time'] ?? ''));
+                $sessionOccurredAt = $sessionDate . ' ' . ($sessionTime !== '' ? $sessionTime : '23:59:59');
+                if ($sessionOccurredAt <= $absenceResetAt) {
+                    continue;
+                }
             }
 
             $status = strtolower(trim((string)($session['status'] ?? '')));
@@ -988,7 +1027,8 @@ class AttendanceApi
             }
         }
 
-        $frozen = strcasecmp($scheduleStatus, 'Frozen') === 0 && strcasecmp($freezePaymentStatus, 'Paid') !== 0;
+        // An older Paid record must not unlock a later freeze caused by new absences.
+        $frozen = strcasecmp($scheduleStatus, 'Frozen') === 0;
         $amount = 100;
 
         return [
