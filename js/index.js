@@ -117,6 +117,112 @@ let appBaseUrl;
     }
 })();
 
+// Keep password feedback consistent across account creation, reset, and
+// change-password forms. The observer also covers dialogs rendered later by
+// SweetAlert and role-specific page scripts.
+(function initSharedPasswordStrengthMeters() {
+    const MANAGED_REFERENCE_IDS = new Set([
+        'registerPassword',
+        'guardian-new-password',
+        'guardian-custom-password'
+    ]);
+
+    const normalizePasswordFieldKey = (input) => String([
+        input?.id,
+        input?.name,
+        input?.getAttribute?.('autocomplete'),
+        input?.getAttribute?.('placeholder')
+    ].filter(Boolean).join(' ')).toLowerCase();
+
+    const isNewPasswordField = (input) => {
+        if (!(input instanceof HTMLInputElement) || input.type !== 'password') return false;
+        if (MANAGED_REFERENCE_IDS.has(input.id) || input.dataset.passwordStrengthReady === '1') return false;
+
+        const key = normalizePasswordFieldKey(input);
+        if (/confirm|current|old|login/.test(key)) return false;
+        if (/new|create|set|password/.test(key) === false) return false;
+
+        const scope = input.closest('form, .swal2-popup, [role="dialog"], .fixed') || document;
+        return Array.from(scope.querySelectorAll('input[type="password"]')).some((candidate) => {
+            if (candidate === input) return false;
+            return /confirm/.test(normalizePasswordFieldKey(candidate));
+        });
+    };
+
+    const getStrengthState = (password) => {
+        if (!password) return { label: 'Password strength', color: '#d4d4d8', filled: 0 };
+
+        let score = 0;
+        if (password.length >= 8) score++;
+        if (/[A-Z]/.test(password)) score++;
+        if (/[a-z]/.test(password)) score++;
+        if (/[0-9]/.test(password)) score++;
+        if (/[!@#$%^&*]/.test(password)) score++;
+
+        if (score <= 2) return { label: 'Weak password', color: '#ef4444', filled: 1 };
+        if (score <= 4) return { label: 'Medium password', color: '#eab308', filled: 3 };
+        return { label: 'Strong password', color: '#16a34a', filled: 4 };
+    };
+
+    const enhancePasswordField = (input) => {
+        if (!isNewPasswordField(input)) return;
+        input.dataset.passwordStrengthReady = '1';
+
+        const meter = document.createElement('div');
+        meter.className = 'fas-password-strength';
+        meter.setAttribute('aria-live', 'polite');
+        meter.style.cssText = 'margin-top:8px;padding:10px 12px;border:1px solid #e4e4e7;border-radius:12px;background:#fafafa;text-align:left;';
+        meter.innerHTML = `
+            <div style="display:flex;gap:5px" aria-hidden="true">
+                <span data-strength-bar style="height:4px;flex:1;border-radius:999px;background:#d4d4d8"></span>
+                <span data-strength-bar style="height:4px;flex:1;border-radius:999px;background:#d4d4d8"></span>
+                <span data-strength-bar style="height:4px;flex:1;border-radius:999px;background:#d4d4d8"></span>
+                <span data-strength-bar style="height:4px;flex:1;border-radius:999px;background:#d4d4d8"></span>
+            </div>
+            <p data-strength-label style="margin:6px 0 0;font-size:12px;line-height:1.25;color:#71717a">Password strength</p>`;
+        input.insertAdjacentElement('afterend', meter);
+
+        const bars = Array.from(meter.querySelectorAll('[data-strength-bar]'));
+        const label = meter.querySelector('[data-strength-label]');
+        const update = () => {
+            const state = getStrengthState(String(input.value || ''));
+            bars.forEach((bar, index) => {
+                bar.style.background = index < state.filled ? state.color : '#d4d4d8';
+            });
+            label.textContent = state.label;
+            label.style.color = state.filled ? state.color : '#71717a';
+        };
+
+        input.addEventListener('input', update);
+        update();
+    };
+
+    const scan = (root = document) => {
+        if (root instanceof HTMLInputElement && root.type === 'password') {
+            enhancePasswordField(root);
+        }
+        if (root.querySelectorAll) {
+            root.querySelectorAll('input[type="password"]').forEach(enhancePasswordField);
+        }
+    };
+
+    const start = () => {
+        scan(document);
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === Node.ELEMENT_NODE) scan(node);
+            }));
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start, { once: true });
+    } else {
+        start();
+    }
+})();
+
 let currentStudentId = null;
 let currentPaymentRedirectUrl = '';
 let currentPaymentSource = '';
@@ -640,6 +746,35 @@ function validatePassword() {
     updateRequirement('req-number', requirements.number);
     updateRequirement('req-special', requirements.special);
 
+    const strengthBars = Array.from(document.querySelectorAll('[data-register-strength-bar]'));
+    const strengthText = document.getElementById('registerPasswordStrengthText');
+    const score = Object.values(requirements).filter(Boolean).length;
+    let strengthLabel = 'Password strength';
+    let strengthColor = '#d4d4d8';
+    let filledBars = 0;
+
+    if (password && score <= 2) {
+        strengthLabel = 'Weak password';
+        strengthColor = '#ef4444';
+        filledBars = 1;
+    } else if (password && score <= 4) {
+        strengthLabel = 'Medium password';
+        strengthColor = '#eab308';
+        filledBars = 3;
+    } else if (password) {
+        strengthLabel = 'Strong password';
+        strengthColor = '#16a34a';
+        filledBars = 4;
+    }
+
+    strengthBars.forEach((bar, index) => {
+        bar.style.backgroundColor = index < filledBars ? strengthColor : '#d4d4d8';
+    });
+    if (strengthText) {
+        strengthText.textContent = strengthLabel;
+        strengthText.style.color = filledBars ? strengthColor : '';
+    }
+
     // Validate password match if confirm field has value
     if (document.getElementById('registerPasswordConfirm')?.value) {
         validatePasswordMatch();
@@ -655,11 +790,11 @@ function updateRequirement(id, met) {
 
     const icon = element.querySelector('i');
     if (met) {
-        icon.classList.remove('fa-circle', 'text-zinc-600');
+        icon.classList.remove('fa-circle', 'text-zinc-300', 'text-zinc-600');
         icon.classList.add('fa-check-circle', 'text-green-500');
     } else {
         icon.classList.remove('fa-check-circle', 'text-green-500');
-        icon.classList.add('fa-circle', 'text-zinc-600');
+        icon.classList.add('fa-circle', 'text-zinc-300');
     }
 }
 
@@ -4116,7 +4251,7 @@ function getGuardianSessionRows(item) {
 }
 
 function getGuardianLatestCompletedSessionRow(item) {
-    const rows = getGuardianSessionRows(item).filter((row) => getGuardianSessionCompletionState(row) === 'completed');
+    const rows = getGuardianSessionRows(item).filter((row) => String(row?.instructor_completed_at || '').trim() !== '');
     return rows.length > 0 ? rows[rows.length - 1] : null;
 }
 
@@ -6041,16 +6176,24 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
 
     const regStatus = String(student.registration_status || 'Pending');
     const profileComplete = isRegistrationProfileComplete(student);
+    const registrationApproved = ['Approved', 'Fee Paid'].includes(regStatus);
+
+    // The same modal is reused for different linked students. Clear any disabled
+    // state left by a previously viewed ineligible or pending student.
+    submitBtn.disabled = false;
+    submitBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+
+    if (registrationApproved && !profileComplete) {
+        // Admin approval is authoritative. Older approved records may not have
+        // every optional profile field populated, but can still enroll.
+        statusEl.innerHTML += '<div class="mt-2 text-xs text-slate-500">Registration approved. You may continue with enrollment.</div>';
+    }
 
     if (String(student.status || '') !== 'Active') {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
         statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Your student account is not active yet. Please contact desk/admin.</div>';
-    } else if (!profileComplete) {
-        submitBtn.disabled = true;
-        submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
-        statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Complete your registration details before requesting enrollment.</div>';
-    } else if (!['Approved', 'Fee Paid'].includes(regStatus)) {
+    } else if (!registrationApproved) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
         statusEl.innerHTML += '<div class="text-xs text-yellow-300 mt-2">Registration payment must be completed before enrollment.</div>';
@@ -6660,6 +6803,21 @@ function renderStudentRegistrationModal(student, portal) {
                             </div>
                             <div id="guardianInputs" class="space-y-2.5 sm:space-y-3 hidden min-w-0">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 min-w-0">
+                                    <div class="min-w-0 md:col-span-2">
+                                        <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Guardian Email *</label>
+                                        <div class="flex flex-col gap-2 sm:flex-row">
+                                            <div class="relative min-w-0 flex-1">
+                                                <input id="guardianEmailInput" type="email" autocomplete="email" placeholder="guardian@example.com" class="w-full min-w-0 px-3 py-2.5 pr-11 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-gold-500" />
+                                                <button type="button" id="guardianCopyEmailBtn" aria-label="Copy guardian email" title="Copy email" class="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-white">
+                                                    <i class="far fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <button type="button" id="guardianFindBtn" class="shrink-0 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-xs font-bold text-zinc-700 hover:border-gold-400 hover:bg-gold-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                                                Find existing
+                                            </button>
+                                        </div>
+                                        <p id="guardianInfoBox" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></p>
+                                    </div>
                                     <div class="min-w-0">
                                         <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">First Name *</label>
                                         <input id="guardianFirstNameInput" class="w-full min-w-0 px-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-base sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" />
@@ -7183,6 +7341,7 @@ function wireStudentOnboardingActions(student, meta, portal) {
     const guardianPhoneInput = document.getElementById('guardianPhoneInput');
     const guardianRelationshipInput = document.getElementById('guardianRelationshipInput');
     const guardianEmailInput = document.getElementById('guardianEmailInput');
+    const guardianCopyEmailBtn = document.getElementById('guardianCopyEmailBtn');
     const guardianFindBtn = document.getElementById('guardianFindBtn');
     const guardianInfoBox = document.getElementById('guardianInfoBox');
     const regForm = document.getElementById('registrationDetailsForm');
@@ -7255,6 +7414,25 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 if (guardianRelationshipInput) guardianRelationshipInput.value = g.relationship_type || '';
             } else {
                 guardianInfoBox.textContent = res.error || 'Guardian not found.';
+            }
+        };
+    }
+
+    if (guardianCopyEmailBtn && guardianEmailInput) {
+        guardianCopyEmailBtn.onclick = async () => {
+            const email = guardianEmailInput.value.trim();
+            if (!email) {
+                showMessage('Enter the guardian email first.', 'error');
+                guardianEmailInput.focus();
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(email);
+                showMessage('Guardian email copied.', 'success');
+            } catch (error) {
+                guardianEmailInput.select();
+                document.execCommand('copy');
+                showMessage('Guardian email copied.', 'success');
             }
         };
     }
@@ -7385,6 +7563,11 @@ function wireStudentOnboardingActions(student, meta, portal) {
             if (guardianRequired) {
                 if (!guardianEmailInput?.value?.trim()) {
                     showMessage('Guardian email is required.', 'error');
+                    return;
+                }
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmailInput.value.trim())) {
+                    showMessage('Enter a valid guardian email address.', 'error');
+                    guardianEmailInput.focus();
                     return;
                 }
                 if (!guardianFirstNameInput?.value?.trim() || !guardianLastNameInput?.value?.trim() || !(window.FasIntlPhone?.getValue(guardianPhoneInput) || guardianPhoneInput?.value?.trim()) || !guardianRelationshipInput?.value?.trim()) {
@@ -8885,18 +9068,21 @@ async function openGuardianAdditionalSessions(index) {
 
     const result = await Swal.fire({
         title: 'Request Additional Sessions',
-        width: 560,
+        width: 480,
         confirmButtonText: 'Submit Request',
         showCancelButton: true,
         confirmButtonColor: '#d4a62a',
+        customClass: {
+            popup: 'guardian-additional-sessions-popup'
+        },
         html: `
-            <div class="text-left space-y-4">
-                <p class="text-sm text-zinc-600">For <strong>${escapeHtml(`${student.first_name || ''} ${student.last_name || ''}`.trim() || 'student')}</strong>. Each additional session costs ₱650. Scheduling remains separate.</p>
-                <div><label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Number of sessions</label><input id="guardianAdditionalQuantity" type="number" min="1" max="50" value="1" class="swal2-input !m-0 !w-full"></div>
-                <div><label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Payment method</label><select id="guardianAdditionalPaymentMethod" class="swal2-select !m-0 !w-full"><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option><option value="Cash">Cash</option></select></div>
-                <div><label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Payment proof</label><input id="guardianAdditionalProof" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="block w-full text-sm"><div class="mt-1 text-xs text-zinc-500">Required for GCash and Bank Transfer.</div></div>
-                <div><label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Notes (optional)</label><textarea id="guardianAdditionalNotes" class="swal2-textarea !m-0 !w-full" rows="2"></textarea></div>
-                <div class="rounded-xl bg-amber-50 px-4 py-3"><span class="text-sm text-zinc-600">Request total:</span> <strong id="guardianAdditionalTotal" class="float-right">₱650.00</strong></div>
+            <div class="space-y-3 text-left">
+                <p class="text-sm leading-5 text-zinc-600"><strong>${escapeHtml(`${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student')}</strong> · ₱650 per session</p>
+                <div><label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Number of sessions</label><input id="guardianAdditionalQuantity" type="number" min="1" max="50" value="1" class="swal2-input guardian-additional-field !m-0 !w-full"></div>
+                <div><label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Payment method</label><select id="guardianAdditionalPaymentMethod" class="swal2-select guardian-additional-field !m-0 !w-full"><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option><option value="Cash">Cash</option></select></div>
+                <div><label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Payment proof</label><input id="guardianAdditionalProof" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="block w-full text-xs"><div class="mt-1 text-[11px] text-zinc-500">Required for GCash and bank transfer.</div></div>
+                <div><label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Notes <span class="font-medium normal-case tracking-normal">(optional)</span></label><textarea id="guardianAdditionalNotes" class="swal2-textarea guardian-additional-field !m-0 !w-full" rows="2"></textarea></div>
+                <div class="flex items-center justify-between rounded-xl bg-amber-50 px-3.5 py-2.5"><span class="text-sm text-zinc-600">Total</span><strong id="guardianAdditionalTotal" class="text-base">₱650.00</strong></div>
             </div>`,
         didOpen: () => {
             const quantity = document.getElementById('guardianAdditionalQuantity');
@@ -10017,7 +10203,9 @@ function notifyGuardianSessionCompletion(row, studentName = 'A linked student') 
     const sessionId = Number(row?.session_id || 0);
     if (sessionId < 1 || !isGuardianSessionCompletionTrackable(row)) return false;
 
-    const currentState = getGuardianSessionCompletionState(row);
+    const currentState = String(row?.instructor_completed_at || '').trim() !== ''
+        ? 'completed'
+        : 'pending';
     const previousState = readGuardianSessionToastState(sessionId);
     writeGuardianSessionToastState(sessionId, currentState);
 
@@ -10518,7 +10706,7 @@ function renderRegistrationsTable() {
             </tr>
         `;
     }).join('');
-    
+
     // Add event delegation for proof view buttons in table
     setTimeout(() => {
         if (!tbody.dataset.proofListenerAdded) {
@@ -10729,7 +10917,7 @@ async function viewDetails(studentId) {
             document.getElementById('detailsModal').classList.remove('hidden');
             document.getElementById('detailsModal').classList.add('flex');
             document.body.classList.add('overflow-hidden');
-            
+
             // Add event delegation for proof viewing buttons
             setTimeout(() => {
                 const detailsContent = document.getElementById('detailsContent');
@@ -10756,7 +10944,7 @@ async function viewDetails(studentId) {
 // Open Proof Viewer Modal
 function openProofViewerModal(proofUrl, title) {
     const modal = document.getElementById('proofViewerModal');
-    
+
     if (!modal) {
         // Create compact modal with higher z-index
         const modalHTML = `
@@ -10780,24 +10968,24 @@ function openProofViewerModal(proofUrl, title) {
         `;
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     }
-    
+
     const actualModal = document.getElementById('proofViewerModal');
     const actualIframe = document.getElementById('proofViewerIframe');
     const actualImage = document.getElementById('proofViewerImage');
     const actualTitle = document.getElementById('proofViewerTitle');
     const loadingEl = document.getElementById('proofViewerLoading');
-    
+
     if (actualTitle) actualTitle.textContent = title;
-    
+
     // Check if it's an image or PDF
     const isImage = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(proofUrl);
-    
+
     if (isImage && actualImage) {
         // Display as image for better fitting
         actualImage.style.display = 'block';
         if (actualIframe) actualIframe.style.display = 'none';
         if (loadingEl) loadingEl.style.display = 'flex';
-        
+
         actualImage.onload = () => {
             if (loadingEl) loadingEl.style.display = 'none';
         };
@@ -10818,7 +11006,7 @@ function openProofViewerModal(proofUrl, title) {
         if (loadingEl) loadingEl.style.display = 'none';
         actualIframe.src = proofUrl;
     }
-    
+
     if (actualModal) {
         actualModal.classList.remove('hidden');
         actualModal.classList.add('flex');

@@ -523,7 +523,12 @@ class TeachersApi
     {
         $raw = trim((string)$value);
         if ($raw === '') return '';
-        $allowed = ['Needs Improvement', 'Developing', 'Good', 'Very Good', 'Excellent'];
+        // Keep accepting the legacy evaluation labels while supporting the
+        // current instructor grading UI's overall-level choices.
+        $allowed = [
+            'Beginner', 'Developing', 'Proficient', 'Advanced',
+            'Needs Improvement', 'Good', 'Very Good', 'Excellent'
+        ];
         foreach ($allowed as $item) {
             if (strcasecmp($raw, $item) === 0) {
                 return $item;

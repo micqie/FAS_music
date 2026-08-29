@@ -31,7 +31,10 @@ function closeGradingPanel() {
 
 function selectSkillLevel(level) {
     const input = document.getElementById('skillLevelInput');
-    if (input) input.value = level;
+    if (input) {
+        input.value = level;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     
     // Update button states
     document.querySelectorAll('.skill-level-btn').forEach(btn => {

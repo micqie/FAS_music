@@ -323,6 +323,7 @@ class AttendanceApi
                 'operation_id' => "ALTER TABLE tbl_sessions ADD COLUMN operation_id INT NULL AFTER room_id",
                 'instrument_id' => "ALTER TABLE tbl_sessions ADD COLUMN instrument_id INT NULL AFTER end_time",
                 'attendance_status' => "ALTER TABLE tbl_sessions ADD COLUMN attendance_status ENUM('Pending','Present','Absent','Late','Excused','CI','Teacher Absent') NOT NULL DEFAULT 'Pending' AFTER status",
+                'instructor_completed_at' => "ALTER TABLE tbl_sessions ADD COLUMN instructor_completed_at DATETIME NULL AFTER attendance_status",
                 'absence_notice' => "ALTER TABLE tbl_sessions ADD COLUMN absence_notice ENUM('None','Prior','NoNotice','Teacher') NOT NULL DEFAULT 'None' AFTER attendance_status",
                 'counted_in' => "ALTER TABLE tbl_sessions ADD COLUMN counted_in TINYINT(1) NOT NULL DEFAULT 0 AFTER absence_notice",
                 'makeup_eligible' => "ALTER TABLE tbl_sessions ADD COLUMN makeup_eligible TINYINT(1) NOT NULL DEFAULT 0 AFTER counted_in",
@@ -2360,6 +2361,15 @@ class AttendanceApi
             $this->applySessionAttendanceOutcome($studentId, $todayYmd, 'present', [
                 'note' => 'Completed from instructor attendance mark'
             ]);
+
+            // This marker is written only by the instructor's explicit
+            // Session Done action. Guardian alerts must not use generic
+            // attendance/session status as a substitute.
+            $this->conn->prepare("
+                UPDATE tbl_sessions
+                SET instructor_completed_at = NOW()
+                WHERE session_id = ?
+            ")->execute([$sessionId]);
 
             $this->conn->commit();
             $guardianEmailsNotified = 0;

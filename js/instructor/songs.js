@@ -128,6 +128,19 @@ function setQuickAssignHint(message, type = 'info') {
     el.textContent = message;
 }
 
+function showInstructorSongToast(message) {
+    if (typeof Swal === 'undefined' || !Swal.fire) return;
+    Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: message,
+        showConfirmButton: false,
+        timer: 2600,
+        timerProgressBar: true
+    });
+}
+
 function normalizeCategory(value) {
     return String(value || '').trim().toLowerCase();
 }
@@ -347,7 +360,12 @@ function updateQuickAssignControls() {
 
     const selectedStudent = getStudentById(instructorSongSelectedStudentId);
     const selectedSong = getSongById(instructorSongSelectedSongId);
-    const canSend = !!selectedStudent && !!selectedSong && songIsAllowedForStudent(selectedStudent, selectedSong);
+    const existingAssignment = instructorSongAssignments.find(item =>
+        Number(item.student_id || 0) === Number(instructorSongSelectedStudentId || 0) &&
+        Number(item.song_id || 0) === Number(instructorSongSelectedSongId || 0)
+    );
+    const alreadyCompleted = String(existingAssignment?.progress_status || '').toLowerCase() === 'completed';
+    const canSend = !!selectedStudent && !!selectedSong && songIsAllowedForStudent(selectedStudent, selectedSong) && !alreadyCompleted;
 
     if (button) {
         button.disabled = !canSend;
@@ -366,6 +384,8 @@ function updateQuickAssignControls() {
         setQuickAssignHint('Choose a song from the library to continue.', 'muted');
     } else if (!songIsAllowedForStudent(selectedStudent, selectedSong)) {
         setQuickAssignHint('That song category is not available for this student.', 'error');
+    } else if (alreadyCompleted) {
+        setQuickAssignHint('Completed already — this song is kept in the student’s practice history.', 'success');
     } else {
         setQuickAssignHint('Ready to send this practice song.', 'success');
     }
@@ -658,6 +678,11 @@ function renderSongLibrary() {
     grid.innerHTML = rows.map(song => {
         const selected = Number(song.song_id || 0) === Number(instructorSongSelectedSongId || 0);
         const allowed = !selectedStudent || songIsAllowedForStudent(selectedStudent, song);
+        const completedAssignment = selectedStudent ? instructorSongAssignments.find(item =>
+            Number(item.student_id || 0) === Number(selectedStudent.student_id || 0) &&
+            Number(item.song_id || 0) === Number(song.song_id || 0) &&
+            String(item.progress_status || '').toLowerCase() === 'completed'
+        ) : null;
         const meta = [song.artist, song.category, song.difficulty_level].filter(Boolean).join(' · ');
         return `
             <div class="flex items-center justify-between gap-3 py-3 px-1 ${selected ? 'bg-amber-50/60' : ''} ${!allowed ? 'opacity-50' : ''}">
@@ -665,9 +690,9 @@ function renderSongLibrary() {
                     <div class="text-sm font-bold text-slate-900 truncate">${escapeSongHtml(song.title || 'Untitled')}</div>
                     <div class="text-xs text-slate-500 mt-0.5 truncate">${escapeSongHtml(meta || '—')}</div>
                 </div>
-                <button type="button" data-song-select="${Number(song.song_id || 0)}"
-                    class="flex-shrink-0 text-sm font-semibold ${selected ? 'text-gold-600 font-bold' : 'text-gold-500 hover:text-gold-600'} transition">
-                    ${selected ? 'Selected' : 'Choose'}
+                <button type="button" data-song-select="${Number(song.song_id || 0)}" ${completedAssignment ? 'disabled' : ''}
+                    class="flex-shrink-0 text-sm font-semibold ${completedAssignment ? 'cursor-default rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-700' : selected ? 'text-gold-600 font-bold' : 'text-gold-500 hover:text-gold-600'} transition">
+                    ${completedAssignment ? '<i class="fas fa-check mr-1"></i>Completed' : selected ? 'Selected' : 'Choose'}
                 </button>
             </div>
         `;
@@ -684,76 +709,33 @@ function renderAssignments() {
         return;
     }
 
-    list.innerHTML = instructorSongAssignments.map(item => `
-        <article class="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-            <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <h3 class="text-base font-black text-slate-900">${escapeSongHtml(item.title || 'Untitled')}</h3>
-                        <span class="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${progressBadgeClass(item.progress_status)}">${escapeSongHtml(item.progress_status || 'assigned')}</span>
-                    </div>
-                    <div class="mt-1 text-sm text-slate-500">${escapeSongHtml(item.artist || 'Unknown Artist')} • ${escapeSongHtml(item.student_name || 'Student')}</div>
-                    <div class="mt-1 text-[11px] text-slate-400">Assigned ${formatSongDate(item.assigned_at)}</div>
-                </div>
-                <div class="text-sm text-slate-500">${escapeSongHtml(item.category || 'Category')} • ${escapeSongHtml(item.difficulty_level || 'No difficulty set')}</div>
-            </div>
-
-            <div class="mt-3 grid gap-3 xl:grid-cols-[0.9fr_1.1fr]">
-                <div class="space-y-3">
-                    <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
-                        <div class="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Assignment Notes</div>
-                        <textarea data-assignment-notes="${Number(item.assignment_id || 0)}" rows="3" class="mt-2.5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm">${escapeSongHtml(item.assigned_notes || '')}</textarea>
-                        <div class="mt-2.5 flex flex-col gap-2.5 sm:flex-row">
-                            <select data-assignment-progress="${Number(item.assignment_id || 0)}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm">
-                                <option value="assigned" ${String(item.progress_status) === 'assigned' ? 'selected' : ''}>Assigned</option>
-                                <option value="practicing" ${String(item.progress_status) === 'practicing' ? 'selected' : ''}>Practicing</option>
-                                <option value="polishing" ${String(item.progress_status) === 'polishing' ? 'selected' : ''}>Polishing</option>
-                                <option value="completed" ${String(item.progress_status) === 'completed' ? 'selected' : ''}>Completed</option>
-                            </select>
-                            <button type="button" data-save-assignment="${Number(item.assignment_id || 0)}" class="rounded-2xl bg-slate-900 px-3.5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700">Save Progress</button>
+    list.innerHTML = instructorSongAssignments.map(item => {
+        const completed = String(item.progress_status || '').toLowerCase() === 'completed';
+        const latestHistory = Array.isArray(item.history) && item.history.length ? item.history[0] : null;
+        return `
+            <article class="rounded-2xl border ${completed ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-white'} px-4 py-3.5 soft-shadow">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl ${completed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-50 text-gold-600'}">
+                            <i class="fas ${completed ? 'fa-circle-check' : 'fa-music'}"></i>
                         </div>
-                    </div>
-                    <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
-                        <div class="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Reference Links</div>
-                        <div class="mt-2.5 flex flex-wrap gap-2">
-                            ${item.youtube_link ? `<a href="${escapeSongHtml(item.youtube_link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700"><i class="fab fa-youtube mr-2"></i>YouTube</a>` : ''}
-                            ${item.spotify_link ? `<a href="${escapeSongHtml(item.spotify_link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-emerald-50 px-2.5 py-2 text-xs font-bold text-emerald-700"><i class="fab fa-spotify mr-2"></i>Spotify</a>` : ''}
-                            ${item.sheet_music_path ? `<a href="${escapeSongHtml(songAssetUrl(item.sheet_music_path))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-sky-50 px-2.5 py-2 text-xs font-bold text-sky-700"><i class="fas fa-file-pdf mr-2"></i>Sheet PDF</a>` : ''}
-                            ${item.accompaniment_audio_path ? `<a href="${escapeSongHtml(songAssetUrl(item.accompaniment_audio_path))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-violet-50 px-2.5 py-2 text-xs font-bold text-violet-700"><i class="fas fa-headphones mr-2"></i>Audio</a>` : ''}
-                        </div>
-                    </div>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Lesson History</div>
-                        <div class="text-xs text-slate-400">${(item.history || []).length} entr${(item.history || []).length === 1 ? 'y' : 'ies'}</div>
-                    </div>
-                    <div class="mt-2.5 grid gap-2.5 md:grid-cols-2">
-                        <input type="date" data-history-date="${Number(item.assignment_id || 0)}" class="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm" value="${new Date().toISOString().slice(0, 10)}">
-                        <select data-history-progress="${Number(item.assignment_id || 0)}" class="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm">
-                            <option value="assigned">Assigned</option>
-                            <option value="practicing">Practicing</option>
-                            <option value="polishing">Polishing</option>
-                            <option value="completed">Completed</option>
-                        </select>
-                    </div>
-                    <textarea data-history-notes="${Number(item.assignment_id || 0)}" rows="3" class="mt-2.5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm" placeholder="What happened in today’s lesson? Which section improved, and what needs work next?"></textarea>
-                    <button type="button" data-save-history="${Number(item.assignment_id || 0)}" class="mt-2.5 rounded-2xl bg-gold-500 px-3.5 py-2.5 text-sm font-black text-black transition hover:bg-gold-400">Add Lesson History</button>
-                    <div class="mt-3 space-y-2.5">
-                        ${(item.history || []).length ? item.history.map(history => `
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3.5">
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <div class="text-sm font-bold text-slate-900">${formatSongDate(history.lesson_date)}</div>
-                                    <span class="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${progressBadgeClass(history.progress_status)}">${escapeSongHtml(history.progress_status || 'assigned')}</span>
-                                </div>
-                                <div class="mt-1.5 text-sm text-slate-600">${escapeSongHtml(history.lesson_notes || 'No lesson note recorded.')}</div>
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="truncate text-sm font-black text-slate-900">${escapeSongHtml(item.title || 'Untitled')}</h3>
+                                <span class="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${progressBadgeClass(item.progress_status)}">${escapeSongHtml(item.progress_status || 'assigned')}</span>
                             </div>
-                        `).join('') : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3.5 py-4 text-sm text-slate-500">No lesson history yet for this song.</div>'}
+                            <p class="mt-1 text-sm font-semibold text-slate-700">${escapeSongHtml(item.student_name || 'Student')}</p>
+                            <p class="mt-0.5 text-xs text-slate-500">${escapeSongHtml([item.artist, item.category, item.difficulty_level].filter(Boolean).join(' · ') || 'Song')} · Given ${formatSongDate(item.assigned_at)}</p>
+                            ${item.assigned_notes ? `<p class="mt-2 text-xs leading-5 text-slate-600">Practice tip: ${escapeSongHtml(item.assigned_notes)}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="shrink-0 text-left sm:text-right">
+                        <div class="text-xs font-bold ${completed ? 'text-emerald-700' : 'text-slate-600'}">${completed ? 'Student finished practicing' : 'Waiting for student update'}</div>
+                        ${latestHistory ? `<div class="mt-1 text-[11px] text-slate-400">Updated ${formatSongDate(latestHistory.lesson_date)}</div>` : ''}
                     </div>
                 </div>
-            </div>
-        </article>
-    `).join('');
+            </article>`;
+    }).join('');
 
     updateSongStats();
 }
@@ -928,6 +910,14 @@ async function submitQuickAssignment(event) {
         setQuickAssignHint('That song category is not available for this student.', 'error');
         return;
     }
+    const existingAssignment = instructorSongAssignments.find(item =>
+        Number(item.student_id || 0) === Number(selectedStudent.student_id || 0) &&
+        Number(item.song_id || 0) === Number(selectedSong.song_id || 0)
+    );
+    if (String(existingAssignment?.progress_status || '').toLowerCase() === 'completed') {
+        setQuickAssignHint('This student already completed the song. It cannot be assigned again.', 'error');
+        return;
+    }
 
     const payload = {
         action: 'assign-song',
@@ -946,9 +936,15 @@ async function submitQuickAssignment(event) {
         }
         const notesEl = document.getElementById('quickAssignNotes');
         if (notesEl) notesEl.value = '';
-        setQuickAssignHint('Song assigned successfully.', 'success');
+        const assignedSongTitle = selectedSong.title || 'Song';
+        const assignedStudentName = selectedStudent.student_name
+            || `${selectedStudent.first_name || ''} ${selectedStudent.last_name || ''}`.trim()
+            || 'student';
+        instructorSongSelectedSongId = 0;
+        instructorSongSelectedPracticeBy = 'next_lesson';
         await loadAssignments();
         renderInstructorSongView();
+        showInstructorSongToast(`${assignedSongTitle} was assigned to ${assignedStudentName}.`);
     } catch (error) {
         setQuickAssignHint(error.response?.data?.error || 'Failed to assign song.', 'error');
     }

@@ -764,7 +764,7 @@ class SongsApi
             }
 
             $stmtCheck = $this->conn->prepare("
-                SELECT assignment_id
+                SELECT assignment_id, progress_status
                 FROM tbl_student_song_assignments
                 WHERE teacher_id = ?
                   AND song_id = ?
@@ -772,9 +772,15 @@ class SongsApi
                 LIMIT 1
             ");
             $stmtCheck->execute([$teacherId, $songId, $studentId]);
-            $assignmentId = (int)($stmtCheck->fetchColumn() ?: 0);
+            $existingAssignment = $stmtCheck->fetch(PDO::FETCH_ASSOC) ?: null;
+            $assignmentId = (int)($existingAssignment['assignment_id'] ?? 0);
 
             if ($assignmentId > 0) {
+                if (strcasecmp((string)($existingAssignment['progress_status'] ?? ''), 'completed') === 0) {
+                    $this->sendJSON([
+                        'error' => 'This student already completed this song. It remains in completed practice history and cannot be assigned again.'
+                    ], 409);
+                }
                 $stmt = $this->conn->prepare("
                     UPDATE tbl_student_song_assignments
                     SET progress_status = ?,
@@ -917,6 +923,18 @@ class SongsApi
         }
 
         try {
+            $stmtCurrent = $this->conn->prepare("
+                SELECT progress_status
+                FROM tbl_student_song_assignments
+                WHERE assignment_id = ? AND teacher_id = ?
+                LIMIT 1
+            ");
+            $stmtCurrent->execute([$assignmentId, $teacherId]);
+            $currentStatus = (string)($stmtCurrent->fetchColumn() ?: '');
+            if (strcasecmp($currentStatus, 'completed') === 0) {
+                $this->sendJSON(['error' => 'Completed practice is read-only and remains in the student history.'], 409);
+            }
+
             $stmt = $this->conn->prepare("
                 UPDATE tbl_student_song_assignments
                 SET progress_status = ?,
@@ -963,15 +981,19 @@ class SongsApi
 
         try {
             $stmtCheck = $this->conn->prepare("
-                SELECT assignment_id
+                SELECT assignment_id, progress_status
                 FROM tbl_student_song_assignments
                 WHERE assignment_id = ?
                   AND teacher_id = ?
                 LIMIT 1
             ");
             $stmtCheck->execute([$assignmentId, $teacherId]);
-            if (!(int)$stmtCheck->fetchColumn()) {
+            $checkedAssignment = $stmtCheck->fetch(PDO::FETCH_ASSOC) ?: null;
+            if (!(int)($checkedAssignment['assignment_id'] ?? 0)) {
                 $this->sendJSON(['error' => 'Assignment not found for this teacher'], 404);
+            }
+            if (strcasecmp((string)($checkedAssignment['progress_status'] ?? ''), 'completed') === 0) {
+                $this->sendJSON(['error' => 'Completed practice is read-only and remains in the student history.'], 409);
             }
 
             $stmt = $this->conn->prepare("

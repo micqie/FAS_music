@@ -808,11 +808,20 @@ async function saveSessionGrade(event) {
         return;
     }
 
+    const skillLevelInput = document.getElementById('skillLevelInput');
+    const skillLevel = String(skillLevelInput?.value || '').trim();
+    const validSkillLevels = ['Beginner', 'Developing', 'Proficient', 'Advanced'];
+    if (!validSkillLevels.includes(skillLevel)) {
+        showGradeMessage('Choose the student’s overall level before saving the grade.', 'error');
+        document.querySelector('.skill-level-btn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
     const payload = {
         action: 'save-session-grade',
         user_id: Number(user.user_id),
         session_id: sessionId,
-        skill_level: document.getElementById('skillLevelInput').value,
+        skill_level: skillLevel,
         criteria_scores: criteriaScores,
         remarks: document.getElementById('remarksInput').value.trim()
     };

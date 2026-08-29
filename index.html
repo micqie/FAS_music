@@ -591,13 +591,6 @@ Experience Prestige
                                     <i id="registerPasswordIcon" class="fas fa-eye"></i>
                                 </button>
                             </div>
-                            <div id="passwordRequirements" class="mt-2 text-xs text-zinc-500 space-y-1">
-                                <div id="req-length" class="flex items-center"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>At least 8 characters</div>
-                                <div id="req-uppercase" class="flex items-center"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>One uppercase letter</div>
-                                <div id="req-lowercase" class="flex items-center"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>One lowercase letter</div>
-                                <div id="req-number" class="flex items-center"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>One number</div>
-                                <div id="req-special" class="flex items-center"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>One special character (!@#$%^&*)</div>
-                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">
@@ -613,6 +606,22 @@ Experience Prestige
                                 </button>
                             </div>
                             <div id="passwordMatch" class="mt-2 text-xs"></div>
+                        </div>
+                        <div id="passwordRequirements" class="sm:col-span-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 px-4 py-3">
+                            <div class="flex gap-1.5" aria-hidden="true">
+                                <span data-register-strength-bar class="h-1 flex-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                                <span data-register-strength-bar class="h-1 flex-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                                <span data-register-strength-bar class="h-1 flex-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                                <span data-register-strength-bar class="h-1 flex-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                            </div>
+                            <p id="registerPasswordStrengthText" class="mt-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Password strength</p>
+                            <div class="mt-2 grid grid-cols-2 lg:grid-cols-5 gap-x-4 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                <div id="req-length" class="flex items-center whitespace-nowrap"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>8+ characters</div>
+                                <div id="req-uppercase" class="flex items-center whitespace-nowrap"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>Uppercase letter</div>
+                                <div id="req-lowercase" class="flex items-center whitespace-nowrap"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>Lowercase letter</div>
+                                <div id="req-number" class="flex items-center whitespace-nowrap"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>Number</div>
+                                <div id="req-special" class="flex items-center whitespace-nowrap"><i class="fas fa-circle text-zinc-300 dark:text-zinc-600 mr-2" style="font-size: 6px;"></i>Special character</div>
+                            </div>
                         </div>
                     </div>
                 </div>

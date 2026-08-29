@@ -112,7 +112,7 @@
             const tbody = document.getElementById('teachersTable');
             const count = document.getElementById('teacherCount');
             if (!tbody) return;
-            if (count) count.textContent = `${filteredTeachers.length} teacher(s)`;
+            if (count) count.textContent = `${filteredTeachers.length} instructor${filteredTeachers.length === 1 ? '' : 's'}`;
             if (!filteredTeachers.length) {
                 tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500"><i class="fas fa-inbox text-2xl mb-2 text-gold-500/50"></i><p>No teachers found.</p></td></tr>';
                 return;
@@ -145,13 +145,13 @@
         async function openTeacherPasswordModal(teacherId) {
             const teacher = allTeachers.find(x => Number(x.teacher_id) === Number(teacherId));
             if (!teacher) {
-                showMessage('Teacher not found.', 'error');
+                showMessage('Instructor not found.', 'error');
                 return;
             }
 
-            const fullName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Teacher';
+            const fullName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Instructor';
             const result = await Swal.fire({
-                title: 'Change Teacher Password',
+                title: 'Change Instructor Password',
                 width: 560,
                 confirmButtonText: 'Update Password',
                 confirmButtonColor: '#b8860b',
@@ -228,7 +228,7 @@
             if (form) form.reset();
             document.getElementById('teacherId').value = '';
             setSelectedSpecializationIds([]);
-            if (title) title.textContent = 'Add Teacher';
+            if (title) title.textContent = 'Add Instructor';
             if (subtitle) subtitle.textContent = 'Set profile details, specializations, and portal login.';
             // Hide status field — new teachers are always Active
             const statusWrapper = document.getElementById('statusFieldWrapper');
@@ -260,11 +260,11 @@
                 ? t.specialization_ids
                 : String(t.specialization_ids_csv || '').split(',').map(v => Number(v || 0)).filter(v => v > 0);
             setSelectedSpecializationIds(ids);
-            document.getElementById('email').value = (t.email || '').includes('@fas.com') ? '' : (t.email || '');
+            document.getElementById('email').value = t.email || '';
             document.getElementById('phone').value = t.phone || '';
             document.getElementById('status').value = t.status || 'Active';
-            document.getElementById('teacherModalTitle').textContent = 'Edit Teacher';
-            document.getElementById('teacherModalSubtitle').textContent = 'Update teacher profile and specializations.';
+            document.getElementById('teacherModalTitle').textContent = 'Edit Instructor';
+            document.getElementById('teacherModalSubtitle').textContent = 'Update instructor profile and specializations.';
             // Show status field in edit mode
             const statusWrapper = document.getElementById('statusFieldWrapper');
             if (statusWrapper) statusWrapper.classList.remove('hidden');
@@ -285,7 +285,7 @@
                 const mode = document.getElementById('accountModeReal')?.checked ? 'real_email' : 'system_account';
                 const email = String(document.getElementById('email')?.value || '').trim();
                 if (mode === 'real_email' && !email) {
-                    showMessage('Please enter the teacher email for a real email account.', 'error');
+                    showMessage('Please enter the instructor email for a real email account.', 'error');
                     return false;
                 }
             }
@@ -301,7 +301,7 @@
             if (accountMode === 'real_email') {
                 Swal.fire({
                     icon: emailSent ? 'success' : 'warning',
-                    title: emailSent ? 'Teacher Created' : 'Teacher Created (Email Not Sent)',
+                    title: emailSent ? 'Instructor Created' : 'Instructor Created (Email Not Sent)',
                     html: emailSent
                         ? `Login details were emailed to <strong>${esc(username)}</strong>.<br><br>Temporary password: <span class="font-mono">${esc(tempPassword)}</span>`
                         : `Account created for <strong>${esc(username)}</strong>, but the email could not be sent.<br><br>Share these credentials manually:<br><strong>Username:</strong> ${esc(username)}<br><strong>Temporary password:</strong> <span class="font-mono">${esc(tempPassword)}</span>${data.email_error ? `<br><br><span class="text-xs text-slate-500">${esc(data.email_error)}</span>` : ''}`,
@@ -313,7 +313,7 @@
             if (username && tempPassword) {
                 Swal.fire({
                     icon: 'success',
-                    title: 'Teacher Account Created',
+                    title: 'Instructor Account Created',
                     html: `<div class="text-left text-sm space-y-2">
                         <p><strong>Login:</strong> <span class="font-mono">${esc(username)}</span></p>
                         <p><strong>Temporary password:</strong> <span class="font-mono">${esc(tempPassword)}</span></p>
@@ -324,7 +324,7 @@
                 return;
             }
 
-            showMessage('Teacher saved successfully', 'success');
+            showMessage('Instructor saved successfully', 'success');
         }
 
         async function saveTeacher(event) {
@@ -359,7 +359,7 @@
             if (!isEdit && (data.username || data.login_identifier)) {
                 showTeacherCreatedDialog(data);
             } else {
-                showMessage('Teacher saved successfully', 'success');
+                showMessage('Instructor saved successfully', 'success');
             }
             await loadTeachers();
         }

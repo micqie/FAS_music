@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Frozen Accounts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/admin-responsive.css">
+    <link rel="stylesheet" href="../../css/table-responsive.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    },
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .dark-glass { background: rgba(15, 17, 21, 0.9); backdrop-filter: blur(10px); }
+        .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: white !important; }
+        .sidebar-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    </style>
+    <link rel="stylesheet" href="../../css/desk-premium.css">
+</head>
+<body class="bg-[#f1f5f9] text-slate-900 antialiased">
+
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-8">
+            <a href="admin_dashboard.html" class="h-10 flex items-center">
+                <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
+            </a>
+        </div>
+                <div class="flex items-center gap-4">
+            <div class="hidden md:flex flex-col text-right">
+                <span id="userNameNav" class="text-sm font-semibold text-white">Administrator</span>
+                <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Portal Access</span>
+            </div>
+            <details class="relative group/profile">
+                <summary class="list-none cursor-pointer">
+                    <div class="h-10 w-10 rounded-full border-2 border-gold-500/30 p-0.5">
+                        <div class="w-full h-full rounded-full bg-darkSlate flex items-center justify-center">
+                            <i class="fas fa-user-tie text-gold-400"></i>
+                        </div>
+                    </div>
+                </summary>
+                <div class="absolute right-0 mt-3 w-56 rounded-xl border border-white/10 bg-obsidian/95 backdrop-blur-md shadow-2xl overflow-hidden opacity-0 pointer-events-none group-open/profile:opacity-100 group-open/profile:pointer-events-auto transition-all">
+                    <div class="px-4 py-3 border-b border-white/10">
+                        <p id="profileMenuName" class="text-sm font-semibold text-white truncate">Administrator</p>
+                        <p class="text-[10px] uppercase tracking-widest text-gold-400 font-bold mt-1">Account</p>
+                    </div>
+                    <button onclick="logout()" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-300 hover:text-red-200 hover:bg-red-400/10 transition-all">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </button>
+                </div>
+            </details>
+
+        </div>
+    </nav>
+
+    <aside class="fixed inset-y-0 left-0 w-72 bg-obsidian z-40 pt-24 hidden lg:flex flex-col border-r border-white/5 overflow-y-auto sidebar-scroll">
+        <div class="px-6 space-y-8 flex-1 mt-4">
+        <div class="px-4 mb-4">
+            <h2 class="text-[1.5rem] leading-none font-extrabold text-white tracking-tight">Admin Panel</h2>
+            <div class="mt-3 h-2 w-[14rem] rounded-full bg-gold-500"></div>
+        </div>
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Management</h3>
+                <nav class="space-y-2">
+                    <a href="admin_dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-chart-line mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Dashboard
+                    </a>
+                    <a href="admin_registration.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-id-card mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Registrations
+                    </a>
+                    <a href="admin_students.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-user-graduate mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Students</a>
+                  <a href="admin_users.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-users-cog mr-3"></i> Users
+                    </a>
+                    <a href="admin_teachers.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-chalkboard-teacher mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Instructors</a>
+                    <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
+                    </a>
+                    <a href="admin_frozen_accounts.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all"><i class="fas fa-snowflake mr-3"></i> Frozen Accounts</a>
+                    <a href="admin_enrollments.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-user-plus mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Enrollments
+                    </a>
+                      <a href="admin_payments.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-wallet mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Payment Center
+                    </a>
+                      <a href="admin_reports.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-chart-pie mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Reports
+                    </a>
+                    <a href="admin_audit_logs.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"><i class="fas fa-shield-halved mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Audit Logs</a>
+                </nav>
+            </div>
+            <div>
+                <h3 class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4">Academy Assets</h3>
+                <nav class="space-y-2">
+                    <a href="admin_instruments.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-guitar mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Instruments
+                    </a>
+                    <a href="admin_maintenance.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-screwdriver-wrench mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Maintenance
+                    </a>
+                    <a href="admin_branches.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-landmark mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Branches
+                    </a>
+                    <a href="admin_room.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-door-open mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Rooms
+                    </a>
+                    <a href="admin_package.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                        <i class="fas fa-box mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Packages
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </aside>
+    <!-- Main Content -->
+    <main class="lg:ml-72 pt-24 px-4 sm:px-6 md:px-8 pb-8">
+            <div class="max-w-7xl mx-auto">
+
+                <!-- Header -->
+                <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                            <i class="fas fa-snowflake text-rose-500"></i> Frozen Accounts
+                        </h1>
+                        <p class="text-slate-500 mt-1 text-sm">Review and process slot reservation fee payments (₱100 each).</p>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-end gap-3">
+                    <label id="adminBranchFilterWrap" class="hidden h-12 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 shadow-sm">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Branch</span>
+                        <select id="adminBranchFilter" class="min-w-44 bg-transparent text-sm font-semibold text-slate-800 outline-none">
+                            <option value="">All branches</option>
+                        </select>
+                    </label>
+                    <div class="flex h-12 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                        <button type="button" onclick="setFreezeView('students')" data-view="students" class="freeze-view-btn h-10 px-5 text-sm font-semibold rounded-lg bg-slate-900 text-white transition">
+                            Frozen Accounts
+                        </button>
+                        <button type="button" onclick="setFreezeView('payments')" data-view="payments" class="freeze-view-btn h-10 px-5 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition">
+                            Payment Requests
+                        </button>
+                        <button type="button" onclick="setFreezeView('history')" data-view="history" class="freeze-view-btn h-10 px-5 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition">
+                            Approved History
+                        </button>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Frozen students list -->
+                <div id="frozenStudentsSection" class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-6">
+                    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                            <h2 class="text-lg font-black text-slate-900">Frozen Students</h2>
+                            <p class="text-sm text-slate-500 mt-1">Students whose schedules are currently frozen and need the ₱100 reservation fee.</p>
+                        </div>
+                        <div class="flex flex-wrap gap-3 text-sm font-semibold">
+                            <span class="rounded-full bg-rose-50 border border-rose-200 px-4 py-1.5 text-rose-700">
+                                Frozen: <span id="frozenCount" class="font-black">0</span>
+                            </span>
+                            <span class="rounded-full bg-slate-50 border border-slate-200 px-4 py-1.5 text-slate-600">
+                                Needs payment: <span id="frozenPendingCount" class="font-black text-amber-600">0</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-rose-50/60">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Branch</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Package</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Absence Details</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Payment State</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Enrollment Since</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="frozenStudentsBody" class="divide-y divide-rose-50">
+                                <tr><td colspan="7" class="px-6 py-10 text-center text-slate-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2 block"></i>Loading frozen students...
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Payment requests -->
+                <div id="freezePaymentsSection" class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+                    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                        <h2 class="text-lg font-black text-slate-900">Freeze Payment Requests</h2>
+                        <p class="text-sm text-slate-500 mt-1">Review and process slot reservation fee submissions.</p>
+                        <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1">
+                            <button onclick="setFreezeFilter('Pending')"  data-filter="Pending"  class="freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg bg-slate-900 text-white transition">Pending</button>
+                            <button onclick="setFreezeFilter('Paid')"     data-filter="Paid"     class="freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition">Paid</button>
+                            <button onclick="setFreezeFilter('all')"      data-filter="all"      class="freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition">All</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-rose-50/60">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Package</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Absences</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Payment</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Submitted</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="freezeTableBody" class="divide-y divide-rose-50">
+                                <tr><td colspan="8" class="px-6 py-10 text-center text-slate-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2 block"></i>Loading...
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Approved / rejected history -->
+                <div id="freezeHistorySection" class="hidden bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mt-6">
+                    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                            <h2 class="text-lg font-black text-slate-900">Freeze Payment History</h2>
+                            <p class="text-sm text-slate-500 mt-1">Approved and rejected freeze payment records.</p>
+                        </div>
+                        <span class="rounded-full bg-slate-50 border border-slate-200 px-4 py-1.5 text-slate-600 text-sm font-semibold">
+                            Approved / Rejected: <span id="historyCount" class="font-black text-slate-900">0</span>
+                        </span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Branch</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Receipt</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Reviewed</th>
+                                </tr>
+                            </thead>
+                            <tbody id="freezeHistoryBody" class="divide-y divide-slate-100">
+                                <tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2 block"></i>Loading history...
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+<!-- Reschedule Modal -->
+<div id="rescheduleModal" class="fixed inset-0 z-[1200] hidden items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div class="flex w-full max-w-6xl max-h-[92vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-6 py-5">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-[0.25em] text-amber-700">Reschedule</p>
+                <h3 id="rescheduleModalTitle" class="mt-1 text-2xl font-black text-slate-900">Reschedule Student Session</h3>
+                <p id="rescheduleModalMeta" class="mt-1 text-sm text-slate-500">Loading...</p>
+            </div>
+            <button type="button" onclick="closeRescheduleModal()" class="rounded-full border border-slate-200 bg-white px-3 py-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800" aria-label="Close reschedule modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="grid gap-0 overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
+            <div class="border-b border-slate-200 p-6 lg:border-b-0 lg:border-r">
+                <div id="rescheduleStudentInfo" class="space-y-3"></div>
+                <div class="mt-6">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <h4 class="text-sm font-black uppercase tracking-[0.2em] text-slate-500">Choose Session</h4>
+                        <span class="text-xs font-semibold text-slate-400">Only future scheduled sessions are enabled</span>
+                    </div>
+                    <div id="rescheduleSessionHint" class="mb-3 text-sm text-slate-500">Select a session to continue.</div>
+                    <div id="rescheduleSessionList" class="space-y-3"></div>
+                </div>
+            </div>
+            <div class="p-6">
+                <!-- Teacher & Instrument context -->
+                <div class="mb-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-3">
+                    <div class="grid gap-3 text-sm sm:grid-cols-3">
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Instrument</p>
+                            <p id="rescheduleInstrumentLabel" class="font-semibold text-slate-800">—</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Package</p>
+                            <p id="reschedulePackageLabel" class="font-semibold text-slate-800">—</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Instrument Type</p>
+                            <p id="rescheduleInstrumentTypeLabel" class="font-semibold text-slate-800">—</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Instructor</label>
+                        <select id="rescheduleTeacherSelect"
+                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-gold-400 transition">
+                            <option value="">Loading teachers…</option>
+                        </select>
+                        <p id="rescheduleTeacherHint" class="mt-1 text-xs text-slate-400">Previous instructor pre-selected. Only instructors matched to this package instrument are shown.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h4 class="text-sm font-black uppercase tracking-[0.2em] text-slate-500">Available Slots</h4>
+                        <p id="rescheduleSelectedSessionInfo" class="mt-1 text-sm text-slate-500">Pick a session first.</p>
+                    </div>
+                </div>
+                <div id="rescheduleStatus" class="hidden mt-4"></div>
+                <div id="rescheduleSlotsWrap" class="mt-4">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                        Select a session to see available replacement slots.
+                    </div>
+                </div>
+                <div id="rescheduleSlotList" class="mt-4 space-y-3"></div>
+                <div class="mt-6 flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                    <button type="button" onclick="closeRescheduleModal()" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800">Cancel</button>
+                    <button type="button" id="rescheduleSubmitBtn" onclick="submitRescheduleFromModal()" class="rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50">
+                        <span id="rescheduleSubmitText">Confirm Reschedule</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="../../js/index.js"></script>
+<script src="../../js/session_timeout.js"></script>
+<script src="../../js/admin/admin_responsive.js"></script>
+
+<script>
+    let deskBranchId   = 0;
+    let frozenStudents  = [];
+    let freezePayments = [];
+    let freezeHistory  = [];
+    let currentFilter  = 'Pending';
+    let activeFreezeView = 'students';
+    let activeEnrollmentsCache = [];
+    const rescheduleState = {
+        enrollmentId: 0,
+        sessionId: 0,
+        studentLabel: '',
+        sessionLabel: '',
+        slots: [],
+        selectedSlotIndex: -1
+    };
+
+    function escHtml(t) {
+        if (t == null) return '';
+        const d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
+
+    function escapeHtml(value) {
+        return escHtml(value);
+    }
+    function fmtDate(d) {
+        if (!d) return '—';
+        return new Date(d).toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'numeric' });
+    }
+
+    function absenceReason(record) {
+        const saved = String(record?.attendance_notes || '').trim();
+        if (saved) return saved;
+        const notice = String(record?.absence_notice || '').toLowerCase();
+        if (notice === 'nonotice') return 'No advance notice was recorded.';
+        if (notice === 'prior') return 'The student gave advance notice; no additional reason was recorded.';
+        return 'No reason was recorded.';
+    }
+
+    function absenceType(record) {
+        const notice = String(record?.absence_notice || '').toLowerCase();
+        return notice === 'nonotice' || String(record?.status || '').toLowerCase() === 'no show'
+            ? 'No notice'
+            : 'With notice';
+    }
+
+    function fmtTime12Hour(value) {
+        if (!value) return '—';
+        const raw = String(value).trim();
+        const parts = raw.split(':').map(Number);
+        if (parts.length < 2 || parts.some(num => Number.isNaN(num))) return raw;
+        const date = new Date();
+        date.setHours(parts[0] || 0, parts[1] || 0, parts[2] || 0, 0);
+        return date.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function normalizeScheduleStatus(status) {
+        return String(status || '').trim().toLowerCase();
+    }
+
+    function isReschedulableSession(session) {
+        if (!session) return false;
+        const status = normalizeScheduleStatus(session.status);
+        const dateValue = String(session.session_date || '').trim();
+        if (!dateValue) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const sessionDate = new Date(`${dateValue}T00:00:00`);
+        if (Number.isNaN(sessionDate.getTime())) return false;
+        return status === 'scheduled' && sessionDate.getTime() >= today.getTime();
+    }
+
+    function getSessionDisplayLabel(session) {
+        const dateText = fmtDate(session.session_date);
+        const timeText = session.start_time || session.end_time
+            ? `${fmtTime12Hour(session.start_time)} - ${fmtTime12Hour(session.end_time)}`
+            : '—';
+        const roomText = session.room_name ? ` • ${session.room_name}` : '';
+        return `${dateText} • ${timeText}${roomText}`;
+    }
+
+    function setRescheduleStatus(message, tone = 'info') {
+        const el = document.getElementById('rescheduleStatus');
+        if (!el) return;
+        const styles = {
+            info: 'border-slate-200 bg-slate-50 text-slate-600',
+            success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+            error: 'border-rose-200 bg-rose-50 text-rose-700'
+        };
+        el.className = `rounded-xl border px-4 py-3 text-sm ${styles[tone] || styles.info}`;
+        el.textContent = message;
+        el.classList.remove('hidden');
+    }
+
+    function clearRescheduleStatus() {
+        const el = document.getElementById('rescheduleStatus');
+        if (!el) return;
+        el.classList.add('hidden');
+        el.textContent = '';
+    }
+
+    function closeRescheduleModal() {
+        const modal = document.getElementById('rescheduleModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        rescheduleState.enrollmentId = 0;
+        rescheduleState.sessionId = 0;
+        rescheduleState.studentLabel = '';
+        rescheduleState.sessionLabel = '';
+        rescheduleState.slots = [];
+        rescheduleState.selectedSlotIndex = -1;
+        clearRescheduleStatus();
+    }
+
+    async function loadActiveEnrollmentsCache() {
+        if (activeEnrollmentsCache.length > 0) return activeEnrollmentsCache;
+        try {
+            let url = `${baseApiUrl}/students.php?action=get-active-enrollments`;
+            if (deskBranchId > 0) url += `&branch_id=${encodeURIComponent(deskBranchId)}`;
+            const res = await axios.get(url);
+            const data = res.data || {};
+            activeEnrollmentsCache = data.success && Array.isArray(data.enrollments) ? data.enrollments : [];
+        } catch (error) {
+            activeEnrollmentsCache = [];
+        }
+        return activeEnrollmentsCache;
+    }
+
+    function renderRescheduleSlots() {
+        const slotWrap = document.getElementById('rescheduleSlotsWrap');
+        const slotList = document.getElementById('rescheduleSlotList');
+        const sessionHint = document.getElementById('rescheduleSessionHint');
+        const submitBtn = document.getElementById('rescheduleSubmitBtn');
+        if (!slotList || !sessionHint || !submitBtn) return;
+        if (slotWrap) slotWrap.innerHTML = '';
+
+        const slots = Array.isArray(rescheduleState.slots) ? rescheduleState.slots : [];
+        if (!rescheduleState.sessionId) {
+            slotList.innerHTML = '';
+            sessionHint.textContent = 'Select a session first.';
+            submitBtn.disabled = true;
+            return;
+        }
+
+        sessionHint.textContent = slots.length
+            ? `${slots.length} available slot${slots.length === 1 ? '' : 's'} found.`
+            : 'No available slots found for this session.';
+
+        if (!slots.length) {
+            slotList.innerHTML = `
+                <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                    No available slots were returned for this student’s teacher.
+                </div>
+            `;
+            submitBtn.disabled = true;
+            return;
+        }
+
+        slotList.innerHTML = slots.map((slot, index) => {
+            const active = Number(rescheduleState.selectedSlotIndex) === index;
+            return `
+                <button type="button"
+                    class="w-full rounded-2xl border px-4 py-3 text-left transition ${active ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'}"
+                    data-slot-index="${index}">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-bold text-slate-900">${escapeHtml(fmtDate(slot.session_date))}</div>
+                            <div class="mt-1 text-xs text-slate-500">
+                                ${escapeHtml(fmtTime12Hour(slot.start_time))} - ${escapeHtml(fmtTime12Hour(slot.end_time))}
+                                ${slot.day_of_week ? ` • ${escapeHtml(slot.day_of_week)}` : ''}
+                                ${slot.room_name ? ` • ${escapeHtml(slot.room_name)}` : ''}
+                            </div>
+                        </div>
+                        <span class="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-600">Choose</span>
+                    </div>
+                </button>
+            `;
+        }).join('');
+
+        slotList.querySelectorAll('[data-slot-index]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                rescheduleState.selectedSlotIndex = Number(btn.dataset.slotIndex || -1);
+                renderRescheduleSlots();
+            });
+        });
+
+        submitBtn.disabled = rescheduleState.selectedSlotIndex < 0;
+    }
+
+    function renderRescheduleSessionCards(row) {
+        const listEl = document.getElementById('rescheduleSessionList');
+        const selectedSessionInfo = document.getElementById('rescheduleSelectedSessionInfo');
+        if (!listEl || !selectedSessionInfo) return;
+
+        const sessions = Array.isArray(row?.sessions_list) ? row.sessions_list : [];
+        if (!sessions.length) {
+            listEl.innerHTML = `
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    No sessions found for this enrollment.
+                </div>
+            `;
+            selectedSessionInfo.textContent = 'No schedulable sessions found yet.';
+            document.getElementById('rescheduleSlotsWrap').innerHTML = '';
+            return;
+        }
+
+        const eligibleSessions = sessions.filter(isReschedulableSession);
+        const sessionPool = sessions;
+        const defaultSession = eligibleSessions[0] || null;
+        if (defaultSession && (!rescheduleState.sessionId || !sessionPool.some(item => Number(item.session_id) === Number(rescheduleState.sessionId)))) {
+            rescheduleState.sessionId = Number(defaultSession.session_id || 0);
+        }
+
+        listEl.innerHTML = sessionPool.map((session) => {
+            const sessionId = Number(session.session_id || 0);
+            const active = Number(rescheduleState.sessionId || 0) === sessionId;
+            const disabled = !isReschedulableSession(session);
+            const status = normalizeScheduleStatus(session.status);
+            const badgeClass = status === 'scheduled'
+                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                : status === 'completed'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : status === 'absent'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-slate-50 text-slate-600 border-slate-200';
+            return `
+                <button type="button"
+                    class="w-full rounded-2xl border px-4 py-3 text-left transition ${active ? 'border-gold-500 bg-gold-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'} ${disabled ? 'opacity-70' : ''}"
+                    data-session-id="${sessionId}"
+                    ${disabled ? 'disabled' : ''}>
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-bold text-slate-900">Session ${escapeHtml(String(session.session_number || '—'))}</div>
+                            <div class="mt-1 text-xs text-slate-500">${escapeHtml(getSessionDisplayLabel(session))}</div>
+                        </div>
+                        <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${badgeClass}">${escapeHtml(session.status || '—')}</span>
+                    </div>
+                </button>
+            `;
+        }).join('');
+
+        if (!defaultSession) {
+            selectedSessionInfo.textContent = 'No future scheduled sessions are available to reschedule.';
+            const slotWrap = document.getElementById('rescheduleSlotsWrap');
+            const submitBtn = document.getElementById('rescheduleSubmitBtn');
+            if (slotWrap) slotWrap.innerHTML = '';
+            if (submitBtn) submitBtn.disabled = true;
+            return;
+        }
+
+        selectedSessionInfo.textContent = `Selected: Session ${defaultSession.session_number || '—'} • ${getSessionDisplayLabel(defaultSession)}`;
+
+        listEl.querySelectorAll('[data-session-id]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const sessionId = Number(btn.dataset.sessionId || 0);
+                if (!sessionId) return;
+                rescheduleState.sessionId = sessionId;
+                rescheduleState.selectedSlotIndex = -1;
+                selectedSessionInfo.textContent = `Selected: Session ${btn.querySelector('.text-sm.font-bold')?.textContent || '—'} • Loading slots...`;
+                await loadRescheduleSlots(sessionId, row);
+                renderRescheduleSessionCards(row);
+            });
+        });
+    }
+
+    async function loadRescheduleSlots(sessionId, row) {
+        const slotWrap = document.getElementById('rescheduleSlotsWrap');
+        const submitBtn = document.getElementById('rescheduleSubmitBtn');
+        if (slotWrap) {
+            slotWrap.innerHTML = `
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    Loading available slots...
+                </div>
+            `;
+        }
+        if (submitBtn) submitBtn.disabled = true;
+
+        // Use the teacher selected in the dropdown, fallback to session's assigned teacher
+        const selectedTeacherId = Number(document.getElementById('rescheduleTeacherSelect')?.value || 0)
+            || Number(rescheduleState.teacherId || 0);
+
+        try {
+            let url = `${baseApiUrl}/students.php?action=get-reschedule-slots&session_id=${encodeURIComponent(sessionId)}`;
+            if (selectedTeacherId > 0) {
+                url += `&override_teacher_id=${encodeURIComponent(selectedTeacherId)}`;
+            }
+            const response = await axios.get(url);
+            const data = response.data || {};
+            if (!data.success) {
+                setRescheduleStatus(data.error || 'Unable to load available slots.', 'error');
+                rescheduleState.slots = [];
+                renderRescheduleSlots();
+                return;
+            }
+            rescheduleState.slots = Array.isArray(data.slots) ? data.slots : [];
+            rescheduleState.selectedSlotIndex = rescheduleState.slots.length ? 0 : -1;
+            const selectedSessionInfo = document.getElementById('rescheduleSelectedSessionInfo');
+            if (selectedSessionInfo) {
+                const sessionName = Array.isArray(row?.sessions_list) ? row.sessions_list.find(item => Number(item.session_id) === Number(sessionId)) : null;
+                selectedSessionInfo.textContent = sessionName
+                    ? `Selected: Session ${sessionName.session_number || '—'} • ${getSessionDisplayLabel(sessionName)}`
+                    : 'Selected session loaded.';
+            }
+            renderRescheduleSlots();
+            if (rescheduleState.slots.length) {
+                clearRescheduleStatus();
+            } else {
+                setRescheduleStatus('No available slots found for this teacher. Try selecting a different instructor.', 'error');
+            }
+        } catch (error) {
+            rescheduleState.slots = [];
+            rescheduleState.selectedSlotIndex = -1;
+            renderRescheduleSlots();
+            setRescheduleStatus('Network error while loading available slots.', 'error');
+        }
+    }
+
+    async function openRescheduleModal(enrollmentId) {
+        const modal = document.getElementById('rescheduleModal');
+        const studentInfo = document.getElementById('rescheduleStudentInfo');
+        if (!modal || !studentInfo) return;
+
+        const enrollments = await loadActiveEnrollmentsCache();
+        const row = enrollments.find(item => Number(item.enrollment_id) === Number(enrollmentId));
+        if (!row) {
+            Swal.fire({ icon: 'error', title: 'Reschedule unavailable', text: 'The active enrollment for this student could not be loaded.', confirmButtonColor: '#b8860b' });
+            return;
+        }
+
+        const studentName = `${escapeHtml(row.first_name || '')} ${escapeHtml(row.last_name || '')}`.trim() || 'Student';
+        const sessionCount = Number(row.sessions || 0);
+        const sessionList = Array.isArray(row.sessions_list) ? row.sessions_list : [];
+        const defaultSession = sessionList.find(isReschedulableSession) || sessionList[0] || null;
+
+        rescheduleState.enrollmentId     = Number(row.enrollment_id || 0);
+        rescheduleState.studentLabel     = studentName;
+        rescheduleState.sessionId        = Number(defaultSession?.session_id || 0);
+        rescheduleState.sessionLabel     = defaultSession ? `Session ${defaultSession.session_number || '—'}` : '';
+        rescheduleState.slots            = [];
+        rescheduleState.selectedSlotIndex = -1;
+        rescheduleState.teacherId        = Number(row.assigned_teacher_id || 0);
+        rescheduleState.instrumentId     = Number(row.instrument_id || 0);
+        rescheduleState.branchId         = Number(row.branch_id || deskBranchId || 0);
+
+        // Populate right-panel context fields
+        const instrLabel   = document.getElementById('rescheduleInstrumentLabel');
+        const pkgLabel     = document.getElementById('reschedulePackageLabel');
+        const typeLabel    = document.getElementById('rescheduleInstrumentTypeLabel');
+        if (instrLabel) instrLabel.textContent = row.instrument_name || '—';
+        if (pkgLabel)   pkgLabel.textContent   = row.package_name   || '—';
+        if (typeLabel)  typeLabel.textContent  = row.type_name      || '—';
+
+        // Load instructors matched to this student's package instrument into the dropdown
+        await loadTeachersForReschedule(row);
+
+        studentInfo.innerHTML = `
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Student</div>
+                    <div class="mt-1 font-bold text-slate-900">${studentName}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Branch</div>
+                    <div class="mt-1 font-bold text-slate-900">${escapeHtml(row.branch_name || '—')}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Assigned Teacher</div>
+                    <div class="mt-1 font-bold text-slate-900">${escapeHtml(`${row.teacher_first_name || ''} ${row.teacher_last_name || ''}`.trim() || '—')}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Sessions</div>
+                    <div class="mt-1 font-bold text-slate-900">${sessionCount}</div>
+                </div>
+            </div>
+        `;
+
+        const modalTitle = document.getElementById('rescheduleModalTitle');
+        const modalMeta  = document.getElementById('rescheduleModalMeta');
+        if (modalTitle) modalTitle.textContent = 'Reschedule Student Session';
+        if (modalMeta)  modalMeta.textContent  = defaultSession
+            ? `Loaded ${sessionList.length} session${sessionList.length === 1 ? '' : 's'} for selection.`
+            : 'No session schedule available yet.';
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        renderRescheduleSessionCards(row);
+        if (defaultSession) {
+            await loadRescheduleSlots(Number(defaultSession.session_id || 0), row);
+        } else {
+            setRescheduleStatus('No session is available to reschedule yet.', 'error');
+        }
+    }
+
+    // Load instructors matched to the student's package instrument
+    async function loadTeachersForReschedule(row) {
+        const select = document.getElementById('rescheduleTeacherSelect');
+        const hint   = document.getElementById('rescheduleTeacherHint');
+        if (!select) return;
+        select.innerHTML = '<option value="">Loading…</option>';
+
+        try {
+            const branchId = Number(row?.branch_id || deskBranchId || 0);
+            const currentTeacherId = Number(row?.assigned_teacher_id || 0);
+            const instrumentTypeId = Number(row?.instrument_type_id || 0);
+            const instrumentName = String(row?.instrument_name || '').trim();
+            const instrumentTypeName = String(row?.type_name || '').trim();
+            const candidateMap = new Map();
+            const addCandidate = (teacher) => {
+                const tid = Number(teacher?.teacher_id || 0);
+                if (tid < 1 || candidateMap.has(tid)) return;
+                candidateMap.set(tid, {
+                    teacher_id: tid,
+                    teacher_name: String(teacher.teacher_name || `${teacher.first_name || ''} ${teacher.last_name || ''}`).trim() || 'Teacher',
+                    specialization: String(teacher.specialization || 'General').trim() || 'General'
+                });
+            };
+
+            if (Array.isArray(row?.teacher_candidates) && row.teacher_candidates.length) {
+                row.teacher_candidates.forEach(addCandidate);
+            } else {
+                let url = `${baseApiUrl}/teachers.php?action=get-teachers`;
+                if (branchId > 0) url += `&branch_id=${encodeURIComponent(branchId)}`;
+                const res  = await axios.get(url);
+                const data = res.data || {};
+                const teachers = Array.isArray(data.teachers) ? data.teachers : [];
+
+                teachers.forEach((teacher) => {
+                    const specText = String(teacher.specialization || '').toLowerCase();
+                    const specializationIds = Array.isArray(teacher.specialization_ids)
+                        ? teacher.specialization_ids.map(v => Number(v || 0)).filter(v => v > 0)
+                        : [];
+                    const matchesAllRound = specText.includes('all') || specText.includes('general') || specText.includes('multi');
+                    const matchesTypeId = instrumentTypeId > 0 && specializationIds.includes(instrumentTypeId);
+                    const matchesName = [instrumentName, instrumentTypeName].some(token => {
+                        const normalizedToken = String(token || '').trim().toLowerCase();
+                        return normalizedToken !== '' && (specText.includes(normalizedToken) || normalizedToken.includes(specText));
+                    });
+                    if (matchesAllRound || matchesTypeId || matchesName) {
+                        addCandidate({
+                            teacher_id: teacher.teacher_id,
+                            teacher_name: `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim(),
+                            specialization: teacher.specialization || 'General'
+                        });
+                    }
+                });
+            }
+
+            if (currentTeacherId > 0 && !candidateMap.has(currentTeacherId)) {
+                addCandidate({
+                    teacher_id: currentTeacherId,
+                    teacher_name: `${row?.teacher_first_name || ''} ${row?.teacher_last_name || ''}`.trim() || 'Previous instructor',
+                    specialization: 'Previous instructor'
+                });
+            }
+
+            const teachers = Array.from(candidateMap.values());
+
+            if (!teachers.length) {
+                select.innerHTML = '<option value="">No teachers available</option>';
+                if (hint) hint.textContent = 'No instructors matched this package instrument.';
+                return;
+            }
+
+            select.innerHTML = teachers.map(t => {
+                const tid  = Number(t.teacher_id || 0);
+                const name = String(t.teacher_name || 'Teacher').trim() || 'Teacher';
+                const spec = t.specialization ? ` — ${t.specialization}` : '';
+                const isCurrent = tid === Number(currentTeacherId);
+                const currentTag = isCurrent ? ' (Previous)' : '';
+                return `<option value="${tid}" ${isCurrent ? 'selected' : ''}>${escapeHtml(name)}${escapeHtml(spec)}${currentTag}</option>`;
+            }).join('');
+
+            rescheduleState.teacherId = Number(select.value || currentTeacherId || 0);
+
+            if (hint) {
+                const currentTeacher = teachers.find(t => Number(t.teacher_id) === Number(currentTeacherId));
+                const cname = currentTeacher ? currentTeacher.teacher_name : 'Previous instructor';
+                hint.textContent = `${cname} pre-selected for ${instrumentName || 'this instrument'}${instrumentTypeName ? ` (${instrumentTypeName})` : ''}.`;
+            }
+
+            // When teacher changes, reload the slots for the selected session
+            select.onchange = async () => {
+                rescheduleState.teacherId = Number(select.value || 0);
+                rescheduleState.slots = [];
+                rescheduleState.selectedSlotIndex = -1;
+                if (rescheduleState.sessionId) {
+                    const row = (await loadActiveEnrollmentsCache()).find(r => Number(r.enrollment_id) === Number(rescheduleState.enrollmentId));
+                    await loadRescheduleSlots(rescheduleState.sessionId, row);
+                }
+            };
+        } catch (e) {
+            const fallbackName = `${row?.teacher_first_name || ''} ${row?.teacher_last_name || ''}`.trim() || 'Previous instructor';
+            select.innerHTML = `<option value="${currentTeacherId}">${escapeHtml(fallbackName)} (offline)</option>`;
+            if (hint) hint.textContent = `Could not load instructor list. Using ${fallbackName}.`;
+        }
+    }
+
+    async function submitRescheduleFromModal() {
+        const sessionId = Number(rescheduleState.sessionId || 0);
+        const slot = rescheduleState.slots[Number(rescheduleState.selectedSlotIndex)];
+        if (!sessionId) {
+            setRescheduleStatus('Please choose a session first.', 'error');
+            return;
+        }
+        if (!slot) {
+            setRescheduleStatus('Please choose an available slot.', 'error');
+            return;
+        }
+
+        const submitBtn = document.getElementById('rescheduleSubmitBtn');
+        const submitText = document.getElementById('rescheduleSubmitText');
+        if (submitBtn) submitBtn.disabled = true;
+        if (submitText) submitText.textContent = 'Rescheduling...';
+
+        try {
+            const selectedTeacherId = Number(document.getElementById('rescheduleTeacherSelect')?.value || rescheduleState.teacherId || 0);
+            const res = await axios.post(`${baseApiUrl}/students.php?action=reschedule-session`, {
+                session_id: sessionId,
+                session_date: slot.session_date,
+                start_time: slot.start_time,
+                end_time: slot.end_time,
+                teacher_id: selectedTeacherId,
+                reason: 'Frozen account rescheduled by desk'
+            });
+            const data = res.data || {};
+            if (data.success) {
+                closeRescheduleModal();
+                Swal.fire({ icon: 'success', title: 'Rescheduled', text: data.message || 'Session rescheduled successfully.', confirmButtonColor: '#b8860b', timer: 2200, showConfirmButton: false });
+                activeEnrollmentsCache = [];
+                await Promise.all([loadFrozenStudents(), loadFreezePayments()]);
+            } else {
+                setRescheduleStatus(data.error || 'Failed to reschedule session.', 'error');
+            }
+        } catch (error) {
+            setRescheduleStatus(error?.response?.data?.error || 'Network error while rescheduling.', 'error');
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+            if (submitText) submitText.textContent = 'Confirm Reschedule';
+        }
+    }
+    function statusBadge(status) {
+        const map = {
+            Pending:  'bg-amber-100 text-amber-700 border-amber-200',
+            Paid:     'bg-emerald-100 text-emerald-700 border-emerald-200',
+            Rejected: 'bg-rose-100 text-rose-700 border-rose-200'
+        };
+        return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${map[status] || 'bg-slate-100 text-slate-600'}">${escHtml(status)}</span>`;
+    }
+
+    function paymentBadge(status) {
+        const key = String(status || 'None');
+        const map = {
+            Paid: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            Pending: 'bg-amber-100 text-amber-700 border-amber-200',
+            Rejected: 'bg-rose-100 text-rose-700 border-rose-200',
+            None: 'bg-slate-100 text-slate-600 border-slate-200'
+        };
+        return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${map[key] || map.None}">${escHtml(key)}</span>`;
+    }
+
+    function setFreezeFilter(f) {
+        currentFilter = f;
+        document.querySelectorAll('.freeze-filter-btn').forEach(btn => {
+            const active = btn.dataset.filter === f;
+            btn.className = active
+                ? 'freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg bg-slate-900 text-white transition'
+                : 'freeze-filter-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition';
+        });
+        renderTable();
+    }
+
+    function setFreezeView(view) {
+        activeFreezeView = ['students', 'payments', 'history'].includes(view) ? view : 'students';
+
+        const studentsSection = document.getElementById('frozenStudentsSection');
+        const paymentsSection = document.getElementById('freezePaymentsSection');
+        const historySection = document.getElementById('freezeHistorySection');
+        const viewButtons = document.querySelectorAll('.freeze-view-btn');
+
+        if (studentsSection) studentsSection.classList.toggle('hidden', activeFreezeView !== 'students');
+        if (paymentsSection) paymentsSection.classList.toggle('hidden', activeFreezeView !== 'payments');
+        if (historySection) historySection.classList.toggle('hidden', activeFreezeView !== 'history');
+
+        viewButtons.forEach(btn => {
+            const active = btn.dataset.view === activeFreezeView;
+            btn.className = active
+                ? 'freeze-view-btn h-10 px-5 text-sm font-semibold rounded-lg bg-slate-900 text-white transition'
+                : 'freeze-view-btn h-10 px-5 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition';
+        });
+    }
+
+    function renderFreezeHistory() {
+        const tbody = document.getElementById('freezeHistoryBody');
+        if (!tbody) return;
+
+        const rows = freezeHistory;
+        const countEl = document.getElementById('historyCount');
+        if (countEl) countEl.textContent = String(rows.length);
+
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">
+                <i class="fas fa-clock-rotate-left text-3xl text-slate-200 block mb-3"></i>
+                No approved or rejected payments yet.
+            </td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = rows.map(r => {
+            const name = `${escHtml(r.first_name || '')} ${escHtml(r.last_name || '')}`.trim() || 'Student';
+            const reviewed = r.reviewed_at ? fmtDate(r.reviewed_at) : (r.created_at ? fmtDate(r.created_at) : '—');
+            const statusValue = String(r.status || '').trim().toLowerCase();
+            const statusLabel = statusValue === 'paid' ? 'Approved' : 'Rejected';
+            const statusClass = statusValue === 'paid'
+                ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                : 'bg-rose-100 text-rose-700 border-rose-200';
+
+            return `<tr class="hover:bg-slate-50 transition">
+                <td class="px-6 py-4">
+                    <div class="font-semibold text-slate-900">${name}</div>
+                    <div class="text-xs text-slate-500">${escHtml(r.email || '')}</div>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-700">${escHtml(r.branch_name || '—')}</td>
+                <td class="px-6 py-4 font-bold text-slate-800">₱${Number(r.amount || 100).toFixed(2)}</td>
+                <td class="px-6 py-4">
+                    <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusClass}">${statusLabel}</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-700">${escHtml(r.receipt_number || '—')}</td>
+                <td class="px-6 py-4 text-sm text-slate-700">${escHtml(reviewed)}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderFrozenStudents() {
+        const tbody = document.getElementById('frozenStudentsBody');
+        if (!tbody) return;
+
+        const pendingPayments = frozenStudents.filter(row => String(row.freeze_payment_status || 'None') !== 'Paid').length;
+        const countEl = document.getElementById('frozenCount');
+        const pendingCountEl = document.getElementById('frozenPendingCount');
+        if (countEl) countEl.textContent = String(frozenStudents.length);
+        if (pendingCountEl) pendingCountEl.textContent = String(pendingPayments);
+
+        if (!frozenStudents.length) {
+            tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-10 text-center text-slate-400">
+                <i class="fas fa-snowflake text-3xl text-slate-200 block mb-3"></i>
+                No frozen student accounts found.
+            </td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = frozenStudents.map(row => {
+            const name = `${escHtml(row.first_name || '')} ${escHtml(row.last_name || '')}`.trim() || 'Student';
+            const paymentStatus = row.freeze_payment_status || 'None';
+            const freezePaymentId = Number(row.freeze_payment_id || 0);
+            const enrollmentSince = row.enrollment_created_at ? fmtDate(row.enrollment_created_at) : '—';
+            const absenceRecords = Array.isArray(row.absence_records) ? row.absence_records : [];
+            const latestAbsence = absenceRecords[0] || null;
+            const actionHtml = paymentStatus === 'Paid'
+                ? '<span class="text-xs font-semibold text-emerald-600">Already cleared</span>'
+                : paymentStatus === 'Pending'
+                    ? `<div class="flex flex-wrap gap-2">
+                            <button onclick="showFrozenStudent(${row.enrollment_id})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">
+                                <i class="fas fa-eye text-[10px]"></i> Details
+                            </button>
+                            <button onclick="approveFreeze(${freezePaymentId})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-bold transition">
+                                <i class="fas fa-check text-[10px]"></i> Approve
+                            </button>
+                       </div>`
+                    : `<div class="flex flex-wrap gap-2">
+                            <button onclick="showFrozenStudent(${row.enrollment_id})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">
+                                <i class="fas fa-eye text-[10px]"></i> Details
+                            </button>
+                            <button onclick="payNowFrozenStudent(${row.enrollment_id}, ${row.student_id}, ${freezePaymentId})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-bold transition">
+                                <i class="fas fa-money-bill text-[10px]"></i> Pay Now
+                            </button>
+                       </div>`;
+
+            return `<tr class="hover:bg-rose-50/30 transition">
+                <td class="px-6 py-4">
+                    <div class="font-semibold text-slate-900">${name}</div>
+                    <div class="text-xs text-slate-500">${escHtml(row.email || '')}</div>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-700">${escHtml(row.branch_name || '—')}</td>
+                <td class="px-6 py-4 text-sm text-slate-700">${escHtml(row.package_name || '—')}</td>
+                <td class="px-6 py-4 max-w-xs">
+                    <div class="flex items-center gap-2"><span class="font-bold text-rose-600">${Number(row.used_absences || 0)}</span><span class="text-xs text-slate-400">absence${Number(row.used_absences || 0) === 1 ? '' : 's'} · ${Number(row.consecutive_absences || 0)} consecutive</span></div>
+                    <div class="mt-1 truncate text-xs text-slate-600" title="${escHtml(latestAbsence ? absenceReason(latestAbsence) : 'No reason was recorded.')}">${escHtml(latestAbsence ? absenceReason(latestAbsence) : 'No reason was recorded.')}</div>
+                    ${latestAbsence ? `<div class="mt-0.5 text-[11px] text-slate-400">Latest: ${fmtDate(latestAbsence.session_date)} · ${absenceType(latestAbsence)}</div>` : ''}
+                </td>
+                <td class="px-6 py-4">${paymentBadge(paymentStatus)}</td>
+                <td class="px-6 py-4 text-sm text-slate-700">${enrollmentSince}</td>
+                <td class="px-6 py-4">${actionHtml}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('freezeTableBody');
+        if (!tbody) return;
+
+        const rows = currentFilter === 'all'
+            ? freezePayments
+            : freezePayments.filter(r => r.status === currentFilter);
+
+        // Update chips
+        const pending = freezePayments.filter(r => r.status === 'Pending').length;
+        const paid    = freezePayments.filter(r => r.status === 'Paid').length;
+        const chipP = document.getElementById('chipPending');
+        const chipPd = document.getElementById('chipPaid');
+        if (chipP)  chipP.textContent  = String(pending);
+        if (chipPd) chipPd.textContent = String(paid);
+
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-10 text-center text-slate-400">
+                <i class="fas fa-snowflake text-3xl text-slate-200 block mb-3"></i>
+                No ${currentFilter === 'all' ? '' : currentFilter.toLowerCase() + ' '}freeze payment records found.
+            </td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = rows.map(r => {
+            const name  = `${escHtml(r.first_name || '')} ${escHtml(r.last_name || '')}`.trim() || 'Student';
+            const isPending  = r.status === 'Pending';
+            const isOnline   = (r.source || 'online') === 'online';
+
+            const actionBtns = isPending ? `
+                <div class="flex flex-wrap gap-2">
+                    ${isOnline ? `
+                        <button onclick="approveFreeze(${r.freeze_payment_id})"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-bold transition">
+                            <i class="fas fa-check text-[10px]"></i> Approve
+                        </button>
+                        <button onclick="rejectFreeze(${r.freeze_payment_id})"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-bold transition">
+                            <i class="fas fa-times text-[10px]"></i> Reject
+                        </button>
+                    ` : `
+                        <button onclick="walkinPayFreeze(${r.enrollment_id}, ${r.student_id}, ${r.freeze_payment_id})"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold transition">
+                            <i class="fas fa-money-bill text-[10px]"></i> Walk-In Pay
+                        </button>
+                    `}
+                </div>
+            ` : (r.status === 'Paid' ? '<span class="text-xs text-emerald-600 font-semibold">Cleared</span>' : '<span class="text-xs text-rose-500 font-semibold">Rejected</span>');
+
+            const refHtml = r.reference_number
+                ? `<div class="text-xs text-slate-500 mt-0.5">Ref: ${escHtml(r.reference_number)}</div>`
+                : '';
+
+            return `<tr class="hover:bg-rose-50/30 transition">
+                <td class="px-6 py-4">
+                    <div class="font-semibold text-slate-900">${name}</div>
+                    <div class="text-xs text-slate-500">${escHtml(r.email || '')}</div>
+                    <div class="text-xs text-slate-400">${escHtml(r.branch_name || '')}</div>
+                </td>
+                <td class="px-6 py-4 text-slate-700 text-sm">${escHtml(r.package_name || '—')}</td>
+                <td class="px-6 py-4 font-bold text-rose-600">${r.used_absences ?? '—'}</td>
+                <td class="px-6 py-4 font-bold text-slate-800">₱${Number(r.amount || 100).toFixed(2)}</td>
+                <td class="px-6 py-4">
+                    <span class="inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-xs font-semibold ${isOnline ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-600'}">
+                        ${isOnline ? '<i class="fas fa-wifi text-[9px]"></i> Online' : '<i class="fas fa-store text-[9px]"></i> Walk-In'}
+                    </span>
+                    <div class="text-xs text-slate-500 mt-0.5">${escHtml(r.payment_method || '—')}</div>
+                    ${refHtml}
+                </td>
+                <td class="px-6 py-4">${statusBadge(r.status)}</td>
+                <td class="px-6 py-4 text-xs text-slate-500">${fmtDate(r.created_at)}</td>
+                <td class="px-6 py-4">${actionBtns}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function showFrozenStudent(enrollmentId) {
+        const row = frozenStudents.find(item => Number(item.enrollment_id) === Number(enrollmentId));
+        if (!row) return;
+
+        const name = `${escHtml(row.first_name || '')} ${escHtml(row.last_name || '')}`.trim() || 'Student';
+        const paymentStatus = row.freeze_payment_status || 'None';
+        const paymentMethod = row.freeze_payment_method || '—';
+        const paymentDate = row.freeze_payment_created_at ? fmtDate(row.freeze_payment_created_at) : '—';
+        const freezePaymentId = Number(row.freeze_payment_id || 0);
+        const absenceRecords = Array.isArray(row.absence_records) ? row.absence_records : [];
+        const absenceHistory = absenceRecords.length
+            ? absenceRecords.map(record => `
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="font-semibold text-slate-900">Session ${Number(record.session_number || 0) || '—'} · ${fmtDate(record.session_date)}</span>
+                        <span class="rounded-full bg-white px-2 py-1 text-[11px] font-bold text-slate-600">${absenceType(record)}</span>
+                    </div>
+                    <p class="mt-1 text-slate-600">${escHtml(absenceReason(record))}</p>
+                </div>`).join('')
+            : '<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">No detailed absence reason was recorded for the sessions that caused this freeze.</div>';
+
+        Swal.fire({
+            title: `Frozen Account - ${name}`,
+            width: 640,
+            confirmButtonText: 'Close',
+            didOpen: () => {
+                const btn = document.getElementById('freezeModalPayNowBtn');
+                if (btn && paymentStatus !== 'Paid') {
+                    btn.addEventListener('click', () => payNowFrozenStudent(row.enrollment_id, row.student_id, freezePaymentId));
+                }
+            },
+            html: `
+                <div class="text-left space-y-3 text-sm text-slate-700">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><span class="font-semibold text-slate-900">Branch:</span> ${escHtml(row.branch_name || '—')}</div>
+                        <div><span class="font-semibold text-slate-900">Package:</span> ${escHtml(row.package_name || '—')}</div>
+                        <div><span class="font-semibold text-slate-900">Absences:</span> ${Number(row.used_absences || 0)}</div>
+                        <div><span class="font-semibold text-slate-900">Consecutive:</span> ${Number(row.consecutive_absences || 0)}</div>
+                        <div><span class="font-semibold text-slate-900">Payment State:</span> ${escHtml(paymentStatus)}</div>
+                        <div><span class="font-semibold text-slate-900">Payment Method:</span> ${escHtml(paymentMethod)}</div>
+                        <div><span class="font-semibold text-slate-900">Payment Submitted:</span> ${escHtml(paymentDate)}</div>
+                        <div><span class="font-semibold text-slate-900">Phone:</span> ${escHtml(row.phone || '—')}</div>
+                    </div>
+                    <div>
+                        <div class="mb-2 flex items-center justify-between"><span class="font-bold text-slate-900">Recorded absence history</span><span class="text-xs text-slate-500">${absenceRecords.length} record${absenceRecords.length === 1 ? '' : 's'}</span></div>
+                        <div class="max-h-60 space-y-2 overflow-y-auto pr-1">${absenceHistory}</div>
+                    </div>
+                    ${paymentStatus === 'Paid'
+                        ? '<div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700 font-semibold">Account has already been cleared.</div>'
+                        : paymentStatus === 'Pending'
+                            ? `<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700 font-semibold">A payment is already pending approval for this account.</div>`
+                            : `<button type="button" id="freezeModalPayNowBtn" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-white font-bold hover:bg-emerald-700 transition"><i class="fas fa-money-bill"></i> Pay Now</button>`}
+                </div>
+            `
+        });
+    }
+
+    async function payNowFrozenStudent(enrollmentId, studentId, existingFpId) {
+        const confirm = await Swal.fire({
+            title: 'Pay Now?',
+            text: 'Confirm ₱100 payment for this frozen account. The account will be unfrozen right away if the payment is approved.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Continue',
+            confirmButtonColor: '#b8860b',
+            cancelButtonText: 'Cancel'
+        });
+        if (!confirm.isConfirmed) return;
+        return walkinPayFreeze(enrollmentId, studentId, existingFpId || null);
+    }
+
+    async function loadFrozenStudents() {
+        try {
+            let url = `${baseApiUrl}/students.php?action=get-frozen-students`;
+            if (deskBranchId > 0) url += `&branch_id=${encodeURIComponent(deskBranchId)}`;
+            const res  = await axios.get(url);
+            const data = res.data || {};
+            frozenStudents = data.success && Array.isArray(data.students) ? data.students : [];
+            renderFrozenStudents();
+        } catch (e) {
+            const tbody = document.getElementById('frozenStudentsBody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-500">Failed to load frozen students. Please try again.</td></tr>`;
+        }
+    }
+
+    async function loadFreezePayments() {
+        const tbody = document.getElementById('freezeTableBody');
+        try {
+            let url = `${baseApiUrl}/students.php?action=get-freeze-payments`;
+            if (deskBranchId > 0) url += `&branch_id=${encodeURIComponent(deskBranchId)}`;
+            const res  = await axios.get(url);
+            const data = res.data || {};
+            freezePayments = data.success && Array.isArray(data.payments) ? data.payments : [];
+            freezeHistory = freezePayments.filter(row => ['paid', 'rejected'].includes(String(row.status || '').trim().toLowerCase()));
+            renderTable();
+            renderFreezeHistory();
+        } catch (e) {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-8 text-center text-red-500">Failed to load data. Please try again.</td></tr>`;
+        }
+    }
+
+    async function approveFreeze(fpId) {
+        const confirm = await Swal.fire({
+            title: 'Approve Payment?',
+            text: 'This will mark the payment as Paid and reactivate the student account.',
+            icon: 'question',
+            showCancelButton: true,
+            showDenyButton: true,
+            confirmButtonText: 'Resume schedule',
+            denyButtonText: 'Reschedule now',
+            confirmButtonColor: '#16a34a',
+            denyButtonColor: '#b8860b',
+            cancelButtonText: 'Cancel'
+        });
+        if (!confirm.isConfirmed && !confirm.isDenied) return;
+        try {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const freezeRow = freezePayments.find(row => Number(row.freeze_payment_id || 0) === Number(fpId || 0));
+            const enrollmentId = Number(freezeRow?.enrollment_id || 0);
+            const res  = await axios.post(`${baseApiUrl}/students.php?action=approve-freeze-payment`, {
+                freeze_payment_id: fpId,
+                user_id: Number(user?.user_id || 0)
+            });
+            const data = res.data || {};
+            if (data.success) {
+                if (confirm.isDenied && enrollmentId > 0) {
+                    activeEnrollmentsCache = [];
+                    await openRescheduleModal(enrollmentId);
+                    return;
+                }
+
+                Swal.fire({ icon:'success', title:'Approved', text: data.message || 'Account unfrozen and schedule resumed.', confirmButtonColor:'#b8860b', timer: 2500, showConfirmButton: false });
+                await loadFreezePayments();
+            } else {
+                Swal.fire({ icon:'error', title:'Error', text: data.error || 'Could not approve.', confirmButtonColor:'#b8860b' });
+            }
+        } catch (e) {
+            Swal.fire({ icon:'error', title:'Error', text:'Network error.', confirmButtonColor:'#b8860b' });
+        }
+    }
+
+    async function rejectFreeze(fpId) {
+        const { value: reason, isConfirmed } = await Swal.fire({
+            title: 'Reject Payment?',
+            input: 'text',
+            inputLabel: 'Reason (optional)',
+            inputPlaceholder: 'Reference number',
+            showCancelButton: true,
+            confirmButtonText: 'Reject',
+            confirmButtonColor: '#dc2626',
+            cancelButtonText: 'Cancel'
+        });
+        if (!isConfirmed) return;
+        try {
+            const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+            const res  = await axios.post(`${baseApiUrl}/students.php?action=reject-freeze-payment`, {
+                freeze_payment_id: fpId,
+                reason: reason || '',
+                user_id: Number(user?.user_id || 0)
+            });
+            const data = res.data || {};
+            if (data.success) {
+                Swal.fire({ icon:'success', title:'Rejected', text: data.message || 'Payment rejected.', confirmButtonColor:'#b8860b', timer: 2000, showConfirmButton: false });
+                await loadFreezePayments();
+            } else {
+                Swal.fire({ icon:'error', title:'Error', text: data.error || 'Could not reject.', confirmButtonColor:'#b8860b' });
+            }
+        } catch (e) {
+            Swal.fire({ icon:'error', title:'Error', text:'Network error.', confirmButtonColor:'#b8860b' });
+        }
+    }
+
+    async function walkinPayFreeze(enrollmentId, studentId, existingFpId) {
+        const confirm = await Swal.fire({
+            title: 'Walk-In Payment',
+            text: 'Confirm ₱100 cash payment received. Account will be unfrozen immediately.',
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Confirm Cash Payment',
+            confirmButtonColor: '#b8860b',
+            cancelButtonText: 'Cancel'
+        });
+        if (!confirm.isConfirmed) return;
+
+        try {
+            // If there's already a pending row, approve it directly; otherwise submit as walkin
+            let res;
+            if (existingFpId) {
+                const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+                res = await axios.post(`${baseApiUrl}/students.php?action=approve-freeze-payment`, {
+                    freeze_payment_id: existingFpId,
+                    user_id: Number(user?.user_id || 0)
+                });
+            } else {
+                const payload = new FormData();
+                payload.append('action',        'submit-freeze-payment');
+                payload.append('enrollment_id', String(enrollmentId));
+                payload.append('student_id',    String(studentId));
+                payload.append('payment_method','Cash');
+                payload.append('source',        'walkin');
+                res = await axios.post(`${baseApiUrl}/students.php?action=submit-freeze-payment`, payload);
+            }
+            const data = res.data || {};
+            if (data.success) {
+                const postApproval = await Swal.fire({
+                    title: 'Payment confirmed',
+                    text: 'What would you like to do next?',
+                    icon: 'success',
+                    showCancelButton: true,
+                    showDenyButton: true,
+                    confirmButtonText: 'Resume schedule',
+                    denyButtonText: 'Reschedule now',
+                    confirmButtonColor: '#16a34a',
+                    denyButtonColor: '#b8860b',
+                    cancelButtonText: 'Later'
+                });
+
+                if (postApproval.isDenied) {
+                    activeEnrollmentsCache = [];
+                    await openRescheduleModal(enrollmentId);
+                    return;
+                }
+
+                await loadFreezePayments();
+            } else {
+                Swal.fire({ icon:'error', title:'Error', text: data.error || 'Could not process.', confirmButtonColor:'#b8860b' });
+            }
+        } catch (e) {
+            Swal.fire({ icon:'error', title:'Error', text:'Network error.', confirmButtonColor:'#b8860b' });
+        }
+    }
+
+    // Also allow desk to start a walk-in payment for any frozen student not yet in list
+    async function deskWalkinFreezeForStudent(enrollmentId, studentId) {
+        return walkinPayFreeze(enrollmentId, studentId, null);
+    }
+
+    window.approveFreeze        = approveFreeze;
+    window.rejectFreeze         = rejectFreeze;
+    window.walkinPayFreeze      = walkinPayFreeze;
+    window.setFreezeFilter      = setFreezeFilter;
+    window.setFreezeView        = setFreezeView;
+    window.showFrozenStudent    = showFrozenStudent;
+    window.payNowFrozenStudent  = payNowFrozenStudent;
+    window.openRescheduleModal  = openRescheduleModal;
+    window.closeRescheduleModal = closeRescheduleModal;
+    window.submitRescheduleFromModal = submitRescheduleFromModal;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        const role = String(user?.role_name || '').toLowerCase();
+        if (!user || !['admin','administrator'].includes(role)) {
+            Swal.fire({ icon:'error', title:'Access Denied', text:'You do not have access to frozen accounts.', confirmButtonColor:'#b8860b' })
+                .then(() => { window.location.href = '../../index.html'; });
+            return;
+        }
+        const isAdmin = ['admin','administrator'].includes(role);
+        const displayName = `${String(user.first_name || '').trim()} ${String(user.last_name || '').trim()}`.trim()
+            || user.username || user.email || 'Administrator';
+        const userNameNav = document.getElementById('userNameNav');
+        if (userNameNav) userNameNav.textContent = displayName;
+        const profileMenuName = document.getElementById('profileMenuName');
+        if (profileMenuName) profileMenuName.textContent = displayName;
+        deskBranchId = isAdmin ? 0 : Number(user.branch_id || 0);
+        const branchName = user.branch_name || '—';
+        document.querySelectorAll('.desk-topnav-branch span').forEach(el => el.textContent = branchName);
+        if (isAdmin) {
+            const wrap = document.getElementById('adminBranchFilterWrap');
+            const select = document.getElementById('adminBranchFilter');
+            wrap?.classList.remove('hidden');
+            wrap?.classList.add('inline-flex');
+            try {
+                const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches-all`);
+                const branches = Array.isArray(response.data?.branches) ? response.data.branches : [];
+                branches.forEach(branch => {
+                    const option = document.createElement('option');
+                    option.value = branch.branch_id;
+                    option.textContent = branch.branch_name;
+                    select.appendChild(option);
+                });
+                select.addEventListener('change', async () => {
+                    deskBranchId = Number(select.value || 0);
+                    await Promise.all([loadFrozenStudents(), loadFreezePayments()]);
+                });
+            } catch (error) {
+                console.error('Unable to load branches', error);
+            }
+        }
+        if (typeof syncDeskNavUser === 'function') syncDeskNavUser();
+        await loadFrozenStudents();
+        await loadFreezePayments();
+        setFreezeView('students');
+    });
+</script>
+</body>
+</html>

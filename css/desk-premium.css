@@ -463,6 +463,25 @@
     display: none;
 }
 
+.desk-topnav .desk-profile-trigger:focus,
+.desk-topnav .desk-profile-trigger:focus-visible {
+    outline: none !important;
+}
+
+.desk-topnav .desk-profile-trigger:focus-visible > div {
+    border-color: rgba(212, 175, 55, 0.7) !important;
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.16);
+}
+
+.desk-topnav details[open] .desk-profile-trigger > div {
+    border-color: rgba(212, 175, 55, 0.42) !important;
+    background: rgba(255, 255, 255, 0.09) !important;
+}
+
+.desk-topnav .desk-profile-menu {
+    transform-origin: top right;
+}
+
 .desk-topnav .desk-topnav-branch {
     background: rgba(255, 255, 255, 0.11) !important;
     border-color: rgba(255, 255, 255, 0.16) !important;
@@ -479,8 +498,8 @@
     color: #f5c542 !important;
 }
 
-.desk-topnav details[open] summary .rounded-full {
-    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.35);
+.desk-topnav details[open] summary .h-8.w-8.rounded-full {
+    border-color: rgba(212, 175, 55, 0.7) !important;
 }
 
 /* —— Responsive: slightly tighter on small screens —— */

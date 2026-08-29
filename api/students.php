@@ -1164,6 +1164,7 @@ class StudentsApi
         $columnSql = [
             'operation_id' => "ALTER TABLE tbl_sessions ADD COLUMN operation_id INT NULL AFTER room_id",
             'attendance_status' => "ALTER TABLE tbl_sessions ADD COLUMN attendance_status ENUM('Pending','Present','Absent','Late','Excused','CI','Teacher Absent') NOT NULL DEFAULT 'Pending' AFTER status",
+            'instructor_completed_at' => "ALTER TABLE tbl_sessions ADD COLUMN instructor_completed_at DATETIME NULL AFTER attendance_status",
             'absence_notice' => "ALTER TABLE tbl_sessions ADD COLUMN absence_notice ENUM('None','Prior','NoNotice','Teacher') NOT NULL DEFAULT 'None' AFTER attendance_status",
             'counted_in' => "ALTER TABLE tbl_sessions ADD COLUMN counted_in TINYINT(1) NOT NULL DEFAULT 0 AFTER absence_notice",
             'makeup_eligible' => "ALTER TABLE tbl_sessions ADD COLUMN makeup_eligible TINYINT(1) NOT NULL DEFAULT 0 AFTER counted_in",
@@ -1254,6 +1255,7 @@ class StudentsApi
                     ts.end_time,
                     ts.status,
                     ts.attendance_status,
+                    ts.instructor_completed_at,
                     ts.absence_notice,
                     ts.attendance_notes,
                     ts.notes,
@@ -4172,6 +4174,9 @@ class StudentsApi
             if ($guardianEmail === '') {
                 $this->sendJSON(['error' => 'guardian_email is required for With Guardian'], 400);
             }
+            if (!filter_var($guardianEmail, FILTER_VALIDATE_EMAIL)) {
+                $this->sendJSON(['error' => 'A valid guardian email is required'], 400);
+            }
 
             $stmtGuardian = $this->conn->prepare("
                 SELECT guardian_id, first_name, last_name, email, phone, relationship_type, status
@@ -4897,6 +4902,10 @@ class StudentsApi
                     s.status,
                     s.first_name,
                     s.last_name,
+                    s.email,
+                    s.phone,
+                    s.date_of_birth,
+                    s.address,
                     COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
                     COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
                     GREATEST(0, COALESCE(rf.registration_fee_amount, 1000.00) - COALESCE(rf.registration_fee_paid, 0.00)) AS registration_fee_due,

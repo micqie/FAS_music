@@ -345,6 +345,12 @@ function renderStudentSongs() {
     const emptyState = document.getElementById('studentCompletedEmptyState');
     const currentSong = getCurrentStudentSong();
     const featured = getStudentAssignedSongById(studentSelectedSongId) || currentSong || getFeaturedSong();
+    const doneButton = document.getElementById('studentMarkSongDoneBtn');
+    const featuredIsCurrent = !!featured && !!currentSong && Number(featured.assignment_id || 0) === Number(currentSong.assignment_id || 0);
+    if (doneButton) {
+        doneButton.classList.toggle('hidden', !featuredIsCurrent);
+        doneButton.disabled = !featuredIsCurrent;
+    }
     if (!grid) return;
 
     renderSelectedSongHeader(featured);
@@ -378,10 +384,11 @@ function renderStudentSongs() {
                     <span class="mt-2 inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${studentProgressBadgeClass(item.progress_status)}">${escapeStudentSongHtml(studentSongStatusLabel(item.progress_status))}</span>
                 </div>
             </div>
-            <div class="mt-3 flex flex-wrap gap-2">
+            <div class="mt-3 flex flex-wrap items-center gap-2">
                 <button type="button" data-student-song-open="${Number(item.assignment_id || 0)}" class="inline-flex items-center rounded-2xl ${active ? 'bg-gold-500 text-black' : 'bg-zinc-900 text-white dark:bg-white/10 dark:text-white'} px-3 py-2 text-sm font-bold transition hover:opacity-90">
                     <i class="fas fa-folder-open mr-2"></i>Open practice song
                 </button>
+                ${isCompleted ? '<span class="inline-flex items-center rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200"><i class="fas fa-circle-check mr-2"></i>Practice completed</span>' : ''}
             </div>
             ${isCurrent ? '<p class="mt-2 text-xs font-semibold text-[#a15d00]">This is the next song to finish.</p>' : ''}
             ${item.assigned_notes ? `<p class="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">${escapeStudentSongHtml(item.assigned_notes)}</p>` : ''}

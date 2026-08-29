@@ -20,16 +20,17 @@ document.addEventListener('DOMContentLoaded', () => {
     nav.style.top = '0';
     nav.style.width = 'auto';
 
-    // Keep Frozen Accounts available from every Admin screen. The shared page
-    // detects the Admin role and exposes the all-branches filter there.
-    if (!sidebar.querySelector('a[href*="desk_freezeaccounts.html"]')) {
+    // Keep the Admin-owned frozen account page available from every Admin screen.
+    if (!sidebar.querySelector('a[href*="admin_frozen_accounts.html"]')) {
         const managementNav = sidebar.querySelector('nav');
         if (managementNav) {
             const frozenLink = document.createElement('a');
-            frozenLink.href = '../desk/desk_freezeaccounts.html';
+            frozenLink.href = 'admin_frozen_accounts.html';
             frozenLink.className = 'flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group';
             frozenLink.innerHTML = '<i class="fas fa-snowflake mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Frozen Accounts';
-            managementNav.appendChild(frozenLink);
+            const sessionsLink = managementNav.querySelector('a[href*="admin_sessions.html"]');
+            if (sessionsLink) sessionsLink.insertAdjacentElement('afterend', frozenLink);
+            else managementNav.appendChild(frozenLink);
         }
     }
     if (!sidebar.querySelector('a[href*="admin_learning_materials.html"]')) {

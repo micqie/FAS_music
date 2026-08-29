@@ -63,9 +63,13 @@ if (!function_exists('fas_set_browser_binding_cookie')) {
         }
 
         $isSecure = fas_is_https_request();
+        // Keep the browser identity across browser restarts. The PHP login
+        // session remains a session cookie, but this identifier lets a verified
+        // re-login reclaim an abandoned database token safely.
+        $expiresAt = time() + (30 * 24 * 60 * 60);
         if (PHP_VERSION_ID >= 70300) {
             setcookie(fas_browser_binding_cookie_name(), $token, [
-                'expires' => 0,
+                'expires' => $expiresAt,
                 'path' => '/',
                 'domain' => '',
                 'secure' => $isSecure,
@@ -73,7 +77,7 @@ if (!function_exists('fas_set_browser_binding_cookie')) {
                 'samesite' => 'Lax',
             ]);
         } else {
-            setcookie(fas_browser_binding_cookie_name(), $token, 0, '/; samesite=Lax', '', $isSecure, true);
+            setcookie(fas_browser_binding_cookie_name(), $token, $expiresAt, '/; samesite=Lax', '', $isSecure, true);
         }
         $_COOKIE[fas_browser_binding_cookie_name()] = $token;
     }
@@ -375,7 +379,7 @@ if (!function_exists('fas_fetch_user_auth_record')) {
 }
 
 if (!function_exists('fas_is_session_timestamp_stale')) {
-    function fas_is_session_timestamp_stale(?string $timestamp, int $maxIdleSeconds = 2700): bool
+    function fas_is_session_timestamp_stale(?string $timestamp, int $maxIdleSeconds = 1800): bool
     {
         $timestamp = trim((string)$timestamp);
         if ($timestamp === '') {
@@ -489,6 +493,17 @@ if (!function_exists('fas_login_user')) {
             $activeToken = '';
             $activeBrowserHash = '';
         }
+
+        $sameBrowserBinding = $activeBrowserHash !== '' && hash_equals($activeBrowserHash, $browserHash);
+        $canReplaceAbandonedSession = $activeToken !== '' && $sameBrowserBinding;
+
+        if ($canReplaceAbandonedSession) {
+            // Correct credentials from the same/reopened browser start a fresh
+            // session and invalidate the abandoned token immediately.
+            fas_release_user_session_if_matches($conn, $userId, $activeToken);
+            $activeToken = '';
+            $activeBrowserHash = '';
+        }
         if (
             $activeToken !== ''
             && (
@@ -571,6 +586,11 @@ if (!function_exists('fas_resolve_authenticated_user')) {
         $activeBrowserHash = trim((string)($dbUser['active_browser_token_hash'] ?? ''));
         $browserToken = fas_get_browser_binding_token();
         $browserHash = $browserToken !== '' ? fas_browser_binding_hash($browserToken) : '';
+        if ($browserToken !== '') {
+            // Upgrade older session-only browser cookies to the persistent,
+            // secure binding used for same-browser recovery after restart.
+            fas_set_browser_binding_cookie($browserToken);
+        }
         if (
             $activeToken === ''
             || !hash_equals($activeToken, $sessionToken)

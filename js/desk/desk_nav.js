@@ -45,8 +45,8 @@
 
                         <!-- User block + dropdown trigger -->
                         <details class="relative group/desk-profile shrink-0">
-                            <summary class="list-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60" aria-label="Account menu">
-                                <div class="flex items-center gap-2.5 rounded-full border border-white/10 bg-white/5 pl-2 pr-3 py-1.5 hover:bg-white/10 transition">
+                            <summary class="desk-profile-trigger list-none cursor-pointer rounded-full outline-none" aria-label="Account menu">
+                                <div class="flex items-center gap-2.5 rounded-full border border-white/10 bg-white/5 pl-1.5 pr-3 py-1.5 hover:bg-white/10 transition">
                                     <!-- Circle avatar -->
                                     <div class="h-8 w-8 rounded-full bg-[#2a1f00] border border-gold-500/50 flex items-center justify-center shrink-0">
                                         <i class="fas fa-user text-gold-400 text-xs"></i>
@@ -62,11 +62,11 @@
                             </summary>
 
                             <!-- Dropdown menu -->
-                            <div class="absolute right-0 mt-2.5 w-64 rounded-2xl border border-white/10 bg-[#0f1115]/98 backdrop-blur-md shadow-2xl overflow-hidden
+                            <div class="desk-profile-menu absolute right-0 mt-2 w-60 rounded-xl border border-white/10 bg-[#0f1115]/98 backdrop-blur-md shadow-2xl overflow-hidden
                                         opacity-0 pointer-events-none group-open/desk-profile:opacity-100 group-open/desk-profile:pointer-events-auto
                                         transition-all duration-150 z-50">
                                 <!-- User info header -->
-                                <div class="flex items-center gap-3 px-4 py-3.5 border-b border-white/10">
+                                <div class="flex items-center gap-3 px-4 py-3 border-b border-white/10">
                                     <div class="h-9 w-9 rounded-full bg-[#2a1f00] border border-gold-500/40 flex items-center justify-center shrink-0">
                                         <i class="fas fa-user text-gold-400 text-sm"></i>
                                     </div>
@@ -75,17 +75,17 @@
                                         <p id="deskProfileMenuEmail" class="text-xs text-slate-400 truncate">—</p>
                                     </div>
                                 </div>
-                                <a href="desk_profile.html" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-white/5 transition">
+                                <a href="desk_profile.html" class="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5 transition">
                                     <i class="fas fa-user-pen text-gold-400 w-4 text-center"></i>
                                     Edit Profile
                                 </a>
                                 <button type="button" id="deskChangePasswordBtn"
-                                    class="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-white/5 transition text-left">
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5 transition text-left">
                                     <i class="fas fa-key text-gold-400 w-4 text-center"></i>
                                     Change Password
                                 </button>
                                 <button type="button" onclick="logout()"
-                                    class="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-red-300 hover:text-red-200 hover:bg-red-400/10 transition text-left border-t border-white/10">
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-red-300 hover:text-red-200 hover:bg-red-400/10 transition text-left border-t border-white/10">
                                     <i class="fas fa-sign-out-alt w-4 text-center"></i>
                                     Sign Out
                                 </button>

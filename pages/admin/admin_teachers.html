@@ -2,7 +2,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teachers</title>
+    <title>Instructors</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -93,16 +93,7 @@
                     <a href="admin_users.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-users-cog mr-3"></i> Users
                     </a>
-                    <details class="group/dropdown" open>
-                        <summary class="sidebar-item-active flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all w-full list-none cursor-pointer">
-                            <span class="flex items-center"><i class="fas fa-chalkboard-teacher mr-3"></i> Teachers</span>
-                            <i class="fas fa-chevron-down text-xs opacity-70 transition-transform group-open/dropdown:rotate-180"></i>
-                        </summary>
-                        <div class="mt-2 space-y-1">
-                            <a href="admin_teachers.html" class="block ml-11 px-3 py-2 text-sm font-semibold text-white bg-white/10 rounded-lg">Teacher Masterfile</a>
-                            <a href="admin_specializations.html" class="block ml-11 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">Specializations</a>
-                        </div>
-                    </details>
+                    <a href="admin_teachers.html" class="sidebar-item-active flex items-center px-4 py-3 text-sm font-semibold rounded-xl shadow-lg transition-all"><i class="fas fa-chalkboard-teacher mr-3"></i> Instructors</a>
                     <a href="admin_sessions.html" class="flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                         <i class="fas fa-calendar-check mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Sessions
                     </a>
@@ -145,16 +136,16 @@
         <div class="max-w-6xl mx-auto">
             <div class="mb-6 flex items-center justify-between">
                 <div>
-                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">Teachers Masterfile</h1>
+                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">Instructors</h1>
                     <div class="h-1 w-12 bg-gold-500 mt-2 rounded-full"></div>
-                    <p class="text-slate-500 mt-2">Manage teacher profiles, branch assignment, and status</p>
+                    <p class="text-slate-500 mt-2">Manage instructor profiles, branch assignments, and status</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <a href="admin_specializations.html" class="inline-flex items-center px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-sm font-bold rounded-xl transition-all duration-200">
                         <i class="fas fa-tags mr-2 text-gold-600"></i> Specializations
                     </a>
                     <button id="openTeacherModalBtn" class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-500 text-black text-sm font-bold rounded-xl shadow-lg shadow-gold-500/25 transition-all duration-200">
-                        <i class="fas fa-plus mr-2"></i> Add Teacher
+                        <i class="fas fa-plus mr-2"></i> Add Instructor
                     </button>
                 </div>
             </div>
@@ -182,14 +173,14 @@
 
             <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
                 <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
-                    <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-chalkboard-teacher mr-2 text-gold-500"></i>Teachers</h3>
+                    <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-chalkboard-teacher mr-2 text-gold-500"></i>Instructors</h3>
                     <span class="text-xs text-slate-500" id="teacherCount">Loading...</span>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead class="bg-slate-50">
                             <tr>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Teacher</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Instructor</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Specialization</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Branch</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Employment</th>
@@ -210,8 +201,8 @@
         <div class="teacher-modal-panel border border-slate-200 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto relative">
             <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white/95 backdrop-blur px-6 md:px-8 py-5 rounded-t-3xl ">
                 <div>
-                    <p class="text-[11px] font-bold uppercase tracking-[0.25em] text-gold-600 mb-1">Teacher Masterfile</p>
-                    <h3 id="teacherModalTitle" class="text-2xl font-black text-slate-900">Add Teacher</h3>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.25em] text-gold-600 mb-1">Instructor Profile</p>
+                    <h3 id="teacherModalTitle" class="text-2xl font-black text-slate-900">Add Instructor</h3>
                     <p id="teacherModalSubtitle" class="text-sm text-slate-500 mt-1">Set profile details, specializations, and portal login.</p>
                 </div>
                 <button id="closeTeacherModalBtn" type="button" class="h-10 w-10 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition" aria-label="Close">
@@ -234,6 +225,11 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Last Name *</label>
                             <input id="lastName" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Teacher Email</label>
+                            <input id="email" type="email" autocomplete="email" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20" placeholder="teacher@example.com">
+                            <p class="mt-1.5 text-xs text-slate-500">Updating this also updates the instructor's login email.</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Branch *</label>
@@ -310,12 +306,8 @@
                     </div>
 
                     <div id="accountModeRealPanel" class="space-y-3">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Teacher Email *</label>
-                            <input id="email" type="email" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20" placeholder="teacher@example.com">
-                        </div>
                         <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
-                            A temporary password will be emailed to this address. The teacher must change it on first login.
+                            A temporary password will be sent to the Teacher Email entered under Basic Information. The teacher must change it on first login.
                         </div>
                     </div>
 
