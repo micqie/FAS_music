@@ -125,17 +125,17 @@ async function loadAuditLogs(page = 1) {
                     return `
                     <tr class="border-b border-slate-100 hover:bg-slate-50 transition group audit-row"
                         data-log='${escapeHtml(JSON.stringify(log))}'>
-                        <td class="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">${escapeHtml(formatDateTime(log.created_at))}</td>
-                        <td class="px-4 py-3">${severityBadge(log.severity)}</td>
-                        <td class="px-4 py-3">${moduleBadge(log.module)}</td>
-                        <td class="px-4 py-3 text-sm font-semibold text-slate-800 max-w-[160px] truncate">${escapeHtml(log.action || '—')}</td>
-                        <td class="px-4 py-3 text-sm text-slate-600 max-w-[240px] truncate" title="${escapeHtml(log.description || '')}">${escapeHtml(log.description || '—')}</td>
-                        <td class="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">
+                        <td class="px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap">${escapeHtml(formatDateTime(log.created_at))}</td>
+                        <td class="px-3 py-2.5">${severityBadge(log.severity)}</td>
+                        <td class="px-3 py-2.5">${moduleBadge(log.module)}</td>
+                        <td class="px-3 py-2.5 text-sm font-semibold text-slate-800 max-w-[160px] truncate">${escapeHtml(log.action || '—')}</td>
+                        <td class="px-3 py-2.5 text-sm text-slate-600 max-w-[240px] truncate" title="${escapeHtml(log.description || '')}">${escapeHtml(log.description || '—')}</td>
+                        <td class="px-3 py-2.5 text-sm text-slate-600 whitespace-nowrap">
                             <div class="font-medium text-slate-800">${escapeHtml(log.user_name || '—')}</div>
                             ${log.user_role  ? `<div class="text-[11px] text-slate-400 uppercase tracking-wide">${escapeHtml(log.user_role)}</div>` : ''}
                             ${log.user_email ? `<div class="text-[11px] text-slate-400">${escapeHtml(log.user_email)}</div>` : ''}
                         </td>
-                        <td class="px-4 py-3 text-center">
+                        <td class="px-3 py-2.5 text-center">
                             <button type="button" class="audit-detail-btn text-gold-500 hover:text-gold-600 text-sm transition"
                                 title="View details" data-log='${escapeHtml(JSON.stringify(log))}'>
                                 <i class="fas fa-eye"></i>

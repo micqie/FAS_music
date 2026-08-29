@@ -25,6 +25,31 @@
             return Number(branchFilter?.value || 0);
         }
 
+        async function loadEnrollmentBranches() {
+            const branchFilter = document.getElementById('branchFilter');
+            if (!branchFilter) return;
+            const selectedValue = String(branchFilter.value || '');
+            branchFilter.disabled = true;
+            branchFilter.innerHTML = '<option value="">Loading branches...</option>';
+            try {
+                const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
+                const branches = response.data?.success && Array.isArray(response.data.branches)
+                    ? response.data.branches
+                    : [];
+                branchFilter.innerHTML = '<option value="">All branches</option>' + branches.map(branch =>
+                    `<option value="${escapeHtml(String(branch.branch_id || ''))}">${escapeHtml(branch.branch_name || 'Branch')}</option>`
+                ).join('');
+                if (selectedValue && branches.some(branch => String(branch.branch_id) === selectedValue)) {
+                    branchFilter.value = selectedValue;
+                }
+            } catch (error) {
+                console.error('Failed to load enrollment branches:', error);
+                branchFilter.innerHTML = '<option value="">Unable to load branches</option>';
+            } finally {
+                branchFilter.disabled = false;
+            }
+        }
+
         function getEnrollmentExtensionOnlyState() {
             const toggle = document.getElementById('extensionOnlyToggle');
             return Boolean(toggle?.checked || adminEnrollmentExtensionOnly);
@@ -328,7 +353,7 @@
                 if (!rows.length) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="4" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-user-check text-2xl mb-2 text-gold-500/60"></i>
                                 <p>No active enrollments found.</p>
                             </td>
@@ -342,13 +367,6 @@
                     const packageName = escapeHtml(r.package_name || '—');
                     const teacherName = `${escapeHtml(r.teacher_first_name || '')} ${escapeHtml(r.teacher_last_name || '')}`.trim() || '—';
                     const branchName = escapeHtml(r.branch_name || '—');
-                    const totalSessions = Number(r.sessions || 0);
-                    const completedSessions = Number(r.completed_sessions || r.used_sessions || 0);
-                    const progress = totalSessions > 0 ? Math.min(100, Math.round((completedSessions / totalSessions) * 100)) : 0;
-                    const progressText = totalSessions > 0 ? `${completedSessions}/${totalSessions}` : '—';
-                    const sessionDate = r.first_session_date ? new Date(r.first_session_date).toLocaleDateString() : '—';
-                    const startTime = formatTime12Hour(r.first_start_time);
-                    const nextSession = r.first_session_date ? `${sessionDate} • ${startTime}` : '—';
                     return `
                         <tr class="hover:bg-slate-50/80 transition">
                             <td class="px-6 py-4 table-name-cell">
@@ -358,14 +376,6 @@
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${packageName}">${packageName}</td>
                             <td class="px-6 py-4 text-sm text-slate-700 table-text-cell truncate-text" title="${teacherName}">${teacherName}</td>
-                            <td class="px-6 py-4">
-                                <div class="font-semibold text-slate-900">${progressText}</div>
-                                <div class="mt-2 h-2 w-full max-w-[180px] rounded-full bg-slate-100 overflow-hidden">
-                                    <div class="h-full rounded-full bg-gold-500" style="width:${progress}%"></div>
-                                </div>
-                                <div class="mt-1 text-xs text-slate-400">${progress}%</div>
-                            </td>
-                            <td class="px-6 py-4 text-sm text-slate-700 table-date-cell truncate-text" title="${nextSession}">${nextSession}</td>
                             <td class="px-6 py-4">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <button type="button" onclick="openAdminEnrollmentDetails(${Number(r.enrollment_id)})" class="rounded-md bg-blue-100 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200">Details</button>
@@ -380,7 +390,7 @@
                 if (countEl) countEl.textContent = 'Error';
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-red-500">
+                        <td colspan="4" class="px-6 py-8 text-center text-red-500">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Failed to load active enrollments.</p>
                         </td>
@@ -992,22 +1002,28 @@
 
         function getAdminAssignTeachersForInstrument(instrument) {
             const candidates = Array.isArray(adminAssignRequest?.teacher_candidates) ? adminAssignRequest.teacher_candidates : [];
+            const instrumentTypeId = Number(instrument?.type_id || 0);
             const keywords = [instrument?.type_name, instrument?.instrument_name]
                 .map(value => String(value || '').trim().toLowerCase())
                 .filter(Boolean);
-            if (!keywords.length) return candidates;
+            if (!keywords.length && instrumentTypeId < 1) return [];
             const matched = candidates.filter(teacher => {
-                const specialization = String(teacher.specialization || '').toLowerCase();
-                return specialization.includes('all around') || specialization.includes('all-around') || specialization.includes('all instrument') || specialization === 'general' || keywords.some(keyword => specialization.includes(keyword));
+                const teacherTypeIds = Array.isArray(teacher.specialization_type_ids)
+                    ? teacher.specialization_type_ids.map(Number)
+                    : String(teacher.specialization_type_ids || '').split(',').map(Number);
+                if (instrumentTypeId > 0 && teacherTypeIds.some(typeId => typeId === instrumentTypeId)) return true;
+                if (instrumentTypeId > 0 && teacherTypeIds.some(typeId => typeId > 0)) return false;
+                const specializations = String(teacher.specialization || '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
+                return specializations.some(specialization => keywords.includes(specialization));
             });
-            return matched.length ? matched : candidates;
+            return matched;
         }
 
         function getAdminAssignTeacherOptions(instrument, selectedId = '') {
             const candidates = getAdminAssignTeachersForInstrument(instrument);
             if (!candidates.length) return '<option value="">No matching teachers</option>';
             return '<option value="">Select teacher</option>' + candidates.map(teacher =>
-                `<option value="${Number(teacher.teacher_id)}"${Number(selectedId) === Number(teacher.teacher_id) ? ' selected' : ''}>${escapeHtml(teacher.teacher_name || 'Teacher')} — ${escapeHtml(teacher.specialization || 'General')}</option>`
+                `<option value="${Number(teacher.teacher_id)}"${Number(selectedId) === Number(teacher.teacher_id) ? ' selected' : ''}>${escapeHtml(teacher.teacher_name || 'Teacher')}</option>`
             ).join('');
         }
 
@@ -1509,7 +1525,7 @@
                 }
             }
 
-            loadBranches();
+            loadEnrollmentBranches();
             loadPendingEnrollmentSummary().then(() => {
                 const requestId = Number(new URLSearchParams(window.location.search).get('assign_request_id') || 0);
                 if (requestId) void openAdminAssignRequestModal(requestId);

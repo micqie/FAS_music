@@ -2771,6 +2771,9 @@ function getStudentCertificateState(portal) {
         certificateNumber: certificate?.certificate_number || '',
         teacherName: certificate?.teacher_name || `${enrollment?.teacher_first_name || ''} ${enrollment?.teacher_last_name || ''}`.trim() || 'Teacher',
         issueDate: certificate?.issue_date || '',
+        examRating: certificate?.exam_rating || '',
+        examinerNotes: certificate?.examiner_notes || '',
+        strengths: Array.isArray(certificate?.strengths) ? certificate.strengths : [],
         branchName: student?.branch_name || enrollment?.branch_name || 'Father & Sons Music'
     };
 }
@@ -2791,36 +2794,36 @@ function renderStudentCertificateCard(portal) {
 
     const issuedLabel = formatDateLong(state.issueDate) || state.issueDate;
     return `
-        <section class="rounded-[1.75rem] border border-gold-200/80 dark:border-gold-500/20 bg-gradient-to-br from-gold-50 via-white to-amber-50 dark:from-gold-500/10 dark:via-white/5 dark:to-white/3 px-5 py-5 sm:px-6 sm:py-5 mb-6">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div class="flex items-start gap-4">
-                    <div class="h-14 w-14 rounded-2xl bg-gold-500 text-black grid place-items-center shrink-0">
-                        <i class="fas fa-certificate text-2xl"></i>
+        <section class="mb-5 rounded-2xl border border-gold-200/80 bg-gradient-to-br from-gold-50 via-white to-amber-50 px-4 py-4 dark:border-gold-500/20 dark:from-gold-500/10 dark:via-white/5 dark:to-white/3 sm:px-5">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-start gap-3">
+                    <div class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gold-500 text-black">
+                        <i class="fas fa-certificate text-lg"></i>
                     </div>
                     <div class="min-w-0">
                         <p class="text-xs font-black uppercase tracking-[0.3em] text-gold-600 dark:text-gold-300">Certificate Issued</p>
-                        <h2 class="mt-1 text-2xl font-black text-zinc-900 dark:text-white">Achievement Certificate Ready</h2>
-                        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300 max-w-2xl">
+                        <h2 class="mt-0.5 text-lg font-black text-zinc-900 dark:text-white">Achievement Certificate Ready</h2>
+                        <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300 max-w-2xl">
                             The academy recognized your ${escapeHtml(state.achievedLevel)} achievement in ${escapeHtml(state.instrumentName)} after formal assessment.
                         </p>
-                        <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold text-zinc-600 dark:text-zinc-300">
-                            <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-3 py-1.5 dark:border-gold-500/20 dark:bg-white/5">
+                        <div class="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold text-zinc-600 dark:text-zinc-300">
+                            <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-2.5 py-1 dark:border-gold-500/20 dark:bg-white/5">
                                 <i class="fas fa-user-graduate mr-2 text-gold-500"></i>${escapeHtml(state.studentName)}
                             </span>
-                            <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-3 py-1.5 dark:border-gold-500/20 dark:bg-white/5">
+                            <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-2.5 py-1 dark:border-gold-500/20 dark:bg-white/5">
                                 <i class="fas fa-chalkboard-teacher mr-2 text-gold-500"></i>${escapeHtml(state.teacherName)}
                             </span>
-                            <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-3 py-1.5 dark:border-gold-500/20 dark:bg-white/5">
+                            <span class="inline-flex items-center rounded-full border border-gold-200 bg-white/80 px-2.5 py-1 dark:border-gold-500/20 dark:bg-white/5">
                                 <i class="fas fa-calendar-check mr-2 text-gold-500"></i>${escapeHtml(issuedLabel)}
                             </span>
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-3">
-                    <button type="button" onclick="openStudentCertificatePreview()" class="px-5 py-3 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-extrabold transition">
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="openStudentCertificatePreview()" class="rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-zinc-800">
                         <i class="fas fa-eye mr-2"></i>View Certificate
                     </button>
-                    <button type="button" onclick="printStudentCertificate()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                    <button type="button" onclick="printStudentCertificate()" class="rounded-xl bg-gold-500 px-4 py-2.5 text-xs font-extrabold text-black transition hover:bg-gold-400">
                         <i class="fas fa-print mr-2"></i>Print / Save PDF
                     </button>
                 </div>
@@ -2930,23 +2933,23 @@ function ensureStudentCertificateModal() {
     wrapper.innerHTML = `
         <div id="studentCertificateModal" class="fixed inset-0 z-[80] hidden bg-black/60 backdrop-blur-sm p-0 sm:p-4" aria-hidden="true">
             <div class="min-h-full flex items-stretch sm:items-center justify-center">
-                <div class="w-full h-full sm:h-auto sm:max-h-[94vh] sm:max-w-5xl bg-white dark:bg-obsidian rounded-none sm:rounded-3xl border-0 sm:border sm:border-zinc-200 dark:sm:border-white/10 shadow-2xl overflow-hidden">
-                    <div class="flex items-center justify-between gap-4 px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-white/10">
+                <div class="w-full h-full sm:h-auto sm:max-h-[88vh] sm:max-w-3xl bg-white dark:bg-obsidian rounded-none sm:rounded-2xl border-0 sm:border sm:border-zinc-200 dark:sm:border-white/10 shadow-2xl overflow-hidden">
+                    <div class="flex items-center justify-between gap-4 px-4 sm:px-5 py-3 border-b border-zinc-200 dark:border-white/10">
                         <div>
                             <div class="text-xs uppercase tracking-[0.25em] text-gold-600 dark:text-gold-300 font-bold">Certificate</div>
-                            <div class="text-lg font-extrabold text-zinc-900 dark:text-white mt-1">Achievement Certificate Preview</div>
+                            <div class="text-base font-extrabold text-zinc-900 dark:text-white mt-0.5">Achievement Certificate</div>
                         </div>
                         <button type="button" onclick="closeStudentCertificatePreview()" class="h-10 w-10 rounded-full border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 transition" aria-label="Close certificate preview">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                    <div class="overflow-y-auto max-h-[calc(100vh-73px)] sm:max-h-[calc(94vh-73px)] px-4 sm:px-6 py-5 bg-zinc-50/80 dark:bg-black/20">
-                        <div id="studentCertificatePreview" class="mx-auto max-w-4xl"></div>
-                        <div class="mt-4 flex flex-wrap justify-end gap-3">
-                            <button type="button" onclick="printStudentCertificate()" class="px-4 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">
+                    <div class="overflow-y-auto max-h-[calc(100vh-65px)] sm:max-h-[calc(88vh-65px)] px-3 sm:px-5 py-4 bg-zinc-50/80 dark:bg-black/20">
+                        <div id="studentCertificatePreview" class="mx-auto max-w-2xl"></div>
+                        <div class="mt-3 flex flex-wrap justify-end gap-2">
+                            <button type="button" onclick="printStudentCertificate()" class="px-4 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-xs font-extrabold transition">
                                 <i class="fas fa-print mr-2"></i>Print / Save PDF
                             </button>
-                            <button type="button" onclick="closeStudentCertificatePreview()" class="px-4 py-3 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-extrabold transition">
+                            <button type="button" onclick="closeStudentCertificatePreview()" class="px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-extrabold transition">
                                 Close
                             </button>
                         </div>
@@ -2962,55 +2965,58 @@ function ensureStudentCertificateModal() {
 function buildStudentCertificateMarkup(portal) {
     const state = getStudentCertificateState(portal);
     const issuedLabel = formatDateLong(state.issueDate) || state.issueDate;
+    const strengthsMarkup = state.strengths.length
+        ? state.strengths.map(item => `<span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-3 py-1.5 text-xs font-bold text-gold-700"><i class="fas fa-star mr-1.5 text-[9px]"></i>${escapeHtml(item.name)} · ${Number(item.average).toFixed(1)}/5</span>`).join('')
+        : '';
     return `
-        <div class="certificate-sheet relative overflow-hidden rounded-[2rem] border-2 border-gold-200 bg-white p-6 sm:p-10 shadow-2xl shadow-black/10">
+        <div class="certificate-sheet relative overflow-hidden rounded-2xl border-2 border-gold-200 bg-white p-5 sm:p-7 shadow-xl shadow-black/10">
             <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(212,175,55,0.18),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(184,134,11,0.12),_transparent_35%)]"></div>
             <div class="relative">
                 <div class="flex items-start justify-between gap-4">
                     <div>
-                        <p class="text-[11px] font-black uppercase tracking-[0.45em] text-gold-600">Father & Sons Music</p>
-                        <h3 class="mt-2 text-3xl sm:text-5xl font-black text-zinc-900">Certificate of Achievement</h3>
+                        <p class="text-[9px] font-black uppercase tracking-[0.38em] text-gold-600">Father & Sons Music</p>
+                        <h3 class="mt-1 text-2xl sm:text-3xl font-black text-zinc-900">Certificate of Achievement</h3>
                     </div>
-                    <div class="h-16 w-16 rounded-2xl bg-gold-500 text-black grid place-items-center shadow-lg shadow-gold-500/20 shrink-0">
-                        <i class="fas fa-award text-3xl"></i>
+                    <div class="h-11 w-11 rounded-xl bg-gold-500 text-black grid place-items-center shadow-lg shadow-gold-500/20 shrink-0">
+                        <i class="fas fa-award text-xl"></i>
                     </div>
                 </div>
 
-                <div class="mt-10 text-center">
-                    <p class="text-sm font-bold uppercase tracking-[0.3em] text-zinc-500">This certifies that</p>
-                    <div class="mt-4 text-3xl sm:text-5xl font-black text-zinc-900">${escapeHtml(state.studentName)}</div>
-                    <p class="mt-4 text-base sm:text-lg text-zinc-600">
+                <div class="mt-6 text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-[0.28em] text-zinc-500">This certifies that</p>
+                    <div class="mt-2 text-2xl sm:text-3xl font-black text-zinc-900">${escapeHtml(state.studentName)}</div>
+                    <p class="mt-2 text-sm text-zinc-600">
                         has achieved <span class="font-bold text-zinc-900">${escapeHtml(state.achievedLevel)}</span>
                         in <span class="font-bold text-zinc-900">${escapeHtml(state.instrumentName)}</span>
                         at <span class="font-bold text-zinc-900">${escapeHtml(state.branchName)}</span>.
                     </p>
                 </div>
 
-                <div class="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div class="rounded-3xl border border-zinc-200 bg-white/80 px-5 py-4 text-center">
-                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Level Achieved</div>
-                        <div class="mt-2 text-xl font-black text-zinc-900">${escapeHtml(state.achievedLevel)}</div>
+                <div class="mt-6 grid grid-cols-3 gap-2">
+                    <div class="rounded-xl border border-zinc-200 bg-white/80 px-3 py-3 text-center">
+                        <div class="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Level</div>
+                        <div class="mt-1 text-sm font-black text-zinc-900">${escapeHtml(state.achievedLevel)}</div>
                     </div>
-                    <div class="rounded-3xl border border-zinc-200 bg-white/80 px-5 py-4 text-center">
-                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Instrument</div>
-                        <div class="mt-2 text-xl font-black text-zinc-900">${escapeHtml(state.instrumentName)}</div>
+                    <div class="rounded-xl border border-zinc-200 bg-white/80 px-3 py-3 text-center">
+                        <div class="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Instrument</div>
+                        <div class="mt-1 text-sm font-black text-zinc-900">${escapeHtml(state.instrumentName)}</div>
                     </div>
-                    <div class="rounded-3xl border border-zinc-200 bg-white/80 px-5 py-4 text-center">
-                        <div class="text-[11px] uppercase tracking-[0.25em] text-zinc-500 font-bold">Issued On</div>
-                        <div class="mt-2 text-lg font-black text-zinc-900">${escapeHtml(issuedLabel)}</div>
+                    <div class="rounded-xl border border-zinc-200 bg-white/80 px-3 py-3 text-center">
+                        <div class="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Issued</div>
+                        <div class="mt-1 text-xs font-black text-zinc-900">${escapeHtml(issuedLabel)}</div>
                     </div>
                 </div>
 
-                <div class="mt-10 flex items-end justify-between gap-6">
+                ${(state.examRating || strengthsMarkup) ? `<div class="mt-4 rounded-xl border border-gold-200 bg-white/80 px-4 py-3"><div class="flex flex-wrap items-center justify-between gap-2"><div><div class="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Achievement highlights</div><div class="mt-1 text-sm font-bold text-zinc-900">Passed promotional exam${state.examRating ? ` · ${escapeHtml(state.examRating)}` : ''}</div></div><i class="fas fa-chart-line text-gold-600"></i></div>${strengthsMarkup ? `<div class="mt-2 flex flex-wrap gap-2">${strengthsMarkup}</div>` : ''}${state.examinerNotes ? `<div class="mt-2 text-xs italic text-zinc-500">Examiner note: ${escapeHtml(state.examinerNotes)}</div>` : ''}</div>` : ''}
+
+                <div class="mt-5 flex items-end justify-between gap-6">
                     <div class="text-left">
                         <div class="text-xs uppercase tracking-[0.3em] text-zinc-500 font-bold">Teacher</div>
-                        <div class="mt-2 text-lg font-bold text-zinc-900">${escapeHtml(state.teacherName)}</div>
-                        <div class="text-sm text-zinc-500">Lesson instructor</div>
+                        <div class="mt-1 text-sm font-bold text-zinc-900">${escapeHtml(state.teacherName)}</div>
                     </div>
                     <div class="text-right">
                         <div class="text-xs uppercase tracking-[0.3em] text-zinc-500 font-bold">Status</div>
-                        <div class="mt-2 text-lg font-black text-emerald-600">Achieved</div>
-                        <div class="text-sm text-zinc-500">Ready for print</div>
+                        <div class="mt-1 text-sm font-black text-emerald-600">Achieved</div>
                     </div>
                 </div>
             </div>
@@ -3372,6 +3378,18 @@ function formatDateLong(dateString) {
         month: 'short',
         day: 'numeric'
     });
+}
+
+function formatDateShort(dateString) {
+    if (!dateString) return '';
+    const raw = String(dateString).trim();
+    if (!raw) return '';
+    const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const date = ymd
+        ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))
+        : new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function getDayOfWeekFromDate(dateString) {
@@ -4461,6 +4479,25 @@ function renderGuardianStudentModal(item, index) {
     const hasPendingAdditionalRequest = String(additionalRequest?.status || '') === 'Pending';
     const learningProgress = Array.isArray(item?.learning_progress) ? item.learning_progress : [];
     const learningHistory = Array.isArray(item?.learning_history) ? item.learning_history : [];
+    const registrationReady = String(s.status || '') === 'Active' && ['Approved', 'Fee Paid'].includes(String(regStatus));
+    const enrollmentStatus = String(enrollment?.status || '');
+    const canRequestEnrollment = registrationReady && !['Pending', 'Active', 'Completed'].includes(enrollmentStatus);
+
+    const recentSessions = sessionRows.slice(0, 5);
+    const hasMoreDetails = learningProgress.length > 0 || learningHistory.length > 0 || sessionRows.length > 0 || history.length > 0;
+    return `<div class="space-y-4">
+        ${getScheduleFreezeReservationNotice(enrollment) ? `<div class="flex items-start gap-3 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 dark:border-rose-500/30 dark:bg-rose-500/10"><i class="fas fa-snowflake mt-0.5 text-rose-500"></i><div><div class="text-sm font-bold text-rose-800 dark:text-rose-200">Account frozen</div><div class="mt-0.5 text-xs text-rose-600 dark:text-rose-300">Pay the ₱${getScheduleFreezeReservationNotice(enrollment)?.amount || 100} reservation fee at the branch to restore access.</div></div></div>` : ''}
+        <div class="flex flex-wrap items-center justify-between gap-2"><div class="text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(branch)} <span class="mx-1">·</span> ID ${escapeHtml(String(studentId))}</div><span class="rounded-full px-3 py-1 text-xs font-bold ${badgeClassForRegistrationStatus(regStatus)}">${escapeHtml(regStatus)}</span></div>
+        ${canRequestEnrollment ? `<div class="flex flex-col gap-3 rounded-xl border border-gold-200 bg-gold-50 p-4 dark:border-gold-500/20 dark:bg-gold-500/10 sm:flex-row sm:items-center sm:justify-between"><div><div class="font-bold text-zinc-900 dark:text-white">No enrollment yet</div><div class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-300">Start with 12 sessions and one instrument.</div></div><button type="button" onclick="openGuardianEnrollmentRequest(${index})" class="rounded-xl bg-gold-500 px-5 py-2.5 text-sm font-extrabold text-black hover:bg-gold-400"><i class="fas fa-paper-plane mr-2"></i>Enroll Student</button></div>` : ''}
+        ${enrollmentStatus === 'Pending' ? `<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"><i class="fas fa-clock mr-2"></i>Enrollment request awaiting review.</div>` : ''}
+        ${enrollment ? `<div class="grid gap-3 sm:grid-cols-2"><section class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/20"><div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Enrollment</div><div class="mt-1 font-bold text-zinc-900 dark:text-white">${escapeHtml(pkgName)}</div><div class="mt-1 text-xs text-zinc-500">${pkgSessions || '—'} sessions · ${escapeHtml(instrumentsLabel)}</div>${pkgBalance > 0 ? `<div class="mt-2 text-xs font-bold text-gold-600">${formatCurrencyPHP(pkgBalance)} balance</div>` : '<div class="mt-2 text-xs font-bold text-emerald-600">Paid</div>'}${['Active', 'Completed'].includes(enrollmentStatus) ? `<button type="button" onclick="openGuardianAdditionalSessions(${index})" ${hasPendingAdditionalRequest ? 'disabled' : ''} class="mt-3 rounded-lg bg-gold-500 px-3 py-2 text-xs font-bold text-black hover:bg-gold-400 disabled:opacity-50">${hasPendingAdditionalRequest ? 'Additional Sessions Pending' : 'Request Additional Sessions'}</button>` : ''}</section><section class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/20"><div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Sessions</div><div class="mt-2 flex gap-6"><div><div id="guardianModalProgressAttended-${studentId}" class="text-2xl font-black text-zinc-900 dark:text-white">—</div><div class="text-[10px] text-zinc-500">Attended</div></div><div><div id="guardianModalProgressRemaining-${studentId}" class="text-2xl font-black text-zinc-900 dark:text-white">—</div><div class="text-[10px] text-zinc-500">Remaining</div></div></div><div id="guardianModalProgressLast-${studentId}" class="mt-2 text-xs text-zinc-500">—</div></section></div><section class="rounded-xl border border-zinc-200 px-4 py-3 dark:border-white/10"><div class="flex gap-3"><i class="fas fa-calendar-day mt-1 text-gold-600"></i><div><div class="text-sm font-bold text-zinc-900 dark:text-white">${scheduleDate ? escapeHtml(scheduleDate) : 'Schedule pending'}${scheduleTime !== 'Not set' ? ` · ${escapeHtml(scheduleTime)}` : ''}</div><div class="mt-0.5 text-xs text-zinc-500">${escapeHtml(teacherName)}</div></div></div></section>` : ''}
+        ${hasMoreDetails ? `<details class="group rounded-xl border border-zinc-200 dark:border-white/10"><summary class="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-bold text-zinc-800 dark:text-white"><span><i class="fas fa-folder-open mr-2 text-gold-600"></i>View sessions and progress</span><i class="fas fa-chevron-down text-xs text-zinc-400 transition group-open:rotate-180"></i></summary><div class="space-y-4 border-t border-zinc-200 p-4 dark:border-white/10">
+            ${learningProgress.length ? `<section><div class="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">Learning progress</div><div class="space-y-2">${learningProgress.map(row => `<div class="rounded-lg bg-zinc-50 px-3 py-3 dark:bg-white/5"><div class="flex items-center justify-between gap-2"><div class="text-sm font-bold text-zinc-900 dark:text-white">${escapeHtml(row.instrument_name || 'Instrument')} · ${escapeHtml(row.level_name || 'Level not set')}</div><span class="text-xs text-zinc-500">${escapeHtml(row.assessment_readiness || 'Not Ready')}</span></div>${row.current_topic ? `<div class="mt-1 text-xs text-zinc-500">${escapeHtml(row.current_topic)}</div>` : ''}</div>`).join('')}</div></section>` : ''}
+            ${recentSessions.length ? `<section><div class="mb-2 flex justify-between"><div class="text-xs font-bold uppercase tracking-wider text-zinc-500">Recent sessions</div><span class="text-xs text-zinc-400">${sessionRows.length} total</span></div><div class="space-y-2">${recentSessions.map((row, sessionIndex) => `<button type="button" onclick="openGuardianSessionDetails(${index}, ${sessionIndex})" class="flex w-full items-center justify-between rounded-lg bg-zinc-50 px-3 py-3 text-left dark:bg-white/5"><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Session ${escapeHtml(String(row.session_number || ''))}</div><div class="text-xs text-zinc-500">${escapeHtml(row.session_date ? formatDateShort(row.session_date) : 'Date pending')}</div></div><span class="text-xs font-bold text-gold-600">View</span></button>`).join('')}</div></section>` : ''}
+            ${learningHistory.length ? `<section><div class="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">Achievements</div><div class="space-y-2">${learningHistory.map(row => `<div class="rounded-lg bg-zinc-50 px-3 py-3 text-sm dark:bg-white/5"><span class="font-bold">${escapeHtml(row.instrument_name || 'Instrument')} · ${escapeHtml(row.level_name || 'Level')}</span>${row.certificate_id ? '<span class="ml-2 text-xs font-bold text-emerald-600">Certificate issued</span>' : ''}</div>`).join('')}</div></section>` : ''}
+            ${history.length ? `<section><div class="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">Enrollment history</div><div class="space-y-2">${renderEnrollmentHistoryList(history)}</div></section>` : ''}
+        </div></details>` : ''}
+    </div>`;
 
     return `
         <div class="space-y-6">
@@ -4483,6 +4520,9 @@ function renderGuardianStudentModal(item, index) {
                 </div>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(regStatus)}">${escapeHtml(regStatus)}</span>
             </div>
+
+            ${canRequestEnrollment ? `<div class="rounded-2xl border border-gold-200 bg-gold-50 p-4 dark:border-gold-500/20 dark:bg-gold-500/10 sm:flex sm:items-center sm:justify-between sm:gap-4"><div><div class="font-extrabold text-zinc-900 dark:text-white">Ready to enroll this student?</div><p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">Request the standard 12-session package and choose one instrument.</p></div><button type="button" onclick="openGuardianEnrollmentRequest(${index})" class="mt-3 inline-flex items-center justify-center rounded-xl bg-gold-500 px-5 py-3 text-sm font-extrabold text-black transition hover:bg-gold-400 sm:mt-0"><i class="fas fa-paper-plane mr-2"></i>Enroll Student</button></div>` : ''}
+            ${enrollmentStatus === 'Pending' ? `<div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"><i class="fas fa-clock mr-2"></i>The enrollment request is waiting for academy review.</div>` : ''}
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4">
@@ -5701,6 +5741,41 @@ async function fetchStudentRequestMetaByEmail(email, options = {}) {
     return res.data;
 }
 
+function ensureGuardianEnrollmentModal() {
+    if (document.getElementById('studentRequestModal')) return;
+    document.body.insertAdjacentHTML('beforeend', `<div id="studentRequestModal" class="fixed inset-0 z-[80] hidden overflow-y-auto bg-black/60 p-0 backdrop-blur-sm sm:p-4" aria-hidden="true"><div class="flex min-h-full items-stretch justify-center sm:items-center"><div class="flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-obsidian sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-zinc-200 dark:sm:border-white/10"><div class="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-white/10"><div><div class="text-[10px] font-bold uppercase tracking-[.22em] text-gold-600">Enrollment Request</div><h2 id="guardianEnrollmentStudentName" class="mt-1 text-lg font-black text-zinc-900 dark:text-white">Enroll Student</h2></div><button type="button" onclick="closeStudentRequestModal()" class="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-100 dark:border-white/10 dark:hover:bg-white/10"><i class="fas fa-times"></i></button></div><div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"><div id="studentRequestStatus"></div><form id="studentPackageRequestForm" class="mt-4 space-y-4"><div class="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_300px]"><div class="space-y-4"><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">1.</span>Choose the 12-session package</div><select id="studentRequestPackage" class="hidden"><option value="">Select package</option></select><div id="studentRequestPackageCards" class="space-y-2"></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">2.</span>Choose payment</div><div class="grid gap-3 sm:grid-cols-2"><select id="studentRequestPaymentMode" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="Partial Payment">Partial Payment</option><option value="Full Payment">Full Payment</option></select><select id="studentRequestPaymentMethod" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="">Select payment method</option><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option></select></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">3.</span>Choose one instrument</div><div id="studentRequestInstrumentContainer"></div><label class="mt-4 block text-xs font-bold uppercase tracking-wider text-zinc-500">Payment proof</label><input id="studentRequestPaymentProof" name="package_payment_proof_file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="mt-2 w-full rounded-xl border border-dashed border-zinc-300 p-3 text-sm dark:border-zinc-700"><p id="guardianEnrollmentProofName" class="mt-1 hidden text-xs text-gold-600"></p></section></div><aside class="self-start rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/5"><div class="text-sm font-extrabold text-zinc-900 dark:text-white">Payment Summary</div><div id="studentRequestAmount" class="mt-3 text-sm"></div></aside></div><div id="studentAvailabilityCalendar" class="hidden"></div><div id="studentRequestAutoDay" class="mt-3 text-xs text-zinc-500"></div><div class="mt-5 flex flex-col-reverse gap-2 border-t border-zinc-200 pt-4 dark:border-white/10 sm:flex-row sm:justify-end"><button type="button" onclick="closeStudentRequestModal()" class="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-bold dark:border-white/10">Cancel</button><button id="studentSubmitRequestBtn" type="submit" class="rounded-xl bg-gold-500 px-6 py-3 text-sm font-extrabold text-black hover:bg-gold-400"><i class="fas fa-paper-plane mr-2"></i>Submit Request</button></div></form></div></div></div></div>`);
+    document.getElementById('studentRequestPaymentProof')?.addEventListener('change', event => {
+        const label = document.getElementById('guardianEnrollmentProofName');
+        const file = event.target.files?.[0];
+        if (label) { label.textContent = file ? file.name : ''; label.classList.toggle('hidden', !file); }
+    });
+}
+
+async function openGuardianEnrollmentRequest(index) {
+    const item = guardianPortalStudents[Number(index)];
+    const student = item?.student || {};
+    const studentId = Number(student.student_id || 0);
+    if (!studentId) return;
+    try {
+        ensureGuardianEnrollmentModal();
+        const requestMeta = await fetchStudentRequestMetaByStudentId(studentId);
+        if (!requestMeta?.success) throw new Error(requestMeta?.error || 'Unable to load enrollment choices.');
+        closeGuardianStudentModal();
+        setText('guardianEnrollmentStudentName', `Enroll ${`${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student'}`);
+        initStudentRequestSection(student, requestMeta, { studentId, onSuccess: initGuardianStudentsPage });
+        openStudentRequestModal();
+    } catch (error) {
+        showMessage(error?.response?.data?.error || error?.message || 'Unable to open enrollment request.', 'error');
+    }
+}
+
+window.openGuardianEnrollmentRequest = openGuardianEnrollmentRequest;
+
+async function fetchStudentRequestMetaByStudentId(studentId) {
+    const res = await axios.get(`${baseApiUrl}/students.php?action=get-student-request-meta&student_id=${encodeURIComponent(studentId)}`);
+    return res.data;
+}
+
 async function postStudentPackageRequest(payload) {
     const isFormData = (typeof FormData !== 'undefined') && (payload instanceof FormData);
     const res = await axios.post(
@@ -5747,7 +5822,7 @@ function initStudentAdditionalSessionAction(student, portal, requestMeta, attend
     };
 }
 
-function initStudentRequestSection(student, requestMeta) {
+function initStudentRequestSection(student, requestMeta, options = {}) {
     const statusEl = document.getElementById('studentRequestStatus');
     const packageSelect = document.getElementById('studentRequestPackage');
     const packageCardsContainer = document.getElementById('studentRequestPackageCards');
@@ -6037,13 +6112,16 @@ function initStudentRequestSection(student, requestMeta) {
                 closeStudentRequestModal();
                 showMessage(response.message || 'Request submitted successfully.', 'success');
                 const user = Auth.getUser();
-                if (user?.email) {
-                    const refreshedMeta = await fetchStudentRequestMetaByEmail(user.email);
+                if (options.studentId || user?.email) {
+                    const refreshedMeta = options.studentId
+                        ? await fetchStudentRequestMetaByStudentId(options.studentId)
+                        : await fetchStudentRequestMetaByEmail(user.email);
                     if (refreshedMeta?.success) {
                         keepDisabled = true;
-                        initStudentRequestSection(student, refreshedMeta);
+                        initStudentRequestSection(student, refreshedMeta, options);
                     }
                 }
+                if (typeof options.onSuccess === 'function') await options.onSuccess();
             } else {
                 showMessage(response.error || 'Failed to submit request.', 'error');
             }

@@ -162,8 +162,7 @@
 
         function keywordMatchesSpecialization(keyword, specialization) {
             if (!keyword || !specialization) return false;
-            if (keyword === specialization) return true;
-            return specialization.includes(keyword) || keyword.includes(specialization);
+            return keyword === specialization;
         }
 
         function teacherMatchesInstrument(teacher, instrument) {
@@ -174,6 +173,13 @@
 
             const keywords = getInstrumentKeywords(instrument);
             const typeName = normalizeText(instrument?.type_name || '');
+            const instrumentTypeId = Number(instrument?.type_id || 0);
+            const teacherTypeIds = Array.isArray(teacher?.specialization_type_ids)
+                ? teacher.specialization_type_ids.map(Number)
+                : String(teacher?.specialization_type_ids || '').split(',').map(Number);
+
+            if (instrumentTypeId > 0 && teacherTypeIds.some(typeId => typeId === instrumentTypeId)) return true;
+            if (instrumentTypeId > 0 && teacherTypeIds.some(typeId => typeId > 0)) return false;
 
             return specializations.some(spec => {
                 if (typeName && spec === typeName) return true;
@@ -185,10 +191,11 @@
             const teachers = Array.isArray(assignRequestTeacherCandidates) ? assignRequestTeacherCandidates : [];
             const key = [
                 instrument?.instrument_id || '',
+                instrument?.type_id || '',
                 instrument?.instrument_name || '',
                 instrument?.type_name || '',
                 teachers.length,
-                teachers.map(teacher => `${teacher.teacher_id || ''}:${teacher.specialization || ''}`).join('|')
+                teachers.map(teacher => `${teacher.teacher_id || ''}:${teacher.specialization || ''}:${teacher.specialization_type_ids || ''}`).join('|')
             ].join('::');
 
             if (assignRequestTeacherCache.has(key)) {

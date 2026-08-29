@@ -20,6 +20,30 @@ document.addEventListener('DOMContentLoaded', () => {
     nav.style.top = '0';
     nav.style.width = 'auto';
 
+    // Keep Frozen Accounts available from every Admin screen. The shared page
+    // detects the Admin role and exposes the all-branches filter there.
+    if (!sidebar.querySelector('a[href*="desk_freezeaccounts.html"]')) {
+        const managementNav = sidebar.querySelector('nav');
+        if (managementNav) {
+            const frozenLink = document.createElement('a');
+            frozenLink.href = '../desk/desk_freezeaccounts.html';
+            frozenLink.className = 'flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group';
+            frozenLink.innerHTML = '<i class="fas fa-snowflake mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Frozen Accounts';
+            managementNav.appendChild(frozenLink);
+        }
+    }
+    if (!sidebar.querySelector('a[href*="admin_learning_materials.html"]')) {
+        const academyNavs = sidebar.querySelectorAll('nav');
+        const academyNav = academyNavs.length ? academyNavs[academyNavs.length - 1] : null;
+        if (academyNav) {
+            const link = document.createElement('a');
+            link.href = 'admin_learning_materials.html';
+            link.className = 'flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group';
+            link.innerHTML = '<i class="fas fa-book-open mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Learning Materials';
+            academyNav.appendChild(link);
+        }
+    }
+
     let backdrop = document.getElementById('adminSidebarBackdrop') || document.querySelector('.admin-sidebar-backdrop');
     if (!backdrop) {
         backdrop = document.createElement('button');

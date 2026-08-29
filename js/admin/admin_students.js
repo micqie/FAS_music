@@ -60,9 +60,9 @@
             if (!filteredStudents || filteredStudents.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-slate-500">
-                            <i class="fas fa-inbox text-2xl mb-2 text-gold-500/50"></i>
-                            <p>No students found</p>
+                        <td colspan="7" class="px-4 py-6 text-center text-sm text-slate-500">
+                            <i class="fas fa-inbox text-lg mb-1.5 text-gold-500/50"></i>
+                            <p>No students found for the selected branch.</p>
                         </td>
                     </tr>
                 `;
@@ -90,26 +90,26 @@
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-6 py-4 table-name-cell">
-                            <div class="font-medium text-slate-900 truncate-text" title="${escapeHtml(fullName)}">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
-                            <div class="text-sm text-slate-500 truncate-text" title="${escapeHtml(fullEmail)}">${escapeHtml(student.email || '')}</div>
+                        <td class="px-3 py-2.5 table-name-cell">
+                            <div class="font-semibold text-slate-900 truncate-text" title="${escapeHtml(fullName)}">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
+                            <div class="text-xs text-slate-500 truncate-text" title="${escapeHtml(fullEmail)}">${escapeHtml(student.email || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-slate-800 table-phone-cell truncate-text" title="${escapeHtml(student.phone || '')}">${escapeHtml(student.phone || '')}</td>
-                        <td class="px-6 py-4 text-slate-800 table-text-cell truncate-text" title="${escapeHtml(student.branch_name || 'N/A')}">${escapeHtml(student.branch_name || 'N/A')}</td>
-                        <td class="px-6 py-4 table-money-cell">
+                        <td class="px-3 py-2.5 text-slate-700 table-phone-cell truncate-text whitespace-nowrap" title="${escapeHtml(student.phone || '')}">${escapeHtml(student.phone || '—')}</td>
+                        <td class="px-3 py-2.5 text-slate-700 table-text-cell truncate-text" title="${escapeHtml(student.branch_name || 'N/A')}">${escapeHtml(student.branch_name || 'N/A')}</td>
+                        <td class="px-3 py-2.5 table-money-cell whitespace-nowrap">
                             <div class="text-slate-800 font-medium">₱${parseFloat(student.registration_fee_amount || 0).toFixed(2)}</div>
-                            ${student.registration_fee_paid ? `<div class="text-xs text-slate-500">Paid: ₱${parseFloat(student.registration_fee_paid).toFixed(2)}</div>` : ''}
+                            ${student.registration_fee_paid ? `<div class="text-[11px] text-slate-500">Paid: ₱${parseFloat(student.registration_fee_paid).toFixed(2)}</div>` : ''}
                         </td>
-                        <td class="px-6 py-4 table-status-cell">
-                            <span class="px-2 py-1 rounded text-xs font-semibold border ${statusClass}">
+                        <td class="px-3 py-2.5 table-status-cell">
+                            <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold border ${statusClass}">
                                 ${escapeHtml(student.status || 'N/A')}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-slate-500 text-sm table-date-cell">
+                        <td class="px-3 py-2.5 text-slate-500 text-xs table-date-cell whitespace-nowrap">
                             ${new Date(student.created_at).toLocaleDateString()}
                         </td>
-                        <td class="px-6 py-4 table-actions-cell">
-                            <button class="px-3 py-1.5 text-xs font-semibold rounded border ${actionClass} transition"
+                        <td class="px-3 py-2.5 table-actions-cell">
+                            <button class="px-2.5 py-1 text-[11px] font-semibold rounded-md border ${actionClass} transition whitespace-nowrap"
                                 onclick="toggleStudentStatus(${Number(student.student_id)}, '${isActive ? 'Inactive' : 'Active'}')">
                                 ${actionLabel}
                             </button>

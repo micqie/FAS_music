@@ -95,31 +95,73 @@
         if (typeof Swal !== 'undefined') {
             /* ── SweetAlert2 version ── */
             Swal.fire({
-                title: '⏰ Session Expiring Soon',
+                title: 'Your session is about to expire',
                 html: `
-                    <p style="font-size:15px;color:#475569;margin:0 0 12px;">
-                        You've been inactive for a while.<br>
-                        Your session will automatically end in:
-                    </p>
-                    <p id="_sto_countdown"
-                       style="font-size:48px;font-weight:900;color:#b8860b;
-                              letter-spacing:-1px;margin:0 0 10px;line-height:1;">
-                        ${seconds}
-                    </p>
-                    <p style="font-size:13px;color:#94a3b8;margin:0;">
-                        Click <strong>Stay Logged In</strong> to continue.
-                    </p>`,
-                icon: 'warning',
-                confirmButtonText:  '<i class="fas fa-check" style="margin-right:6px"></i>Stay Logged In',
-                confirmButtonColor: '#b8860b',
+                    <div style="text-align:left;">
+                        <div style="display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+                            <div style="display:grid;flex:0 0 34px;width:34px;height:34px;place-items:center;border-radius:8px;background:#fef3c7;color:#92400e;font-size:15px;">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div style="min-width:0;">
+                                <p style="font-size:14px;line-height:1.5;color:#475569;margin:0;">You have been inactive. For your security, you will be signed out automatically.</p>
+                                <div style="margin-top:10px;font-size:13px;color:#64748b;">
+                                    Time remaining: <strong id="_sto_countdown" style="color:#0f172a;font-variant-numeric:tabular-nums;">${seconds}</strong> seconds
+                                </div>
+                            </div>
+                        </div>
+                    </div>`,
+                confirmButtonText:  'Continue session',
+                confirmButtonColor: '#1d4ed8',
                 showCancelButton:   true,
-                cancelButtonText:   'Log Out Now',
-                cancelButtonColor:  '#6b7280',
+                cancelButtonText:   'Sign out',
+                cancelButtonColor:  '#ffffff',
                 allowOutsideClick:  false,
                 allowEscapeKey:     false,
+                width:              '430px',
+                padding:            '1.5rem',
+                reverseButtons:     true,
+                buttonsStyling:     true,
+                customClass: {
+                    popup: 'session-timeout-popup',
+                    title: 'session-timeout-title',
+                    confirmButton: 'session-timeout-confirm',
+                    cancelButton: 'session-timeout-cancel'
+                },
                 timer:              WARN_MS,
                 timerProgressBar:   true,
                 didOpen: () => {
+                    const popup = Swal.getPopup();
+                    const title = popup?.querySelector('.swal2-title');
+                    const actions = popup?.querySelector('.swal2-actions');
+                    const confirmButton = Swal.getConfirmButton();
+                    const cancelButton = Swal.getCancelButton();
+                    if (popup) popup.style.borderRadius = '14px';
+                    if (title) {
+                        title.style.padding = '0';
+                        title.style.fontSize = '20px';
+                        title.style.lineHeight = '1.3';
+                        title.style.textAlign = 'left';
+                        title.style.color = '#0f172a';
+                    }
+                    if (actions) {
+                        actions.style.width = '100%';
+                        actions.style.justifyContent = 'flex-end';
+                        actions.style.marginTop = '18px';
+                    }
+                    [confirmButton, cancelButton].forEach(button => {
+                        if (!button) return;
+                        button.style.margin = '0 0 0 8px';
+                        button.style.padding = '10px 16px';
+                        button.style.borderRadius = '8px';
+                        button.style.fontSize = '14px';
+                        button.style.fontWeight = '600';
+                        button.style.boxShadow = 'none';
+                    });
+                    if (cancelButton) {
+                        cancelButton.style.background = '#ffffff';
+                        cancelButton.style.color = '#475569';
+                        cancelButton.style.border = '1px solid #cbd5e1';
+                    }
                     _countdownTick = setInterval(() => {
                         seconds = Math.max(0, seconds - 1);
                         const el = document.getElementById('_sto_countdown');

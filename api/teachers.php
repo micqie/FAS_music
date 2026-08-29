@@ -473,6 +473,47 @@ class TeachersApi
             if (!$this->tableHasColumn('tbl_student_certificates', 'learning_level_id')) {
                 $this->conn->exec("ALTER TABLE tbl_student_certificates ADD COLUMN learning_level_id INT NULL AFTER promotional_exam_id");
             }
+
+            $this->conn->exec("
+                CREATE TABLE IF NOT EXISTS tbl_learning_materials (
+                    material_id INT AUTO_INCREMENT PRIMARY KEY,
+                    instrument_type VARCHAR(100) NOT NULL,
+                    level_name VARCHAR(100) NOT NULL,
+                    material_name VARCHAR(255) NOT NULL,
+                    description TEXT NULL,
+                    file_path VARCHAR(500) NULL,
+                    original_filename VARCHAR(255) NULL,
+                    status ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_learning_material (instrument_type, level_name, material_name),
+                    INDEX idx_learning_material_lookup (instrument_type, level_name, status)
+                )
+            ");
+            $materialColumns = [
+                'description' => "ALTER TABLE tbl_learning_materials ADD COLUMN description TEXT NULL AFTER material_name",
+                'file_path' => "ALTER TABLE tbl_learning_materials ADD COLUMN file_path VARCHAR(500) NULL AFTER description",
+                'original_filename' => "ALTER TABLE tbl_learning_materials ADD COLUMN original_filename VARCHAR(255) NULL AFTER file_path",
+                'updated_at' => "ALTER TABLE tbl_learning_materials ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"
+            ];
+            foreach ($materialColumns as $column => $sql) {
+                if (!$this->tableHasColumn('tbl_learning_materials', $column)) $this->conn->exec($sql);
+            }
+            $this->conn->exec("
+                INSERT IGNORE INTO tbl_learning_materials (instrument_type,level_name,material_name) VALUES
+                ('Piano','Level 1','John Thompson Book 1'),('Piano','Level 2','John Thompson Book 2'),('Piano','Level 1','Alfred Basic Piano Library Book 1A'),
+                ('Guitar','Level 1','Hal Leonard Guitar Method Book 1'),('Guitar','Level 2','Hal Leonard Guitar Method Book 2'),
+                ('Bass Guitar','Level 1','Hal Leonard Bass Method Book 1'),('Bass Guitar','Level 2','Hal Leonard Bass Method Book 2'),
+                ('Ukulele','Level 1','Hal Leonard Ukulele Method Book 1'),('Ukulele','Level 2','Hal Leonard Ukulele Method Book 2'),
+                ('Violin','Level 1','Essential Elements for Strings Book 1'),('Violin','Level 2','Essential Elements for Strings Book 2'),
+                ('Voice','Level 1','Contemporary Voice Foundations'),('Voice','Level 2','Intermediate Vocal Technique'),
+                ('Drums','Level 1','Alfred Drum Method Book 1'),('Drums','Level 2','Alfred Drum Method Book 2'),
+                ('General','Level 1','Academy Level 1 Learning Guide'),('General','Level 2','Academy Level 2 Learning Guide'),
+                ('General','Level 3','Academy Level 3 Learning Guide'),('General','Level 4','Academy Level 4 Learning Guide'),
+                ('General','Level 5','Academy Level 5 Learning Guide'),('General','Level 6','Academy Level 6 Learning Guide'),
+                ('General','Level 7','Academy Level 7 Learning Guide'),('General','Level 8','Academy Level 8 Learning Guide'),
+                ('General','Level 9','Academy Level 9 Learning Guide'),('General','Level 10','Academy Level 10 Learning Guide')
+            ");
         } catch (PDOException $e) {
             // Keep existing teacher features usable if migration permissions are restricted.
         }
@@ -2134,7 +2175,7 @@ class TeachersApi
         try {
             $stmt = $this->conn->prepare("
                 SELECT DISTINCT s.student_id, s.first_name, s.last_name,
-                       i.instrument_id, i.instrument_name,
+                       i.instrument_id, COALESCE(it.type_name, i.instrument_name) AS instrument_name,
                        ll.learning_level_id, ll.level_name, ll.book_material,
                        ll.current_topic, ll.instructor_notes, ll.skills_developing,
                        ll.areas_for_improvement, ll.assessment_readiness,
@@ -2143,6 +2184,7 @@ class TeachersApi
                 INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
                 INNER JOIN tbl_students s ON s.student_id = e.student_id
                 INNER JOIN tbl_instruments i ON i.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
+                LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
                 LEFT JOIN tbl_student_learning_levels ll
                   ON ll.learning_level_id = (
                       SELECT ll2.learning_level_id
@@ -2171,9 +2213,58 @@ class TeachersApi
                 WHERE ll.student_id = ? AND ll.instrument_id = ?
                 ORDER BY ll.started_at DESC, ll.learning_level_id DESC
             ");
+            $evaluationStmt = $this->conn->prepare("
+                SELECT ts.session_id, ts.session_number, ts.session_date,
+                       ts.notes AS session_notes, ts.attendance_notes,
+                       p.progress_id, p.skill_level, p.criteria_scores,
+                       p.performance_score, p.technique_score, p.rhythm_score,
+                       p.focus_score, p.assignment_score, p.remarks,
+                       p.assessment_date
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                LEFT JOIN tbl_student_progress p ON p.session_id = ts.session_id
+                WHERE ts.teacher_id = ?
+                  AND e.student_id = ?
+                  AND COALESCE(ts.instrument_id, e.instrument_id) = ?
+                  AND ts.status = 'Completed'
+                  AND COALESCE(ts.attendance_status, '') = 'Present'
+                ORDER BY ts.session_date DESC, ts.session_number DESC, ts.session_id DESC
+            ");
+            $materialsStmt = $this->conn->prepare("
+                SELECT material_id, level_name, material_name, description, file_path, original_filename
+                FROM tbl_learning_materials
+                WHERE status = 'Active' AND (instrument_type = ? OR instrument_type = 'General')
+                ORDER BY instrument_type = 'General', level_name, material_name
+            ");
             foreach ($rows as &$row) {
                 $historyStmt->execute([(int)$row['student_id'], (int)$row['instrument_id']]);
                 $row['learning_history'] = $historyStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+                $evaluationStmt->execute([$teacherId, (int)$row['student_id'], (int)$row['instrument_id']]);
+                $evaluations = $evaluationStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                foreach ($evaluations as &$evaluation) {
+                    $criteria = $this->decodeCriteriaScores($evaluation['criteria_scores'] ?? null);
+                    $scores = [];
+                    foreach ($criteria as $criterion) {
+                        if (isset($criterion['score']) && is_numeric($criterion['score'])) {
+                            $scores[] = (float)$criterion['score'];
+                        }
+                    }
+                    if (!$scores) {
+                        foreach (['performance_score','technique_score','rhythm_score','focus_score','assignment_score'] as $scoreColumn) {
+                            if ($evaluation[$scoreColumn] !== null && is_numeric($evaluation[$scoreColumn])) {
+                                $scores[] = (float)$evaluation[$scoreColumn];
+                            }
+                        }
+                    }
+                    $evaluation['criteria_scores'] = $criteria;
+                    $evaluation['average_score'] = $scores ? round(array_sum($scores) / count($scores), 2) : null;
+                }
+                unset($evaluation);
+                $row['completed_sessions'] = count($evaluations);
+                $row['session_evaluations'] = $evaluations;
+                $materialsStmt->execute([(string)$row['instrument_name']]);
+                $row['learning_materials'] = $materialsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             }
             unset($row);
             $this->sendJSON(['success' => true, 'learning_progress' => $rows]);
@@ -2196,11 +2287,15 @@ class TeachersApi
         $skills = trim((string)($data['skills_developing'] ?? ''));
         $improvement = trim((string)($data['areas_for_improvement'] ?? ''));
         $readiness = trim((string)($data['assessment_readiness'] ?? 'Not Ready'));
+        $readinessReviewed = !empty($data['readiness_reviewed']);
         $validReadiness = ['Not Ready','Developing','Improving','Ready for Assessment'];
         if ($teacherId < 1 || $studentId < 1 || $instrumentId < 1 || $levelName === '') {
             $this->sendJSON(['error' => 'Teacher, student, instrument, and current level are required'], 400);
         }
         if (!in_array($readiness, $validReadiness, true)) $this->sendJSON(['error' => 'Invalid assessment readiness'], 400);
+        if ($readiness === 'Ready for Assessment' && !$readinessReviewed) {
+            $this->sendJSON(['error' => 'Review the student session evaluations before marking promotional-exam readiness'], 400);
+        }
         if (!$this->teacherCanManageStudentInstrument($teacherId, $studentId, $instrumentId)) {
             $this->sendJSON(['error' => 'This student/instrument is not assigned to this instructor'], 403);
         }
@@ -2256,8 +2351,8 @@ class TeachersApi
         }
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $examDate)) $this->sendJSON(['error'=>'Invalid exam date'],400);
         if ($rating === '') $this->sendJSON(['error'=>'Record the formal exam grade or rating'],400);
-        if ($result === 'Passed' && ($nextLevel === '' || $nextBook === '')) {
-            $this->sendJSON(['error'=>'Next level and next book/material are required after a passing result'],400);
+        if ($result === 'Passed' && $nextLevel === '') {
+            $this->sendJSON(['error'=>'Next level is required after a passing result'],400);
         }
 
         try {
@@ -2311,7 +2406,7 @@ class TeachersApi
                 (student_id,instrument_id,teacher_id,level_name,book_material,assessment_readiness,status,started_at,previous_learning_level_id)
                 VALUES (?,?,?,?,?,'Not Ready','In Progress',?,?)
             ");
-            $next->execute([$studentId,$instrumentId,$teacherId,$nextLevel,$nextBook,$examDate,$learningId]);
+            $next->execute([$studentId,$instrumentId,$teacherId,$nextLevel,$nextBook ?: null,$examDate,$learningId]);
             $nextLearningId = (int)$this->conn->lastInsertId();
             $this->conn->commit();
             $this->sendJSON([

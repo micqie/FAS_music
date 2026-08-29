@@ -1396,7 +1396,9 @@ class StudentsApi
                 if ($keyword === '' || $specName === '') {
                     continue;
                 }
-                if ($specName === $keyword || strpos($specName, $keyword) !== false || strpos($keyword, $specName) !== false) {
+                // Instrument types must match exactly. A partial match would
+                // incorrectly treat "Guitar" as eligible for "Bass Guitar".
+                if ($specName === $keyword) {
                     return true;
                 }
             }
@@ -1491,7 +1493,8 @@ class StudentsApi
                 $candidates[] = [
                     'teacher_id' => $teacherId,
                     'teacher_name' => trim(($t['first_name'] ?? '') . ' ' . ($t['last_name'] ?? '')),
-                    'specialization' => $specializationRaw !== '' ? $specializationRaw : 'General'
+                    'specialization' => $specializationRaw !== '' ? $specializationRaw : 'General',
+                    'specialization_type_ids' => $teacherTypeIds
                 ];
             }
 
@@ -3686,6 +3689,7 @@ class StudentsApi
         $enrollmentHistory = [];
         $currentSessionGrades = [];
         $issuedCertificate = null;
+        $certificateStrengths = [];
         try {
             $paymentsHasType = $this->tableExists('tbl_payments') && $this->tableHasColumn('tbl_payments', 'payment_type');
             $paySummaryPaymentTypeSelect = $paymentsHasType
@@ -3853,6 +3857,7 @@ class StudentsApi
                                c.issued_at, c.instrument_id,
                                COALESCE(NULLIF(TRIM(it.type_name), ''), i.instrument_name) AS instrument_name,
                                pe.exam_id AS promotional_exam_id, pe.exam_date, pe.result AS exam_result,
+                               pe.grade_rating AS exam_rating, pe.examiner_notes,
                                CONCAT(COALESCE(ct.first_name, ''), ' ', COALESCE(ct.last_name, '')) AS issuing_teacher_name
                         FROM tbl_student_certificates c
                         LEFT JOIN tbl_instruments i ON i.instrument_id = c.instrument_id
@@ -3865,6 +3870,27 @@ class StudentsApi
                     ");
                     $stmtCertificate->execute([(int)$student['student_id']]);
                     $issuedCertificate = $stmtCertificate->fetch(PDO::FETCH_ASSOC) ?: null;
+                    if ($issuedCertificate && $this->tableExists('tbl_student_progress')) {
+                        $strengthStmt = $this->conn->prepare("SELECT p.criteria_scores,p.performance_score,p.technique_score,p.rhythm_score,p.focus_score,p.assignment_score FROM tbl_student_progress p LEFT JOIN tbl_sessions ts ON ts.session_id=p.session_id LEFT JOIN tbl_enrollments e ON e.enrollment_id=ts.enrollment_id WHERE p.student_id=? AND COALESCE(p.instrument_id,ts.instrument_id,e.instrument_id)=? AND (p.assessment_date IS NULL OR p.assessment_date<=?) ORDER BY p.assessment_date DESC,p.progress_id DESC");
+                        $strengthStmt->execute([(int)$student['student_id'],(int)$issuedCertificate['instrument_id'],(string)($issuedCertificate['exam_date']??$issuedCertificate['issued_at'])]);
+                        $scoreGroups = [];
+                        foreach ($strengthStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $grade) {
+                            $criteria = json_decode((string)($grade['criteria_scores']??''),true);
+                            if (is_array($criteria) && $criteria) {
+                                foreach ($criteria as $criterion) {
+                                    $label=trim((string)($criterion['name']??'')); $score=(float)($criterion['score']??0);
+                                    if ($label!=='' && $score>=1 && $score<=5) $scoreGroups[$label][]=$score;
+                                }
+                            } else {
+                                foreach (['Performance'=>'performance_score','Technique'=>'technique_score','Rhythm'=>'rhythm_score','Focus'=>'focus_score','Practice'=>'assignment_score'] as $label=>$column) {
+                                    $score=(float)($grade[$column]??0); if ($score>=1 && $score<=5) $scoreGroups[$label][]=$score;
+                                }
+                            }
+                        }
+                        foreach ($scoreGroups as $label=>$scores) $certificateStrengths[]=['name'=>$label,'average'=>round(array_sum($scores)/count($scores),2)];
+                        usort($certificateStrengths,function($a,$b){return $b['average']<=>$a['average'];});
+                        $certificateStrengths=array_slice(array_values(array_filter($certificateStrengths,function($row){return $row['average']>=3.5;})),0,3);
+                    }
                 } catch (PDOException $e) {
                     $issuedCertificate = null;
                 }
@@ -3949,6 +3975,9 @@ class StudentsApi
                 'promotional_exam_id' => $issuedCertificate['promotional_exam_id'] ?? null,
                 'exam_date' => $issuedCertificate['exam_date'] ?? null,
                 'exam_result' => $issuedCertificate['exam_result'] ?? null,
+                'exam_rating' => $issuedCertificate['exam_rating'] ?? null,
+                'examiner_notes' => $issuedCertificate['examiner_notes'] ?? null,
+                'strengths' => $certificateStrengths,
                 'student_name' => trim((string)($student['first_name'] ?? '') . ' ' . (string)($student['last_name'] ?? '')),
                 'teacher_name' => trim((string)($issuedCertificate['issuing_teacher_name'] ?? '')),
                 'issue_date' => $issuedCertificate['issued_at'] ?? null
@@ -4824,12 +4853,24 @@ class StudentsApi
         }
 
         $email = trim($_GET['email'] ?? '');
+        $requestedStudentId = (int)($_GET['student_id'] ?? 0);
         $staffContext = !empty($_GET['staff_context']);
-        if ($email === '') {
-            $this->sendJSON(['error' => 'Email is required'], 400);
+        if ($email === '' && $requestedStudentId < 1) {
+            $this->sendJSON(['error' => 'Email or student_id is required'], 400);
         }
 
         try {
+            $actor = fas_require_authenticated_user($this->conn);
+            $roleCategory = fas_normalize_role_category($actor['role_name'] ?? '');
+            if ($requestedStudentId > 0 && $roleCategory === 'guardian') {
+                $access = $this->conn->prepare("SELECT 1 FROM tbl_student_guardians sg INNER JOIN tbl_guardians g ON g.guardian_id=sg.guardian_id WHERE sg.student_id=? AND sg.can_enroll='Y' AND (g.guardian_user_id=? OR sg.guardian_user_id=? OR (g.guardian_user_id IS NULL AND g.email=?)) LIMIT 1");
+                $access->execute([$requestedStudentId,(int)($actor['user_id']??0),(int)($actor['user_id']??0),trim((string)($actor['email']??''))]);
+                if (!$access->fetchColumn()) $this->sendJSON(['error'=>'You are not authorized to enroll this student'],403);
+            } elseif ($requestedStudentId > 0 && $roleCategory === 'student') {
+                $access = $this->conn->prepare('SELECT 1 FROM tbl_students WHERE student_id=? AND (student_user_id=? OR email=?) LIMIT 1');
+                $access->execute([$requestedStudentId,(int)($actor['user_id']??0),trim((string)($actor['email']??''))]);
+                if (!$access->fetchColumn()) $this->sendJSON(['error'=>'You can only view your own enrollment choices'],403);
+            }
             $stmtStudent = $this->conn->prepare("
                 SELECT
                     s.student_id,
@@ -4857,10 +4898,10 @@ class StudentsApi
                     FROM tbl_registration_payments rp
                     GROUP BY rp.student_id
                 ) rf ON rf.student_id = s.student_id
-                WHERE s.email = ?
+                WHERE " . ($requestedStudentId > 0 ? "s.student_id = ?" : "s.email = ?") . "
                 LIMIT 1
             ");
-            $stmtStudent->execute([$email]);
+            $stmtStudent->execute([$requestedStudentId > 0 ? $requestedStudentId : $email]);
             $student = $stmtStudent->fetch(PDO::FETCH_ASSOC);
             if (!$student) {
                 $this->sendJSON(['error' => 'Student not found for this email'], 404);
@@ -5286,6 +5327,22 @@ class StudentsApi
         if ($studentId < 1 || $packageId < 1) {
             $this->sendJSON(['error' => 'student_id and package_id are required'], 400);
         }
+        $actor = fas_require_authenticated_user($this->conn);
+        $roleCategory = fas_normalize_role_category($actor['role_name'] ?? '');
+        if ($isWalkinRequest && !in_array($roleCategory, ['admin','owner','manager','staff'], true)) {
+            $this->sendJSON(['error'=>'Promotional and walk-in packages can only be assigned by authorized staff'],403);
+        }
+        $guardianLinkId = 0;
+        if ($roleCategory === 'guardian') {
+            $access = $this->conn->prepare("SELECT sg.student_guardian_id FROM tbl_student_guardians sg INNER JOIN tbl_guardians g ON g.guardian_id=sg.guardian_id WHERE sg.student_id=? AND sg.can_enroll='Y' AND (g.guardian_user_id=? OR sg.guardian_user_id=? OR (g.guardian_user_id IS NULL AND g.email=?)) LIMIT 1");
+            $access->execute([$studentId,(int)($actor['user_id']??0),(int)($actor['user_id']??0),trim((string)($actor['email']??''))]);
+            $guardianLinkId = (int)($access->fetchColumn() ?: 0);
+            if ($guardianLinkId < 1) $this->sendJSON(['error'=>'You are not authorized to enroll this student'],403);
+        } elseif ($roleCategory === 'student') {
+            $access = $this->conn->prepare('SELECT 1 FROM tbl_students WHERE student_id=? AND (student_user_id=? OR email=?) LIMIT 1');
+            $access->execute([$studentId,(int)($actor['user_id']??0),trim((string)($actor['email']??''))]);
+            if (!$access->fetchColumn()) $this->sendJSON(['error'=>'You can only submit your own enrollment request'],403);
+        }
         $validDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
         if ($paymentType === '') {
             // Backward-compatible fallback for cached clients/forms.
@@ -5338,6 +5395,9 @@ class StudentsApi
             }
             if ($student['status'] !== 'Active') {
                 $this->sendJSON(['error' => 'Student account is not active yet'], 400);
+            }
+            if (!in_array((string)($student['registration_status'] ?? ''), ['Approved', 'Fee Paid'], true)) {
+                $this->sendJSON(['error' => 'The student registration fee must be approved before requesting enrollment'], 400);
             }
 
             $enrollmentContext = $this->getStudentEnrollmentContext($studentId);
@@ -5467,12 +5527,13 @@ class StudentsApi
                     preferred_schedule,
                     request_notes,
                     enrolled_by_type,
+                    student_guardian_id,
                     start_date,
                     end_date,
                     total_sessions,
                     completed_sessions,
                     status
-                ) VALUES (?, ?, ?, ?, ?, 'Self', NULL, NULL, ?, 0, 'Pending')
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0, 'Pending')
             ");
             $stmtPendingEnrollment->execute([
                 $studentId,
@@ -5480,6 +5541,8 @@ class StudentsApi
                 $primaryInstrumentId,
                 ($preferredSchedule !== '' ? $preferredSchedule : null),
                 $requestMeta,
+                $roleCategory === 'guardian' ? 'Guardian' : 'Self',
+                $guardianLinkId > 0 ? $guardianLinkId : null,
                 $totalSessions
             ]);
             $requestId = (int)$this->conn->lastInsertId();
@@ -7686,6 +7749,42 @@ class StudentsApi
             ");
             $stmt->execute($params);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            // Include the actual absence events which led to the freeze. Counts alone
+            // are not enough for staff to explain the account state to a family.
+            $rowsByEnrollment = [];
+            $enrollmentIds = [];
+            foreach ($rows as $index => &$row) {
+                $row['absence_records'] = [];
+                $enrollmentId = (int)($row['enrollment_id'] ?? 0);
+                if ($enrollmentId > 0) {
+                    $enrollmentIds[] = $enrollmentId;
+                    $rowsByEnrollment[$enrollmentId] = $index;
+                }
+            }
+            unset($row);
+
+            if ($enrollmentIds && $this->tableExists('tbl_sessions')) {
+                $placeholders = implode(',', array_fill(0, count($enrollmentIds), '?'));
+                $absenceStmt = $this->conn->prepare("
+                    SELECT session_id, enrollment_id, session_number, session_date,
+                           attendance_status, absence_notice, attendance_notes, status
+                    FROM tbl_sessions
+                    WHERE enrollment_id IN ($placeholders)
+                      AND (
+                          attendance_status IN ('Absent', 'CI')
+                          OR status IN ('No Show', 'Cancelled')
+                      )
+                    ORDER BY session_date DESC, session_number DESC, session_id DESC
+                ");
+                $absenceStmt->execute($enrollmentIds);
+                foreach (($absenceStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) as $absence) {
+                    $enrollmentId = (int)($absence['enrollment_id'] ?? 0);
+                    if (isset($rowsByEnrollment[$enrollmentId])) {
+                        $rows[$rowsByEnrollment[$enrollmentId]]['absence_records'][] = $absence;
+                    }
+                }
+            }
             $this->sendJSON(['success' => true, 'students' => $rows]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);

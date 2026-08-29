@@ -205,10 +205,10 @@
                     <thead class="bg-slate-50">
                         <tr>
                             <th id="activeColStudent" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th id="activeColPackage" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package &amp; Progress</th>
+                            <th id="activeColPackage" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Session Counter</th>
                             <th id="activeColFour" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Weekly Schedule</th>
                             <th id="activeColFive" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
-                            <th id="activeColSix" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
+                            <th id="activeColSix" class="hidden px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
                             <th id="activeColSeven" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -271,10 +271,10 @@
                     <thead class="bg-slate-50">
                         <tr>
                             <th id="completedColStudent" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th id="completedColPackage" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package &amp; Progress</th>
+                            <th id="completedColPackage" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Session Counter</th>
                             <th id="completedColSchedule" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Schedule</th>
                             <th id="completedColTeacher" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
-                            <th id="completedColRoom" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
+                            <th id="completedColRoom" class="hidden px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</th>
                             <th id="completedColActions" class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -854,7 +854,7 @@
             const isEnrollmentPage = managerPageMode === 'enrollments';
             const labels = isEnrollmentPage
                 ? ['Student', 'Branch', 'Package', 'Payment Type', 'Package Amount', 'Paid / Balance', 'Status']
-                : ['Student', 'Branch', 'Package', 'Schedule', 'Teacher', 'Room', 'Actions'];
+                : ['Student', 'Branch', 'Session Counter', 'Schedule', 'Teacher', '', 'Actions'];
             const ids = [
                 'activeColStudent',
                 'activeColBranch',
@@ -866,7 +866,10 @@
             ];
             ids.forEach((id, index) => {
                 const el = document.getElementById(id);
-                if (el) el.textContent = labels[index] || '';
+                if (el) {
+                    el.textContent = labels[index] || '';
+                    el.classList.toggle('hidden', !isEnrollmentPage && id === 'activeColSix');
+                }
             });
         }
 
@@ -898,6 +901,7 @@
             const branchScopeLabel = document.getElementById('managerBranchScopeLabel');
             const pendingTitle = document.getElementById('pendingSectionTitle');
             const activeTitle = document.getElementById('activeSectionTitle');
+            const pendingPackageHeader = document.getElementById('pendingColPackage');
 
             if (managerPageMode === 'enrollments') {
                 document.title = 'Manager - Enrollments';
@@ -906,6 +910,7 @@
                 if (branchScopeLabel) branchScopeLabel.textContent = 'Enrollments are locked to your branch:';
                 if (pendingTitle) pendingTitle.innerHTML = '<i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Enrollments';
                 if (activeTitle) activeTitle.innerHTML = '<i class="fas fa-wallet mr-2 text-gold-500"></i>Enrollment Payments';
+                if (pendingPackageHeader) pendingPackageHeader.textContent = 'Package';
                 window.pendingRequestActionLabel = 'Schedule Sessions';
                 window.onPendingRequestAssignClick = function(requestId) {
                     openAssignRequestModal(requestId);
@@ -917,6 +922,7 @@
                 if (branchScopeLabel) branchScopeLabel.textContent = 'Sessions are locked to your branch:';
                 if (pendingTitle) pendingTitle.innerHTML = '<i class="fas fa-inbox mr-2 text-gold-500"></i>Pending Student Requests';
                 if (activeTitle) activeTitle.innerHTML = '<i class="fas fa-box mr-2 text-gold-500"></i>Active Sessions';
+                if (pendingPackageHeader) pendingPackageHeader.textContent = 'Session Count';
                 window.pendingRequestActionLabel = 'Assign & Approve';
                 window.onPendingRequestAssignClick = null;
             }
@@ -1504,7 +1510,9 @@
                 tableBody.innerHTML = requests.map(r => {
                     pendingRequestsById[String(r.request_id)] = r;
                     const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
-                    const pkg = escapeHtml(r.package_name || '—');
+                    const packageOrSessions = managerPageMode === 'enrollments'
+                        ? escapeHtml(r.package_name || '—')
+                        : `${Number(r.sessions || 0)} sessions`;
                     const instruments = Array.isArray(r.instruments) && r.instruments.length
                         ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
                         : '—';
@@ -1517,7 +1525,7 @@
                                 <div class="text-sm text-slate-500">${escapeHtml(r.email || '')}</div>
                                 <div class="text-xs text-slate-400">${escapeHtml(r.branch_name || '')}</div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-700">${pkg}</td>
+                            <td class="px-6 py-4 text-sm font-semibold text-slate-700">${packageOrSessions}</td>
                             <td class="px-6 py-4 text-sm text-slate-700">${instruments}</td>
                             <td class="px-6 py-4 text-sm text-slate-700">Based on instructor availability</td>
                             <td class="px-6 py-4 text-sm text-slate-700">
@@ -2250,9 +2258,10 @@
             }
 
             tableBody.innerHTML = allStudents.map(student => {
-                const packageName = student.package_name || '—';
                 const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
-                const roomName = escapeHtml(student.assigned_room || '—');
+                const sessionsTotal = Number(student.sessions || 0);
+                const completedSessions = Math.min(sessionsTotal, Math.max(0, Number(student.completed_sessions || 0)));
+                const remainingSessions = Math.max(0, sessionsTotal - completedSessions);
                 const scheduleText = buildFixedScheduleText(student);
                 const nextDate = student.first_session_date ? formatDateShort(student.first_session_date) : '—';
 
@@ -2263,13 +2272,12 @@
                             <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
                         </td>
                         <td class="px-6 py-4 text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
-                        <td class="px-6 py-4 text-slate-700">${escapeHtml(packageName)}</td>
+                        <td class="px-6 py-4 text-slate-700"><div class="font-bold text-slate-900">${completedSessions} / ${sessionsTotal}</div><div class="mt-1 text-xs text-slate-500">${remainingSessions} remaining</div></td>
                         <td class="px-6 py-4 text-slate-700">
                             <div>${escapeHtml(scheduleText)}</div>
                             <div class="text-xs text-slate-500 mt-1">Starts: ${escapeHtml(nextDate)}</div>
                         </td>
                         <td class="px-6 py-4 text-slate-700">${teacherName}</td>
-                        <td class="px-6 py-4 text-slate-700">${roomName}</td>
                         <td class="px-6 py-4">
                             <div class="flex flex-wrap gap-2">
                                 <button type="button" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold border border-slate-200 transition" onclick="openSessionScheduleModal(${Number(student.enrollment_id)})">

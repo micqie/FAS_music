@@ -142,45 +142,45 @@
         </div>
     </aside>
 
-    <main class="lg:ml-72 pt-12 px-4 sm:px-6 md:px-8 py-5">
-        <div class="max-w-7xl mx-auto space-y-6">
+    <main class="lg:ml-72 pt-12 px-3 sm:px-5 md:px-6 py-4">
+        <div class="max-w-[1500px] mx-auto space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Payment Center</h1>
-                    <p class="text-sm text-slate-500 mt-1.5">Track collections, outstanding balances, and every student ledger in one place.</p>
+                    <p class="text-sm text-slate-500 mt-1">Collections and student balances.</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button id="paymentPrintBtn" type="button" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50">
+                    <button id="paymentPrintBtn" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50">
                         <i class="fas fa-print text-slate-500"></i> Print
                     </button>
-                    <button id="paymentExportBtn" type="button" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50">
+                    <button id="paymentExportBtn" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50">
                         <i class="fas fa-download text-slate-500"></i> Export CSV
                     </button>
                     <button id="openRecordPaymentModalBtn" type="button"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-obsidian px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-obsidian px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800">
                         <i class="fas fa-plus"></i> Record Payment
                     </button>
                 </div>
             </div>
 
-            <section class="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
-                <div class="grid gap-4 lg:grid-cols-[1.1fr_0.85fr_0.85fr_0.9fr_0.9fr]">
+            <section class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div class="grid gap-2 lg:grid-cols-[1.1fr_0.85fr_0.85fr_0.9fr_0.9fr]">
                     <div>
                         <label for="paymentSearch" class="block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500 mb-2">Search Student</label>
                         <div class="relative">
                             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                            <input id="paymentSearch" type="text" placeholder="Name or student ID" class="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                            <input id="paymentSearch" type="text" placeholder="Name or student ID" class="w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                         </div>
                     </div>
                     <div>
                         <label for="paymentBranchFilter" class="block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500 mb-2">Branch</label>
-                        <select id="paymentBranchFilter" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                        <select id="paymentBranchFilter" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                             <option value="">All branches</option>
                         </select>
                     </div>
                     <div>
                         <label for="paymentBalanceFilter" class="block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500 mb-2">Status</label>
-                        <select id="paymentBalanceFilter" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                        <select id="paymentBalanceFilter" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                             <option value="all">All statuses</option>
                             <option value="with_balance">With balance</option>
                             <option value="paid">Paid in full</option>
@@ -188,65 +188,60 @@
                     </div>
                     <div>
                         <label for="paymentDateFrom" class="block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500 mb-2">Enrolled From</label>
-                        <input id="paymentDateFrom" type="date" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                        <input id="paymentDateFrom" type="date" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                     </div>
                     <div>
                         <label for="paymentDateTo" class="block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500 mb-2">Enrolled To</label>
-                        <input id="paymentDateTo" type="date" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                        <input id="paymentDateTo" type="date" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                     </div>
                 </div>
-                <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <p id="paymentsMessage" class="hidden rounded-2xl border px-4 py-3 text-sm"></p>
                     <div class="flex items-center gap-3 ml-auto">
-                        <button id="paymentSort" type="button" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50">Reset filters</button>
-                        <button id="paymentBalanceModeBtn" type="button" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"><i class="fas fa-rotate-left mr-1.5"></i>Reset</button>
+                        <button id="paymentBalanceModeBtn" type="button" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"><i class="fas fa-rotate-left mr-1.5"></i>Reset filters</button>
                     </div>
                 </div>
             </section>
 
-            <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <article class="rounded-3xl bg-white border border-slate-200 p-5 shadow-sm">
+            <section class="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                <article class="rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Total Collected</p>
-                            <h2 id="statCollected" class="mt-3 text-2xl font-black text-slate-900">₱0.00</h2>
-                            <p class="mt-2 text-sm text-slate-500">Payments posted in this view</p>
+                            <h2 id="statCollected" class="mt-1 text-xl font-black text-slate-900">₱0.00</h2>
                         </div>
                         <div class="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
                             <i class="fas fa-coins"></i>
                         </div>
                     </div>
                 </article>
-                <article class="rounded-3xl bg-white border border-slate-200 p-5 shadow-sm">
+                <article class="rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Outstanding</p>
-                            <h2 id="statOutstanding" class="mt-3 text-2xl font-black text-slate-900">₱0.00</h2>
-                            <p class="mt-2 text-sm text-slate-500">Balance still to collect</p>
+                            <h2 id="statOutstanding" class="mt-1 text-xl font-black text-slate-900">₱0.00</h2>
                         </div>
                         <div class="grid h-11 w-11 place-items-center rounded-2xl bg-amber-50 text-amber-600">
                             <i class="fas fa-balance-scale"></i>
                         </div>
                     </div>
                 </article>
-                <article class="rounded-3xl bg-white border border-slate-200 p-5 shadow-sm">
+                <article class="rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Total Charges</p>
-                            <h2 id="statTotalCharges" class="mt-3 text-2xl font-black text-slate-900">₱0.00</h2>
-                            <p class="mt-2 text-sm text-slate-500">Registration + package fees</p>
+                            <h2 id="statTotalCharges" class="mt-1 text-xl font-black text-slate-900">₱0.00</h2>
                         </div>
                         <div class="grid h-11 w-11 place-items-center rounded-2xl bg-sky-50 text-sky-600">
                             <i class="fas fa-wallet"></i>
                         </div>
                     </div>
                 </article>
-                <article class="rounded-3xl bg-white border border-slate-200 p-5 shadow-sm">
+                <article class="rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Accounts With Balance</p>
-                            <h2 id="statBalanceAccounts" class="mt-3 text-2xl font-black text-slate-900">0</h2>
-                            <p class="mt-2 text-sm text-slate-500">Of all students shown</p>
+                            <h2 id="statBalanceAccounts" class="mt-1 text-xl font-black text-slate-900">0</h2>
                         </div>
                         <div class="grid h-11 w-11 place-items-center rounded-2xl bg-rose-50 text-rose-600">
                             <i class="fas fa-user-clock"></i>
@@ -266,13 +261,13 @@
                 <table class="w-full">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-100">
-                            <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Student</th>
-                            <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Branch</th>
-                            <th class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Charges</th>
-                            <th class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Paid</th>
-                            <th class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Balance</th>
-                            <th class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-slate-400">Status</th>
-                            <th class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Actions</th>
+                            <th class="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Student</th>
+                            <th class="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Branch</th>
+                            <th class="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Charges</th>
+                            <th class="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Paid</th>
+                            <th class="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Balance</th>
+                            <th class="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-slate-400">Status</th>
+                            <th class="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="enrollmentPaymentsTable" class="divide-y divide-slate-100">
@@ -291,8 +286,7 @@
                 <article class="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm self-start">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <h2 class="text-xl font-black text-slate-900">Largest Balances</h2>
-                            <p class="mt-1 text-sm text-slate-500">Students needing follow-up first.</p>
+                            <h2 class="text-base font-bold text-slate-900">Largest Balances</h2>
                             <div id="largestBalancesSummary" class="mt-3 text-sm font-semibold text-slate-500">Loading balances...</div>
                         </div>
                         <div class="grid h-11 w-11 place-items-center rounded-2xl bg-amber-50 text-amber-600">
@@ -305,8 +299,7 @@
                 <article class="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm self-start">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <h2 class="text-xl font-black text-slate-900">Enrollment Revenue Tracker</h2>
-                            <p class="mt-1 text-sm text-slate-500">Package totals versus what has been collected.</p>
+                            <h2 class="text-base font-bold text-slate-900">Revenue Tracker</h2>
                         </div>
                         <div class="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
                             <i class="fas fa-chart-simple"></i>
@@ -334,8 +327,7 @@
                 <article class="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm self-start">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <h2 class="text-xl font-black text-slate-900">Registration Fee Tracker</h2>
-                            <p class="mt-1 text-sm text-slate-500">Fees charged at enrollment, by branch.</p>
+                            <h2 class="text-base font-bold text-slate-900">Registration Fees</h2>
                         </div>
                         <div class="grid h-11 w-11 place-items-center rounded-2xl bg-sky-50 text-sky-600">
                             <i class="fas fa-receipt"></i>

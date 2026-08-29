@@ -59,7 +59,23 @@
                     profileStatus.textContent = statusText;
                     profileStatus.className = `mt-4 px-3 py-1 rounded-full text-xs font-semibold ${statusText === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`;
                 }
-                if (profileSpecialization) profileSpecialization.textContent = `Primary: ${specializationText}`;
+                if (profileSpecialization) {
+                    if (profileSpecialization.dataset.specializationBadges === 'true') {
+                        const names = specializationText.split(',').map(name => name.trim()).filter(Boolean);
+                        profileSpecialization.replaceChildren(...(names.length ? names : ['General']).map(name => {
+                            const badge = document.createElement('span');
+                            badge.className = 'inline-flex items-center gap-1.5 rounded-lg border border-gold-400/40 bg-gold-50 px-3 py-1.5 text-xs font-bold text-gold-600 shadow-sm';
+                            const icon = document.createElement('i');
+                            icon.className = 'fas fa-music text-[10px]';
+                            const label = document.createElement('span');
+                            label.textContent = name;
+                            badge.append(icon, label);
+                            return badge;
+                        }));
+                    } else {
+                        profileSpecialization.textContent = `Primary: ${specializationText}`;
+                    }
+                }
                 if (profileBranch) profileBranch.textContent = branchText;
                 if (profileEmploymentType) profileEmploymentType.textContent = employmentTypeText;
                 if (profileFirstName) profileFirstName.value = teacher.first_name || '';

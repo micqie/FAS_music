@@ -812,7 +812,7 @@
                                 <div class="text-sm font-bold text-slate-900">${studentName}</div>
                                 ${getSessionStatusBadge(session.status)}
                             </div>
-                            <div class="text-xs text-slate-500">${escapeHtml(session.package_name || 'Package')} • Session ${Number(session.session_number || 0)}</div>
+                            <div class="text-xs text-slate-500">Session ${Number(session.session_number || 0)}</div>
                             <div class="text-sm text-slate-700">${teacherName}</div>
                             <div class="text-sm text-slate-600">Cancelled slot: ${originalTime}</div>
                             <div class="text-xs text-slate-500">Reason: ${reason}</div>
@@ -837,20 +837,21 @@
 
             listEl.innerHTML = allStudents.map(student => {
                 const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
-                const packageName = escapeHtml(student.package_name || '—');
                 const sessionsTotal = Number(student.sessions || 0);
+                const completedSessions = Math.min(sessionsTotal, Math.max(0, Number(student.completed_sessions || 0)));
+                const remainingSessions = Math.max(0, sessionsTotal - completedSessions);
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="px-6 py-4">
+                        <td class="px-3 py-2.5">
                             <div class="font-medium text-slate-900">${studentName}</div>
-                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                            <div class="text-xs text-slate-500">${escapeHtml(student.email || '')}</div>
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
-                        <td class="px-6 py-4 text-sm text-slate-700">
-                            ${packageName}
-                            <div class="text-xs text-slate-400 mt-1">${sessionsTotal} sessions</div>
+                        <td class="px-3 py-2.5 text-sm text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
+                        <td class="px-3 py-2.5 text-sm text-slate-700">
+                            <div class="font-bold text-slate-900">${completedSessions} / ${sessionsTotal}</div>
+                            <div class="text-xs text-slate-400 mt-1">${remainingSessions} remaining</div>
                         </td>
-                        <td class="px-6 py-4">
+                        <td class="px-3 py-2.5">
                             <button type="button" class="px-3 py-1.5 rounded-lg bg-gold-500/15 text-gold-700 hover:bg-gold-500/25 text-xs font-bold" onclick="openSessionScheduleModal(${Number(student.enrollment_id)})">
                                 View Schedule
                             </button>
@@ -898,7 +899,7 @@
             if (!row) return;
 
             const studentName = `${escapeHtml(row.first_name || '')} ${escapeHtml(row.last_name || '')}`.trim() || 'Student';
-            meta.textContent = `${studentName} • ${escapeHtml(row.package_name || 'Package')} • ${Number(row.sessions || 0)} sessions`;
+            meta.textContent = `${studentName} • ${Number(row.completed_sessions || 0)} completed of ${Number(row.sessions || 0)} sessions`;
 
             const sessionsList = Array.isArray(row.sessions_list) ? row.sessions_list : [];
             const sessionsTotal = Number(row.sessions || 0);

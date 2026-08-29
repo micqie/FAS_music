@@ -49,6 +49,17 @@
         });
     }
 
+    function mountFrozenAccountsLink() {
+        const sidebar = document.querySelector('body > aside');
+        const managementNav = sidebar?.querySelector('nav');
+        if (!managementNav || managementNav.querySelector('a[href*="desk_freezeaccounts.html"]')) return;
+        const link = document.createElement('a');
+        link.href = '../desk/desk_freezeaccounts.html';
+        link.className = 'flex items-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group';
+        link.innerHTML = '<i class="fas fa-snowflake mr-3 text-slate-500 group-hover:text-gold-400 transition-colors"></i> Frozen Accounts';
+        managementNav.appendChild(link);
+    }
+
     window.syncManagerShell = function syncManagerShell(displayName, branchName, email) {
         if (typeof displayName !== 'undefined') {
             updateUserLabels(displayName);
@@ -66,6 +77,7 @@
 
     const bootstrap = () => {
         mountProfileBlock();
+        mountFrozenAccountsLink();
     };
 
     if (document.readyState === 'loading') {
