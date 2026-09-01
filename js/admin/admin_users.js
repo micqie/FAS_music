@@ -219,6 +219,20 @@
             if (modal) modal.classList.add('hidden');
         }
 
+        function toggleAdminPasswordVisibility(inputId, button) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            const icon = button?.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-eye', showing);
+                icon.classList.toggle('fa-eye-slash', !showing);
+            }
+            if (button) button.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+        }
+        window.toggleAdminPasswordVisibility = toggleAdminPasswordVisibility;
+
         function openAdminUserPasswordModal(userId, displayName) {
             const modal = document.getElementById('adminUserPasswordModal');
             const idInput = document.getElementById('adminUserPasswordUserId');
@@ -234,8 +248,20 @@
             if (subtitle) {
                 subtitle.textContent = name ? `Editing password for ${name}` : '';
             }
-            if (pwdNew) pwdNew.value = '';
-            if (pwdConfirm) pwdConfirm.value = '';
+            if (pwdNew) {
+                pwdNew.type = 'password';
+                pwdNew.value = '';
+                pwdNew.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (pwdConfirm) {
+                pwdConfirm.type = 'password';
+                pwdConfirm.value = '';
+                pwdConfirm.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            modal.querySelectorAll('button[onclick*="toggleAdminPasswordVisibility"] i').forEach(icon => {
+                icon.classList.add('fa-eye');
+                icon.classList.remove('fa-eye-slash');
+            });
             if (msgEl) {
                 msgEl.textContent = '';
                 msgEl.classList.add('hidden');
@@ -365,6 +391,10 @@
             const form = document.getElementById(formId);
             if (!form) return;
             form.reset();
+            form.querySelectorAll('input[type="password"], input[data-password-strength-ready="1"]').forEach(input => {
+                input.value = '';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
             setAdminCreationFormMode(formId, 'system_account');
 
             let messageId = 'adminAddStaffMessage';

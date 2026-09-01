@@ -4292,15 +4292,22 @@ function getNextUpcomingSession(item) {
     return rows[0] || null;
 }
 
+function formatGuardianSessionLabel(row) {
+    if (!row?.session_date) return 'Date and time pending';
+
+    const dateLabel = formatDateLong(row.session_date);
+    const timeLabel = row.start_time && row.end_time
+        ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
+        : (row.start_time ? formatTime12Hour(row.start_time) : '');
+
+    return `${dateLabel}${timeLabel ? ` • ${timeLabel}` : ''}`;
+}
+
 function formatGuardianNextSessionLabel(item) {
     const enrollment = item?.current_enrollment || null;
     const nextRow = getNextUpcomingSession(item);
     if (nextRow) {
-        const dateLabel = formatDateLong(nextRow.session_date);
-        const timeLabel = nextRow.start_time && nextRow.end_time
-            ? `${formatTime12Hour(nextRow.start_time)} - ${formatTime12Hour(nextRow.end_time)}`
-            : (nextRow.start_time ? formatTime12Hour(nextRow.start_time) : '');
-        return `${dateLabel}${timeLabel ? ` • ${timeLabel}` : ''}`;
+        return formatGuardianSessionLabel(nextRow);
     }
     const scheduleDate = enrollment?.first_session_date || enrollment?.start_date;
     if (scheduleDate) {
@@ -4469,7 +4476,7 @@ function renderGuardianDashboardUpcomingList(items) {
     return upcoming.map((entry) => {
         const name = getGuardianStudentName(entry.item, entry.index);
         const session = entry.session;
-        const when = formatGuardianNextSessionLabel(entry.item);
+        const when = formatGuardianSessionLabel(session);
         const teacher = session.teacher_name || 'Teacher pending';
         const room = session.room_name || 'Room pending';
         return `
@@ -8181,6 +8188,8 @@ async function initStudentDashboardPage() {
         } catch (_) { /* non-critical */ }
     }
     studentDashboardPortalState = portal;
+    notifyStudentSessionCompletions(portal);
+    startStudentSessionRefreshWatcher();
     notifyFreezeRestoredForStudentPortal(portal, s);
     startStudentFreezeRefreshWatcher();
 
@@ -9960,7 +9969,10 @@ function initWalkinPage() {
             }
         } catch (error) {
             console.error('Walk-in create error:', error);
-            showMessage(error.message || 'An error occurred. Please try again.', 'error');
+            showMessage(
+                error?.response?.data?.error || error.message || 'An error occurred. Please try again.',
+                'error'
+            );
         } finally {
             form.dataset.submitting = '0';
             if (btn) btn.disabled = false;
@@ -10238,6 +10250,129 @@ function notifyGuardianSessionCompletions(students) {
     return notified;
 }
 
+function getStudentSessionCompletionKey(sessionId) {
+    return `fas_student_session_completed_${Number(sessionId || 0)}`;
+}
+
+function readStudentSessionCompletionState(sessionId) {
+    try { return localStorage.getItem(getStudentSessionCompletionKey(sessionId)) || ''; }
+    catch (e) { return ''; }
+}
+
+function writeStudentSessionCompletionState(sessionId, state) {
+    try { localStorage.setItem(getStudentSessionCompletionKey(sessionId), String(state || '')); }
+    catch (e) { /* Ignore storage failures. */ }
+}
+
+function getStudentPortalSessionRows(portal) {
+    return (Array.isArray(portal?.current_session_grades) ? portal.current_session_grades : [])
+        .slice()
+        .sort((a, b) => {
+            const aTime = new Date(`${a?.session_date || ''}T${a?.start_time || '00:00:00'}`).getTime() || 0;
+            const bTime = new Date(`${b?.session_date || ''}T${b?.start_time || '00:00:00'}`).getTime() || 0;
+            return bTime - aTime;
+        });
+}
+
+function dismissStudentSessionCompletion(sessionId) {
+    writeStudentSessionCompletionState(sessionId, 'dismissed');
+    const alert = document.getElementById('studentSessionCompletionAlert');
+    if (alert) { alert.innerHTML = ''; alert.classList.add('hidden'); }
+}
+window.dismissStudentSessionCompletion = dismissStudentSessionCompletion;
+
+function renderStudentSessionCompletionAlert(portal) {
+    const alert = document.getElementById('studentSessionCompletionAlert');
+    if (!alert) return;
+    const completed = getStudentPortalSessionRows(portal).find(row => {
+        const sessionId = Number(row?.session_id || 0);
+        return sessionId > 0
+            && isGuardianSessionCompletionTrackable(row)
+            && String(row?.instructor_completed_at || '').trim() !== ''
+            && readStudentSessionCompletionState(sessionId) !== 'dismissed';
+    });
+    if (!completed) {
+        alert.innerHTML = '';
+        alert.classList.add('hidden');
+        return;
+    }
+    const sessionId = Number(completed.session_id || 0);
+    const dateLabel = completed.session_date ? formatDateLong(completed.session_date) : 'Today';
+    const timeLabel = completed.start_time && completed.end_time
+        ? `${formatTime12Hour(completed.start_time)} - ${formatTime12Hour(completed.end_time)}` : '';
+    alert.innerHTML = `
+        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm dark:border-emerald-500/25 dark:bg-emerald-500/10">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-start gap-3">
+                    <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"><i class="fas fa-circle-check"></i></div>
+                    <div>
+                        <div class="text-xs font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Session Ended</div>
+                        <div class="mt-0.5 text-sm font-bold text-zinc-900 dark:text-white">Your instructor completed this lesson.</div>
+                        <div class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">${escapeHtml(completed.instrument_name || 'Music lesson')} · ${escapeHtml(dateLabel)}${timeLabel ? ` · ${escapeHtml(timeLabel)}` : ''}</div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <a href="student_grades.html" class="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-600">View lesson</a>
+                    <button type="button" onclick="dismissStudentSessionCompletion(${sessionId})" class="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-emerald-100">Dismiss</button>
+                </div>
+            </div>
+        </div>`;
+    alert.classList.remove('hidden');
+}
+
+function notifyStudentSessionCompletions(portal) {
+    let notified = false;
+    getStudentPortalSessionRows(portal).filter(isGuardianSessionCompletionTrackable).forEach(row => {
+        const sessionId = Number(row?.session_id || 0);
+        if (sessionId < 1) return;
+        const currentState = String(row?.instructor_completed_at || '').trim() !== '' ? 'completed' : 'pending';
+        const previousState = readStudentSessionCompletionState(sessionId);
+        if (previousState !== 'dismissed') writeStudentSessionCompletionState(sessionId, currentState);
+        if (currentState === 'completed' && previousState === 'pending') {
+            showPortalToast('Your instructor has ended the session. You can now review the lesson update.', 'success', 'Session Ended');
+            notified = true;
+        }
+    });
+    renderStudentSessionCompletionAlert(portal);
+    return notified;
+}
+
+function stopStudentSessionRefreshWatcher() {
+    if (window.__studentSessionRefreshTimer) {
+        window.clearInterval(window.__studentSessionRefreshTimer);
+        window.__studentSessionRefreshTimer = null;
+    }
+}
+
+function startStudentSessionRefreshWatcher() {
+    stopStudentSessionRefreshWatcher();
+    const rows = getStudentPortalSessionRows(studentDashboardPortalState).filter(isGuardianSessionCompletionTrackable);
+    if (!rows.length) return;
+    rows.forEach(row => {
+        const sessionId = Number(row?.session_id || 0);
+        if (sessionId > 0 && !readStudentSessionCompletionState(sessionId)) {
+            writeStudentSessionCompletionState(sessionId, String(row?.instructor_completed_at || '').trim() ? 'completed' : 'pending');
+        }
+    });
+    window.__studentSessionRefreshBusy = false;
+    window.__studentSessionRefreshTimer = window.setInterval(async () => {
+        if (window.__studentSessionRefreshBusy) return;
+        window.__studentSessionRefreshBusy = true;
+        try {
+            const user = Auth.getUser();
+            const portal = await fetchStudentPortalDataByEmail(user?.email || '');
+            if (portal?.success) {
+                studentDashboardPortalState = portal;
+                notifyStudentSessionCompletions(portal);
+            }
+        } catch (e) {
+            // Non-critical polling failure.
+        } finally {
+            window.__studentSessionRefreshBusy = false;
+        }
+    }, 15000);
+}
+
 function stopGuardianSessionRefreshWatcher() {
     if (window.__guardianSessionRefreshTimer) {
         window.clearInterval(window.__guardianSessionRefreshTimer);
@@ -10455,10 +10590,27 @@ async function loadAllRegistrations() {
 }
 
 const registrationsTableState = {
+    allRows: [],
     rows: [],
     page: 1,
-    pageSize: 5
+    pageSize: 10
 };
+
+function applyRegistrationTableFilters() {
+    const search = String(document.getElementById('registrationsSearch')?.value || '').trim().toLowerCase();
+    const branchId = String(document.getElementById('registrationsBranchFilter')?.value || '');
+    registrationsTableState.rows = registrationsTableState.allRows.filter(reg => {
+        if (branchId && String(reg.branch_id || '') !== branchId) return false;
+        if (!search) return true;
+        const haystack = [reg.first_name, reg.last_name, reg.email, reg.student_code,
+            reg.guardian_first_name, reg.guardian_last_name, reg.guardian_phone,
+            reg.branch_name, reg.registration_status, reg.registration_source]
+            .map(value => String(value || '').toLowerCase()).join(' ');
+        return haystack.includes(search);
+    });
+    registrationsTableState.page = 1;
+    renderRegistrationsTable();
+}
 
 function sortNewestRegistrationsFirst(rows) {
     return (Array.isArray(rows) ? rows.slice() : []).sort((a, b) => {
@@ -10521,6 +10673,17 @@ function initRegistrationsPaginationControls() {
     const pageSizeEl = document.getElementById('registrationsPageSize');
     const prevBtn = document.getElementById('registrationsPrevBtn');
     const nextBtn = document.getElementById('registrationsNextBtn');
+    const searchEl = document.getElementById('registrationsSearch');
+    const branchEl = document.getElementById('registrationsBranchFilter');
+
+    if (searchEl && searchEl.dataset.bound !== '1') {
+        searchEl.addEventListener('input', applyRegistrationTableFilters);
+        searchEl.dataset.bound = '1';
+    }
+    if (branchEl && branchEl.dataset.bound !== '1') {
+        branchEl.addEventListener('change', applyRegistrationTableFilters);
+        branchEl.dataset.bound = '1';
+    }
 
     if (pageSizeEl && pageSizeEl.dataset.bound !== '1') {
         pageSizeEl.addEventListener('change', () => {
@@ -10732,10 +10895,9 @@ function displayRegistrations(registrations) {
     if (!document.getElementById('registrationsTable')) {
         return;
     }
-    registrationsTableState.rows = sortNewestRegistrationsFirst(registrations);
-    registrationsTableState.page = 1;
+    registrationsTableState.allRows = sortNewestRegistrationsFirst(registrations);
     initRegistrationsPaginationControls();
-    renderRegistrationsTable();
+    applyRegistrationTableFilters();
 }
 
 // Update Stats
@@ -11612,7 +11774,7 @@ function enforceAdminFixedPageSizes() {
     const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
     if (!pathname.includes('/pages/admin/')) return;
 
-    ['registrationsPageSize', 'adminUsersPageSize'].forEach((id) => {
+    ['adminUsersPageSize'].forEach((id) => {
         const select = document.getElementById(id);
         if (!select) return;
         select.innerHTML = '<option value="5" selected>5</option>';

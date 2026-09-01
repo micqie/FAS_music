@@ -35,19 +35,15 @@
             }
         }
 
-        // Filter students by branch
+        // Apply branch and text search together.
         function filterStudentsByBranch(branchId) {
-            if (!branchId || branchId === '') {
-                filteredStudents = allStudents;
-            } else {
-                // Filter by branch_id (convert to number for comparison)
-                filteredStudents = allStudents.filter(student => {
-                    // Handle both string and number comparisons
-                    const studentBranchId = student.branch_id ? String(student.branch_id) : null;
-                    const filterBranchId = String(branchId);
-                    return studentBranchId === filterBranchId;
-                });
-            }
+            const search = String(document.getElementById('studentSearchInput')?.value || '').trim().toLowerCase();
+            filteredStudents = allStudents.filter(student => {
+                if (branchId && String(student.branch_id || '') !== String(branchId)) return false;
+                if (!search) return true;
+                return [student.first_name, student.last_name, student.email, student.phone, student.branch_name, student.status]
+                    .map(value => String(value || '').toLowerCase()).join(' ').includes(search);
+            });
             displayFilteredStudents();
             updateStudentCount();
         }
@@ -258,4 +254,7 @@
                     filterStudentsByBranch(this.value);
                 });
             }
+            document.getElementById('studentSearchInput')?.addEventListener('input', () => {
+                filterStudentsByBranch(document.getElementById('branchFilter')?.value || '');
+            });
         });

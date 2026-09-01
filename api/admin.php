@@ -34,6 +34,25 @@ class Admin
         exit;
     }
 
+    private function normalizePersonName($value): string
+    {
+        $name = preg_replace('/\s+/u', ' ', trim((string)$value));
+        if ($name === '') {
+            return '';
+        }
+
+        return preg_replace_callback(
+            "/(^|[\\s'’\\-])(\\p{L})/u",
+            static function (array $matches): string {
+                $letter = function_exists('mb_strtoupper')
+                    ? mb_strtoupper($matches[2], 'UTF-8')
+                    : strtoupper($matches[2]);
+                return $matches[1] . $letter;
+            },
+            $name
+        );
+    }
+
     /**
      * Extract the "performed by" staff/admin info from a decoded request payload.
      * Returns [userId, userName, userRole, userEmail].
@@ -1579,8 +1598,8 @@ class Admin
             $this->sendJSON(['error' => 'Invalid payload'], 400);
         }
 
-        $firstName = trim((string)($data['first_name'] ?? ''));
-        $lastName  = trim((string)($data['last_name'] ?? ''));
+        $firstName = $this->normalizePersonName($data['first_name'] ?? '');
+        $lastName  = $this->normalizePersonName($data['last_name'] ?? '');
         $email     = trim((string)($data['email'] ?? ''));
         $phone     = trim((string)($data['phone'] ?? ''));
         $roleName  = trim((string)($data['role'] ?? ''));
@@ -1636,7 +1655,7 @@ class Admin
             // Prevent duplicate username/email
             $dupCheck = $this->conn->prepare("
                 SELECT user_id FROM tbl_users
-                WHERE username = ? OR email = ?
+                WHERE LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?)
                 LIMIT 1
             ");
             $dupCheck->execute([$username, $storedEmail]);
@@ -1743,8 +1762,8 @@ class Admin
         }
 
         $userId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
-        $firstName = trim((string)($data['first_name'] ?? ''));
-        $lastName = trim((string)($data['last_name'] ?? ''));
+        $firstName = $this->normalizePersonName($data['first_name'] ?? '');
+        $lastName = $this->normalizePersonName($data['last_name'] ?? '');
         $email = trim((string)($data['email'] ?? ''));
         $phone = trim((string)($data['phone'] ?? ''));
         $branchId = isset($data['branch_id']) && $data['branch_id'] !== '' ? (int)$data['branch_id'] : 0;
@@ -1775,7 +1794,7 @@ class Admin
             // Prevent duplicate username/email (exclude current user)
             $stmtCheck = $this->conn->prepare("
                 SELECT user_id FROM tbl_users
-                WHERE (username = ? OR email = ?) AND user_id <> ?
+                WHERE (LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?)) AND user_id <> ?
                 LIMIT 1
             ");
             $stmtCheck->execute([$email, $email, $userId]);

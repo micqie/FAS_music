@@ -226,7 +226,7 @@
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Last Name *</label>
                             <input id="lastName" required class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
                         </div>
-                        <div>
+                        <div id="teacherEmailFieldWrapper" class="hidden">
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Teacher Email</label>
                             <input id="email" type="email" autocomplete="email" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20" placeholder="teacher@example.com">
                             <p class="mt-1.5 text-xs text-slate-500">Updating this also updates the instructor's login email.</p>
@@ -272,7 +272,7 @@
                         </h4>
                         <span id="specializationSelectionSummary" class="text-xs text-slate-500">Tap one or more instruments this teacher can teach</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-3">Select every instrument category this teacher is qualified to teach. You can pick more than one.</p>
+                    <p class="text-xs text-slate-500 mb-3">Select every instrument category this teacher is qualified to teach. Choose General for all instruments; individual options will be disabled.</p>
                     <div id="specializationChipGrid" class="rounded-xl border border-slate-200 bg-slate-50/70 p-3"></div>
                 </section>
 
@@ -280,7 +280,7 @@
                     <h4 class="text-sm font-bold text-slate-900 mb-1 flex items-center gap-2">
                         <i class="fas fa-key text-gold-500"></i> Portal Login
                     </h4>
-                    <p class="text-xs text-slate-500 mb-4">Choose how this teacher will sign in to the system.</p>
+                    <p class="text-xs text-slate-500 mb-4">Create the instructor's school login account.</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
                         <label class="account-mode-card is-selected block" id="accountModeRealCard">

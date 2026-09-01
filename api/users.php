@@ -178,6 +178,42 @@ class User
         return filter_var(trim((string)$email), FILTER_VALIDATE_EMAIL) !== false;
     }
 
+    private function normalizePersonName($value): string
+    {
+        $name = preg_replace('/\s+/u', ' ', trim((string)$value));
+        if ($name === '') {
+            return '';
+        }
+
+        // Capitalize the first letter of each name part without destroying
+        // intentional internal capitalization such as McDonald or DeLeon.
+        return preg_replace_callback(
+            "/(^|[\\s'’\\-])(\\p{L})/u",
+            static function (array $matches): string {
+                $letter = function_exists('mb_strtoupper')
+                    ? mb_strtoupper($matches[2], 'UTF-8')
+                    : strtoupper($matches[2]);
+                return $matches[1] . $letter;
+            },
+            $name
+        );
+    }
+
+    private function normalizeRegistrationNames(array &$data): void
+    {
+        foreach ([
+            'student_first_name',
+            'student_middle_name',
+            'student_last_name',
+            'guardian_first_name',
+            'guardian_last_name'
+        ] as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = $this->normalizePersonName($data[$field]);
+            }
+        }
+    }
+
     private function isSchoolLoginEmail($email)
     {
         return preg_match('/@fas\.com$/i', trim((string)$email)) === 1;
@@ -194,7 +230,13 @@ class User
         if ($username === '' || strpos($username, '@') !== false) {
             return $username;
         }
-        return $this->sanitizeWalkInLoginBase($username) . '@fas.com';
+
+        // Login identifiers are case-sensitive. Only expand the shorthand when
+        // the supplied value already matches its canonical lowercase form.
+        $canonicalUsername = $this->sanitizeWalkInLoginBase($username);
+        return hash_equals($canonicalUsername, $username)
+            ? $canonicalUsername . '@fas.com'
+            : $username;
     }
 
     private function ensureWalkInAccountsSynced()
@@ -279,7 +321,7 @@ class User
         $studentId = 0;
         if (ctype_digit($loginInput)) {
             $studentId = (int) $loginInput;
-        } elseif (preg_match('/^STU-(\d{4})-(\d{4,})$/i', $loginInput, $matches)) {
+        } elseif (preg_match('/^STU-(\d{4})-(\d{4,})$/', $loginInput, $matches)) {
             $studentId = (int) $matches[2];
         }
 
@@ -313,7 +355,7 @@ class User
             return true;
         }
 
-        return preg_match('/^STU-\d{4}-\d{4,}$/i', $loginInput) === 1;
+        return preg_match('/^STU-\d{4}-\d{4,}$/', $loginInput) === 1;
     }
 
     private function getStudentAccountMetaForUser(array $user): ?array
@@ -376,13 +418,13 @@ class User
 
     private function walkInEmailExists($email)
     {
-        $stmt = $this->conn->prepare("SELECT 1 FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
+        $stmt = $this->conn->prepare("SELECT 1 FROM tbl_users WHERE LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?) LIMIT 1");
         $stmt->execute([$email, $email]);
         if ($stmt->fetchColumn()) {
             return true;
         }
 
-        $stmt = $this->conn->prepare("SELECT 1 FROM tbl_students WHERE email = ? LIMIT 1");
+        $stmt = $this->conn->prepare("SELECT 1 FROM tbl_students WHERE LOWER(TRIM(email)) = LOWER(?) LIMIT 1");
         $stmt->execute([$email]);
         return (bool) $stmt->fetchColumn();
     }
@@ -1249,15 +1291,15 @@ class User
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 {$joinBranch}
                 WHERE (
-                    u.username = ?
-                    OR u.email = ?
-                    OR u.username = ?
-                    OR u.email = ?
+                    BINARY u.username = BINARY ?
+                    OR BINARY u.email = BINARY ?
+                    OR BINARY u.username = BINARY ?
+                    OR BINARY u.email = BINARY ?
                 )
                 " . ($isStudentLogin ? " AND LOWER(r.role_name) = 'student' " : "") . "
                 ORDER BY {$roleOrderSql}
-                    CASE WHEN u.username = ? THEN 0 ELSE 1 END,
-                    CASE WHEN u.email = ? THEN 0 ELSE 1 END,
+                    CASE WHEN BINARY u.username = BINARY ? THEN 0 ELSE 1 END,
+                    CASE WHEN BINARY u.email = BINARY ? THEN 0 ELSE 1 END,
                     u.user_id ASC
                 LIMIT 1
             ");
@@ -1865,6 +1907,7 @@ class User
                 $data[$k] = trim($data[$k]);
             }
         }
+        $this->normalizeRegistrationNames($data);
 
         $required = ['student_first_name', 'student_last_name', 'student_email', 'student_phone', 'branch_id', 'password'];
         $labels = [
@@ -2044,6 +2087,7 @@ class User
                 $data[$k] = trim($data[$k]);
             }
         }
+        $this->normalizeRegistrationNames($data);
 
         $registrationSource = strtolower(trim((string)($data['registration_source'] ?? 'walkin')));
         if (!in_array($registrationSource, ['admin', 'walkin', 'staff', 'manager'], true)) {
@@ -2293,6 +2337,7 @@ class User
                 $data[$k] = trim($data[$k]);
             }
         }
+        $this->normalizeRegistrationNames($data);
 
         if ($this->isWalkInRegistrationRequest($data)) {
             $this->sendJSON([
@@ -2574,7 +2619,7 @@ class User
             $guardianEmail = trim((string)($data['guardian_email'] ?? ''));
             if ($guardianId && $guardianEmail !== '' && $guardianRoleId) {
                 $guardianUsername = $guardianEmail;
-                $guardianExistsStmt = $this->conn->prepare("SELECT user_id, role_id FROM tbl_users WHERE username = ? OR email = ? LIMIT 1");
+                $guardianExistsStmt = $this->conn->prepare("SELECT user_id, role_id FROM tbl_users WHERE LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?) LIMIT 1");
                 $guardianExistsStmt->execute([$guardianEmail, $guardianEmail]);
                 $existingGuardianUser = $guardianExistsStmt->fetch(PDO::FETCH_ASSOC);
 

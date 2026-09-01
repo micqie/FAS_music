@@ -7,50 +7,28 @@ let selectedGradeSessionId  = 0;
 let currentGradeFilter      = 'all';
 let _radarChartInstance     = null;
 let _trendChartInstance     = null;
+let _lessonTimerInterval    = null;
+let _rowTimerInterval       = null;
 
 // ── Criteria ───────────────────────────────────────────────────────
 const DEFAULT_CRITERIA = ['Performance','Technique','Rhythm & Timing','Focus & Discipline','Assignment & Practice'];
-const CRITERIA_STORAGE_KEY = 'fas_grade_criteria';
 let isEditingCriteria = false;
-let instructorCriteria = null;
-function criteriaStorageKey() {
-    const userId = (typeof Auth !== 'undefined' && Auth.getUser) ? Number(Auth.getUser()?.user_id || 0) : 0;
-    return userId > 0 ? `${CRITERIA_STORAGE_KEY}_${userId}` : CRITERIA_STORAGE_KEY;
-}
+let instructorCriteria = [...DEFAULT_CRITERIA];
+let criteriaSessionId = 0;
 
 function loadCriteria() {
     if (Array.isArray(instructorCriteria) && instructorCriteria.length) return [...instructorCriteria];
-    try {
-        const s = localStorage.getItem(criteriaStorageKey()) || localStorage.getItem(CRITERIA_STORAGE_KEY);
-        if (s) { const p = JSON.parse(s); if (Array.isArray(p) && p.length) return p; }
-    } catch(e) {}
     return [...DEFAULT_CRITERIA];
 }
 function saveCriteria(c) {
     instructorCriteria = [...c];
-    try { localStorage.setItem(criteriaStorageKey(), JSON.stringify(c)); } catch(e) {}
 }
 async function loadServerCriteria() {
-    const user = Auth.getUser();
-    if (!user?.user_id) return;
-    const locallySaved = loadCriteria();
-    try {
-        const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-grading-criteria&user_id=${encodeURIComponent(user.user_id)}`);
-        if (res.data?.success && Array.isArray(res.data.criteria) && res.data.criteria.length) {
-            if (!res.data.customized && JSON.stringify(locallySaved) !== JSON.stringify(DEFAULT_CRITERIA)) {
-                await persistCriteria(locallySaved);
-            } else {
-                saveCriteria(res.data.criteria);
-            }
-        }
-    } catch (e) { console.warn('Using locally cached grading criteria.', e); }
+    // Criteria are session-specific. Every new ungraded session starts with defaults.
+    saveCriteria(DEFAULT_CRITERIA);
 }
 async function persistCriteria(criteria) {
-    const user = Auth.getUser();
-    const res = await axios.post(`${baseApiUrl}/teachers.php`, { action:'save-grading-criteria', user_id:Number(user.user_id), criteria });
-    if (!res.data?.success) throw new Error(res.data?.error || 'Unable to save criteria.');
-    saveCriteria(res.data.criteria);
-    try { localStorage.removeItem(CRITERIA_STORAGE_KEY); } catch (e) {}
+    saveCriteria(criteria);
 }
 
 // ── Score fields ───────────────────────────────────────────────────
@@ -119,7 +97,9 @@ function renderScoreCriteria() {
             const activeCls = ['bg-red-100 border-red-400 text-red-700','bg-orange-100 border-orange-400 text-orange-700','bg-yellow-100 border-yellow-400 text-yellow-700','bg-green-100 border-green-400 text-green-700','bg-emerald-100 border-emerald-400 text-emerald-700'][wi];
             return `<button type="button"
                 class="score-btn score-btn-${val} py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${isActive ? activeCls : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}"
-                data-field="${fieldId}" data-label-id="${labelId}" data-val="${val}">${word}</button>`;
+                data-field="${fieldId}" data-label-id="${labelId}" data-val="${val}"
+                aria-label="Rate ${escapeHtml(name)} ${val} out of 5" aria-pressed="${isActive ? 'true' : 'false'}"
+                onclick="selectCriterionScore('${fieldId}', '${labelId}', ${val}, this)">${word}</button>`;
         }).join('');
         return `<div class="criterion-row">
             <input type="hidden" id="${fieldId}" class="criterion-score-input" data-criterion-name="${escapeHtml(name)}" value="${escapeHtml(currentVal)}">
@@ -135,6 +115,15 @@ function renderScoreCriteria() {
 }
 
 async function toggleEditCriteria() {
+    const selected = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
+    if (selected && Number(selected.progress_id || 0) > 0) {
+        showGradeMessage('This grade is saved and its criteria can no longer be changed.', 'error');
+        return;
+    }
+    if (!selected || Number(selected.room_id || 0) < 1 || Number(selected.assigned_instrument_id || 0) < 1) {
+        showGradeMessage('Desk must assign the room and physical instrument before criteria can be edited.', 'error');
+        return;
+    }
     if (isEditingCriteria) {
         const inputs = document.querySelectorAll('.criteria-name-input');
         const newC   = Array.from(inputs).map(inp => inp.value.trim()).filter(Boolean);
@@ -221,6 +210,7 @@ function getLocalISODate(date = new Date()) {
 
 // ── Gradeability ───────────────────────────────────────────────────
 function isGradeable(session) {
+    if (String(session?._attendanceDraft || '').toLowerCase() === 'present' || session?.grading_started_at) return true;
     const att = String(session?.attendance_status || '').toLowerCase();
     return String(session?.status || '').toLowerCase() === 'completed' &&
            (att === 'present' || att === 'late');
@@ -274,6 +264,7 @@ function renderAttendanceControl(session) {
 
     const graded = session ? Number(session.progress_id || 0) > 0 : false;
     const att    = String(session?.attendance_status || 'Pending').toLowerCase();
+    const hasRequiredAssignment = Number(session?.room_id || 0) > 0 && Number(session?.assigned_instrument_id || 0) > 0;
 
     const badge = (icon, label, cls) =>
         `<span class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold ${cls}">
@@ -287,39 +278,151 @@ function renderAttendanceControl(session) {
     }
 
     if (graded) {
-        container.innerHTML = badge('fa-circle-check', 'Present — already graded', 'border-teal-200 bg-teal-50 text-teal-700');
-        if (descEl) descEl.textContent = 'This session has already been graded.';
+        const gradedLabel = att === 'late' ? 'Late — grade saved' : 'Present — grade saved';
+        container.innerHTML = badge('fa-circle-check', gradedLabel, 'border-teal-200 bg-teal-50 text-teal-700');
+        if (descEl) descEl.textContent = 'Attendance and grade have been recorded.';
         return;
     }
 
-    if (att === 'present') {
-        container.innerHTML = badge('fa-circle-check', 'Present — confirmed by desk', 'border-emerald-200 bg-emerald-50 text-emerald-700');
-        if (descEl) descEl.textContent = 'Attendance confirmed. You can now grade this session.';
+    if (session.grading_started_at) {
+        container.innerHTML = badge('fa-stopwatch', 'Present — lesson in progress', 'border-blue-200 bg-blue-50 text-blue-700');
+        if (descEl) descEl.textContent = 'Attendance is locked after the lesson timer starts. Your ratings and timer will be kept.';
         return;
     }
 
-    if (att === 'late') {
-        // Treat "late" the same as "present" — allow grading
-        container.innerHTML = badge('fa-circle-check', 'Present — confirmed by desk', 'border-emerald-200 bg-emerald-50 text-emerald-700');
-        if (descEl) descEl.textContent = 'Attendance confirmed. You can now grade this session.';
-        return;
-    }
-
-    if (['absent','excused','ci','teacher absent'].includes(att)) {
+    if (['excused','ci','teacher absent'].includes(att)) {
         const labels = { absent:'Absent', excused:'Excused', ci:'CI', 'teacher absent':'Teacher Absent' };
         container.innerHTML = badge('fa-times-circle', labels[att] || att, 'border-rose-200 bg-rose-50 text-rose-600');
         if (descEl) descEl.textContent = 'Student is not present — grading is not available for this session.';
         return;
     }
 
-    // Pending / Scheduled — completion is handled directly on the student row.
+    const selectedAttendance = String(session._attendanceDraft || (session.grading_started_at ? 'present' : att) || '').toLowerCase();
+    const assignmentTitle = hasRequiredAssignment ? '' : 'title="Desk must assign a room and physical instrument first"';
     container.innerHTML = `
         <div class="flex flex-wrap items-center gap-3">
-            <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
-                <i class="fas fa-clock text-gray-400 text-xs"></i>Not yet marked by desk
-            </span>
+            <button type="button" onclick="instructorMarkAttendance(${Number(session.session_id)}, 'present', this)" ${hasRequiredAssignment ? '' : 'disabled'} ${assignmentTitle} class="rounded-xl border px-4 py-2.5 text-sm font-semibold ${hasRequiredAssignment ? (selectedAttendance === 'present' ? 'border-emerald-500 bg-emerald-100 text-emerald-800 ring-2 ring-emerald-200' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100') : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'}"><i class="fas fa-check mr-2"></i>Present</button>
+            <button type="button" onclick="instructorMarkAttendance(${Number(session.session_id)}, 'absent', this)" ${hasRequiredAssignment ? '' : 'disabled'} ${assignmentTitle} class="rounded-xl border px-4 py-2.5 text-sm font-semibold ${hasRequiredAssignment ? (selectedAttendance === 'absent' ? 'border-rose-500 bg-rose-100 text-rose-800 ring-2 ring-rose-200' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100') : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'}"><i class="fas fa-user-xmark mr-2"></i>Absent</button>
         </div>`;
-    if (descEl) descEl.textContent = 'Use Session Done on the student row once the lesson is finished.';
+    if (descEl) descEl.textContent = !hasRequiredAssignment
+        ? 'Attendance is locked. Desk must assign the room and physical instrument first.'
+        : selectedAttendance === 'present'
+        ? 'Present is selected. It becomes final only when the grade is saved.'
+        : 'Choose Present to grade, or Absent. You can change this before a grade is saved.';
+}
+
+async function instructorMarkAttendance(sessionId, attendanceStatus, triggerButton = null) {
+    const session = instructorGradeSessions.find(item => Number(item.session_id) === Number(sessionId));
+    if (!session || Number(session.progress_id || 0) > 0) return;
+    if (Number(session.room_id || 0) < 1 || Number(session.assigned_instrument_id || 0) < 1) {
+        showGradeMessage('Desk must assign the room and physical instrument before attendance can be marked.', 'error');
+        return;
+    }
+    if (attendanceStatus === 'absent' && session.grading_started_at) {
+        showGradeMessage('This lesson is already in progress. Absent can no longer be selected; your ratings and timer were kept.', 'error');
+        return;
+    }
+    if (attendanceStatus === 'present') {
+        const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        if (triggerButton) triggerButton.disabled = true;
+        try {
+            const response = await axios.post(`${baseApiUrl}/teachers.php?action=start-grading-timer`, {
+                action: 'start-grading-timer', session_id: Number(sessionId), user_id: Number(user?.user_id || 0)
+            });
+            const data = response.data || {};
+            if (!data.success) throw new Error(data.error || 'Unable to start the lesson timer.');
+            session._attendanceDraft = 'present';
+            session.grading_started_at = data.grading_started_at || session.grading_started_at;
+            populateGradeForm(session);
+            renderGradeSessions();
+        } catch (error) {
+            showGradeMessage(error?.response?.data?.error || error.message || 'Unable to start the timer.', 'error');
+            if (triggerButton) triggerButton.disabled = false;
+        }
+        return;
+    }
+
+    if (!isTodaySession(session) && !['present', 'late'].includes(att)) {
+        showGradeMessage('Attendance can only be selected on the scheduled session date.', 'error');
+        return;
+    }
+    const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+    if (triggerButton) triggerButton.disabled = true;
+    try {
+        const res = await axios.post(`${baseApiUrl}/attendance.php?action=mark-attendance-by-instructor`, {
+            session_id: Number(sessionId),
+            user_id: Number(user?.user_id || 0),
+            attendance_status: 'absent'
+        });
+        const data = res.data || {};
+        if (!data.success) throw new Error(data.error || 'Could not save attendance.');
+        await loadGradeSessions(currentGradeFilter);
+        const refreshed = instructorGradeSessions.find(s => Number(s.session_id) === Number(sessionId)) || null;
+        if (refreshed) { refreshed._attendanceDraft = 'absent'; populateGradeForm(refreshed); }
+        showGradeMessage(data.message || 'Attendance saved.', 'success');
+    } catch (error) {
+        showGradeMessage(error?.response?.data?.error || error.message || 'Unable to save attendance.', 'error');
+        if (triggerButton) triggerButton.disabled = false;
+    }
+}
+window.instructorMarkAttendance = instructorMarkAttendance;
+
+function parseGradeDateTime(value) {
+    if (!value) return null;
+    const parsed = new Date(String(value).replace(' ', 'T'));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+function formatLessonClock(date) {
+    return date ? date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
+}
+function formatTimerDuration(totalSeconds) {
+    const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return hours > 0
+        ? `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(secs).padStart(2,'0')}`
+        : `${String(minutes).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+}
+function getSessionTimerSeconds(startValue, completedValue) {
+    const started = parseGradeDateTime(startValue);
+    const completed = parseGradeDateTime(completedValue);
+    if (!started) return null;
+    const end = completed || new Date();
+    return Math.max(0, Math.floor((end.getTime() - started.getTime()) / 1000));
+}
+function renderLessonTimer(session) {
+    if (_lessonTimerInterval) { clearInterval(_lessonTimerInterval); _lessonTimerInterval = null; }
+    const valueEl = document.getElementById('lessonTimerValue');
+    const rangeEl = document.getElementById('lessonTimerRange');
+    const hintEl = document.getElementById('lessonTimerHint');
+    if (!valueEl || !rangeEl || !hintEl) return;
+    const started = parseGradeDateTime(session?.grading_started_at);
+    const completed = parseGradeDateTime(session?.grading_completed_at);
+    const startParts = String(session?.start_time || '').split(':').map(Number);
+    const endParts = String(session?.end_time || '').split(':').map(Number);
+    const scheduledMinutes = startParts.length >= 2 && endParts.length >= 2
+        ? Math.max(1, (endParts[0] * 60 + endParts[1]) - (startParts[0] * 60 + startParts[1]))
+        : 60;
+    const paint = () => {
+        const seconds = getSessionTimerSeconds(session?.grading_started_at, session?.grading_completed_at) || 0;
+        const targetSeconds = scheduledMinutes * 60;
+        const remainingSeconds = Math.max(0, targetSeconds - seconds);
+        valueEl.textContent = completed ? `${formatTimerDuration(seconds)} used` : (started ? `${formatTimerDuration(remainingSeconds)} left` : '60:00');
+        rangeEl.textContent = started ? `${formatLessonClock(started)} – ${completed ? formatLessonClock(completed) : 'In progress'}` : 'Not started';
+        hintEl.textContent = completed
+            ? `Grade saved after ${formatTimerDuration(seconds)}. The lesson was not forced to use the full ${scheduledMinutes} minutes.`
+            : (started ? `${formatTimerDuration(seconds)} elapsed of the ${scheduledMinutes}-minute lesson. Timer stops when Save Grade is clicked.` : `Select Present to start the ${scheduledMinutes}-minute timer.`);
+    };
+    paint();
+    if (started && !completed) _lessonTimerInterval = setInterval(paint, 1000);
+}
+function updateSessionRowTimers() {
+    document.querySelectorAll('[data-row-timer-start]').forEach(element => {
+        const seconds = getSessionTimerSeconds(element.dataset.rowTimerStart, element.dataset.rowTimerEnd || '');
+        if (seconds === null) return;
+        element.textContent = `${formatTimerDuration(seconds)} ${element.dataset.rowTimerEnd ? 'used' : 'elapsed'}`;
+    });
 }
 function markGradeDirty() {
     const status = document.getElementById('gradeSaveStatus');
@@ -342,41 +445,43 @@ async function instructorMarkPresent(sessionId = selectedGradeSessionId, trigger
         const data = res.data || {};
         if (!data.success) {
             showGradeMessage(data.error || 'Could not mark attendance. Please try again.', 'error');
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-circle-check text-sm"></i>Session Done'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-flag-checkered text-sm"></i>Session Ended'; }
             return;
         }
         await loadGradeSessions(currentGradeFilter);
-        showGradeMessage(data.message || 'Session marked done. You can now save the grade.', 'success');
-        if (typeof showMessage === 'function') showMessage(data.message || 'Session marked done. You can now save the grade.', 'success');
+        showGradeMessage(data.message || 'Session ended successfully.', 'success');
+        if (typeof showMessage === 'function') showMessage(data.message || 'Session ended successfully.', 'success');
         const refreshed = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
         if (refreshed) populateGradeForm(refreshed);
         renderGradeSessions();
     } catch (e) {
         console.error('Mark present failed:', e);
         showGradeMessage(e?.response?.data?.error || 'Network error — please try again.', 'error');
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-circle-check text-sm"></i>Session Done'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-flag-checkered text-sm"></i>Session Ended'; }
     }
 }
 window.instructorMarkPresent = instructorMarkPresent;
 
 // ── Score buttons ──────────────────────────────────────────────────
 function initScoreButtons() {
-    document.querySelectorAll('.score-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const field = btn.dataset.field;
-            const val   = btn.dataset.val;
-            const input = document.getElementById(field);
-            if (!input || input.disabled) return;
-            input.value = val;
-            document.querySelectorAll(`.score-btn[data-field="${field}"]`).forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            const labelEl = document.getElementById(btn.dataset.labelId || '');
-            if (labelEl) labelEl.textContent = SCORE_WORDS[Number(val)] || val;
-            markGradeDirty();
-            updateScorePreview();
-        });
-    });
+    // Buttons use an explicit click handler so all five values behave consistently.
 }
+function selectCriterionScore(field, labelId, value, button) {
+    const score = Number(value);
+    const input = document.getElementById(field);
+    if (!input || input.disabled || score < 1 || score > 5) return;
+    input.value = String(score);
+    document.querySelectorAll(`.score-btn[data-field="${field}"]`).forEach(item => {
+        const selected = item === button;
+        item.classList.toggle('active', selected);
+        item.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+    const labelEl = document.getElementById(labelId || '');
+    if (labelEl) labelEl.textContent = SCORE_WORDS[score] || String(score);
+    markGradeDirty();
+    updateScorePreview();
+}
+window.selectCriterionScore = selectCriterionScore;
 function getFieldInputId(key) {
     const parts = key.replace('_score','').split('_');
     return parts.map((p, i) => i === 0 ? p : p[0].toUpperCase() + p.slice(1)).join('') + 'ScoreInput';
@@ -493,10 +598,9 @@ function populateGradeForm(session) {
 
     const studentName = session ? `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student' : 'Select a session';
     const instrument = session?.instrument_name || 'Instrument';
-    const duration = session?.duration ? `${session.duration} min` : '45 min';
-    const room = session?.room_name || 'Studio';
-    const time = session ? formatTime12Hour(session.start_time) : '—';
-    const sessionMeta = session ? `${instrument} · ${duration} · ${time} in ${room}` : '—';
+    const room = session?.room_name || 'Room not assigned';
+    const time = session ? `${formatTime12Hour(session.start_time)}${session.end_time ? ` – ${formatTime12Hour(session.end_time)}` : ''}` : '—';
+    const sessionMeta = session ? `${instrument} · ${time} · ${room}` : '—';
     
     // Update panel header
     setGradeText('gradeStudentHeading', studentName);
@@ -521,6 +625,16 @@ function populateGradeForm(session) {
     if (hidName) hidName.value = studentName;
     if (hidSub)  hidSub.value  = sessionMeta;
 
+    // Each session starts with defaults; saved sessions restore only their own criteria.
+    if (criteriaSessionId !== selectedGradeSessionId) {
+        criteriaSessionId = selectedGradeSessionId;
+        isEditingCriteria = false;
+        const savedCriteria = Array.isArray(session?.criteria_scores)
+            ? session.criteria_scores.map(item => String(item?.name || '').trim()).filter(Boolean)
+            : [];
+        saveCriteria(savedCriteria.length ? savedCriteria : DEFAULT_CRITERIA);
+    }
+
     // Pre-fill score inputs then render criteria
     renderScoreCriteria();
     syncScoreButtons(session);
@@ -540,8 +654,15 @@ function populateGradeForm(session) {
     });
 
     const graded    = session ? Number(session.progress_id || 0) > 0 : false;
-    const gradeable = session ? isGradeable(session) : false;
-    const active    = gradeable || graded;
+    const hasRequiredAssignment = Number(session?.room_id || 0) > 0 && Number(session?.assigned_instrument_id || 0) > 0;
+    const gradeable = session ? isGradeable(session) && hasRequiredAssignment : false;
+    const active    = gradeable && !graded;
+    if (graded && isEditingCriteria) {
+        isEditingCriteria = false;
+        renderScoreCriteria();
+        syncScoreButtons(session);
+    }
+    renderLessonTimer(session);
 
     // Render smart attendance control (read-only badge or Mark Present button)
     renderAttendanceControl(session);
@@ -550,6 +671,20 @@ function populateGradeForm(session) {
     const lockBanner = document.getElementById('gradeLockBanner');
     const lockMsg    = document.getElementById('gradeLockMsg');
     const saveBtn    = document.getElementById('saveGradeBtn');
+    const criteriaBtn = document.getElementById('editCriteriaBtn');
+
+    if (criteriaBtn) {
+        const criteriaLocked = graded || !hasRequiredAssignment;
+        criteriaBtn.disabled = criteriaLocked;
+        criteriaBtn.classList.toggle('opacity-40', criteriaLocked);
+        criteriaBtn.classList.toggle('cursor-not-allowed', criteriaLocked);
+        criteriaBtn.title = graded ? 'Saved grades are read-only' : (!hasRequiredAssignment ? 'Assign the room and physical instrument first' : 'Edit this session’s grading criteria');
+    }
+    document.querySelectorAll('.skill-level-btn').forEach(btn => {
+        btn.disabled = !active;
+        btn.classList.toggle('opacity-40', !active);
+        btn.classList.toggle('cursor-not-allowed', !active);
+    });
 
     if (active) {
         if (lockBanner) lockBanner.classList.add('hidden');
@@ -563,10 +698,14 @@ function populateGradeForm(session) {
         if (lockBanner) lockBanner.classList.remove('hidden');
         const att = String(session?.attendance_status || '').toLowerCase();
         if (lockMsg) {
-            if (!session) {
+            if (graded) {
+                lockMsg.textContent = 'Grade saved — this evaluation is now read-only.';
+            } else if (!session) {
                 lockMsg.textContent = 'Select Present to continue.';
             } else if (['absent','excused','ci','teacher absent'].includes(att)) {
                 lockMsg.textContent = 'Student is not present — grading is not available for this session.';
+            } else if (!hasRequiredAssignment) {
+                lockMsg.textContent = 'Desk must assign a room and physical instrument before attendance and grading.';
             } else {
                 lockMsg.textContent = 'Desk hasn\'t marked attendance yet. Use Session Done on the student row if the lesson is finished.';
             }
@@ -636,15 +775,18 @@ function renderGradeSessions() {
         const isSelected = sid === selectedGradeSessionId;
         const name       = `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student';
         const instrument = session.instrument_name || 'Instrument';
-        const duration   = session.duration ? `${session.duration} min` : '45 min';
         const room       = session.room_name || 'Studio';
         const time       = formatTime12Hour(session.start_time);
         const graded     = Number(session.progress_id || 0) > 0;
         const score      = graded && session.average_score ? Number(session.average_score).toFixed(1) : null;
         const attendance = String(session.attendance_status || 'Pending').toLowerCase();
-        const sessionCompleted = String(session.status || '').toLowerCase() === 'completed' && ['present','late'].includes(attendance);
+        const sessionEnded = Boolean(session.instructor_completed_at);
+        const canEndSession = graded && ['present','late'].includes(attendance) && !sessionEnded;
         const cannotComplete = ['absent','excused','ci','teacher absent'].includes(attendance)
             || ['cancelled','cancelled_by_teacher','rescheduled','no show'].includes(String(session.status || '').toLowerCase());
+        const timerMarkup = session.grading_started_at
+            ? `<span class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold ${session.grading_completed_at ? 'text-slate-500' : 'text-blue-600'}"><i class="fas fa-stopwatch"></i><span data-row-timer-start="${escapeHtml(String(session.grading_started_at))}" data-row-timer-end="${escapeHtml(String(session.grading_completed_at || ''))}">00:00</span></span>`
+            : '';
         
         // Get initials for avatar
         const initials   = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -662,18 +804,19 @@ function renderGradeSessions() {
                         </div>
                         <p class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(name)}</p>
                     </div>
-                    <p class="text-sm text-gray-500">${escapeHtml(instrument)} · ${escapeHtml(duration)} · ${escapeHtml(room)}</p>
+                    <p class="text-sm text-gray-500">${escapeHtml(instrument)} · ${escapeHtml(room)}</p>
+                    ${timerMarkup}
                 </div>
                 ${score ? `<div class="flex-shrink-0 flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-teal-700">
                     <i class="fas fa-check text-xs"></i>
                     <span class="text-xs font-bold">Graded · ${score}/5</span>
                 </div>` : '<div class="flex-shrink-0 text-sm text-gray-400">Not graded</div>'}
               </button>
-              ${sessionCompleted
-                ? '<span class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"><i class="fas fa-circle-check"></i>Session Done</span>'
+              ${sessionEnded
+                ? '<span class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"><i class="fas fa-circle-check"></i>Session Ended</span>'
                 : cannotComplete
                     ? `<span class="inline-flex shrink-0 items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-500">${escapeHtml(session.attendance_status || session.status || 'Unavailable')}</span>`
-                : `<button type="button" data-session-done-id="${sid}" onclick="event.stopPropagation(); instructorMarkPresent(${sid}, this)" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-teal-300 bg-teal-50 px-3 py-2 text-xs font-bold text-teal-700 hover:bg-teal-100 transition"><i class="fas fa-circle-check"></i>Session Done</button>`}
+                : `<button type="button" data-session-done-id="${sid}" onclick="event.stopPropagation(); instructorMarkPresent(${sid}, this)" ${canEndSession ? '' : 'disabled title="Save the grade before ending this session"'} class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${canEndSession ? 'border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100' : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'}"><i class="fas fa-flag-checkered"></i>Session Ended</button>`}
             </div>
         </div>`;
     }).join('');
@@ -688,6 +831,11 @@ function renderGradeSessions() {
             }
         });
     });
+    updateSessionRowTimers();
+    if (_rowTimerInterval) clearInterval(_rowTimerInterval);
+    if (rows.some(session => session.grading_started_at && !session.grading_completed_at)) {
+        _rowTimerInterval = setInterval(updateSessionRowTimers, 1000);
+    }
 }
 
 // ── Student history panel ─────────────────────────────────────────
@@ -795,6 +943,14 @@ async function saveSessionGrade(event) {
     if (sessionId < 1) { showGradeMessage('Please select a session first.', 'error'); return; }
 
     const sessionData = instructorGradeSessions.find(s => Number(s.session_id || 0) === sessionId);
+    if (Number(sessionData?.progress_id || 0) > 0 || sessionData?.grading_completed_at) {
+        showGradeMessage('This grade has already been saved and is read-only.', 'error');
+        return;
+    }
+    if (Number(sessionData?.room_id || 0) < 1 || Number(sessionData?.assigned_instrument_id || 0) < 1) {
+        showGradeMessage('Desk must assign a room and physical instrument before saving the grade.', 'error');
+        return;
+    }
     if (sessionData && !isGradeable(sessionData) && Number(sessionData.progress_id || 0) < 1) {
         showGradeMessage('Attendance must be marked Present before grading.', 'error'); return;
     }

@@ -8,12 +8,12 @@
         let adminAssignRequest = null;
         let adminAssignActiveRow = null;
         let adminAssignAvailability = [];
+        let adminAssignElapsedAvailabilityDates = new Set();
         let adminAssignSelectedDate = '';
         let adminAssignCalendarMonth = '';
         let adminAssignAvailabilityToken = 0;
         let adminAssignAvailabilityTimer = null;
         let adminAssignAvailabilityController = null;
-        const adminAssignAvailabilityCache = new Map();
 
         function getEnrollmentSearchTerm() {
             const input = document.getElementById('enrollmentSearchInput');
@@ -1225,7 +1225,8 @@
                 const availableItems = (grouped[date] || []).filter(item => !isAdminAssignSlotSelected(item.slot));
                 const count = availableItems.length;
                 const selected = date === adminAssignSelectedDate;
-                cells.push(`<button type="button" ${count ? `onclick="openAdminAssignAvailabilityDatePicker('${date}')"` : 'disabled'} class="h-14 rounded-lg border p-1.5 text-left transition ${count ? (selected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-200 bg-white hover:border-emerald-300 hover:bg-emerald-50') : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300'}"><div class="flex items-start justify-between gap-2"><span class="text-sm font-semibold leading-none ${count ? 'text-slate-900' : 'text-slate-400'}">${day}</span>${count ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${count}</span>` : ''}</div><div class="mt-0.5 text-[9px] leading-tight ${count ? 'text-slate-500' : 'text-slate-400'}">${count ? escapeHtml(availableItems[0]?.slot?.day_of_week || '') : 'Unavailable'}</div></button>`);
+                const elapsedToday = adminAssignElapsedAvailabilityDates.has(date);
+                cells.push(`<button type="button" ${count ? `onclick="openAdminAssignAvailabilityDatePicker('${date}')"` : 'disabled'} class="h-14 rounded-lg border p-1.5 text-left transition ${count ? (selected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-200 bg-white hover:border-emerald-300 hover:bg-emerald-50') : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300'}"><div class="flex items-start justify-between gap-2"><span class="text-sm font-semibold leading-none ${count ? 'text-slate-900' : 'text-slate-400'}">${day}</span>${count ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${count}</span>` : ''}</div><div class="mt-0.5 text-[9px] leading-tight ${count ? 'text-slate-500' : (elapsedToday ? 'text-amber-600' : 'text-slate-400')}">${count ? escapeHtml(availableItems[0]?.slot?.day_of_week || '') : (elapsedToday ? 'Ended today' : 'Unavailable')}</div></button>`);
             }
             const monthLabel = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
             listEl.innerHTML = `
@@ -1249,14 +1250,6 @@
                 if (listEl) listEl.innerHTML = '<div class="grid min-h-[320px] place-items-center text-center text-sm text-slate-500"><div><i class="fas fa-user-tie mb-2 text-2xl text-slate-300"></i><p>Select a teacher to view availability.</p></div></div>';
                 return;
             }
-            const cacheKey = getAdminAssignAvailabilityCacheKey(slot);
-            if (adminAssignAvailabilityCache.has(cacheKey)) {
-                adminAssignAvailability = adminAssignAvailabilityCache.get(cacheKey);
-                adminAssignSelectedDate = adminAssignAvailability[0]?.session_date || '';
-                adminAssignCalendarMonth = String(adminAssignSelectedDate).slice(0, 7);
-                renderAdminAssignAvailability();
-                return;
-            }
             listEl.innerHTML = '<div class="grid min-h-[320px] place-items-center text-sm text-slate-500"><span><i class="fas fa-spinner fa-spin mr-2 text-gold-500"></i>Loading teacher availability...</span></div>';
             const token = ++adminAssignAvailabilityToken;
             if (adminAssignAvailabilityController) adminAssignAvailabilityController.abort();
@@ -1275,7 +1268,7 @@
                 });
                 if (token !== adminAssignAvailabilityToken) return;
                 adminAssignAvailability = response.data?.success && Array.isArray(response.data.slots) ? response.data.slots : [];
-                adminAssignAvailabilityCache.set(cacheKey, adminAssignAvailability);
+                adminAssignElapsedAvailabilityDates = new Set(Array.isArray(response.data?.elapsed_availability_dates) ? response.data.elapsed_availability_dates : []);
                 adminAssignSelectedDate = adminAssignAvailability[0]?.session_date || '';
                 adminAssignCalendarMonth = String(adminAssignSelectedDate).slice(0, 7);
                 renderAdminAssignAvailability();
@@ -1373,7 +1366,6 @@
                     admin_notes: ''
                 });
                 if (!response.data?.success) throw new Error(response.data?.error || 'Failed to assign schedule.');
-                adminAssignAvailabilityCache.clear();
                 closeAdminAssignRequestModal();
                 await Promise.all([loadPendingEnrollmentSummary(), loadActiveEnrollments()]);
                 showMessage(response.data.message || 'Enrollment scheduled successfully.', 'success');

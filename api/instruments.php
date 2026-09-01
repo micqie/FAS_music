@@ -98,6 +98,11 @@ class Instruments
         exit;
     }
 
+    private function normalizeName($value): string
+    {
+        return preg_replace('/\s+/', ' ', trim((string)$value));
+    }
+
     // Get all instrument types
     public function getInstrumentTypes()
     {
@@ -132,22 +137,29 @@ class Instruments
 
         $data = json_decode(file_get_contents('php://input'), true);
 
-        if (empty($data['type_name'])) {
+        $typeName = $this->normalizeName($data['type_name'] ?? '');
+        if ($typeName === '') {
             $this->sendJSON(['error' => 'Instrument type name is required'], 400);
         }
 
         try {
+            $duplicateStmt = $this->conn->prepare("SELECT type_id FROM tbl_instrument_types WHERE LOWER(TRIM(type_name)) = LOWER(?) LIMIT 1");
+            $duplicateStmt->execute([$typeName]);
+            if ($duplicateStmt->fetchColumn()) {
+                $this->sendJSON(['error' => 'Instrument type already exists (names are checked without regard to capitalization)'], 409);
+            }
+
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_instrument_types (type_name, description)
                 VALUES (?, ?)
             ");
             $stmt->execute([
-                $data['type_name'],
+                $typeName,
                 $data['description'] ?? null
             ]);
 
             $typeId = (int) $this->conn->lastInsertId();
-            upsert_specialization_for_instrument_type($this->conn, $typeId, (string) $data['type_name']);
+            upsert_specialization_for_instrument_type($this->conn, $typeId, $typeName);
 
             $this->sendJSON([
                 'success' => true,
@@ -261,7 +273,8 @@ class Instruments
 
         $data = json_decode(file_get_contents('php://input'), true);
 
-        if (empty($data['type_id']) || empty($data['type_name'])) {
+        $typeName = $this->normalizeName($data['type_name'] ?? '');
+        if (empty($data['type_id']) || $typeName === '') {
             $this->sendJSON(['error' => 'Type ID and type name are required'], 400);
         }
 
@@ -273,13 +286,19 @@ class Instruments
                 $this->sendJSON(['error' => 'Instrument type not found'], 404);
             }
 
+            $duplicateStmt = $this->conn->prepare("SELECT type_id FROM tbl_instrument_types WHERE LOWER(TRIM(type_name)) = LOWER(?) AND type_id <> ? LIMIT 1");
+            $duplicateStmt->execute([$typeName, $data['type_id']]);
+            if ($duplicateStmt->fetchColumn()) {
+                $this->sendJSON(['error' => 'Instrument type already exists (names are checked without regard to capitalization)'], 409);
+            }
+
             $stmt = $this->conn->prepare("
                 UPDATE tbl_instrument_types
                 SET type_name = ?, description = ?
                 WHERE type_id = ?
             ");
             $stmt->execute([
-                $data['type_name'],
+                $typeName,
                 $data['description'] ?? null,
                 $data['type_id']
             ]);
@@ -288,7 +307,7 @@ class Instruments
                 $this->conn,
                 (int) $data['type_id'],
                 (string) ($existingType['type_name'] ?? ''),
-                (string) $data['type_name']
+                $typeName
             );
 
             $this->sendJSON([
@@ -403,7 +422,8 @@ class Instruments
         $data = json_decode(file_get_contents('php://input'), true);
 
         // Validate required fields based on database schema
-        if (empty($data['branch_id']) || empty($data['instrument_name']) || empty($data['type_id'])) {
+        $instrumentName = $this->normalizeName($data['instrument_name'] ?? '');
+        if (empty($data['branch_id']) || $instrumentName === '' || empty($data['type_id'])) {
             $this->sendJSON(['error' => 'Branch, instrument name, and type are required'], 400);
         }
 
@@ -433,6 +453,17 @@ class Instruments
                 $this->sendJSON(['error' => 'Instrument type not found'], 400);
             }
 
+
+            $duplicateStmt = $this->conn->prepare("
+                SELECT instrument_id FROM tbl_instruments
+                WHERE branch_id = ? AND LOWER(TRIM(instrument_name)) = LOWER(?)
+                LIMIT 1
+            ");
+            $duplicateStmt->execute([$data['branch_id'], $instrumentName]);
+            if ($duplicateStmt->fetchColumn()) {
+                $this->sendJSON(['error' => 'Instrument name already exists in this branch (names are checked without regard to capitalization)'], 409);
+            }
+
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_instruments (
                     branch_id, instrument_name, type_id, serial_number, 
@@ -442,7 +473,7 @@ class Instruments
             ");
             $stmt->execute([
                 $data['branch_id'],
-                $data['instrument_name'],
+                $instrumentName,
                 $data['type_id'],
                 $data['serial_number'] ?? null,
                 $condition,
@@ -490,10 +521,29 @@ class Instruments
 
         try {
             // Check if instrument exists
-            $checkStmt = $this->conn->prepare("SELECT instrument_id FROM tbl_instruments WHERE instrument_id = ?");
+            $checkStmt = $this->conn->prepare("SELECT instrument_id, branch_id, instrument_name FROM tbl_instruments WHERE instrument_id = ?");
             $checkStmt->execute([$data['instrument_id']]);
-            if (!$checkStmt->fetch()) {
+            $existingInstrument = $checkStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$existingInstrument) {
                 $this->sendJSON(['error' => 'Instrument not found'], 404);
+            }
+
+
+            $targetBranchId = (int)($data['branch_id'] ?? $existingInstrument['branch_id']);
+            $targetInstrumentName = isset($data['instrument_name'])
+                ? $this->normalizeName($data['instrument_name'])
+                : (string)$existingInstrument['instrument_name'];
+            if ($targetInstrumentName === '') {
+                $this->sendJSON(['error' => 'Instrument name is required'], 400);
+            }
+            $duplicateStmt = $this->conn->prepare("
+                SELECT instrument_id FROM tbl_instruments
+                WHERE branch_id = ? AND LOWER(TRIM(instrument_name)) = LOWER(?) AND instrument_id <> ?
+                LIMIT 1
+            ");
+            $duplicateStmt->execute([$targetBranchId, $targetInstrumentName, $data['instrument_id']]);
+            if ($duplicateStmt->fetchColumn()) {
+                $this->sendJSON(['error' => 'Instrument name already exists in this branch (names are checked without regard to capitalization)'], 409);
             }
 
             // Verify branch if provided
@@ -524,7 +574,7 @@ class Instruments
             }
             if (isset($data['instrument_name'])) {
                 $updateFields[] = "instrument_name = ?";
-                $params[] = $data['instrument_name'];
+                $params[] = $targetInstrumentName;
             }
             if (isset($data['type_id'])) {
                 $updateFields[] = "type_id = ?";

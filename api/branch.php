@@ -24,7 +24,7 @@ class Branch
 
     private function sanitizeTextField($value): string
     {
-        return trim(strip_tags((string)($value ?? '')));
+        return preg_replace('/\s+/', ' ', trim(strip_tags((string)($value ?? ''))));
     }
 
     public function sendJSON($data, $statusCode = 200)
@@ -140,6 +140,16 @@ class Branch
         }
 
         try {
+            $duplicateStmt = $this->conn->prepare("
+                SELECT branch_id FROM tbl_branches
+                WHERE LOWER(TRIM(branch_name)) = LOWER(?)
+                LIMIT 1
+            ");
+            $duplicateStmt->execute([$name]);
+            if ($duplicateStmt->fetchColumn()) {
+                $this->sendJSON(['error' => 'Branch name already exists (names are checked without regard to capitalization)'], 409);
+            }
+
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_branches (branch_name, address, phone, email, status)
                 VALUES (?, ?, ?, ?, ?)
@@ -177,6 +187,16 @@ class Branch
         }
 
         try {
+            $duplicateStmt = $this->conn->prepare("
+                SELECT branch_id FROM tbl_branches
+                WHERE LOWER(TRIM(branch_name)) = LOWER(?) AND branch_id <> ?
+                LIMIT 1
+            ");
+            $duplicateStmt->execute([$name, $id]);
+            if ($duplicateStmt->fetchColumn()) {
+                $this->sendJSON(['error' => 'Branch name already exists (names are checked without regard to capitalization)'], 409);
+            }
+
             $stmt = $this->conn->prepare("
                 UPDATE tbl_branches
                 SET branch_name = ?, address = ?, phone = ?, email = ?

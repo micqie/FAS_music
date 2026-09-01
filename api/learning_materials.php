@@ -14,6 +14,10 @@ function lm_json($payload, $status = 200) {
     exit;
 }
 
+function lm_normalize_name($value) {
+    return preg_replace('/\s+/', ' ', trim((string)$value));
+}
+
 function lm_ensure(PDO $conn) {
     $conn->exec("CREATE TABLE IF NOT EXISTS tbl_learning_materials (
         material_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -91,17 +95,17 @@ try {
     if ($action === 'request') {
         if ($roleCategory !== 'instructor') lm_json(['error'=>'Instructor access required.'],403);
         $data=json_decode(file_get_contents('php://input'),true)?:[];
-        $instrument=trim((string)($data['instrument_type']??'')); $level=trim((string)($data['level_name']??''));
-        $name=trim((string)($data['material_name']??'')); $reason=trim((string)($data['request_reason']??''));
+        $instrument=lm_normalize_name($data['instrument_type']??''); $level=lm_normalize_name($data['level_name']??'');
+        $name=lm_normalize_name($data['material_name']??''); $reason=trim((string)($data['request_reason']??''));
         if ($instrument===''||$level===''||$name==='') lm_json(['error'=>'Instrument, level, and book/material name are required.'],400);
         $teacherStmt=$conn->prepare('SELECT teacher_id FROM tbl_teachers WHERE user_id=? AND status=\'Active\' LIMIT 1'); $teacherStmt->execute([(int)$user['user_id']]); $teacherId=(int)($teacherStmt->fetchColumn()?:0);
         if ($teacherId<1) lm_json(['error'=>'Instructor record not found.'],404);
         $specialization=$conn->prepare("SELECT 1 FROM tbl_teacher_specializations ts INNER JOIN tbl_specialization sp ON sp.specialization_id=ts.specialization_id INNER JOIN tbl_instrument_types it ON it.type_id=sp.type_id WHERE ts.teacher_id=? AND BINARY it.type_name=BINARY ? LIMIT 1");
         $specialization->execute([$teacherId,$instrument]);
         if (!$specialization->fetchColumn()) lm_json(['error'=>'You may request materials only for your instructor specialization.'],403);
-        $duplicate=$conn->prepare("SELECT 1 FROM tbl_learning_materials WHERE instrument_type=? AND level_name=? AND material_name=? AND status='Active' LIMIT 1"); $duplicate->execute([$instrument,$level,$name]);
+        $duplicate=$conn->prepare("SELECT 1 FROM tbl_learning_materials WHERE LOWER(TRIM(instrument_type))=LOWER(?) AND LOWER(TRIM(level_name))=LOWER(?) AND LOWER(TRIM(material_name))=LOWER(?) AND status='Active' LIMIT 1"); $duplicate->execute([$instrument,$level,$name]);
         if ($duplicate->fetchColumn()) lm_json(['error'=>'That material is already available in the masterfile.'],409);
-        $pending=$conn->prepare("SELECT 1 FROM tbl_learning_material_requests WHERE teacher_id=? AND instrument_type=? AND level_name=? AND material_name=? AND status='Pending' LIMIT 1"); $pending->execute([$teacherId,$instrument,$level,$name]);
+        $pending=$conn->prepare("SELECT 1 FROM tbl_learning_material_requests WHERE teacher_id=? AND LOWER(TRIM(instrument_type))=LOWER(?) AND LOWER(TRIM(level_name))=LOWER(?) AND LOWER(TRIM(material_name))=LOWER(?) AND status='Pending' LIMIT 1"); $pending->execute([$teacherId,$instrument,$level,$name]);
         if ($pending->fetchColumn()) lm_json(['error'=>'You already have a pending request for this material.'],409);
         $conn->prepare("INSERT INTO tbl_learning_material_requests (teacher_id,instrument_type,level_name,material_name,request_reason) VALUES (?,?,?,?,?)")->execute([$teacherId,$instrument,$level,$name,$reason?:null]);
         lm_json(['success'=>true,'message'=>'Book request sent to Admin for approval.']);
@@ -127,18 +131,27 @@ try {
         $conn->beginTransaction(); $stmt->execute([$id]); $request=$stmt->fetch(PDO::FETCH_ASSOC);
         if (!$request) { $conn->rollBack(); lm_json(['error'=>'Pending request not found.'],404); }
         if ($decision==='Approved') {
-            $insert=$conn->prepare("INSERT INTO tbl_learning_materials (instrument_type,level_name,material_name,description,status) VALUES (?,?,?,?,'Active') ON DUPLICATE KEY UPDATE status='Active',description=COALESCE(NULLIF(VALUES(description),''),description)");
-            $insert->execute([$request['instrument_type'],$request['level_name'],$request['material_name'],$request['request_reason']]);
+            $existing=$conn->prepare("SELECT material_id FROM tbl_learning_materials WHERE LOWER(TRIM(instrument_type))=LOWER(?) AND LOWER(TRIM(level_name))=LOWER(?) AND LOWER(TRIM(material_name))=LOWER(?) LIMIT 1 FOR UPDATE");
+            $existing->execute([$request['instrument_type'],$request['level_name'],$request['material_name']]);
+            $existingId=(int)($existing->fetchColumn()?:0);
+            if ($existingId>0) {
+                $conn->prepare("UPDATE tbl_learning_materials SET status='Active',description=COALESCE(NULLIF(?,''),description) WHERE material_id=?")->execute([$request['request_reason'],$existingId]);
+            } else {
+                $conn->prepare("INSERT INTO tbl_learning_materials (instrument_type,level_name,material_name,description,status) VALUES (?,?,?,?,'Active')")->execute([$request['instrument_type'],$request['level_name'],$request['material_name'],$request['request_reason']]);
+            }
         }
         $conn->prepare("UPDATE tbl_learning_material_requests SET status=?,reviewed_by=?,reviewed_at=NOW(),review_notes=? WHERE request_id=?")->execute([$decision,(int)$user['user_id'],$notes?:null,$id]);
         $conn->commit(); lm_json(['success'=>true,'message'=>$decision==='Approved'?'Request approved and added to the masterfile.':'Request rejected.']);
     }
     if ($action === 'save') {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') lm_json(['error'=>'Method not allowed'],405);
-        $id=(int)($_POST['material_id']??0); $instrument=trim((string)($_POST['instrument_type']??''));
-        $level=trim((string)($_POST['level_name']??'')); $name=trim((string)($_POST['material_name']??''));
+        $id=(int)($_POST['material_id']??0); $instrument=lm_normalize_name($_POST['instrument_type']??'');
+        $level=lm_normalize_name($_POST['level_name']??''); $name=lm_normalize_name($_POST['material_name']??'');
         $description=trim((string)($_POST['description']??''));
         if ($instrument===''||$level===''||$name==='') lm_json(['error'=>'Instrument, level, and material name are required.'],400);
+        $duplicate=$conn->prepare("SELECT material_id FROM tbl_learning_materials WHERE LOWER(TRIM(instrument_type))=LOWER(?) AND LOWER(TRIM(level_name))=LOWER(?) AND LOWER(TRIM(material_name))=LOWER(?) AND material_id<>? LIMIT 1");
+        $duplicate->execute([$instrument,$level,$name,$id]);
+        if ($duplicate->fetchColumn()) lm_json(['error'=>'That material already exists for this instrument and level (names are checked without regard to capitalization).'],409);
         [$path,$original]=lm_upload($_FILES['material_file']??null);
         if ($id>0) {
             $old=$conn->prepare('SELECT file_path FROM tbl_learning_materials WHERE material_id=? LIMIT 1'); $old->execute([$id]); $oldPath=$old->fetchColumn();

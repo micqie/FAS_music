@@ -9,6 +9,11 @@
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../../css/admin-responsive.css"><link rel="stylesheet" href="../../css/table-responsive.css">
+    <style>
+        .registration-compact th { padding: .65rem .75rem !important; font-size: .68rem !important; }
+        .registration-compact td { padding: .65rem .75rem !important; font-size: .78rem !important; vertical-align: middle; }
+        .registration-compact td .text-sm { font-size: .72rem !important; }
+    </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/css/intlTelInput.css">
 <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/intlTelInput.min.js"></script>
     <script>
@@ -170,7 +175,7 @@
 
         <!-- Registrations Table -->
         <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-            <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between gap-4 flex-wrap">
+            <div class="px-4 py-3 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
                 <div>
                     <h3 class="text-xl font-bold text-slate-800" id="tableTitle"><i class="fas fa-list mr-2 text-gold-500 "></i>All Registration Records</h3>
                     <p class="text-xs text-slate-500 mt-1" id="tableSubtitle">Showing all registration records in the system.</p>
@@ -184,8 +189,17 @@
                     </a>
                 </div>
             </div>
+            <div class="px-4 py-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row gap-2">
+                <div class="relative flex-1 min-w-[220px]">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+                    <input id="registrationsSearch" type="search" placeholder="Search student, guardian, ID or status" class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20">
+                </div>
+                <select id="registrationsBranchFilter" class="w-full sm:w-56 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20">
+                    <option value="">All branches</option>
+                </select>
+            </div>
             <div class="overflow-x-auto">
-                <table class="w-full">
+                <table class="registration-compact w-full text-sm">
                     <thead class="bg-slate-50">
                         <tr>
                             <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Student</th>
@@ -487,8 +501,8 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/birthdate_validation.js"></script>
     <script src="../../js/admin/admin_responsive.js"></script>
-    <script src="../../js/index.js"></script>
-    <script src="../../js/admin/admin_registration.js"></script>
+    <script src="../../js/index.js?v=20260829008"></script>
+    <script src="../../js/admin/admin_registration.js?v=20260829008"></script>
      <script src="../../js/intl-phone-input.js"></script>
     <script src="../../js/session_timeout.js"></script>
     <script>

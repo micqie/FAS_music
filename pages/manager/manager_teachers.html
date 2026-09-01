@@ -38,7 +38,9 @@
         .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
     </style>
     <script src="manager_shared.js" defer></script>
-    <link rel="stylesheet" href="../../css/table-responsive.css"></head>
+    <link rel="stylesheet" href="../../css/table-responsive.css">
+    <script src="../../js/table_responsive.js" defer></script>
+</head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
     <nav class="fixed w-full z-50 dark-glass border-b border-white/10 pl-20 pr-10 py-4 flex justify-between items-center shadow-2xl">
         <a href="manager_dashboard.html" class="h-12 flex items-center ml-2">
@@ -300,7 +302,7 @@
                         <label class="block text-sm font-semibold text-slate-700 mb-2">
                             <i class="fas fa-music text-gold-500 mr-1"></i> Specializations *
                         </label>
-                        <p class="text-xs text-slate-500 mb-3">Select one or more instruments the teacher can teach</p>
+                        <p class="text-xs text-slate-500 mb-3">Select one or more instruments the teacher can teach. Choose General for all instruments; individual options will be disabled.</p>
                         <div id="specializationChipGrid" class="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-wrap gap-2 max-h-48 overflow-y-auto"></div>
                     </div>
 

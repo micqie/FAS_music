@@ -146,6 +146,26 @@ class SessionPackages
         }
     }
 
+    private function normalizeName($value): string
+    {
+        return preg_replace('/\s+/', ' ', trim((string)$value));
+    }
+
+    private function packageNameExists(int $branchId, string $name, int $excludeId = 0): bool
+    {
+        $sql = "SELECT package_id FROM tbl_session_packages
+                WHERE branch_id = ? AND LOWER(TRIM(package_name)) = LOWER(?)";
+        $params = [$branchId, $name];
+        if ($excludeId > 0) {
+            $sql .= " AND package_id <> ?";
+            $params[] = $excludeId;
+        }
+        $sql .= " LIMIT 1";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return (bool)$stmt->fetchColumn();
+    }
+
     public function sendJSON($data, $statusCode = 200)
     {
         http_response_code($statusCode);
@@ -194,7 +214,7 @@ class SessionPackages
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
-        $name = trim($data['package_name'] ?? '');
+        $name = $this->normalizeName($data['package_name'] ?? '');
         $branchId = (int) ($data['branch_id'] ?? 0);
         $sessions = (int) ($data['sessions'] ?? 0);
         $maxInstruments = (int) ($data['max_instruments'] ?? 1);
@@ -218,6 +238,10 @@ class SessionPackages
         }
 
         try {
+            if ($this->packageNameExists($branchId, $name)) {
+                $this->sendJSON(['error' => 'Package name already exists in this branch (names are checked without regard to capitalization)'], 409);
+            }
+
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_session_packages (branch_id, package_name, sessions, max_instruments, price, description)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -237,7 +261,7 @@ class SessionPackages
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $id = (int) ($data['package_id'] ?? 0);
         $branchId = (int) ($data['branch_id'] ?? 0);
-        $name = trim($data['package_name'] ?? '');
+        $name = $this->normalizeName($data['package_name'] ?? '');
         $sessions = (int) ($data['sessions'] ?? 0);
         $maxInstruments = (int) ($data['max_instruments'] ?? 1);
         $price = isset($data['price']) ? (float) $data['price'] : 0;
@@ -263,6 +287,10 @@ class SessionPackages
         }
 
         try {
+            if ($this->packageNameExists($branchId, $name, $id)) {
+                $this->sendJSON(['error' => 'Package name already exists in this branch (names are checked without regard to capitalization)'], 409);
+            }
+
             $stmt = $this->conn->prepare("
                 UPDATE tbl_session_packages
                 SET branch_id = ?, package_name = ?, sessions = ?, max_instruments = ?, price = ?, description = ?

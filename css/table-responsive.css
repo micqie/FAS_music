@@ -7,12 +7,40 @@
    BASE TABLE STYLES
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Ensure tables are responsive and scrollable on small screens */
-.table-container {
+/* Ensure tables are responsive and scrollable on small screens. The admin
+   helper also adds .admin-table-scroll to legacy wrappers at runtime. */
+.table-container,
+.admin-table-scroll {
     width: 100%;
+    max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     position: relative;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.admin-table-scroll:focus-visible {
+    outline: 2px solid #b8860b;
+    outline-offset: -2px;
+}
+
+.admin-table-scroll::-webkit-scrollbar {
+    height: 9px;
+}
+
+.admin-table-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+}
+
+/* desk-premium.css historically hides horizontal overflow. Enhanced table
+   regions must remain scrollable so action columns are never clipped. */
+body.desk-app .admin-table-scroll {
+    overflow-x: auto !important;
 }
 
 /* Base table improvements */
@@ -22,11 +50,105 @@ table {
     border-collapse: collapse;
 }
 
-/* Prevent table from breaking layout on small screens */
+/* Admin tables use a width based on their actual column count. This avoids
+   forcing a small two-column table to be 800px wide while keeping dense data
+   tables readable and horizontally scrollable. */
+main table.admin-data-table {
+    min-width: max(100%, var(--admin-table-min-width, 42rem));
+}
+
+main table.admin-data-table th,
+main table.admin-data-table td {
+    vertical-align: middle;
+}
+
+main table.admin-data-table tr[hidden] {
+    display: none !important;
+}
+
+/* Keep the original mobile fallback for non-admin screens that also use this
+   shared stylesheet. */
 @media (max-width: 768px) {
-    table {
-        min-width: 800px; /* Ensures horizontal scroll on mobile */
+    body:not(.admin-responsive-ready):not(.table-responsive-ready) table {
+        min-width: 800px;
     }
+}
+
+/* Shared pagination (automatically added to tables without native paging). */
+.admin-table-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #e2e8f0;
+    background: rgba(248, 250, 252, 0.75);
+    color: #475569;
+    font-size: 0.75rem;
+}
+
+.admin-table-pagination[hidden] {
+    display: none !important;
+}
+
+.admin-table-pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.admin-table-pagination button,
+.admin-table-pagination select {
+    min-height: 2.25rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    background: #fff;
+    color: #334155;
+    font: inherit;
+}
+
+.admin-table-pagination button {
+    padding: 0.4rem 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.admin-table-pagination select {
+    padding: 0.35rem 1.75rem 0.35rem 0.5rem;
+}
+
+.admin-table-pagination button:hover:not(:disabled) {
+    border-color: #b8860b;
+    color: #8a6508;
+}
+
+.admin-table-pagination button:focus-visible,
+.admin-table-pagination select:focus-visible {
+    outline: 2px solid rgba(184, 134, 11, 0.35);
+    outline-offset: 1px;
+}
+
+.admin-table-pagination button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+/* Existing page-specific pagination receives the same mobile-safe behavior. */
+#registrationsPrevBtn,
+#registrationsNextBtn,
+#adminUsersPrevBtn,
+#adminUsersNextBtn {
+    min-height: 2.25rem;
+}
+
+#registrationsPrevBtn:disabled,
+#registrationsNextBtn:disabled,
+#adminUsersPrevBtn:disabled,
+#adminUsersNextBtn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -398,6 +520,31 @@ table {
         margin-right: -1rem;
         padding-left: 1rem;
         padding-right: 1rem;
+    }
+
+    .admin-table-pagination {
+        align-items: stretch;
+        padding: 0.75rem;
+    }
+
+    .admin-table-pagination-info {
+        flex: 1 0 100%;
+    }
+
+    .admin-table-pagination-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .admin-table-pagination-controls button {
+        flex: 1 1 5rem;
+    }
+
+    #registrationsPaginationInfo + div,
+    #adminUsersPaginationInfo + div {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
     }
     
     /* Reduce cell padding on mobile */

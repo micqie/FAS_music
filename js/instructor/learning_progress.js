@@ -162,7 +162,67 @@ function learningTrend(evaluations) {
 function evaluationDetails(evaluation) {
     const criteria = Array.isArray(evaluation.criteria_scores) ? evaluation.criteria_scores : [];
     if (!criteria.length) return '';
-    return `<div class="mt-3 grid grid-cols-2 gap-2">${criteria.map(item => `<div class="rounded-lg bg-white px-3 py-2"><div class="text-[10px] font-bold uppercase tracking-wide text-slate-400">${learningHtml(item.name || 'Criterion')}</div><div class="mt-0.5 font-black text-slate-800">${Number(item.score || 0)}/5</div></div>`).join('')}</div>`;
+    return `<div class="mt-2 grid grid-cols-2 gap-1.5">${criteria.map(item => `<div class="rounded-md bg-white px-2.5 py-1.5"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">${learningHtml(item.name || 'Criterion')}</div><div class="text-xs font-black text-slate-800">${Number(item.score || 0)}/5</div></div>`).join('')}</div>`;
+}
+
+function buildPromotionalExamProgressPreview(row) {
+    const evaluations = (Array.isArray(row?.session_evaluations) ? row.session_evaluations : [])
+        .filter(item => Number(item?.progress_id || 0) > 0 && item?.average_score !== null && item?.average_score !== '' && Number.isFinite(Number(item?.average_score)));
+    const trend = learningTrend(evaluations);
+    if (!evaluations.length) {
+        return `<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center">
+            <div class="text-sm font-bold text-slate-700">No saved session ratings</div>
+            <div class="mt-1 text-xs leading-5 text-slate-500">Record the formal exam using your live assessment. This preview does not decide the result.</div>
+        </div>`;
+    }
+
+    const overall = evaluations.reduce((sum, item) => sum + Number(item.average_score || 0), 0) / evaluations.length;
+    const criteriaGroups = new Map();
+    evaluations.forEach(evaluation => {
+        let sessionCriteria = Array.isArray(evaluation.criteria_scores) ? evaluation.criteria_scores : [];
+        if (!sessionCriteria.length) {
+            sessionCriteria = [
+                ['Performance', evaluation.performance_score],
+                ['Technique', evaluation.technique_score],
+                ['Rhythm & Timing', evaluation.rhythm_score],
+                ['Focus & Discipline', evaluation.focus_score],
+                ['Assignment & Practice', evaluation.assignment_score]
+            ].map(([name, score]) => ({ name, score })).filter(item => Number(item.score || 0) >= 1);
+        }
+        sessionCriteria.forEach(criterion => {
+            const name = String(criterion?.name || '').trim();
+            const score = Number(criterion?.score || 0);
+            if (!name || score < 1 || score > 5) return;
+            const key = name.toLowerCase();
+            const group = criteriaGroups.get(key) || { name, scores: [] };
+            group.scores.push(score);
+            criteriaGroups.set(key, group);
+        });
+    });
+    const criteria = Array.from(criteriaGroups.values()).map(group => ({
+        name: group.name,
+        average: group.scores.reduce((sum, score) => sum + score, 0) / group.scores.length
+    })).sort((a, b) => b.average - a.average);
+    const strongest = criteria[0] || null;
+    const needsSupport = criteria.length > 1 ? criteria[criteria.length - 1] : null;
+    const recent = evaluations.slice(0, 4);
+
+    return `<section class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div class="flex items-center justify-between gap-3">
+            <div><div class="text-[10px] font-black uppercase tracking-[.14em] text-slate-500">Session rating preview</div><div class="mt-0.5 text-xs text-slate-500">Guide only · ${evaluations.length} graded session${evaluations.length === 1 ? '' : 's'} · selected instrument</div></div>
+            <div class="rounded-lg bg-slate-900 px-3 py-2 text-center text-white"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-300">Overall</div><div class="text-lg font-black">${overall.toFixed(2)}<span class="text-xs text-slate-300">/5</span></div></div>
+        </div>
+        <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div class="rounded-lg bg-white px-3 py-2"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Recent trend</div><div class="mt-0.5 text-xs font-black text-slate-800">${learningHtml(trend.label)}</div></div>
+            <div class="rounded-lg bg-white px-3 py-2"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Strongest area</div><div class="mt-0.5 text-xs font-black text-emerald-700">${strongest ? `${learningHtml(strongest.name)} · ${strongest.average.toFixed(2)}/5` : 'Not enough data'}</div></div>
+            <div class="rounded-lg bg-white px-3 py-2"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Review during exam</div><div class="mt-0.5 text-xs font-black text-amber-700">${needsSupport ? `${learningHtml(needsSupport.name)} · ${needsSupport.average.toFixed(2)}/5` : 'Not enough data'}</div></div>
+        </div>
+        <details class="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <summary class="cursor-pointer text-xs font-bold text-slate-700">View recent session ratings</summary>
+            <div class="mt-2 divide-y divide-slate-100">${recent.map(evaluation => `<div class="flex items-center justify-between gap-3 py-2 text-xs"><div><span class="font-bold text-slate-800">Session ${Number(evaluation.session_number || 0) || '—'}</span><span class="ml-2 text-slate-400">${learningDate(evaluation.session_date)}</span></div><span class="font-black text-slate-900">${Number(evaluation.average_score).toFixed(2)}/5</span></div>`).join('')}</div>
+        </details>
+        <p class="mt-2 text-[10px] leading-4 text-slate-500">Previous lesson ratings support professional judgment. The instructor still records the formal exam rating and Passed or Retake result.</p>
+    </section>`;
 }
 
 async function openLevelReadinessReview(index) {
@@ -174,18 +234,23 @@ async function openLevelReadinessReview(index) {
         const rated = Number(evaluation.progress_id || 0) > 0;
         const rating = evaluation.skill_level || (rated ? 'Evaluated' : 'Not evaluated yet');
         const notes = evaluation.remarks || evaluation.session_notes || evaluation.attendance_notes || 'No notes recorded for this session.';
-        return `<article class="rounded-xl border ${rated ? 'border-slate-200 bg-slate-50' : 'border-dashed border-slate-200 bg-white'} p-4">
-            <div class="flex flex-wrap items-start justify-between gap-2">
-                <div><div class="font-black text-slate-900">Session ${Number(evaluation.session_number || 0) || '—'} — ${learningHtml(rating)}</div><div class="mt-0.5 text-xs text-slate-400">${learningDate(evaluation.session_date)}</div></div>
+        return `<article class="rounded-lg border ${rated ? 'border-slate-200 bg-slate-50' : 'border-dashed border-slate-200 bg-white'} px-3 py-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div><div class="text-sm font-black text-slate-900">Session ${Number(evaluation.session_number || 0) || '—'} · ${learningHtml(rating)}</div><div class="text-[11px] text-slate-400">${learningDate(evaluation.session_date)}</div></div>
                 ${evaluation.average_score !== null && evaluation.average_score !== '' ? `<span class="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-black text-white">${Number(evaluation.average_score).toFixed(2)}/5</span>` : '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">No saved grade</span>'}
             </div>
-            <p class="mt-3 text-sm leading-6 text-slate-600">${learningHtml(notes)}</p>
-            ${evaluationDetails(evaluation)}
+            <details class="mt-2 border-t border-slate-200 pt-2">
+                <summary class="cursor-pointer text-xs font-bold text-slate-600">Details</summary>
+                <p class="mt-2 text-xs leading-5 text-slate-600">${learningHtml(notes)}</p>
+                ${evaluationDetails(evaluation)}
+            </details>
         </article>`;
-    }).join('') : '<div class="rounded-xl border border-dashed border-slate-300 px-5 py-8 text-center text-sm text-slate-500">No completed sessions are available for this instrument yet. Readiness is never set automatically.</div>';
+    }).join('') : '<div class="rounded-xl border border-dashed border-slate-300 px-5 py-6 text-center text-sm text-slate-500">No completed sessions yet.</div>';
 
     const result = await Swal.fire({
-        width: 820,
+        width: 740,
+        padding: '1rem',
+        customClass: { popup: 'readiness-review-popup' },
         title: 'Review Level Readiness',
         showCancelButton: true,
         showDenyButton: true,
@@ -196,18 +261,17 @@ async function openLevelReadinessReview(index) {
         denyButtonColor: '#334155',
         reverseButtons: true,
         html: `<div class="text-left">
-            <div class="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-4">
+            <div class="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-4">
                 <div class="col-span-2"><div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Student</div><div class="mt-1 font-black text-slate-900">${learningHtml(`${row.first_name || ''} ${row.last_name || ''}`.trim())}</div></div>
                 <div><div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Instrument</div><div class="mt-1 font-bold text-slate-800">${learningHtml(row.instrument_name || '—')}</div></div>
                 <div><div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Completed</div><div class="mt-1 font-black text-slate-900">${Number(row.completed_sessions || 0)} sessions</div></div>
                 <div class="col-span-2"><div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Current level</div><div class="mt-1 font-bold text-slate-800">${learningHtml(row.level_name || 'Not set')}</div></div>
                 <div class="col-span-2"><div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Book / material</div><div class="mt-1 font-bold text-slate-800">${learningHtml(row.book_material || 'Not set')}</div></div>
             </div>
-            <div class="mt-4 rounded-xl px-4 py-3 ${trend.className}"><div class="text-xs font-black uppercase tracking-wider">Recent progress trend: ${trend.label}</div><div class="mt-1 text-sm">${trend.detail}</div></div>
-            ${row.instructor_notes ? `<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"><div class="text-xs font-black uppercase tracking-wider text-amber-800">Current instructor notes</div><p class="mt-1 text-sm leading-6 text-amber-900">${learningHtml(row.instructor_notes)}</p></div>` : ''}
-            <div class="mb-2 mt-5 flex items-end justify-between gap-3"><div><div class="font-black text-slate-900">Previous session evaluations</div><div class="text-xs text-slate-500">Newest session first · selected instrument only</div></div><span class="text-xs font-semibold text-slate-500">${evaluations.length} completed</span></div>
-            <div class="max-h-[42vh] space-y-3 overflow-y-auto pr-1">${sessionCards}</div>
-            <p class="mt-4 rounded-xl bg-slate-100 px-4 py-3 text-xs leading-5 text-slate-600">Session history supports your decision but does not decide it. Only a passed promotional exam advances the level and creates a certificate.</p>
+            <div class="mt-3 rounded-lg px-3 py-2 ${trend.className}"><div class="text-[11px] font-black uppercase tracking-wider">Recent trend</div><div class="mt-0.5 text-xs font-bold">${trend.label}</div></div>
+            ${row.instructor_notes ? `<details class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"><summary class="cursor-pointer text-xs font-black text-amber-800">Current instructor notes</summary><p class="mt-2 text-xs leading-5 text-amber-900">${learningHtml(row.instructor_notes)}</p></details>` : ''}
+            <div class="mb-2 mt-3 flex items-end justify-between gap-3"><div class="text-sm font-black text-slate-900">Session evaluations</div><span class="text-[11px] font-semibold text-slate-500">${evaluations.length}</span></div>
+            <div class="max-h-[30vh] space-y-2 overflow-y-auto pr-1">${sessionCards}</div>
         </div>`
     });
     if (!result.isConfirmed && !result.isDenied) return;
@@ -235,10 +299,11 @@ async function openPromotionalExamForm(index) {
     const today = new Date().toISOString().slice(0,10);
     const levels = Array.from({ length: 10 }, (_, levelIndex) => `Level ${levelIndex + 1}`);
     const materials = Array.isArray(row.learning_materials) ? row.learning_materials : [];
+    const progressPreview = buildPromotionalExamProgressPreview(row);
     const nextMaterialOptions = level => `<option value="">No next book/material</option>${materials.filter(material => !level || material.level_name === level).map(material => `<option value="${learningHtml(material.material_name)}">${learningHtml(material.material_name)}</option>`).join('')}`;
     const result = await Swal.fire({
         title: `Promotional Exam · ${learningHtml(row.level_name)}`,
-        width: 580,
+        width: 700,
         padding: '1rem',
         customClass: { popup: 'promotional-exam-popup' },
         showCancelButton: true,
@@ -246,6 +311,7 @@ async function openPromotionalExamForm(index) {
         confirmButtonColor: '#b8860b',
         html: `<div class="space-y-3 text-left">
             <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2"><div><div class="text-sm font-bold text-slate-900">${learningHtml(`${row.first_name || ''} ${row.last_name || ''}`.trim())}</div><div class="text-xs text-slate-500">${learningHtml(row.instrument_name || 'Instrument')}</div></div><span class="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700">Formal assessment</span></div>
+            ${progressPreview}
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Exam date</label><input id="examDate" type="date" value="${today}" class="swal2-input !m-0 !w-full"></div>
                 <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Result</label><select id="examResult" class="swal2-select !m-0 !w-full"><option value="Passed">Passed</option><option value="Retake">Retake</option></select></div>

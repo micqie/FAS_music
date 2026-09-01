@@ -10,9 +10,17 @@
 
     function renderSpecializationChips(container, specializations, selectedIds) {
         if (!container) return;
-        const wanted = new Set((Array.isArray(selectedIds) ? selectedIds : []).map(v => Number(v)).filter(v => v > 0));
         const activeSpecs = (Array.isArray(specializations) ? specializations : [])
             .filter(s => String(s.status || 'Active') === 'Active');
+        const generalSpec = activeSpecs.find(spec => String(spec.specialization_name || '').trim().toLowerCase() === 'general');
+        const generalId = Number(generalSpec?.specialization_id || 0);
+        const wanted = new Set((Array.isArray(selectedIds) ? selectedIds : []).map(v => Number(v)).filter(v => v > 0));
+
+        // General represents every instrument and must be exclusive.
+        if (generalId > 0 && wanted.has(generalId)) {
+            wanted.clear();
+            wanted.add(generalId);
+        }
 
         if (!activeSpecs.length) {
             container.innerHTML = '<p class="text-sm text-slate-500">No specializations available. Add them under Teachers → Specializations.</p>';
@@ -22,11 +30,16 @@
         container.innerHTML = activeSpecs.map(spec => {
             const id = Number(spec.specialization_id || 0);
             const selected = wanted.has(id);
+            const isGeneral = id === generalId;
+            const disabled = generalId > 0 && wanted.has(generalId) && !isGeneral;
             return `
                 <button type="button"
-                    class="teacher-spec-chip inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition-all ${selected ? 'border-gold-500 bg-gold-50 text-gold-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-gold-300 hover:bg-gold-50/40'}"
+                    class="teacher-spec-chip inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition-all ${selected ? 'border-gold-500 bg-gold-50 text-gold-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-gold-300 hover:bg-gold-50/40'} ${disabled ? 'opacity-50 cursor-not-allowed hover:border-slate-200 hover:bg-white' : ''}"
                     data-spec-id="${id}"
-                    aria-pressed="${selected ? 'true' : 'false'}">
+                    data-is-general="${isGeneral ? '1' : '0'}"
+                    aria-pressed="${selected ? 'true' : 'false'}"
+                    aria-disabled="${disabled ? 'true' : 'false'}"
+                    ${disabled ? 'disabled' : ''}>
                     <i class="fas fa-music text-xs ${selected ? 'text-gold-600' : 'text-slate-400'}"></i>
                     <span>${esc(spec.specialization_name || 'Specialization')}</span>
                     ${selected ? '<i class="fas fa-check text-xs text-gold-600"></i>' : ''}
@@ -38,7 +51,14 @@
             button.addEventListener('click', () => {
                 const id = Number(button.dataset.specId || 0);
                 if (id < 1) return;
-                if (wanted.has(id)) {
+                if (button.dataset.isGeneral === '1') {
+                    if (wanted.has(id)) {
+                        wanted.delete(id);
+                    } else {
+                        wanted.clear();
+                        wanted.add(id);
+                    }
+                } else if (wanted.has(id)) {
                     wanted.delete(id);
                 } else {
                     wanted.add(id);
@@ -63,7 +83,10 @@
         const container = document.getElementById('specializationChipGrid');
         if (!summary || !container) return;
         const count = getSelectedSpecializationIdsFromChips(container).length;
-        summary.textContent = count
+        const generalSelected = container.querySelector('.teacher-spec-chip[data-is-general="1"][aria-pressed="true"]');
+        summary.textContent = generalSelected
+            ? 'General selected — qualified for all instruments'
+            : count
             ? `${count} specialization${count === 1 ? '' : 's'} selected`
             : 'Tap one or more instruments this teacher can teach';
         summary.classList.toggle('text-gold-700', count > 0);

@@ -344,7 +344,7 @@ class FeaturedPosts
         $isAdmin = $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
         $postId = (int)($data['featured_post_id'] ?? 0);
 
-        $title = $this->safeTrim($data['title'] ?? '');
+        $title = preg_replace('/\s+/', ' ', $this->safeTrim($data['title'] ?? ''));
         $category = $this->safeTrim($data['category'] ?? '');
         $content = $this->safeTrim($data['content'] ?? '');
         $status = $this->normalizeStatus($data['status'] ?? 'Draft');
@@ -369,6 +369,21 @@ class FeaturedPosts
             if (!$isAdmin && (int)($existingPost['branch_id'] ?? 0) !== (int)($editor['branch_id'] ?? 0)) {
                 $this->sendJSON(['error' => 'You can only edit posts from your branch'], 403);
             }
+        }
+
+        $duplicateTitleStmt = $this->conn->prepare("
+            SELECT featured_post_id
+            FROM tbl_featured_posts
+            WHERE branch_id <=> ?
+              AND LOWER(TRIM(title)) = LOWER(?)
+              AND featured_post_id <> ?
+            LIMIT 1
+        ");
+        $duplicateTitleStmt->execute([$branchId, $title, $postId]);
+        if ($duplicateTitleStmt->fetchColumn()) {
+            $this->sendJSON([
+                'error' => 'A featured post with this title already exists for this branch (titles are checked without regard to capitalization).'
+            ], 409);
         }
 
         $uploadedPath = null;

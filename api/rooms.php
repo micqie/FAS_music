@@ -34,6 +34,11 @@ class Room
         return json_decode(file_get_contents('php://input'), true) ?: [];
     }
 
+    private function normalizeName($value): string
+    {
+        return preg_replace('/\s+/', ' ', trim((string)$value));
+    }
+
     public function getRooms()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -268,7 +273,7 @@ class Room
         }
 
         $data = $this->getPayload();
-        $roomName = trim($data['room_name'] ?? '');
+        $roomName = $this->normalizeName($data['room_name'] ?? '');
         $branchId = (int) ($data['branch_id'] ?? 0);
         $capacity = (int) ($data['capacity'] ?? 1);
         $roomType = trim($data['room_type'] ?? 'Private Lesson');
@@ -280,12 +285,12 @@ class Room
             $duplicateStmt = $this->conn->prepare("
                 SELECT room_id
                 FROM tbl_rooms
-                WHERE branch_id = ? AND room_name = ?
+                WHERE branch_id = ? AND LOWER(TRIM(room_name)) = LOWER(?)
                 LIMIT 1
             ");
             $duplicateStmt->execute([$branchId, $roomName]);
             if ($duplicateStmt->fetch()) {
-                $this->sendJSON(['error' => 'Room name already exists in this branch'], 409);
+                $this->sendJSON(['error' => 'Room name already exists in this branch (names are checked without regard to capitalization)'], 409);
             }
 
             $stmt = $this->conn->prepare("
@@ -311,7 +316,7 @@ class Room
 
         $data = $this->getPayload();
         $roomId = (int) ($data['room_id'] ?? 0);
-        $roomName = trim($data['room_name'] ?? '');
+        $roomName = $this->normalizeName($data['room_name'] ?? '');
         $branchId = (int) ($data['branch_id'] ?? 0);
         $capacity = (int) ($data['capacity'] ?? 1);
         $roomType = trim($data['room_type'] ?? 'Private Lesson');
@@ -327,12 +332,12 @@ class Room
             $duplicateStmt = $this->conn->prepare("
                 SELECT room_id
                 FROM tbl_rooms
-                WHERE branch_id = ? AND room_name = ? AND room_id <> ?
+                WHERE branch_id = ? AND LOWER(TRIM(room_name)) = LOWER(?) AND room_id <> ?
                 LIMIT 1
             ");
             $duplicateStmt->execute([$branchId, $roomName, $roomId]);
             if ($duplicateStmt->fetch()) {
-                $this->sendJSON(['error' => 'Room name already exists in this branch'], 409);
+                $this->sendJSON(['error' => 'Room name already exists in this branch (names are checked without regard to capitalization)'], 409);
             }
 
             $stmt = $this->conn->prepare("

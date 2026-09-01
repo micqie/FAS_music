@@ -2271,6 +2271,147 @@ class AttendanceApi
         }
     }
 
+    public function markAttendanceByInstructor()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $sessionId = (int)($data['session_id'] ?? 0);
+        $attendance = strtolower(trim((string)($data['attendance_status'] ?? '')));
+        if ($teacherId < 1 || $sessionId < 1 || !in_array($attendance, ['present', 'late', 'absent'], true)) {
+            $this->sendJSON(['success' => false, 'error' => 'Instructor, session, and a valid attendance status are required.'], 400);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT ts.session_id, ts.session_date, ts.status, ts.instructor_completed_at,
+                       ts.grading_started_at, ts.grading_completed_at,
+                       ts.room_id, ts.instrument_id,
+                       e.enrollment_id, e.student_id, s.branch_id
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                WHERE ts.session_id = ? AND ts.teacher_id = ? AND e.status = 'Active'
+                LIMIT 1
+            ");
+            $stmt->execute([$sessionId, $teacherId]);
+            $session = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$session) $this->sendJSON(['success' => false, 'error' => 'Session not found for this instructor.'], 404);
+            if ((int)($session['room_id'] ?? 0) < 1 || (int)($session['instrument_id'] ?? 0) < 1) {
+                $this->sendJSON(['success' => false, 'error' => 'Desk must assign both a room and a physical instrument before attendance can be marked.'], 400);
+            }
+            if ((string)$session['session_date'] !== date('Y-m-d')) {
+                $this->sendJSON(['success' => false, 'error' => 'Only today\'s session attendance can be marked.'], 400);
+            }
+            if (!empty($session['instructor_completed_at'])) {
+                $this->sendJSON(['success' => false, 'error' => 'Attendance cannot be changed after the session has ended.'], 400);
+            }
+            if ($attendance === 'absent' && (!empty($session['grading_started_at']) || !empty($session['grading_completed_at']))) {
+                $this->sendJSON([
+                    'success' => false,
+                    'error' => 'This lesson is already in progress. Absent can no longer be selected; the timer and current ratings remain unchanged.'
+                ], 409);
+            }
+            if (in_array(strtolower((string)$session['status']), ['cancelled', 'cancelled_by_teacher', 'rescheduled'], true)) {
+                $this->sendJSON(['success' => false, 'error' => 'Attendance cannot be recorded for this session.'], 400);
+            }
+
+            $statusValue = $attendance === 'present' ? 'Completed' : ($attendance === 'late' ? 'Late' : 'No Show');
+            $attendanceValue = ucfirst($attendance);
+            $countedIn = 1;
+            $update = $this->conn->prepare("
+                UPDATE tbl_sessions
+                SET status = ?, attendance_status = ?, counted_in = ?,
+                    attendance_notes = 'Attendance marked by instructor'
+                WHERE session_id = ?
+            ");
+            $update->execute([$statusValue, $attendanceValue, $countedIn, $sessionId]);
+
+            if (in_array($attendance, ['present', 'late'], true) && $this->ensureAttendanceTable()) {
+                $existing = $this->getStudentAttendanceForDate((int)$session['student_id'], date('Y-m-d'));
+                if (!$existing) {
+                    $insert = $this->conn->prepare("INSERT INTO tbl_attendance (student_id, branch_id, status, source, notes) VALUES (?, ?, ?, 'Instructor', ?)");
+                    $insert->execute([(int)$session['student_id'], (int)$session['branch_id'] ?: null, $attendanceValue, 'Attendance marked by instructor']);
+                }
+            }
+            $this->syncEnrollmentPolicyState((int)$session['enrollment_id']);
+            $this->syncEnrollmentCompletedSessions((int)$session['enrollment_id']);
+            $this->sendJSON(['success' => true, 'message' => "Attendance marked {$attendanceValue}."]);
+        } catch (PDOException $e) {
+            $this->sendJSON(['success' => false, 'error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function reactivateMistakenAbsence()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+        $deskUser = fas_require_authenticated_user($this->conn, ['staff']);
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $sessionId = (int)($data['session_id'] ?? 0);
+        if ($sessionId < 1) {
+            $this->sendJSON(['success' => false, 'error' => 'Session is required.'], 400);
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT ts.session_id, ts.enrollment_id, ts.status, ts.attendance_status,
+                       ts.instructor_completed_at, p.progress_id, s.branch_id
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                LEFT JOIN tbl_student_progress p ON p.session_id = ts.session_id
+                WHERE ts.session_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$sessionId]);
+            $session = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$session) $this->sendJSON(['success' => false, 'error' => 'Session not found.'], 404);
+            $deskRole = fas_normalize_role_category($deskUser['role_name'] ?? '');
+            if ($deskRole !== 'admin' && (int)($deskUser['branch_id'] ?? 0) !== (int)($session['branch_id'] ?? 0)) {
+                $this->sendJSON(['success' => false, 'error' => 'You can only correct attendance for your assigned branch.'], 403);
+            }
+
+            $status = strtolower(trim((string)($session['status'] ?? '')));
+            $attendance = strtolower(trim((string)($session['attendance_status'] ?? '')));
+            if (!in_array($attendance, ['absent', 'ci'], true) && !in_array($status, ['no show', 'cancelled'], true)) {
+                $this->sendJSON(['success' => false, 'error' => 'Only an absent session can be reactivated.'], 400);
+            }
+            if (!empty($session['instructor_completed_at']) || (int)($session['progress_id'] ?? 0) > 0) {
+                $this->sendJSON(['success' => false, 'error' => 'A graded or formally ended session cannot be reactivated.'], 400);
+            }
+
+            $this->conn->beginTransaction();
+            $update = $this->conn->prepare("
+                UPDATE tbl_sessions
+                SET status = 'Scheduled', attendance_status = 'Pending', absence_notice = 'None',
+                    counted_in = 0, makeup_eligible = 0, makeup_required = 0, operation_id = NULL,
+                    attendance_notes = CASE
+                        WHEN attendance_notes IS NULL OR TRIM(attendance_notes) = '' THEN 'Absence corrected by desk'
+                        ELSE CONCAT(attendance_notes, ' | Absence corrected by desk')
+                    END
+                WHERE session_id = ?
+            ");
+            $update->execute([$sessionId]);
+            $enrollmentId = (int)$session['enrollment_id'];
+            $this->syncEnrollmentPolicyState($enrollmentId);
+            $this->syncEnrollmentCompletedSessions($enrollmentId);
+            $this->conn->commit();
+
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Session reactivated. Attendance can now be marked again.'
+            ]);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            $this->sendJSON(['success' => false, 'error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function markPresentByInstructor()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2298,6 +2439,7 @@ class AttendanceApi
                     ts.session_date,
                     ts.status,
                     ts.attendance_status,
+                    ts.instructor_completed_at,
                     e.student_id,
                     s.first_name,
                     s.last_name,
@@ -2332,6 +2474,33 @@ class AttendanceApi
 
             $studentId = (int)($session['student_id'] ?? 0);
             $branchId = (int)($session['branch_id'] ?? 0);
+            $gradeStmt = $this->conn->prepare("SELECT progress_id FROM tbl_student_progress WHERE session_id = ? LIMIT 1");
+            $gradeStmt->execute([$sessionId]);
+            if (!(int)($gradeStmt->fetchColumn() ?: 0)) {
+                $this->sendJSON(['success' => false, 'error' => 'Save the student grade before ending the session.'], 400);
+            }
+            if (!in_array($attendanceStatus, ['present', 'late'], true)) {
+                $this->sendJSON(['success' => false, 'error' => 'Mark the student Present or Late before ending the session.'], 400);
+            }
+            if (!empty($session['instructor_completed_at'])) {
+                $this->sendJSON(['success' => true, 'already_marked' => true, 'message' => 'This session has already ended.']);
+            }
+
+            $this->conn->prepare("UPDATE tbl_sessions SET instructor_completed_at = COALESCE(instructor_completed_at, NOW()) WHERE session_id = ?")
+                ->execute([$sessionId]);
+            $guardianEmailsNotified = 0;
+            try {
+                $guardianEmailsNotified = $this->notifyGuardiansOfSessionCompletion($session);
+            } catch (\Throwable $notifyError) {
+                error_log('Guardian session completion notification failed: ' . $notifyError->getMessage());
+            }
+            $this->sendJSON([
+                'success' => true,
+                'message' => 'Session ended successfully.',
+                'guardian_email_notifications_sent' => $guardianEmailsNotified,
+                'student' => $session
+            ]);
+
             if ($status === 'completed' && $attendanceStatus === 'present') {
                 $this->sendJSON([
                     'success' => true,
@@ -2554,6 +2723,12 @@ switch ($action) {
         break;
     case 'mark-present-by-instructor':
         $api->markPresentByInstructor();
+        break;
+    case 'mark-attendance-by-instructor':
+        $api->markAttendanceByInstructor();
+        break;
+    case 'reactivate-mistaken-absence':
+        $api->reactivateMistakenAbsence();
         break;
     case 'qr-status':
         $api->getQrStatus();

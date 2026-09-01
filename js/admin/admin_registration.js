@@ -46,6 +46,19 @@
                 initPaymentForm();
             }
 
+            const registrationBranchFilter = document.getElementById('registrationsBranchFilter');
+            if (registrationBranchFilter) {
+                try {
+                    const branchResponse = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
+                    const branches = branchResponse.data?.success && Array.isArray(branchResponse.data.branches) ? branchResponse.data.branches : [];
+                    registrationBranchFilter.innerHTML = '<option value="">All branches</option>' + branches.map(branch =>
+                        `<option value="${escapeHtml(String(branch.branch_id || ''))}">${escapeHtml(branch.branch_name || 'Branch')}</option>`
+                    ).join('');
+                } catch (error) {
+                    registrationBranchFilter.innerHTML = '<option value="">All branches</option>';
+                }
+            }
+
             // Initialize Register Student Modal
             const registerModal = document.getElementById('registerStudentModal');
             const openRegisterBtn = document.getElementById('openRegisterStudentModalBtn');

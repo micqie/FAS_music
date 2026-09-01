@@ -233,10 +233,16 @@
             // Hide status field — new teachers are always Active
             const statusWrapper = document.getElementById('statusFieldWrapper');
             const statusHidden  = document.getElementById('statusHidden');
+            const emailWrapper = document.getElementById('teacherEmailFieldWrapper');
+            const realAccountCard = document.getElementById('accountModeRealCard');
             if (statusWrapper) statusWrapper.classList.add('hidden');
             if (statusHidden)  statusHidden.value = 'Active';
+            if (emailWrapper) emailWrapper.classList.add('hidden');
+            if (realAccountCard) realAccountCard.classList.add('hidden');
+            const emailInput = document.getElementById('email');
+            if (emailInput) emailInput.value = '';
             if (window.TeacherFormUI) {
-                TeacherFormUI.setAccountMode('real_email', false);
+                TeacherFormUI.setAccountMode('system_account', false);
                 TeacherFormUI.previewSystemLogin();
                 updateAccountModeCards();
             }
@@ -267,7 +273,11 @@
             document.getElementById('teacherModalSubtitle').textContent = 'Update instructor profile and specializations.';
             // Show status field in edit mode
             const statusWrapper = document.getElementById('statusFieldWrapper');
+            const emailWrapper = document.getElementById('teacherEmailFieldWrapper');
+            const realAccountCard = document.getElementById('accountModeRealCard');
             if (statusWrapper) statusWrapper.classList.remove('hidden');
+            if (emailWrapper) emailWrapper.classList.remove('hidden');
+            if (realAccountCard) realAccountCard.classList.remove('hidden');
             if (window.TeacherFormUI) {
                 TeacherFormUI.setAccountMode('real_email', true);
             }

@@ -6,8 +6,8 @@ ini_set('log_errors', 1);
 date_default_timezone_set('Asia/Manila');
 
 $servername = "localhost";
-$dbusername = "root";
-$dbpassword = "";
+$dbusername = "micah";
+$dbpassword = "YourActualPassword";
 $dbname = "music_db";
 
 try {

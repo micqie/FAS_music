@@ -103,7 +103,10 @@ class TeachersApi
             'needs_rescheduling' => "ALTER TABLE tbl_sessions ADD COLUMN needs_rescheduling TINYINT(1) NOT NULL DEFAULT 0 AFTER rescheduled_to_session_id",
             'cancellation_reason' => "ALTER TABLE tbl_sessions ADD COLUMN cancellation_reason TEXT NULL AFTER needs_rescheduling",
             'cancelled_by_teacher_at' => "ALTER TABLE tbl_sessions ADD COLUMN cancelled_by_teacher_at DATETIME NULL AFTER cancellation_reason",
-            'rescheduled_at' => "ALTER TABLE tbl_sessions ADD COLUMN rescheduled_at DATETIME NULL AFTER cancelled_by_teacher_at"
+            'rescheduled_at' => "ALTER TABLE tbl_sessions ADD COLUMN rescheduled_at DATETIME NULL AFTER cancelled_by_teacher_at",
+            'instructor_completed_at' => "ALTER TABLE tbl_sessions ADD COLUMN instructor_completed_at DATETIME NULL AFTER attendance_status",
+            'grading_started_at' => "ALTER TABLE tbl_sessions ADD COLUMN grading_started_at DATETIME NULL AFTER instructor_completed_at",
+            'grading_completed_at' => "ALTER TABLE tbl_sessions ADD COLUMN grading_completed_at DATETIME NULL AFTER grading_started_at"
         ];
         foreach ($columns as $column => $sql) {
             try {
@@ -571,6 +574,29 @@ class TeachersApi
         return $ids;
     }
 
+    private function normalizeGeneralSpecializationSelection($specializationIds)
+    {
+        $ids = $this->normalizeSpecializationIds($specializationIds);
+        if (empty($ids)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->conn->prepare("
+            SELECT specialization_id
+            FROM tbl_specialization
+            WHERE specialization_id IN ({$placeholders})
+              AND LOWER(TRIM(specialization_name)) = 'general'
+            LIMIT 1
+        ");
+        $stmt->execute($ids);
+        $generalId = (int)($stmt->fetchColumn() ?: 0);
+
+        // General means all instruments, so storing individual selections too
+        // would be redundant and can confuse scheduling filters.
+        return $generalId > 0 ? [$generalId] : $ids;
+    }
+
     private function allSpecializationsExist($specializationIds)
     {
         $ids = $this->normalizeSpecializationIds($specializationIds);
@@ -606,8 +632,8 @@ class TeachersApi
         $stmt = $this->conn->prepare("
             SELECT user_id
             FROM tbl_users
-            WHERE username = ?
-               OR (email IS NOT NULL AND email <> '' AND email = ?)
+            WHERE LOWER(TRIM(username)) = LOWER(?)
+               OR (email IS NOT NULL AND email <> '' AND LOWER(TRIM(email)) = LOWER(?))
             LIMIT 1
         ");
         $stmt->execute([$username, $email]);
@@ -616,7 +642,7 @@ class TeachersApi
 
     private function usernameExists($username)
     {
-        $stmt = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE username = ? LIMIT 1");
+        $stmt = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE LOWER(TRIM(username)) = LOWER(?) LIMIT 1");
         $stmt->execute([$username]);
         return (int)$stmt->fetchColumn() > 0;
     }
@@ -691,13 +717,13 @@ class TeachersApi
 
     private function teacherSystemEmailExists($email)
     {
-        $stmt = $this->conn->prepare('SELECT 1 FROM tbl_users WHERE username = ? OR email = ? LIMIT 1');
+        $stmt = $this->conn->prepare('SELECT 1 FROM tbl_users WHERE LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?) LIMIT 1');
         $stmt->execute([$email, $email]);
         if ($stmt->fetchColumn()) {
             return true;
         }
 
-        $stmt = $this->conn->prepare('SELECT 1 FROM tbl_teachers WHERE email = ? LIMIT 1');
+        $stmt = $this->conn->prepare('SELECT 1 FROM tbl_teachers WHERE LOWER(TRIM(email)) = LOWER(?) LIMIT 1');
         $stmt->execute([$email]);
         return (bool) $stmt->fetchColumn();
     }
@@ -964,8 +990,8 @@ class TeachersApi
             $find = $this->conn->prepare("
                 SELECT user_id
                 FROM tbl_users
-                WHERE username = ?
-                   OR (email IS NOT NULL AND email <> '' AND email = ?)
+                WHERE LOWER(TRIM(username)) = LOWER(?)
+                   OR (email IS NOT NULL AND email <> '' AND LOWER(TRIM(email)) = LOWER(?))
                 LIMIT 1
             ");
             $find->execute([$email, $email]);
@@ -1040,7 +1066,7 @@ class TeachersApi
         }
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
-        $name = trim((string)($data['specialization_name'] ?? ''));
+        $name = preg_replace('/\s+/', ' ', trim((string)($data['specialization_name'] ?? '')));
         $status = trim((string)($data['status'] ?? 'Active'));
 
         if ($name === '') {
@@ -1051,7 +1077,7 @@ class TeachersApi
         }
 
         try {
-            $check = $this->conn->prepare("SELECT specialization_id FROM tbl_specialization WHERE specialization_name = ? LIMIT 1");
+            $check = $this->conn->prepare("SELECT specialization_id FROM tbl_specialization WHERE LOWER(TRIM(specialization_name)) = LOWER(?) LIMIT 1");
             $check->execute([$name]);
             $existingId = (int)$check->fetchColumn();
             if ($existingId > 0) {
@@ -1528,7 +1554,7 @@ class TeachersApi
         $firstName = trim((string)($data['first_name'] ?? ''));
         $lastName = trim((string)($data['last_name'] ?? ''));
         $branchId = (int)($data['branch_id'] ?? 0);
-        $specializationIds = $this->normalizeSpecializationIds($data['specialization_ids'] ?? []);
+        $specializationIds = $this->normalizeGeneralSpecializationSelection($data['specialization_ids'] ?? []);
         $email = trim((string)($data['email'] ?? ''));
         $phone = trim((string)($data['phone'] ?? ''));
         $employmentType = trim((string)($data['employment_type'] ?? 'Full-time'));
@@ -1677,7 +1703,7 @@ class TeachersApi
         $firstName = trim((string)($data['first_name'] ?? ''));
         $lastName = trim((string)($data['last_name'] ?? ''));
         $branchId = (int)($data['branch_id'] ?? 0);
-        $specializationIds = $this->normalizeSpecializationIds($data['specialization_ids'] ?? []);
+        $specializationIds = $this->normalizeGeneralSpecializationSelection($data['specialization_ids'] ?? []);
         $email = trim((string)($data['email'] ?? ''));
         $phone = trim((string)($data['phone'] ?? ''));
         $employmentType = trim((string)($data['employment_type'] ?? 'Full-time'));
@@ -1735,7 +1761,7 @@ class TeachersApi
                 $dupTeacher = $this->conn->prepare("
                     SELECT teacher_id
                     FROM tbl_teachers
-                    WHERE email = ?
+                    WHERE LOWER(TRIM(email)) = LOWER(?)
                       AND teacher_id <> ?
                     LIMIT 1
                 ");
@@ -1751,8 +1777,8 @@ class TeachersApi
                     SELECT user_id
                     FROM tbl_users
                     WHERE (
-                        (email IS NOT NULL AND email <> '' AND email = ?)
-                        OR username = ?
+                        (email IS NOT NULL AND email <> '' AND LOWER(TRIM(email)) = LOWER(?))
+                        OR LOWER(TRIM(username)) = LOWER(?)
                     )
                       AND user_id <> ?
                     LIMIT 1
@@ -1925,12 +1951,18 @@ class TeachersApi
                     ts.end_time,
                     ts.status,
                     ts.attendance_status,
+                    ts.room_id,
+                    ts.instrument_id AS assigned_instrument_id,
+                    ts.instructor_completed_at,
+                    ts.grading_started_at,
+                    ts.grading_completed_at,
                     ts.notes,
                     ts.attendance_notes,
                     s.student_id,
                     s.first_name AS student_first_name,
                     s.last_name AS student_last_name,
                     COALESCE(inst.instrument_name, CONCAT('Instrument #', ts.instrument_id)) AS instrument_name,
+                    CASE WHEN ts.instrument_id IS NOT NULL THEN inst.instrument_name ELSE NULL END AS assigned_instrument_name,
                     COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
                     COALESCE(rm.room_name, NULLIF(TRIM(ts.notes), '')) AS room_name,
                     prog.progress_id,
@@ -2044,11 +2076,17 @@ class TeachersApi
                     ts.session_id,
                     ts.teacher_id,
                     ts.instrument_id,
+                    ts.room_id,
                     ts.session_date,
+                    ts.attendance_status,
+                    ts.instructor_completed_at,
+                    e.enrollment_id,
                     e.student_id,
+                    s.branch_id,
                     e.instrument_id AS enrollment_instrument_id
                 FROM tbl_sessions ts
                 INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
                 WHERE ts.session_id = ?
                   AND ts.teacher_id = ?
                 LIMIT 1
@@ -2059,6 +2097,10 @@ class TeachersApi
                 $this->sendJSON(['error' => 'Session not found for this teacher'], 404);
             }
 
+            if ((int)($session['room_id'] ?? 0) < 1 || (int)($session['instrument_id'] ?? 0) < 1) {
+                $this->sendJSON(['error' => 'A room and physical instrument must be assigned before attendance or grading can be completed. Please contact the desk.'], 400);
+            }
+
             $studentId = (int)($session['student_id'] ?? 0);
             $instrumentId = (int)($session['instrument_id'] ?? 0);
             if ($instrumentId < 1) {
@@ -2066,6 +2108,35 @@ class TeachersApi
             }
             if ($studentId < 1 || $instrumentId < 1) {
                 $this->sendJSON(['error' => 'This session is missing required student or instrument data'], 400);
+            }
+            if (!empty($session['instructor_completed_at'])) {
+                $this->sendJSON(['error' => 'This session has already ended and can no longer be graded.'], 400);
+            }
+            if ((string)($session['session_date'] ?? '') !== date('Y-m-d') && !in_array(strtolower((string)($session['attendance_status'] ?? '')), ['present', 'late'], true)) {
+                $this->sendJSON(['error' => 'Attendance can only be confirmed on the scheduled session date.'], 400);
+            }
+
+            $this->conn->beginTransaction();
+            $this->conn->prepare("
+                UPDATE tbl_sessions
+                SET status = 'Completed', attendance_status = 'Present', counted_in = 1,
+                    absence_notice = 'None', makeup_eligible = 0, makeup_required = 0,
+                    attendance_notes = CASE
+                        WHEN attendance_notes IS NULL OR TRIM(attendance_notes) = '' THEN 'Present confirmed when instructor saved grade'
+                        ELSE CONCAT(attendance_notes, ' | Present confirmed when instructor saved grade')
+                    END
+                WHERE session_id = ?
+            ")->execute([$sessionId]);
+
+            if ($this->tableExists('tbl_attendance')) {
+                $attendanceInsert = $this->conn->prepare("
+                    INSERT INTO tbl_attendance (student_id, branch_id, status, source, notes)
+                    SELECT ?, ?, 'Present', 'Instructor', 'Confirmed when grade was saved'
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM tbl_attendance WHERE student_id = ? AND DATE(attended_at) = ?
+                    )
+                ");
+                $attendanceInsert->execute([$studentId, (int)($session['branch_id'] ?? 0) ?: null, $studentId, (string)$session['session_date']]);
             }
 
             $stmtExisting = $this->conn->prepare("
@@ -2078,35 +2149,8 @@ class TeachersApi
             $progressId = (int)($stmtExisting->fetchColumn() ?: 0);
 
             if ($progressId > 0) {
-                $stmtUpdate = $this->conn->prepare("
-                    UPDATE tbl_student_progress
-                    SET student_id = ?,
-                        instrument_id = ?,
-                        skill_level = ?,
-                        performance_score = ?,
-                        technique_score = ?,
-                        rhythm_score = ?,
-                        focus_score = ?,
-                        assignment_score = ?,
-                        criteria_scores = ?,
-                        remarks = ?,
-                        assessment_date = ?
-                    WHERE progress_id = ?
-                ");
-                $stmtUpdate->execute([
-                    $studentId,
-                    $instrumentId,
-                    $skillLevel,
-                    $performanceScore,
-                    $techniqueScore,
-                    $rhythmScore,
-                    $focusScore,
-                    $assignmentScore,
-                    $criteriaScoresJson,
-                    ($remarks !== '' ? $remarks : null),
-                    $assessmentDate,
-                    $progressId
-                ]);
+                if ($this->conn->inTransaction()) $this->conn->rollBack();
+                $this->sendJSON(['error' => 'This grade has already been saved and cannot be edited.'], 409);
             } else {
                 $stmtInsert = $this->conn->prepare("
                     INSERT INTO tbl_student_progress (
@@ -2144,6 +2188,43 @@ class TeachersApi
             $scores = array_column($criteriaScores, 'score');
             $averageScore = round(array_sum($scores) / count($scores), 2);
 
+            $this->conn->prepare("
+                UPDATE tbl_sessions
+                SET grading_started_at = COALESCE(grading_started_at, NOW()), grading_completed_at = NOW()
+                WHERE session_id = ?
+            ")->execute([$sessionId]);
+
+            $completedStmt = $this->conn->prepare("
+                UPDATE tbl_enrollments e
+                SET e.completed_sessions = (
+                    SELECT COUNT(*) FROM tbl_sessions counted
+                    WHERE counted.enrollment_id = e.enrollment_id
+                      AND (counted.status IN ('Completed','Late') OR counted.attendance_status IN ('Present','Late'))
+                )
+                WHERE e.enrollment_id = ?
+            ");
+            $completedStmt->execute([(int)$session['enrollment_id']]);
+
+            $absenceCountStmt = $this->conn->prepare("
+                SELECT COUNT(*) FROM tbl_sessions
+                WHERE enrollment_id = ?
+                  AND (attendance_status IN ('Absent','CI') OR status IN ('No Show','Cancelled'))
+            ");
+            $absenceCountStmt->execute([(int)$session['enrollment_id']]);
+            $usedAbsences = (int)($absenceCountStmt->fetchColumn() ?: 0);
+            $policyStmt = $this->conn->prepare("SELECT allowed_absences FROM tbl_enrollments WHERE enrollment_id = ? LIMIT 1");
+            $policyStmt->execute([(int)$session['enrollment_id']]);
+            $allowedAbsences = max(1, (int)($policyStmt->fetchColumn() ?: 3));
+            $scheduleStatus = $usedAbsences >= $allowedAbsences ? 'Frozen' : 'Active';
+            $policyUpdate = $this->conn->prepare("
+                UPDATE tbl_enrollments
+                SET used_absences = ?, consecutive_absences = 0, schedule_status = ?,
+                    current_operation_id = CASE WHEN ? = 'Active' THEN NULL ELSE current_operation_id END
+                WHERE enrollment_id = ?
+            ");
+            $policyUpdate->execute([$usedAbsences, $scheduleStatus, $scheduleStatus, (int)$session['enrollment_id']]);
+            $this->conn->commit();
+
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Student performance grade saved successfully.',
@@ -2151,8 +2232,43 @@ class TeachersApi
                 'average_score' => $averageScore
             ]);
         } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
+    }
+
+    public function startTeacherGradingTimer()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->sendJSON(['error' => 'Method not allowed'], 405);
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $sessionId = (int)($data['session_id'] ?? 0);
+        if ($teacherId < 1 || $sessionId < 1) $this->sendJSON(['error' => 'Instructor and session are required.'], 400);
+
+        $stmt = $this->conn->prepare("
+            SELECT ts.session_id, ts.session_date, ts.room_id, ts.instrument_id,
+                   ts.grading_started_at, ts.grading_completed_at, p.progress_id
+            FROM tbl_sessions ts
+            LEFT JOIN tbl_student_progress p ON p.session_id = ts.session_id
+            WHERE ts.session_id = ? AND ts.teacher_id = ? LIMIT 1
+        ");
+        $stmt->execute([$sessionId, $teacherId]);
+        $session = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$session) $this->sendJSON(['error' => 'Session not found.'], 404);
+        if ((int)($session['progress_id'] ?? 0) > 0 || !empty($session['grading_completed_at'])) {
+            $this->sendJSON(['error' => 'This grade has already been saved.'], 409);
+        }
+        if ((int)($session['room_id'] ?? 0) < 1 || (int)($session['instrument_id'] ?? 0) < 1) {
+            $this->sendJSON(['error' => 'Desk must assign both a room and a physical instrument before the lesson can start.'], 400);
+        }
+        if ((string)$session['session_date'] !== date('Y-m-d')) {
+            $this->sendJSON(['error' => 'The lesson timer can only start on the scheduled date.'], 400);
+        }
+        $this->conn->prepare("UPDATE tbl_sessions SET grading_started_at = COALESCE(grading_started_at, NOW()) WHERE session_id = ?")
+            ->execute([$sessionId]);
+        $fetch = $this->conn->prepare("SELECT grading_started_at FROM tbl_sessions WHERE session_id = ?");
+        $fetch->execute([$sessionId]);
+        $this->sendJSON(['success' => true, 'grading_started_at' => $fetch->fetchColumn(), 'message' => 'Lesson timer started.']);
     }
 
     private function teacherCanManageStudentInstrument($teacherId, $studentId, $instrumentId)
@@ -2274,6 +2390,7 @@ class TeachersApi
             unset($row);
             $this->sendJSON(['success' => true, 'learning_progress' => $rows]);
         } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }
@@ -2509,6 +2626,9 @@ switch ($action) {
         break;
     case 'save-session-grade':
         $api->saveTeacherSessionGrade();
+        break;
+    case 'start-grading-timer':
+        $api->startTeacherGradingTimer();
         break;
     case 'get-grading-criteria':
         $api->getTeacherGradingCriteria();

@@ -1472,14 +1472,7 @@ class StudentsApi
                     continue;
                 }
                 $specializationRaw = trim((string) ($t['specialization'] ?? ''));
-                $specialization = strtolower($specializationRaw);
-
-                $isAllAround = ($specialization !== '') && (
-                    strpos($specialization, 'all around') !== false ||
-                    strpos($specialization, 'all-around') !== false ||
-                    strpos($specialization, 'all instruments') !== false ||
-                    strpos($specialization, 'multi') !== false
-                );
+                $isAllAround = $this->isGeneralTeacherSpecialization($specializationRaw);
 
                 $teacherTypeIds = array_values(array_unique(array_filter(array_map('intval', explode(',', (string) ($t['specialization_type_ids'] ?? ''))), function ($v) {
                     return $v > 0;
@@ -1538,12 +1531,15 @@ class StudentsApi
     private function isGeneralTeacherSpecialization($specialization)
     {
         $text = strtolower(trim((string)$specialization));
+        $parts = array_values(array_filter(array_map('trim', explode(',', $text)), static function ($part) {
+            return $part !== '';
+        }));
         return $text !== '' && (
             strpos($text, 'all around') !== false ||
             strpos($text, 'all-around') !== false ||
             strpos($text, 'all instruments') !== false ||
             strpos($text, 'multi') !== false ||
-            $text === 'general'
+            in_array('general', $parts, true)
         );
     }
 
@@ -2858,6 +2854,33 @@ class StudentsApi
 
         $slots = $this->buildTeacherAvailableSlots($teacherId, $branchId, $studentId, $roomId, [], $daysAhead);
         $bookedSessions = $this->getStudentBookedSessionsForTeacher($teacherId, $studentId, $branchId);
+        $elapsedAvailabilityDates = [];
+        try {
+            $todayDate = date('Y-m-d');
+            $todayDay = date('l');
+            $currentTime = date('H:i:s');
+            $elapsedSql = "
+                SELECT COUNT(*) AS window_count,
+                       SUM(CASE WHEN end_time > ? THEN 1 ELSE 0 END) AS future_window_count
+                FROM tbl_teacher_availability
+                WHERE teacher_id = ?
+                  AND day_of_week = ?
+                  AND status = 'Available'
+            ";
+            $elapsedParams = [$currentTime, $teacherId, $todayDay];
+            if ($branchId > 0 && $this->tableHasColumn('tbl_teacher_availability', 'branch_id')) {
+                $elapsedSql .= " AND branch_id = ? ";
+                $elapsedParams[] = $branchId;
+            }
+            $elapsedStmt = $this->conn->prepare($elapsedSql);
+            $elapsedStmt->execute($elapsedParams);
+            $elapsedRow = $elapsedStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            if ((int)($elapsedRow['window_count'] ?? 0) > 0 && (int)($elapsedRow['future_window_count'] ?? 0) === 0) {
+                $elapsedAvailabilityDates[] = $todayDate;
+            }
+        } catch (PDOException $e) {
+            $elapsedAvailabilityDates = [];
+        }
         if ($startDate !== '') {
             $slots = array_values(array_filter($slots, function ($slot) use ($startDate) {
                 return !empty($slot['session_date']) && strcmp((string)$slot['session_date'], $startDate) >= 0;
@@ -2868,6 +2891,7 @@ class StudentsApi
             'success' => true,
             'teacher_id' => $teacherId,
             'slots' => $slots,
+            'elapsed_availability_dates' => $elapsedAvailabilityDates,
             'booked_sessions' => $bookedSessions
         ]);
     }

@@ -256,6 +256,34 @@
             return '';
         }
 
+        function renderAbsenceCorrectionControl(event) {
+            if (String(event?.state || '').toLowerCase() !== 'absent' || Number(event?.sessionId || 0) < 1) return '';
+            return `<button type="button" class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 hover:bg-amber-100 transition" onclick="event.stopPropagation(); reactivateMistakenAbsence(${Number(event.sessionId)})"><i class="fas fa-rotate-left"></i>Correct Absence</button>`;
+        }
+
+        async function reactivateMistakenAbsence(sessionId) {
+            const confirmation = await Swal.fire({
+                icon: 'warning',
+                title: 'Correct mistaken absence?',
+                text: 'This restores the session to Pending attendance and recalculates the student’s absence count.',
+                showCancelButton: true,
+                confirmButtonText: 'Reactivate Session',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#b8860b'
+            });
+            if (!confirmation.isConfirmed) return;
+            try {
+                const response = await axios.post(`${baseApiUrl}/attendance.php?action=reactivate-mistaken-absence`, { session_id: Number(sessionId) });
+                const data = response.data || {};
+                if (!data.success) throw new Error(data.error || 'Unable to reactivate the session.');
+                await loadAttendanceRows(true);
+                showMessage(data.message || 'Session reactivated.', 'success');
+            } catch (error) {
+                showMessage(error?.response?.data?.error || error.message || 'Unable to reactivate the session.', 'error');
+            }
+        }
+        window.reactivateMistakenAbsence = reactivateMistakenAbsence;
+
         function getSessionRoomInstrumentLabel(event) {
             if (!event) return '';
             const roomLabel = getSessionRoomDisplayLabel(event);
@@ -825,6 +853,7 @@
                                         View Attendance
                                    </button>`
                             }
+                            ${renderAbsenceCorrectionControl(event)}
                             ${renderSessionRoomControl(event)}
                         </div>
                     </div>
@@ -893,6 +922,7 @@
                                         View Attendance
                                    </button>`
                             }
+                            ${renderAbsenceCorrectionControl(event)}
                             ${renderSessionRoomControl(event)}
                         </div>
                     </div>

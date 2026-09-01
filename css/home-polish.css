@@ -1,0 +1,401 @@
+/* Restrained homepage polish. All rules are scoped to the existing homepage. */
+body {
+    overflow-x: hidden;
+}
+
+body > nav {
+    transition: padding 200ms ease, background-color 200ms ease, box-shadow 200ms ease;
+}
+
+body > nav.home-nav-compact {
+    padding-top: 0.7rem !important;
+    padding-bottom: 0.7rem !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    box-shadow: 0 10px 35px rgba(24, 24, 27, 0.07);
+}
+
+.dark body > nav.home-nav-compact {
+    background: rgba(10, 10, 10, 0.94) !important;
+}
+
+.home-minimal-hero {
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.home-piano-backdrop {
+    z-index: -3;
+    transform: scale(1.02);
+    translate: 0 var(--hero-scroll-shift, 0px);
+    animation: homePianoDrift 20s ease-in-out infinite alternate;
+}
+
+.home-hero-wash {
+    z-index: -2;
+}
+
+.home-minimal-hero::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    right: -10rem;
+    bottom: -15rem;
+    width: 42rem;
+    height: 42rem;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212, 175, 55, 0.14), rgba(212, 175, 55, 0) 68%);
+    pointer-events: none;
+    animation: homeSoftGlow 6s ease-in-out infinite;
+}
+
+.home-music-ambience {
+    position: absolute;
+    z-index: 0;
+    top: 12%;
+    left: -3rem;
+    width: calc(100% + 6rem);
+    height: 12rem;
+    opacity: 0.16;
+    pointer-events: none;
+    transform: translateY(var(--music-parallax, 0px)) rotate(-4deg);
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent 0 1.9rem,
+        rgba(212, 175, 55, 0.38) 1.94rem 1.99rem
+    );
+    mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+}
+
+.ambient-note {
+    position: absolute;
+    color: #d4af37;
+    font-family: Georgia, serif;
+    font-size: 2.8rem;
+    animation: homeNoteDrift 6s ease-in-out infinite;
+}
+
+.ambient-note-one { top: -0.15rem; left: 15%; }
+.ambient-note-two { top: 3.4rem; left: 52%; animation-delay: -2s; }
+.ambient-note-three { top: 6.8rem; right: 13%; animation-delay: -4s; }
+
+.home-minimal-hero > .relative.z-10 {
+    animation: homeCopyIn 700ms ease both;
+}
+
+.home-hero-actions button {
+    border-radius: 0.45rem;
+}
+
+.home-hero-actions button:last-child {
+    box-shadow: 0 14px 32px rgba(184, 134, 11, 0.18);
+}
+
+.home-featured {
+    position: relative;
+    overflow: hidden;
+}
+
+.home-featured::after {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    left: -5%;
+    bottom: 6%;
+    width: 42%;
+    height: 8rem;
+    opacity: 0.12;
+    pointer-events: none;
+    transform: translateY(var(--music-parallax-reverse, 0px)) rotate(3deg);
+    background: repeating-linear-gradient(to bottom, transparent 0 1.3rem, rgba(184, 134, 11, 0.4) 1.34rem 1.38rem);
+    mask-image: linear-gradient(to right, transparent, #000 22%, #000 78%, transparent);
+}
+
+.home-featured > div {
+    position: relative;
+    z-index: 1;
+}
+
+.home-featured::before {
+    content: '♪';
+    position: absolute;
+    top: -3rem;
+    right: 4%;
+    color: rgba(184, 134, 11, 0.055);
+    font-family: Georgia, serif;
+    font-size: 18rem;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.home-featured video {
+    transition: transform 600ms ease, filter 400ms ease;
+}
+
+.home-featured video:hover {
+    transform: scale(1.008);
+    filter: saturate(1.06);
+}
+
+.instrument-carousel-shell {
+    position: relative;
+    z-index: 1;
+}
+
+.home-instruments-zone {
+    position: relative;
+    overflow: hidden;
+}
+
+.home-instruments-zone::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    top: 14%;
+    right: -7%;
+    width: 56%;
+    height: 10rem;
+    opacity: 0.14;
+    pointer-events: none;
+    transform: translateY(var(--music-parallax, 0px)) rotate(-5deg);
+    background: repeating-linear-gradient(to bottom, transparent 0 1.55rem, rgba(184, 134, 11, 0.45) 1.59rem 1.64rem);
+    mask-image: linear-gradient(to right, transparent, #000 20%, #000 80%, transparent);
+}
+
+.home-instruments-zone::after {
+    content: '♪   ♫   ♩';
+    position: absolute;
+    z-index: 0;
+    top: calc(12% + var(--music-parallax, 0px));
+    right: 8%;
+    color: rgba(184, 134, 11, 0.17);
+    font-family: Georgia, serif;
+    font-size: 2.5rem;
+    letter-spacing: 2.4rem;
+    pointer-events: none;
+}
+
+.home-instruments-zone > div {
+    position: relative;
+    z-index: 1;
+}
+
+.home-music-footer {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.home-music-footer::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    right: -9rem;
+    bottom: -13rem;
+    width: 34rem;
+    height: 34rem;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(184, 134, 11, 0.14), transparent 68%);
+}
+
+.home-music-footer > div:not(.home-music-ambience) {
+    position: relative;
+    z-index: 1;
+}
+
+.home-scroll-progress {
+    position: fixed;
+    z-index: 100;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    pointer-events: none;
+    transform: scaleX(0);
+    transform-origin: left center;
+    background: linear-gradient(90deg, #996515, #d4af37);
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+}
+
+body > nav a.home-nav-active {
+    color: #b8860b !important;
+}
+
+.instrument-carousel {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - 4rem) / 5);
+    gap: 1rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-behavior: smooth;
+    scroll-snap-type: inline mandatory;
+    scrollbar-width: none;
+    padding: 0.4rem 0.15rem 1.15rem;
+}
+
+.instrument-carousel::-webkit-scrollbar {
+    display: none;
+}
+
+.instrument-carousel > div {
+    min-height: 10.5rem;
+    justify-content: center;
+    scroll-snap-align: start;
+    transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.instrument-carousel > div:hover {
+    transform: translateY(-0.3rem);
+    border-color: rgba(184, 134, 11, 0.5);
+    box-shadow: 0 18px 35px rgba(64, 48, 14, 0.1);
+}
+
+.instrument-carousel img {
+    width: 4.5rem !important;
+    height: 4.5rem !important;
+    transition: transform 220ms ease, filter 220ms ease;
+}
+
+.instrument-carousel > div:hover img {
+    transform: scale(1.08);
+    filter: drop-shadow(0 8px 8px rgba(112, 75, 7, 0.14));
+}
+
+.instrument-carousel-button {
+    position: absolute;
+    z-index: 4;
+    top: calc(50% - 1.2rem);
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    place-items: center;
+    border: 1px solid #e4e4e7;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.94);
+    color: #27272a;
+    box-shadow: 0 10px 28px rgba(24, 24, 27, 0.12);
+    transform: translateY(-50%);
+    transition: opacity 160ms ease, transform 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.instrument-carousel-button:hover:not(:disabled) {
+    background: #b8860b;
+    color: #fff;
+    transform: translateY(-50%) scale(1.05);
+}
+
+.instrument-carousel-button:focus-visible,
+.instrument-carousel:focus-visible {
+    outline: 2px solid rgba(184, 134, 11, 0.5);
+    outline-offset: 3px;
+}
+
+.instrument-carousel-button:disabled {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.instrument-carousel-prev { left: -1.3rem; }
+.instrument-carousel-next { right: -1.3rem; }
+
+.instrument-carousel-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    margin-top: 0.35rem;
+    color: #a1a1aa;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.instrument-carousel-hint span {
+    width: 1.8rem;
+    height: 1px;
+    background: #b8860b;
+}
+
+.dark .instrument-carousel-button {
+    border-color: #3f3f46;
+    background: rgba(24, 24, 27, 0.94);
+    color: #f4f4f5;
+}
+
+.home-polish-reveal {
+    opacity: 0;
+    transform: translateY(1rem);
+    transition: opacity 550ms ease, transform 550ms ease;
+}
+
+.home-polish-reveal.reveal-from-up {
+    transform: translateY(-1rem);
+}
+
+.home-polish-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@keyframes homePianoDrift {
+    to { transform: scale(1.07) translate3d(-0.6%, -0.3%, 0); }
+}
+
+@keyframes homeSoftGlow {
+    50% { opacity: 0.62; transform: scale(1.06); }
+}
+
+@keyframes homeNoteDrift {
+    50% { transform: translateY(-0.65rem) rotate(4deg); opacity: 0.6; }
+}
+
+@keyframes homeCopyIn {
+    from { opacity: 0; transform: translateY(0.85rem); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1023px) {
+    .instrument-carousel { grid-auto-columns: calc((100% - 2rem) / 3); }
+    .instrument-carousel-prev { left: -0.8rem; }
+    .instrument-carousel-next { right: -0.8rem; }
+}
+
+@media (max-width: 767px) {
+    .home-minimal-hero {
+        min-height: min(52rem, 100svh);
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
+        background: #fff;
+    }
+    .dark .home-minimal-hero { background: #0a0a0a; }
+    .home-piano-backdrop { background-position: 62% center; opacity: 0.33 !important; }
+    .home-music-ambience { top: 10%; width: calc(100% + 4rem); opacity: 0.12; }
+    .home-instruments-zone::before { top: 10%; right: -25%; width: 95%; opacity: 0.1; }
+    .home-instruments-zone::after { top: calc(9% + var(--music-parallax, 0px)); right: -5%; opacity: 0.8; }
+    .home-minimal-hero h1 { font-size: clamp(2.8rem, 13vw, 4.2rem) !important; }
+    .home-minimal-hero p { max-width: 32rem; }
+    .instrument-carousel { grid-auto-columns: calc((100% - 1rem) / 2.15); }
+    .instrument-carousel-button { width: 2.5rem; height: 2.5rem; }
+    .instrument-carousel-prev { left: -0.45rem; }
+    .instrument-carousel-next { right: -0.45rem; }
+}
+
+@media (max-width: 430px) {
+    .home-minimal-hero { min-height: 46rem; }
+    .home-minimal-hero h1 { font-size: 2.75rem !important; }
+    .instrument-carousel { grid-auto-columns: 72%; }
+    .instrument-carousel-hint { font-size: 0.58rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-piano-backdrop,
+    .home-minimal-hero::after,
+    .ambient-note,
+    .home-minimal-hero > .relative.z-10 {
+        animation: none !important;
+    }
+    .instrument-carousel { scroll-behavior: auto; }
+    .home-polish-reveal { opacity: 1; transform: none; transition: none; }
+    .home-scroll-progress { display: none; }
+}

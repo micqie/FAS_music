@@ -12,12 +12,12 @@
         let activeAssignRequestSlotRow = null;
         let activeAssignRequest = null;
         let assignRequestAvailabilitySlots = [];
+        let assignRequestElapsedAvailabilityDates = new Set();
         let assignRequestBookedSessions = [];
         let assignRequestAvailabilityMonth = '';
         let assignRequestAvailabilitySelectedDate = '';
         let assignRequestAvailabilityLoadTimer = null;
         let assignRequestAvailabilityRequestToken = 0;
-        const assignRequestAvailabilityCache = new Map();
         const assignRequestTeacherCache = new Map();
         let walkinStudents = [];
         let walkinMeta = null;
@@ -2403,7 +2403,7 @@
                             <span class="text-sm font-semibold leading-none ${hasSlots ? 'text-slate-900' : 'text-slate-400'}">${day}</span>
                             ${hasSlots ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${daySlots.length}</span>` : ''}
                         </div>
-                        <div class="mt-0.5 text-[9px] ${hasSlots ? 'text-slate-500' : 'text-slate-400'} leading-tight">${hasSlots ? escapeHtml(daySlots[0].day_of_week || '') : 'Unavailable'}</div>
+                        <div class="mt-0.5 text-[9px] ${hasSlots ? 'text-slate-500' : (assignRequestElapsedAvailabilityDates.has(dateKey) ? 'text-amber-600' : 'text-slate-400')} leading-tight">${hasSlots ? escapeHtml(daySlots[0].day_of_week || '') : (assignRequestElapsedAvailabilityDates.has(dateKey) ? 'Ended today' : 'Unavailable')}</div>
                     </button>
                 `);
             }
@@ -2505,14 +2505,6 @@
                 return;
             }
 
-            const cacheKey = getAssignRequestAvailabilityCacheKey(teacherId, selectedDate);
-            const cachedSlots = assignRequestAvailabilityCache.get(cacheKey);
-            if (cachedSlots) {
-                assignRequestAvailabilitySlots = Array.isArray(cachedSlots.availability_rows) ? cachedSlots.availability_rows : [];
-                renderAssignRequestAvailability(assignRequestAvailabilitySlots, selectedDate);
-                return;
-            }
-
             listEl.innerHTML = `
                 <div class="flex items-center justify-center h-64">
                     <div class="text-center">
@@ -2541,8 +2533,8 @@
                 if (requestToken !== assignRequestAvailabilityRequestToken) return;
                 const data = response.data || {};
                 const availabilityRows = Array.isArray(data.slots) ? data.slots : [];
+                assignRequestElapsedAvailabilityDates = new Set(Array.isArray(data.elapsed_availability_dates) ? data.elapsed_availability_dates : []);
                 assignRequestAvailabilitySlots = availabilityRows;
-                assignRequestAvailabilityCache.set(cacheKey, { availability_rows: availabilityRows });
                 renderAssignRequestAvailability(availabilityRows, selectedDate);
             } catch (error) {
                 if (requestToken !== assignRequestAvailabilityRequestToken) return;

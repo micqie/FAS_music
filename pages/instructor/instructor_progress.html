@@ -28,6 +28,11 @@
         .promotional-exam-popup .swal2-textarea{min-height:64px!important;height:64px!important;margin:0!important;padding:10px!important;border:1px solid #cbd5e1!important;border-radius:.6rem!important;font-size:.84rem!important;resize:vertical!important}
         .promotional-exam-popup .swal2-actions{margin:.85rem 0 0!important;gap:.5rem!important}
         .promotional-exam-popup .swal2-styled{margin:0!important;padding:.65rem 1.1rem!important;border-radius:.65rem!important;font-size:.82rem!important;font-weight:700!important}
+        .readiness-review-popup{max-height:86vh!important;overflow-y:auto!important;border-radius:1rem!important;padding:1rem!important}
+        .readiness-review-popup .swal2-title{padding:.1rem 2rem .25rem!important;font-size:1.15rem!important;line-height:1.4rem!important}
+        .readiness-review-popup .swal2-html-container{margin:.45rem 0 0!important;overflow:visible!important}
+        .readiness-review-popup .swal2-actions{margin:.75rem 0 0!important;gap:.4rem!important}
+        .readiness-review-popup .swal2-styled{margin:0!important;padding:.6rem .9rem!important;border-radius:.65rem!important;font-size:.76rem!important;font-weight:700!important}
     </style>
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
@@ -94,7 +99,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/index.js"></script>
     <script src="../../js/instructor/instructor_nav.js"></script>
-    <script src="../../js/instructor/learning_progress.js"></script>
+    <script src="../../js/instructor/learning_progress.js?v=20260830003"></script>
     <script>
         function toggleInstructorMenu(){const menu=document.getElementById('instructorMobileMenu');const icon=document.getElementById('instructorMenuIcon');const opening=menu.classList.contains('hidden');menu.classList.toggle('hidden');icon.classList.toggle('fa-bars',!opening);icon.classList.toggle('fa-times',opening)}
         document.addEventListener('DOMContentLoaded',()=>{const user=typeof Auth!=='undefined'?Auth.getUser():null;const name=[user?.first_name,user?.last_name].filter(Boolean).join(' ')||user?.username||'Instructor';const label=document.getElementById('instructorNameNav');if(label)label.textContent=name;document.getElementById('progressSearch')?.addEventListener('input',event=>{window.filterInstructorLearningProgress?.(event.target.value||'')});document.getElementById('requestBookBtn')?.addEventListener('click',()=>window.openLearningMaterialRequest?.())});
