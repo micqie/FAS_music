@@ -8,6 +8,8 @@
         let adminAssignRequest = null;
         let adminAssignActiveRow = null;
         let adminAssignAvailability = [];
+        let adminAssignReservedSlots = [];
+        let adminAssignOccupiedSlots = [];
         let adminAssignElapsedAvailabilityDates = new Set();
         let adminAssignSelectedDate = '';
         let adminAssignCalendarMonth = '';
@@ -1134,7 +1136,7 @@
 
         function setAdminAssignCalendarMonth(monthKey) {
             adminAssignCalendarMonth = monthKey;
-            renderAdminAssignAvailability();
+            loadAdminAssignAvailability();
         }
 
         function selectAdminAssignAvailabilityDate(dateValue) {
@@ -1174,12 +1176,16 @@
                 .filter(item => String(item.slot.session_date || '') === date)
                 .filter(item => !isAdminAssignSlotSelected(item.slot))
                 .sort((a, b) => String(a.slot.start_time || '').localeCompare(String(b.slot.start_time || '')));
-            if (!slots.length) return;
+            const reservedSlots = adminAssignReservedSlots.filter(slot => String(slot.session_date || '') === date);
+            const occupiedSlots = adminAssignOccupiedSlots.filter(slot => String(slot.session_date || '') === date);
+            if (!slots.length && !reservedSlots.length && !occupiedSlots.length) return;
             Swal.fire({
                 title: formatAdminAssignDate(date),
-                html: `<div class="text-sm text-slate-500 mb-4">${slots.length} available slot${slots.length === 1 ? '' : 's'}</div>
+                html: `<div class="text-sm text-slate-500 mb-4">Green slots are available. Red slots are already occupied or reserved.</div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
                         ${slots.map(({ slot, index }) => `<button type="button" class="admin-assign-slot-picker-btn assign-request-slot-picker-btn rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100" data-slot-index="${index}"><div class="text-base font-bold text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">${escapeHtml(slot.day_of_week || '')}</div></button>`).join('')}
+                        ${reservedSlots.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="text-base font-bold text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold uppercase tracking-wide text-red-700">Reserved by pending request</div></div>`).join('')}
+                        ${occupiedSlots.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="text-base font-bold text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold uppercase tracking-wide text-red-700">Occupied by scheduled session</div></div>`).join('')}
                     </div>`,
                 showConfirmButton: false,
                 showCloseButton: true,
@@ -1201,7 +1207,7 @@
         function renderAdminAssignAvailability() {
             const listEl = document.getElementById('assignRequestAvailabilityList');
             if (!listEl) return;
-            if (!adminAssignAvailability.length) {
+            if (!adminAssignAvailability.length && !adminAssignReservedSlots.length && !adminAssignOccupiedSlots.length) {
                 listEl.innerHTML = '<div class="grid min-h-[320px] place-items-center text-center text-sm text-slate-500"><div><i class="fas fa-calendar-xmark mb-2 text-2xl text-slate-300"></i><p>No available slots found.</p></div></div>';
                 return;
             }
@@ -1214,8 +1220,11 @@
                 grouped[date].push({ slot, index });
             });
             const dates = Object.keys(grouped).sort();
-            if (!dates.includes(adminAssignSelectedDate)) adminAssignSelectedDate = dates[0] || '';
-            if (!adminAssignCalendarMonth) adminAssignCalendarMonth = String(adminAssignSelectedDate || dates[0]).slice(0, 7);
+            const reservedDates = new Set(adminAssignReservedSlots.map(slot => String(slot.session_date || '')));
+            const occupiedDates = new Set(adminAssignOccupiedSlots.map(slot => String(slot.session_date || '')));
+            const firstKnownDate = dates[0] || adminAssignReservedSlots[0]?.session_date || adminAssignOccupiedSlots[0]?.session_date || '';
+            if (!adminAssignSelectedDate) adminAssignSelectedDate = firstKnownDate;
+            if (!adminAssignCalendarMonth) adminAssignCalendarMonth = String(adminAssignSelectedDate || firstKnownDate).slice(0, 7);
             const [year, month] = adminAssignCalendarMonth.split('-').map(Number);
             const first = new Date(year, month - 1, 1);
             const days = new Date(year, month, 0).getDate();
@@ -1226,7 +1235,16 @@
                 const count = availableItems.length;
                 const selected = date === adminAssignSelectedDate;
                 const elapsedToday = adminAssignElapsedAvailabilityDates.has(date);
-                cells.push(`<button type="button" ${count ? `onclick="openAdminAssignAvailabilityDatePicker('${date}')"` : 'disabled'} class="h-14 rounded-lg border p-1.5 text-left transition ${count ? (selected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-200 bg-white hover:border-emerald-300 hover:bg-emerald-50') : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300'}"><div class="flex items-start justify-between gap-2"><span class="text-sm font-semibold leading-none ${count ? 'text-slate-900' : 'text-slate-400'}">${day}</span>${count ? `<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">${count}</span>` : ''}</div><div class="mt-0.5 text-[9px] leading-tight ${count ? 'text-slate-500' : (elapsedToday ? 'text-amber-600' : 'text-slate-400')}">${count ? escapeHtml(availableItems[0]?.slot?.day_of_week || '') : (elapsedToday ? 'Ended today' : 'Unavailable')}</div></button>`);
+                const hasReservation = reservedDates.has(date);
+                const isOccupied = occupiedDates.has(date);
+                const hasScheduleInfo = count > 0 || hasReservation || isOccupied;
+                const cellClass = count
+                    ? (selected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100')
+                    : hasReservation || isOccupied
+                    ? 'border-red-300 bg-red-100 text-red-900 hover:bg-red-200'
+                    : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300';
+                const statusLabel = count ? 'Available' : hasReservation ? 'Reserved' : isOccupied ? 'Occupied' : elapsedToday ? 'Ended today' : 'Unavailable';
+                cells.push(`<button type="button" ${hasScheduleInfo ? `onclick="openAdminAssignAvailabilityDatePicker('${date}')"` : 'disabled'} class="h-14 rounded-lg border p-1.5 text-left transition ${cellClass}"><div class="flex items-start justify-between gap-1"><span class="text-sm font-semibold leading-none ${hasScheduleInfo ? 'text-slate-900' : 'text-slate-400'}">${day}</span>${count ? `<span class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${count}</span>` : ''}${hasReservation || isOccupied ? '<span class="rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-bold text-white">!</span>' : ''}</div><div class="mt-1 text-[9px] font-semibold leading-tight ${count ? 'text-emerald-700' : hasReservation || isOccupied ? 'text-red-700' : elapsedToday ? 'text-amber-600' : 'text-slate-400'}">${statusLabel}</div></button>`);
             }
             const monthLabel = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
             listEl.innerHTML = `
@@ -1238,7 +1256,7 @@
                 </div>
                 <div class="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
                 <div class="grid grid-cols-7 gap-1.5">${cells.join('')}</div>
-                <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">Choose a highlighted date to view and pick a time slot.</div>
+                <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">Green: available · Red: occupied or reserved. Select a colored date to view its time slots.</div>
                 </div>`;
         }
 
@@ -1247,6 +1265,8 @@
             const slot = getAdminAssignRowData(adminAssignActiveRow);
             if (!listEl || !adminAssignRequest || !slot?.teacher_id) {
                 adminAssignAvailability = [];
+                adminAssignReservedSlots = [];
+                adminAssignOccupiedSlots = [];
                 if (listEl) listEl.innerHTML = '<div class="grid min-h-[320px] place-items-center text-center text-sm text-slate-500"><div><i class="fas fa-user-tie mb-2 text-2xl text-slate-300"></i><p>Select a teacher to view availability.</p></div></div>';
                 return;
             }
@@ -1254,12 +1274,19 @@
             const token = ++adminAssignAvailabilityToken;
             if (adminAssignAvailabilityController) adminAssignAvailabilityController.abort();
             adminAssignAvailabilityController = new AbortController();
+            const requestedStartDate = document.getElementById('assignRequestDate')?.value || '';
+            const visibleMonth = adminAssignCalendarMonth || String(requestedStartDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
+            const [visibleYear, visibleMonthNumber] = visibleMonth.split('-').map(Number);
+            const visibleMonthStart = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-01`;
+            const visibleMonthEnd = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-${String(new Date(visibleYear, visibleMonthNumber, 0).getDate()).padStart(2, '0')}`;
             const params = new URLSearchParams({
                 action: 'get-teacher-available-slots',
                 teacher_id: String(slot.teacher_id),
                 branch_id: String(Number(adminAssignRequest.branch_id || 0)),
                 student_id: String(Number(adminAssignRequest.student_id || 0)),
-                start_date: document.getElementById('assignRequestDate')?.value || ''
+                start_date: visibleMonthStart,
+                end_date: visibleMonthEnd,
+                exclude_request_id: String(Number(adminAssignRequest.request_id || adminAssignRequest.id || 0))
             });
             try {
                 const response = await axios.get(`${baseApiUrl}/students.php?${params.toString()}`, {
@@ -1268,9 +1295,13 @@
                 });
                 if (token !== adminAssignAvailabilityToken) return;
                 adminAssignAvailability = response.data?.success && Array.isArray(response.data.slots) ? response.data.slots : [];
+                adminAssignReservedSlots = response.data?.success && Array.isArray(response.data.reserved_slots) ? response.data.reserved_slots : [];
+                adminAssignOccupiedSlots = response.data?.success && Array.isArray(response.data.occupied_slots) ? response.data.occupied_slots : [];
                 adminAssignElapsedAvailabilityDates = new Set(Array.isArray(response.data?.elapsed_availability_dates) ? response.data.elapsed_availability_dates : []);
-                adminAssignSelectedDate = adminAssignAvailability[0]?.session_date || '';
-                adminAssignCalendarMonth = String(adminAssignSelectedDate).slice(0, 7);
+                if (!adminAssignSelectedDate || String(adminAssignSelectedDate).slice(0, 7) !== visibleMonth) {
+                    adminAssignSelectedDate = adminAssignAvailability[0]?.session_date || adminAssignReservedSlots[0]?.session_date || adminAssignOccupiedSlots[0]?.session_date || visibleMonthStart;
+                }
+                adminAssignCalendarMonth = visibleMonth;
                 renderAdminAssignAvailability();
             } catch (error) {
                 if (token !== adminAssignAvailabilityToken) return;
@@ -1300,6 +1331,8 @@
             dateEl.min = today;
             dateEl.value = request.preferred_date && request.preferred_date >= today ? request.preferred_date : today;
             adminAssignAvailability = [];
+            adminAssignReservedSlots = [];
+            adminAssignOccupiedSlots = [];
             adminAssignSelectedDate = '';
             adminAssignCalendarMonth = '';
             const modal = document.getElementById('assignRequestModal');

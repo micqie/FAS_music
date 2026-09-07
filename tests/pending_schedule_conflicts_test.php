@@ -52,4 +52,14 @@ check(str_contains($deskSource, "exclude_request_id: String(Number(requestId))")
 check(str_contains($deskSource, 'inherit_teacher: isAdditionalDay'), 'Each instrument must have its own main instructor row.');
 check(str_contains($deskSource, "params.append('end_date', visibleMonthEnd)"), 'Calendar navigation must fetch the exact visible month.');
 
+$adminSource = file_get_contents(__DIR__ . '/../js/admin/admin_enrollments.js');
+check($adminSource !== false, 'Could not read admin enrollment calendar.');
+check(str_contains($adminSource, 'adminAssignOccupiedSlots'), 'Admin calendar must display occupied teacher dates.');
+check(str_contains($adminSource, 'Occupied by scheduled session'), 'Admin calendar must explain occupied time slots.');
+
+$managerSource = file_get_contents(__DIR__ . '/../pages/manager/manager_sessions.html');
+check($managerSource !== false, 'Could not read manager sessions calendar.');
+check(str_contains($managerSource, 'assignRequestOccupiedSlots'), 'Branch manager calendar must display occupied teacher dates.');
+check(str_contains($managerSource, 'Green: available · Red: occupied or reserved.'), 'Branch manager calendar must include a clear availability legend.');
+
 echo "pending schedule conflict tests: OK\n";

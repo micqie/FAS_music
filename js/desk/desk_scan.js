@@ -86,6 +86,22 @@ function setStatus(message, type = 'info') {
     el.textContent = message;
 }
 
+function isLocalScannerHost() {
+    const host = String(window.location.hostname || '').toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+
+function showScannerNetworkHelp(message) {
+    const el = document.getElementById('scannerNetworkHelp');
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.innerHTML = message;
+}
+
+function scannerSecureContextAvailable() {
+    return window.isSecureContext || isLocalScannerHost();
+}
+
 // Clock
 function updateClock() {
     const now = new Date();
@@ -255,6 +271,11 @@ async function handleManualEntry(email) {
 
 function initScanner() {
     const preview = document.getElementById('preview');
+    if (!scannerSecureContextAvailable()) {
+        setStatus('Live camera is blocked on an HTTP IP address. Take/upload a QR photo or use manual email entry.', 'warn');
+        showScannerNetworkHelp('<strong>Live camera needs HTTPS.</strong> You opened the scanner through a network IP using HTTP. Use the photo button below, or configure a trusted HTTPS certificate for this IP/device.');
+        return;
+    }
     if (!preview || typeof Instascan === 'undefined') {
         setStatus('Instascan library not available.', 'error');
         return;
@@ -287,6 +308,50 @@ function initScanner() {
     scanner.addListener('scan-error', () => {});
 }
 
+async function decodeQrImageFile(file) {
+    if (!file) return;
+    if (typeof jsQR !== 'function') {
+        setStatus('QR image reader failed to load. Check the internet connection or use manual email entry.', 'error');
+        return;
+    }
+
+    setStatus('Reading QR image...', 'info');
+    try {
+        const bitmap = await createImageBitmap(file);
+        const maxSide = 1600;
+        const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+        const width = Math.max(1, Math.round(bitmap.width * scale));
+        const height = Math.max(1, Math.round(bitmap.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) throw new Error('Canvas is unavailable');
+        context.drawImage(bitmap, 0, 0, width, height);
+        if (typeof bitmap.close === 'function') bitmap.close();
+        const imageData = context.getImageData(0, 0, width, height);
+        const result = jsQR(imageData.data, width, height, { inversionAttempts: 'attemptBoth' });
+        if (!result?.data) {
+            setStatus('No QR code found in that image. Retake the photo closer and in good lighting.', 'warn');
+            return;
+        }
+        await handleScan(String(result.data).trim());
+    } catch (error) {
+        console.warn('QR image decode:', error);
+        setStatus('Unable to read that image. Retake it or use manual email entry.', 'error');
+    }
+}
+
+function initImageScanner() {
+    const input = document.getElementById('qr_image_file');
+    if (!input) return;
+    input.addEventListener('change', async () => {
+        const file = input.files?.[0] || null;
+        input.value = '';
+        if (file) await decodeQrImageFile(file);
+    });
+}
+
 function initManualEntry() {
     const input = document.getElementById('user_email');
     if (!input) return;
@@ -307,7 +372,10 @@ function initDeskScanner() {
     const allowed = ['staff', 'desk', 'front desk'];
     if (!user || !allowed.includes(role)) {
         setStatus('Access denied. Please log in as desk staff.', 'error');
-        showScanAlert('Access Denied', 'You must be logged in as desk staff to use the scanner.', 'warning');
+        const ipLoginNote = !isLocalScannerHost()
+            ? '<br><br><strong>Network address note:</strong> Login from this same IP-address URL first. A localhost login cannot be shared with an IP-address URL.'
+            : '';
+        showScanAlert('Access Denied', `You must be logged in as desk staff to use the scanner.${ipLoginNote}`, 'warning');
         try {
             const appBase = (typeof window.appBaseUrl === 'string' && window.appBaseUrl)
                 ? window.appBaseUrl
@@ -333,6 +401,7 @@ function initDeskScanner() {
     fetchDeskSummary();
     fetchRecentScans();
     initScanner();
+    initImageScanner();
     initManualEntry();
 }
 
