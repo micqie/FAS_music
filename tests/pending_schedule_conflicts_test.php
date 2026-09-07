@@ -37,10 +37,19 @@ check($source !== false, 'Could not read students API.');
 check(str_contains($source, "ORDER BY enrollment_id FOR UPDATE"), 'Pending requests must be locked deterministically.');
 check(str_contains($source, "AND status = 'Pending'"), 'Approval must condition writes on Pending status.');
 check(str_contains($source, "schedule_request_status = 'Approved'"), 'Approval must atomically update request status.');
+check(str_contains($source, 'projectRequestedSessionSlots'), 'Pending weekly requests must be capped to their package session count.');
+check(str_contains($source, "['session_number'] = \$sessionNumber"), 'Projected request sessions must be numbered and bounded.');
+check(str_contains($source, "'student_id' => (int)(\$row['student_id'] ?? 0)"), 'Reservations must expose ownership to the student calendar.');
+
+$studentSource = file_get_contents(__DIR__ . '/../js/index.js');
+check($studentSource !== false, 'Could not read student portal UI.');
+check(str_contains($studentSource, 'Yellow: your 12-session request/schedule'), 'Student calendar legend must identify the student\'s own dates.');
+check(str_contains($studentSource, 'Occupied by others'), 'Student calendar must identify other students\' occupied dates clearly.');
 
 $deskSource = file_get_contents(__DIR__ . '/../js/desk/desk_enrollment.js');
 check($deskSource !== false, 'Could not read desk enrollment UI.');
 check(str_contains($deskSource, "exclude_request_id: String(Number(requestId))"), 'Desk approval checks must exclude the request\'s own reservation.');
 check(str_contains($deskSource, 'inherit_teacher: isAdditionalDay'), 'Each instrument must have its own main instructor row.');
+check(str_contains($deskSource, "params.append('end_date', visibleMonthEnd)"), 'Calendar navigation must fetch the exact visible month.');
 
 echo "pending schedule conflict tests: OK\n";

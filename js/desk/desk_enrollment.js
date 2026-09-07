@@ -2877,7 +2877,7 @@
         function setAssignRequestAvailabilityMonth(monthKey) {
             assignRequestAvailabilityMonth = monthKey || '';
             renderAssignRequestCalendarMonth();
-            updateAssignRequestCalendarAvailability();
+            queueLoadAssignRequestAvailability();
         }
 
         function selectAssignRequestAvailabilityDate(dateKey) {
@@ -3174,7 +3174,12 @@
                     branch_id: Number(activeAssignRequest.branch_id || managerBranchId || 0),
                     student_id: Number(activeAssignRequest.student_id || 0)
                 });
-                if (selectedDate) params.append('start_date', selectedDate);
+                const visibleMonth = assignRequestAvailabilityMonth || (selectedDate ? selectedDate.slice(0, 7) : new Date().toISOString().slice(0, 7));
+                const [visibleYear, visibleMonthNumber] = visibleMonth.split('-').map(Number);
+                const visibleMonthStart = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-01`;
+                const visibleMonthEnd = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-${String(new Date(visibleYear, visibleMonthNumber, 0).getDate()).padStart(2, '0')}`;
+                params.append('start_date', visibleMonthStart);
+                params.append('end_date', visibleMonthEnd);
                 if (requestId) params.append('exclude_request_id', String(requestId));
 
                 const response = await axios.get(`${baseApiUrl}/students.php?${params.toString()}`, {

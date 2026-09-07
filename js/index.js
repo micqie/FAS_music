@@ -6159,6 +6159,7 @@ const studentInstructorAvailabilityState = {
     slots: [],
     reservedSlots: [],
     occupiedSlots: [],
+    bookedSessions: [],
     month: '',
     selectedDate: '',
     selectedSlot: null,
@@ -6455,14 +6456,26 @@ function renderStudentInstructorAvailabilityCalendar(statusMessage = '') {
         result[key].push({ slot, index });
         return result;
     }, {});
-    const reservedDates = new Set(studentInstructorAvailabilityState.reservedSlots.map(slot => String(slot.session_date || '')));
-    const occupiedDates = new Set(studentInstructorAvailabilityState.occupiedSlots.map(slot => String(slot.session_date || '')));
+    const state = studentInstructorAvailabilityState;
+    const studentId = Number(state.student?.student_id || 0);
+    const ownProjectedDates = new Set(buildProjectedRecurringDates(state.selectedSlots, state.sessionCount).flat());
+    const ownReservedSlots = state.reservedSlots.filter(slot => studentId > 0 && Number(slot.student_id || 0) === studentId);
+    const otherReservedDates = new Set(state.reservedSlots
+        .filter(slot => !studentId || Number(slot.student_id || 0) !== studentId)
+        .map(slot => String(slot.session_date || '')));
+    const ownBookedKeys = new Set(state.bookedSessions.map(slot => `${String(slot.session_date || '')}|${String(slot.start_time || '')}|${String(slot.end_time || '')}`));
+    const ownBookedDates = new Set(state.bookedSessions.map(slot => String(slot.session_date || '')));
+    const ownReservedDates = new Set(ownReservedSlots.map(slot => String(slot.session_date || '')));
+    const occupiedDates = new Set(state.occupiedSlots
+        .filter(slot => !ownBookedKeys.has(`${String(slot.session_date || '')}|${String(slot.start_time || '')}|${String(slot.end_time || '')}`))
+        .map(slot => String(slot.session_date || '')));
     const todayKey = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     let html = Array.from({ length: first.getDay() }, () => '<div class="h-14"></div>').join('');
     for (let day = 1; day <= daysInMonth; day += 1) {
         const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const available = (grouped[dateKey] || []).length;
-        const reserved = reservedDates.has(dateKey);
+        const ownRequest = ownProjectedDates.has(dateKey) || ownReservedDates.has(dateKey) || ownBookedDates.has(dateKey);
+        const reservedByOthers = otherReservedDates.has(dateKey);
         const occupied = occupiedDates.has(dateKey);
         const selected = dateKey === studentInstructorAvailabilityState.selectedDate;
         const dateDay = getDayOfWeekFromDate(dateKey);
@@ -6471,19 +6484,21 @@ function renderStudentInstructorAvailabilityCalendar(statusMessage = '') {
             return (slot.day_of_week || getDayOfWeekFromDate(slot.session_date)) === dateDay;
         });
         const disabled = !studentInstructorAvailabilityState.selectedTeacherId || !available || dateKey < todayKey || usedByAnotherSlot;
-        const colorClass = available && !disabled
-            ? (reserved ? 'border-amber-300 bg-amber-100 hover:bg-amber-200 dark:border-amber-500/30 dark:bg-amber-500/10' : (selected ? 'border-gold-500 bg-amber-50 ring-1 ring-gold-500/30 dark:bg-gold-500/10' : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10'))
-            : occupied ? 'cursor-not-allowed border-red-300 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-500/10' : reserved ? 'cursor-not-allowed border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10' : 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400 dark:border-white/5 dark:bg-white/[.02] dark:text-zinc-700';
+        const colorClass = ownRequest
+            ? `border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 ${available && !disabled ? 'hover:bg-amber-200' : 'cursor-not-allowed'}`
+            : available && !disabled
+            ? (selected ? 'border-gold-500 bg-amber-50 ring-1 ring-gold-500/30 dark:bg-gold-500/10' : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10')
+            : occupied || reservedByOthers ? 'cursor-not-allowed border-red-300 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-500/10' : 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400 dark:border-white/5 dark:bg-white/[.02] dark:text-zinc-700';
         html += `<button type="button" data-student-availability-date="${dateKey}" ${disabled ? 'disabled' : ''} class="h-14 rounded-lg border p-1.5 text-left transition ${colorClass}">
             <div class="flex items-start justify-between gap-1"><span class="text-sm font-bold ${available && !disabled ? 'text-zinc-900 dark:text-white' : ''}">${day}</span>${available && !disabled ? `<span class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${available}</span>` : ''}</div>
-            ${available && !disabled ? `<div class="mt-1 text-[9px] font-bold ${reserved ? 'text-amber-800' : 'text-emerald-700 dark:text-emerald-400'}">${reserved ? 'Reserved + open' : 'Available'}</div>` : reserved ? '<div class="mt-1 text-[9px] font-bold text-amber-800">Reserved</div>' : occupied ? '<div class="mt-1 text-[9px] font-bold text-red-700">Occupied</div>' : '<div class="mt-1 text-[9px] font-bold text-zinc-500">Unavailable</div>'}
+            ${ownRequest ? `<div class="mt-1 text-[9px] font-bold text-amber-800">${ownBookedDates.has(dateKey) ? 'Your session' : 'Your request'}</div>` : available && !disabled ? '<div class="mt-1 text-[9px] font-bold text-emerald-700 dark:text-emerald-400">Available</div>' : reservedByOthers ? '<div class="mt-1 text-[9px] font-bold text-red-700">Reserved by others</div>' : occupied ? '<div class="mt-1 text-[9px] font-bold text-red-700">Occupied by others</div>' : '<div class="mt-1 text-[9px] font-bold text-zinc-500">Unavailable</div>'}
         </button>`;
     }
     grid.innerHTML = html;
     if (statusMessage) status.innerHTML = statusMessage;
     else if (!studentInstructorAvailabilityState.selectedTeacherId) status.textContent = 'Select an instructor to display available dates.';
-    else if (!studentInstructorAvailabilityState.slots.length) status.textContent = 'This instructor has no open one-hour slots in the current scheduling window.';
-    else status.textContent = 'Green: available · Yellow: pending reservation · Red: occupied · Gray: unavailable.';
+    else if (!studentInstructorAvailabilityState.slots.length && !ownProjectedDates.size && !ownReservedDates.size && !ownBookedDates.size) status.textContent = 'This instructor has no open one-hour slots in the current scheduling window.';
+    else status.textContent = 'Green: available · Yellow: your 12-session request/schedule · Red: occupied or reserved by others · Gray: unavailable.';
     const inlineTimes = document.getElementById('studentInstructorTimeSlots');
     if (inlineTimes) inlineTimes.innerHTML = '';
 }
@@ -6514,12 +6529,16 @@ function openStudentInstructorTimePickerModal(dateKey) {
     const rows = studentInstructorAvailabilityState.slots
         .filter(slot => String(slot.session_date || '') === normalizedDate)
         .sort((a, b) => String(a.start_time || '').localeCompare(String(b.start_time || '')));
-    const reservedRows = studentInstructorAvailabilityState.reservedSlots.filter(slot => String(slot.session_date || '') === normalizedDate);
-    const occupiedRows = studentInstructorAvailabilityState.occupiedSlots.filter(slot => String(slot.session_date || '') === normalizedDate);
+    const studentId = Number(studentInstructorAvailabilityState.student?.student_id || 0);
+    const ownReservedRows = studentInstructorAvailabilityState.reservedSlots.filter(slot => String(slot.session_date || '') === normalizedDate && studentId > 0 && Number(slot.student_id || 0) === studentId);
+    const reservedByOthersRows = studentInstructorAvailabilityState.reservedSlots.filter(slot => String(slot.session_date || '') === normalizedDate && (!studentId || Number(slot.student_id || 0) !== studentId));
+    const ownBookedRows = studentInstructorAvailabilityState.bookedSessions.filter(slot => String(slot.session_date || '') === normalizedDate);
+    const ownBookedKeys = new Set(ownBookedRows.map(slot => `${String(slot.start_time || '')}|${String(slot.end_time || '')}`));
+    const occupiedRows = studentInstructorAvailabilityState.occupiedSlots.filter(slot => String(slot.session_date || '') === normalizedDate && !ownBookedKeys.has(`${String(slot.start_time || '')}|${String(slot.end_time || '')}`));
     if (!rows.length) return;
     Swal.fire({
         title: formatDateLong(normalizedDate) || normalizedDate,
-        html: `<div class="mb-4 text-sm text-zinc-500">Green: available · Yellow: temporarily reserved · Red: occupied</div><div class="grid grid-cols-1 gap-2 text-left sm:grid-cols-2">${rows.map((slot, index) => `<button type="button" class="student-time-picker-option rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-400 hover:bg-emerald-100" data-slot-index="${index}"><div class="font-black text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs text-zinc-500">Select this preferred time</div></button>`).join('')}${reservedRows.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="font-black text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-amber-700">Pending reservation</div></div>`).join('')}${occupiedRows.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="font-black text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-red-700">Occupied</div></div>`).join('')}</div>`,
+        html: `<div class="mb-4 text-sm text-zinc-500">Green: available · Yellow: yours · Red: occupied/reserved by others</div><div class="grid grid-cols-1 gap-2 text-left sm:grid-cols-2">${rows.map((slot, index) => `<button type="button" class="student-time-picker-option rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-400 hover:bg-emerald-100" data-slot-index="${index}"><div class="font-black text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs text-zinc-500">Select this preferred time</div></button>`).join('')}${ownReservedRows.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="font-black text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-amber-700">Your pending request</div></div>`).join('')}${ownBookedRows.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="font-black text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-amber-700">Your scheduled session</div></div>`).join('')}${reservedByOthersRows.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="font-black text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-red-700">Reserved by another student</div></div>`).join('')}${occupiedRows.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="font-black text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-red-700">Occupied by another student</div></div>`).join('')}</div>`,
         showConfirmButton: false,
         showCloseButton: true,
         width: '42rem',
@@ -6551,6 +6570,7 @@ async function selectStudentAvailableInstructor(teacherId) {
     studentInstructorAvailabilityState.slots = [];
     studentInstructorAvailabilityState.reservedSlots = [];
     studentInstructorAvailabilityState.occupiedSlots = [];
+    studentInstructorAvailabilityState.bookedSessions = [];
     studentInstructorAvailabilityState.selectedDate = '';
     renderStudentAvailableInstructorList();
     await loadStudentInstructorAvailabilityMonth();
@@ -6572,6 +6592,7 @@ async function loadStudentInstructorAvailabilityMonth() {
         state.slots = Array.isArray(cached.slots) ? cached.slots : [];
         state.reservedSlots = Array.isArray(cached.reservedSlots) ? cached.reservedSlots : [];
         state.occupiedSlots = Array.isArray(cached.occupiedSlots) ? cached.occupiedSlots : [];
+        state.bookedSessions = Array.isArray(cached.bookedSessions) ? cached.bookedSessions : [];
         renderStudentInstructorAvailabilityCalendar();
         return;
     }
@@ -6581,6 +6602,7 @@ async function loadStudentInstructorAvailabilityMonth() {
     state.slots = [];
     state.reservedSlots = [];
     state.occupiedSlots = [];
+    state.bookedSessions = [];
     renderStudentInstructorAvailabilityCalendar(`<i class="fas fa-spinner fa-spin mr-2 text-emerald-600"></i>Loading ${escapeHtml(state.selectedTeacherName)}'s available dates...`);
     const token = ++state.requestToken;
     try {
@@ -6600,13 +6622,15 @@ async function loadStudentInstructorAvailabilityMonth() {
         state.slots = response.data?.success && Array.isArray(response.data.slots) ? response.data.slots : [];
         state.reservedSlots = response.data?.success && Array.isArray(response.data.reserved_slots) ? response.data.reserved_slots : [];
         state.occupiedSlots = response.data?.success && Array.isArray(response.data.occupied_slots) ? response.data.occupied_slots : [];
-        state.slotCache.set(cacheKey, { savedAt: Date.now(), slots: state.slots.slice(), reservedSlots: state.reservedSlots.slice(), occupiedSlots: state.occupiedSlots.slice() });
+        state.bookedSessions = response.data?.success && Array.isArray(response.data.booked_sessions) ? response.data.booked_sessions : [];
+        state.slotCache.set(cacheKey, { savedAt: Date.now(), slots: state.slots.slice(), reservedSlots: state.reservedSlots.slice(), occupiedSlots: state.occupiedSlots.slice(), bookedSessions: state.bookedSessions.slice() });
         renderStudentInstructorAvailabilityCalendar();
     } catch (error) {
         if (token !== state.requestToken || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') return;
         state.slots = [];
         state.reservedSlots = [];
         state.occupiedSlots = [];
+        state.bookedSessions = [];
         renderStudentInstructorAvailabilityCalendar('<i class="fas fa-triangle-exclamation mr-2 text-red-500"></i>Unable to load this instructor’s availability. Please try again.');
     } finally {
         if (token === state.requestToken) state.requestController = null;
@@ -6633,6 +6657,7 @@ function openStudentAvailableInstructors() {
     state.slots = [];
     state.reservedSlots = [];
     state.occupiedSlots = [];
+    state.bookedSessions = [];
     state.selectedDate = '';
     const preferredDate = String(document.getElementById('studentRequestPreferredDate')?.value || '');
     state.month = (preferredDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
