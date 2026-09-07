@@ -2,6 +2,9 @@
         let filteredTeachers = [];
         let allBranches = [];
         let allSpecializations = [];
+        let adminUserId = 0;
+        const adminAvailabilityDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const adminAvailabilityState = { teacherId: 0, rows: [] };
 
         function esc(v) {
             return (window.TeacherFormUI && TeacherFormUI.esc) ? TeacherFormUI.esc(v) : String(v ?? '');
@@ -134,6 +137,7 @@
                     <td class="px-6 py-4 table-actions-cell-wide">
                         <div class="table-button-group">
                             <button onclick="openEditTeacher(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold">Edit</button>
+                            <button onclick="openAdminTeacherAvailability(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 text-xs font-bold"><i class="fas fa-calendar-alt mr-1"></i>Schedule</button>
                             <button onclick="openTeacherPasswordModal(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-bold">Password</button>
                             <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" class="px-3 py-1.5 rounded-lg ${t.status === 'Active' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'} text-xs font-bold">${t.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
                         </div>
@@ -388,9 +392,169 @@
             await loadTeachers();
         }
 
+        function setAdminAvailabilityStatus(message, type = 'error') {
+            const box = document.getElementById('adminAvailabilityStatus');
+            if (!box) return;
+            box.textContent = message;
+            box.className = `mb-4 rounded-xl border px-4 py-3 text-sm ${type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-rose-200 bg-rose-50 text-rose-700'}`;
+        }
+
+        function clearAdminAvailabilityStatus() {
+            const box = document.getElementById('adminAvailabilityStatus');
+            if (!box) return;
+            box.textContent = '';
+            box.className = 'hidden mb-4 rounded-xl border px-4 py-3 text-sm';
+        }
+
+        function renderAdminAvailabilityGrid(entries = []) {
+            const grid = document.getElementById('adminAvailabilityGrid');
+            const template = document.getElementById('adminAvailabilityCardTemplate');
+            if (!grid || !template) return;
+
+            const byDay = new Map(entries.map(item => [String(item.day_of_week || ''), item]));
+            grid.innerHTML = '';
+            adminAvailabilityDays.forEach(day => {
+                const row = byDay.get(day) || {};
+                const card = template.content.firstElementChild.cloneNode(true);
+                card.dataset.day = day;
+
+                const enabled = card.querySelector('.admin-availability-enabled');
+                const start = card.querySelector('.admin-availability-start');
+                const end = card.querySelector('.admin-availability-end');
+                card.querySelector('.admin-availability-day').textContent = day;
+                enabled.checked = !!String(row.start_time || '').trim();
+                start.value = String(row.start_time || '09:00').slice(0, 5);
+                end.value = String(row.end_time || '17:00').slice(0, 5);
+
+                const syncEnabledState = () => {
+                    const disabled = !enabled.checked;
+                    start.disabled = disabled;
+                    end.disabled = disabled;
+                    card.classList.toggle('opacity-60', disabled);
+                    card.classList.toggle('border-gold-300', !disabled);
+                };
+                enabled.addEventListener('change', syncEnabledState);
+                syncEnabledState();
+                grid.appendChild(card);
+            });
+        }
+
+        async function loadAdminTeacherAvailability(teacherId) {
+            try {
+                const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-availability&teacher_id=${encodeURIComponent(teacherId)}&user_id=${encodeURIComponent(adminUserId)}`);
+                const data = res.data || {};
+                if (!data.success) throw new Error(data.error || 'Failed to load availability.');
+                adminAvailabilityState.rows = Array.isArray(data.availability) ? data.availability : [];
+                renderAdminAvailabilityGrid(adminAvailabilityState.rows);
+                clearAdminAvailabilityStatus();
+            } catch (error) {
+                console.error('Failed to load instructor availability:', error);
+                adminAvailabilityState.rows = [];
+                renderAdminAvailabilityGrid([]);
+                setAdminAvailabilityStatus(error.response?.data?.error || error.message || 'Failed to load instructor availability.');
+            }
+        }
+
+        async function openAdminTeacherAvailability(teacherId) {
+            const teacher = allTeachers.find(item => Number(item.teacher_id) === Number(teacherId));
+            if (!teacher) {
+                showMessage('Instructor not found.', 'error');
+                return;
+            }
+            if (!adminUserId) {
+                showMessage('Admin session not found. Please log in again.', 'error');
+                return;
+            }
+
+            adminAvailabilityState.teacherId = Number(teacher.teacher_id || 0);
+            adminAvailabilityState.rows = [];
+            const fullName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Instructor';
+            const title = document.getElementById('adminAvailabilityTitle');
+            const meta = document.getElementById('adminAvailabilityMeta');
+            if (title) title.textContent = `${fullName} Availability`;
+            if (meta) meta.textContent = `${teacher.branch_name || 'No branch'} • ${teacher.specialization || 'General'}`;
+
+            clearAdminAvailabilityStatus();
+            renderAdminAvailabilityGrid([]);
+            const modal = document.getElementById('adminTeacherAvailabilityModal');
+            modal?.classList.remove('hidden');
+            modal?.classList.add('flex');
+            await loadAdminTeacherAvailability(adminAvailabilityState.teacherId);
+        }
+
+        function closeAdminTeacherAvailability() {
+            const modal = document.getElementById('adminTeacherAvailabilityModal');
+            modal?.classList.add('hidden');
+            modal?.classList.remove('flex');
+            adminAvailabilityState.teacherId = 0;
+            adminAvailabilityState.rows = [];
+            clearAdminAvailabilityStatus();
+        }
+
+        function collectAdminAvailability() {
+            return Array.from(document.querySelectorAll('#adminAvailabilityGrid .admin-availability-card')).map(card => ({
+                day_of_week: card.dataset.day || '',
+                enabled: !!card.querySelector('.admin-availability-enabled')?.checked,
+                start_time: card.querySelector('.admin-availability-start')?.value || '',
+                end_time: card.querySelector('.admin-availability-end')?.value || ''
+            }));
+        }
+
+        async function saveAdminTeacherAvailability() {
+            if (!adminUserId || !adminAvailabilityState.teacherId) {
+                setAdminAvailabilityStatus('Admin session or instructor selection is missing.');
+                return;
+            }
+
+            const availability = collectAdminAvailability();
+            for (const row of availability) {
+                if (!row.enabled) continue;
+                if (!row.start_time || !row.end_time) {
+                    setAdminAvailabilityStatus(`Please complete the time range for ${row.day_of_week}.`);
+                    return;
+                }
+                if (row.end_time <= row.start_time) {
+                    setAdminAvailabilityStatus(`End time must be later than start time for ${row.day_of_week}.`);
+                    return;
+                }
+            }
+
+            const button = document.getElementById('saveAdminAvailabilityBtn');
+            const buttonText = document.getElementById('saveAdminAvailabilityText');
+            if (button) button.disabled = true;
+            if (buttonText) buttonText.textContent = 'Saving...';
+            clearAdminAvailabilityStatus();
+
+            try {
+                const res = await axios.post(`${baseApiUrl}/teachers.php?action=save-teacher-availability`, {
+                    action: 'save-teacher-availability',
+                    user_id: adminUserId,
+                    teacher_id: adminAvailabilityState.teacherId,
+                    availability
+                });
+                const data = res.data || {};
+                if (!data.success) throw new Error(data.error || 'Failed to save availability.');
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Availability Saved',
+                    text: data.message || 'Instructor availability updated successfully.',
+                    confirmButtonColor: '#b8860b'
+                });
+                await loadAdminTeacherAvailability(adminAvailabilityState.teacherId);
+            } catch (error) {
+                setAdminAvailabilityStatus(error.response?.data?.error || error.message || 'Failed to save instructor availability.');
+            } finally {
+                if (button) button.disabled = false;
+                if (buttonText) buttonText.textContent = 'Save Availability';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async function() {
             if (typeof Auth !== 'undefined' && Auth.getUser) {
                 const user = Auth.getUser();
+                adminUserId = Number(user?.user_id || 0);
                 const userNameNav = document.getElementById('userNameNav');
                     const profileMenuName = document.getElementById('profileMenuName');
                 const displayName = user.username || user.email || 'Admin';
@@ -412,4 +576,7 @@
             document.getElementById('branchFilter')?.addEventListener('change', applyFilters);
             document.getElementById('statusFilter')?.addEventListener('change', applyFilters);
             document.getElementById('searchInput')?.addEventListener('input', applyFilters);
+            document.getElementById('closeAdminAvailabilityBtn')?.addEventListener('click', closeAdminTeacherAvailability);
+            document.getElementById('cancelAdminAvailabilityBtn')?.addEventListener('click', closeAdminTeacherAvailability);
+            document.getElementById('saveAdminAvailabilityBtn')?.addEventListener('click', saveAdminTeacherAvailability);
         });

@@ -92,6 +92,23 @@
         <!-- Messages -->
         <div id="message" class="hidden mb-4 p-3 rounded text-sm"></div>
 
+        <!-- Compact pending-request summary -->
+        <section id="pendingAdditionalSessionsSection" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 shadow-sm">
+            <div class="flex min-w-0 items-center gap-3">
+                <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-700"><i class="fas fa-calendar-plus"></i></div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-sm font-bold text-slate-900">Pending Session Requests</h2>
+                        <span id="deskPendingSessionRequestCount" class="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-black text-amber-800">0</span>
+                    </div>
+                    <p class="mt-0.5 text-xs text-slate-500">Review additional-session requests without leaving this page.</p>
+                </div>
+            </div>
+            <button id="openPendingSessionRequestsBtn" type="button" class="inline-flex h-9 items-center gap-2 rounded-lg bg-amber-500 px-3.5 text-xs font-bold text-white transition hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-200">
+                Review Requests <i class="fas fa-arrow-right text-[10px]"></i>
+            </button>
+        </section>
+
         <!-- Active Sessions Table -->
         <div id="activeSessionsSection" class="desk-panel bg-white rounded-2xl shadow-lg shadow-slate-200/40 border border-slate-200 overflow-hidden">
             <div class="px-4 py-3 bg-slate-50/50 border-b border-slate-200 flex items-center justify-between">
@@ -125,20 +142,81 @@
     </main>
     </div>
 
+    <!-- Pending session requests modal -->
+    <div id="deskPendingSessionRequestsModal" class="fixed inset-0 z-[1200] hidden items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-5" aria-hidden="true">
+        <div class="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div class="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3.5 sm:px-5">
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-base font-bold text-slate-900 sm:text-lg">Pending Session Requests</h2>
+                        <span id="deskPendingSessionModalCount" class="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">0 pending</span>
+                    </div>
+                    <p class="mt-1 text-xs text-slate-500">Review and decide additional sessions requested online.</p>
+                </div>
+                <button id="closePendingSessionRequestsBtn" type="button" class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" aria-label="Close pending requests">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-5">
+                <label class="relative min-w-[220px] flex-1">
+                    <span class="sr-only">Search pending requests</span>
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+                    <input id="pendingSessionRequestSearch" type="search" placeholder="Search student, branch, or payment method" class="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100">
+                </label>
+                <button id="refreshPendingSessionRequestsBtn" type="button" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-100">
+                    <i class="fas fa-rotate"></i>Refresh
+                </button>
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-auto">
+                <table class="w-full min-w-[820px] text-sm">
+                    <thead class="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_#e2e8f0]">
+                        <tr>
+                            <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Student</th>
+                            <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Request</th>
+                            <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Payment</th>
+                            <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Submitted</th>
+                            <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deskPendingSessionRequestsTable" class="divide-y divide-slate-100">
+                        <tr><td colspan="5" class="px-4 py-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading requests…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-5">
+                <span id="pendingSessionRequestRange" class="text-xs text-slate-500">Showing 0 requests</span>
+                <div class="flex items-center gap-2">
+                    <button id="pendingSessionRequestPrev" type="button" class="h-8 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                    <span id="pendingSessionRequestPage" class="min-w-20 text-center text-xs font-semibold text-slate-600">Page 1 of 1</span>
+                    <button id="pendingSessionRequestNext" type="button" class="h-8 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Schedule Modal -->
-    <div id="scheduleModal" class="desk-modal fixed inset-0 z-50 hidden items-center justify-center bg-black/60 px-4">
-        <div class="desk-modal-panel w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col rounded-2xl shadow-2xl">
+    <div id="scheduleModal" class="desk-modal fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-5">
+        <div class="desk-modal-panel w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col rounded-2xl shadow-2xl">
 
             <!-- Header -->
-            <div class="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100 bg-white shrink-0">
-                <div class="min-w-0">
-                    <h3 class="text-base font-bold text-slate-900">Session Schedule</h3>
-                    <p id="scheduleModalMeta" class="text-xs text-slate-500 mt-0.5 truncate">Loading...</p>
+            <div class="flex items-start justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+                <div class="flex min-w-0 items-center gap-3">
+                    <div class="hidden sm:grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600"><i class="fas fa-calendar-days"></i></div>
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 class="text-base font-bold text-slate-900">Manage Session Schedule</h3>
+                            <span id="scheduleProgressSummary" class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">Loading</span>
+                        </div>
+                        <p id="scheduleModalMeta" class="text-xs text-slate-500 mt-1 truncate">Loading...</p>
+                    </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                     <button type="button" id="toggleAddScheduleBtn"
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black text-xs font-bold transition">
-                        Add session
+                        <i class="fas fa-plus"></i><span>Schedule next</span>
                     </button>
                     <button type="button" id="closeScheduleModalBtn"
                         class="h-8 w-8 flex items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
@@ -149,39 +227,51 @@
             </div>
 
             <!-- Add / Edit session form -->
-            <form id="addScheduleForm" class="hidden shrink-0 px-5 py-4 border-b border-slate-100 bg-slate-50 space-y-3">
+            <form id="addScheduleForm" class="hidden shrink-0 px-4 sm:px-6 py-4 border-b border-blue-100 bg-gradient-to-br from-blue-50 to-white space-y-4" aria-live="polite">
                 <input type="hidden" id="scheduleEnrollmentId" value="">
                 <input type="hidden" id="scheduleEditExisting" value="0">
                 <input type="hidden" id="scheduleStart" value="09:00">
                 <input type="hidden" id="scheduleEnd" value="10:00">
-                <div class="grid grid-cols-2 gap-3">
+                <div class="flex items-start justify-between gap-3">
                     <div>
-                        <label class="desk-modal-label">Session #</label>
-                        <input type="number" id="scheduleSessionNumber" min="1" readonly class="desk-modal-input">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h4 id="scheduleFormTitle" class="font-bold text-slate-900">Schedule next session</h4>
+                            <span id="scheduleFormModeBadge" class="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-blue-700">New</span>
+                        </div>
+                        <p id="scheduleFormHelp" class="mt-1 text-xs text-slate-500">Choose the date for the next open session.</p>
                     </div>
-                    <div>
-                        <label class="desk-modal-label">Teacher</label>
+                    <button type="button" id="cancelAddScheduleBtn" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close schedule editor"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="rounded-xl border border-slate-200 bg-white p-3">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Session</label>
+                        <div class="mt-1 flex items-center gap-2 text-sm font-bold text-slate-900"><i class="fas fa-hashtag text-blue-500"></i><span id="scheduleSessionNumberLabel">Session</span></div>
+                        <input type="number" id="scheduleSessionNumber" min="1" readonly class="sr-only">
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-3">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Instructor</label>
                         <input type="hidden" id="scheduleTeacher" value="">
-                        <input type="text" id="scheduleTeacherLabel" readonly class="desk-modal-input">
+                        <input type="text" id="scheduleTeacherLabel" readonly class="mt-1 w-full border-0 bg-transparent p-0 text-sm font-bold text-slate-900 outline-none" aria-label="Assigned instructor">
                     </div>
                 </div>
-                <div>
-                    <label class="desk-modal-label">Date *</label>
-                    <input type="date" id="scheduleDate" class="desk-modal-input">
+                <div class="rounded-xl border border-blue-200 bg-white p-3 sm:p-4">
+                    <label for="scheduleDate" class="block text-xs font-bold text-slate-700"><i class="fas fa-calendar-day mr-2 text-blue-600"></i>Session date <span class="text-red-500">*</span></label>
+                    <input type="date" id="scheduleDate" required class="desk-modal-input mt-2 text-base font-semibold">
+                    <p class="mt-2 text-xs text-slate-500">Only today or a future date can be selected. The instructor and one-hour time remain fixed.</p>
                 </div>
-                <p class="text-xs text-slate-400">Date controls attendance and session validity.</p>
-                <div class="flex items-center justify-end gap-2 pt-1">
-                    <button type="button" id="cancelAddScheduleBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
-                    <button type="submit" id="saveScheduleBtn" class="desk-modal-btn desk-modal-btn-primary">Save</button>
+                <div id="scheduleCurrentValue" class="hidden rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800"></div>
+                <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                    <button type="button" id="cancelScheduleEditorBtn" class="desk-modal-btn desk-modal-btn-secondary">Cancel</button>
+                    <button type="submit" id="saveScheduleBtn" class="desk-modal-btn desk-modal-btn-primary inline-flex items-center justify-center gap-2"><i class="fas fa-floppy-disk"></i><span>Save session</span></button>
                 </div>
             </form>
 
             <!-- Hint -->
-            <p id="nextSessionHint" class="px-5 pt-3 pb-1 text-xs text-slate-400 shrink-0"></p>
+            <div class="px-4 sm:px-6 pt-3 shrink-0"><p id="nextSessionHint" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500"></p></div>
 
             <!-- Session list — scrollable -->
-            <div class="flex-1 min-h-0 overflow-y-auto px-5 pb-5">
-                <div id="scheduleModalBody" class="space-y-2 pt-1">
+            <div class="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-5">
+                <div id="scheduleModalBody" class="space-y-2 pt-3">
                     <div class="text-slate-500 text-sm">Loading...</div>
                 </div>
             </div>
@@ -476,7 +566,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="../../js/index.js"></script>
+    <script src="../../js/index.js?v=20260906009"></script>
     <script src="../../js/session_timeout.js"></script>
     <script src="../../js/desk/desk_nav.js"></script>
     <script>
@@ -1966,6 +2056,46 @@
             return;
         }
 
+        function updateScheduleEditorCopy(mode, sessionNumber, sessionDate = '', startTime = '', endTime = '') {
+            const isEdit = mode === 'edit';
+            const formTitle = document.getElementById('scheduleFormTitle');
+            const formHelp = document.getElementById('scheduleFormHelp');
+            const modeBadge = document.getElementById('scheduleFormModeBadge');
+            const numberLabel = document.getElementById('scheduleSessionNumberLabel');
+            const currentValue = document.getElementById('scheduleCurrentValue');
+            const saveBtn = document.getElementById('saveScheduleBtn');
+            const toggleBtn = document.getElementById('toggleAddScheduleBtn');
+            const normalizedNumber = Number(sessionNumber || 0);
+
+            if (formTitle) formTitle.textContent = isEdit ? `Edit Session ${normalizedNumber}` : `Schedule Session ${normalizedNumber}`;
+            if (formHelp) formHelp.textContent = isEdit
+                ? 'Change the date below, then save your update.'
+                : 'Choose a date for this next open session.';
+            if (modeBadge) {
+                modeBadge.textContent = isEdit ? 'Editing' : 'New';
+                modeBadge.className = `rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${isEdit ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`;
+            }
+            if (numberLabel) numberLabel.textContent = normalizedNumber ? `Session ${normalizedNumber}` : 'Session';
+            if (currentValue) {
+                const timeLabel = startTime
+                    ? `${formatTime12Hour(startTime)}${endTime ? ` – ${formatTime12Hour(endTime)}` : ''}`
+                    : 'Fixed session time';
+                currentValue.innerHTML = isEdit
+                    ? `<i class="fas fa-clock-rotate-left mr-2"></i>Currently scheduled for <strong>${escapeHtml(formatDateShort(sessionDate) || sessionDate || 'Date pending')}</strong> at <strong>${escapeHtml(timeLabel)}</strong>.`
+                    : '';
+                currentValue.classList.toggle('hidden', !isEdit);
+            }
+            if (saveBtn) saveBtn.innerHTML = `<i class="fas fa-floppy-disk"></i><span>${isEdit ? `Update Session ${normalizedNumber}` : 'Save session'}</span>`;
+            if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+        }
+
+        function clearScheduleEditorSelection() {
+            document.querySelectorAll('#scheduleModalBody [data-schedule-session-card]').forEach(card => {
+                card.classList.remove('border-amber-300', 'bg-amber-50', 'ring-2', 'ring-amber-100');
+                card.classList.add('border-slate-200', 'bg-white');
+            });
+        }
+
         function openSessionScheduleModal(enrollmentId, options = {}) {
             const modal = document.getElementById('scheduleModal');
             const body = document.getElementById('scheduleModalBody');
@@ -1986,8 +2116,8 @@
                 return;
             }
 
-            const studentName = `${escapeHtml(row.first_name || '')} ${escapeHtml(row.last_name || '')}`.trim() || 'Student';
-            meta.textContent = `${studentName} • ${escapeHtml(row.package_name || 'Package')} • ${Number(row.sessions || 0)} sessions`;
+            const studentName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Student';
+            meta.textContent = `${studentName} • ${row.package_name || 'Package'} • ${Number(row.sessions || 0)} sessions`;
 
             const sessionsList = Array.isArray(row.sessions_list) ? row.sessions_list : [];
             const sessionsTotal = Number(row.sessions || 0);
@@ -2001,6 +2131,9 @@
                     const slotHtml = slotHistory.length
                         ? slotHistory.map(slot => {
                             const dateText = slot?.session_date ? formatDateShort(slot.session_date) : 'Unscheduled';
+                            const timeText = slot?.start_time
+                                ? `${formatTime12Hour(slot.start_time)}${slot?.end_time ? ` – ${formatTime12Hour(slot.end_time)}` : ''}`
+                                : 'Time pending';
                             const slotTeacherName = slot?.teacher_first_name || slot?.teacher_last_name
                                 ? `${escapeHtml(slot.teacher_first_name || '')} ${escapeHtml(slot.teacher_last_name || '')}`.trim()
                                 : '';
@@ -2008,24 +2141,26 @@
                             const slotDateMs = slot?.session_date ? new Date(`${slot.session_date}T00:00:00`).setHours(0, 0, 0, 0) : NaN;
                             const editableThisSlot = normalizedStatus === 'scheduled' && !Number.isNaN(slotDateMs) && slotDateMs >= todayMs;
                             const editBtn = editableThisSlot
-                                ? `<button type="button" class="edit-schedule-btn shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-bold hover:bg-amber-100 transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}"><i class="fas fa-pen text-[9px]"></i> Edit</button>`
+                                ? `<button type="button" class="edit-schedule-btn shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold hover:bg-amber-100 transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}"><i class="fas fa-pen text-[10px]"></i> Edit date</button>`
                                 : '';
                             const reasonText = slot?.cancellation_reason
                                 ? `<p class="text-[11px] text-slate-400 mt-1 pl-1">Reason: ${escapeHtml(slot.cancellation_reason)}</p>`
                                 : '';
                             return `
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    ${getSessionStatusBadge(slot.status)}
-                                    <span class="text-sm text-slate-700">${escapeHtml(dateText)}${slotTeacherName ? ` · ${slotTeacherName}` : ''}</span>
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2">${getSessionStatusBadge(slot.status)}<span class="font-semibold text-slate-800">${escapeHtml(dateText)}</span></div>
+                                        <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500"><span><i class="fas fa-clock mr-1 text-slate-400"></i>${escapeHtml(timeText)}</span>${slotTeacherName ? `<span><i class="fas fa-user-tie mr-1 text-slate-400"></i>${slotTeacherName}</span>` : ''}</div>
+                                    </div>
                                     ${editBtn}
                                 </div>
                                 ${reasonText}
                             `;
                         }).join('')
-                        : '<span class="text-sm text-slate-400">Not scheduled yet</span>';
+                        : `<div class="flex items-center gap-2 text-sm text-slate-400"><i class="far fa-calendar"></i><span>Not scheduled yet</span>${i === nextUnscheduled ? '<span class="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">Next</span>' : ''}</div>`;
                     rows.push(`
-                        <div class="rounded-xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Session ${i}</div>
+                        <div data-schedule-session-card data-session-number="${i}" class="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition">
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Session ${i}</div>
                             <div class="space-y-1.5">${slotHtml}</div>
                         </div>
                     `);
@@ -2035,6 +2170,9 @@
             }
 
             body.innerHTML = rows.join('');
+            const progressSummary = document.getElementById('scheduleProgressSummary');
+            const scheduledNumbers = new Set(sessionsList.map(slot => Number(slot?.session_number || 0)).filter(number => number > 0));
+            if (progressSummary) progressSummary.textContent = `${scheduledNumbers.size} of ${sessionsTotal} scheduled`;
             if (form) form.classList.add('hidden');
             if (enrollmentInput) enrollmentInput.value = String(enrollmentId);
             if (editExistingInput) editExistingInput.value = '0';
@@ -2047,14 +2185,18 @@
             if (dateInput) dateInput.min = getTodayInputDate();
             if (startInput) startInput.value = '09:00';
             if (endInput) endInput.value = '10:00';
-            if (saveBtn) saveBtn.textContent = 'Save Session';
+            updateScheduleEditorCopy('new', nextUnscheduled || 1);
+            if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
             if (hint) {
                 hint.textContent = nextUnscheduled
                     ? `Session ${nextUnscheduled} is the next open slot for this enrollment. Future scheduled sessions can also be edited here.`
                     : 'All session slots already have saved schedules. You can still edit future scheduled sessions here.';
             }
             if (toggleBtn) {
-                toggleBtn.textContent = nextUnscheduled ? `Schedule Session ${nextUnscheduled}` : 'All Sessions Scheduled';
+                toggleBtn.dataset.nextSessionNumber = nextUnscheduled ? String(nextUnscheduled) : '';
+                toggleBtn.innerHTML = nextUnscheduled
+                    ? `<i class="fas fa-plus"></i><span>Schedule Session ${nextUnscheduled}</span>`
+                    : '<i class="fas fa-check"></i><span>All scheduled</span>';
                 toggleBtn.disabled = !nextUnscheduled;
                 toggleBtn.classList.toggle('opacity-50', !nextUnscheduled);
                 toggleBtn.classList.toggle('cursor-not-allowed', !nextUnscheduled);
@@ -2074,8 +2216,15 @@
                     dateInput.min = getTodayInputDate();
                     startInput.value = (btn.dataset.startTime || '09:00:00').slice(0, 5);
                     endInput.value = (btn.dataset.endTime || '10:00:00').slice(0, 5);
-                    if (saveBtn) saveBtn.textContent = `Update Session ${btn.dataset.sessionNumber || ''}`;
+                    clearScheduleEditorSelection();
+                    const selectedCard = btn.closest('[data-schedule-session-card]');
+                    if (selectedCard) {
+                        selectedCard.classList.remove('border-slate-200', 'bg-white');
+                        selectedCard.classList.add('border-amber-300', 'bg-amber-50', 'ring-2', 'ring-amber-100');
+                    }
+                    updateScheduleEditorCopy('edit', btn.dataset.sessionNumber, btn.dataset.sessionDate, btn.dataset.startTime, btn.dataset.endTime);
                     form.classList.remove('hidden');
+                    dateInput.focus({ preventScroll: true });
                     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 });
             });
@@ -2158,17 +2307,35 @@
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
             }
+            document.getElementById('toggleAddScheduleBtn')?.setAttribute('aria-expanded', 'false');
+            clearScheduleEditorSelection();
         }
 
         function toggleAddScheduleForm() {
             const form = document.getElementById('addScheduleForm');
             const toggleBtn = document.getElementById('toggleAddScheduleBtn');
             const editExistingInput = document.getElementById('scheduleEditExisting');
+            const sessionInput = document.getElementById('scheduleSessionNumber');
             const saveBtn = document.getElementById('saveScheduleBtn');
-            if (!form || !toggleBtn || toggleBtn.disabled) return;
+            if (!form || !toggleBtn) return;
+            const isOpening = form.classList.contains('hidden');
+            if (isOpening && toggleBtn.disabled) return;
             if (editExistingInput) editExistingInput.value = '0';
-            if (saveBtn) saveBtn.textContent = 'Save Session';
-            form.classList.toggle('hidden');
+            if (isOpening) {
+                const sessionNumber = Number(toggleBtn.dataset.nextSessionNumber || sessionInput?.value || 0);
+                const dateInput = document.getElementById('scheduleDate');
+                if (sessionInput) sessionInput.value = String(sessionNumber || '');
+                if (dateInput) dateInput.value = '';
+                clearScheduleEditorSelection();
+                updateScheduleEditorCopy('new', sessionNumber);
+                form.classList.remove('hidden');
+                dateInput?.focus({ preventScroll: true });
+                form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                form.classList.add('hidden');
+                toggleBtn.setAttribute('aria-expanded', 'false');
+                clearScheduleEditorSelection();
+            }
         }
 
         async function submitAddScheduleForm(e) {
@@ -2180,6 +2347,7 @@
             const endTime = document.getElementById('scheduleEnd')?.value || '';
             const teacherId = Number(document.getElementById('scheduleTeacher')?.value || 0);
             const editExisting = document.getElementById('scheduleEditExisting')?.value === '1';
+            const saveBtn = document.getElementById('saveScheduleBtn');
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
             const editorRole = String(user?.role_name || '');
 
@@ -2188,7 +2356,12 @@
                 return;
             }
 
+            let saveCompleted = false;
             try {
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Saving…</span>';
+                }
                 const response = await axios.post(`${baseApiUrl}/students.php?action=schedule-session`, {
                     enrollment_id: enrollmentId,
                     session_number: sessionNumber,
@@ -2202,6 +2375,7 @@
                 });
                 const data = response.data || {};
                 if (data.success) {
+                    saveCompleted = true;
                     showMessage(data.message || 'Session scheduled.', 'success');
                     await loadActiveStudents();
                     openSessionScheduleModal(enrollmentId);
@@ -2211,6 +2385,11 @@
             } catch (error) {
                 const backendMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message;
                 showMessage(backendMessage || 'Network error. Please try again.', 'error');
+            } finally {
+                if (!saveCompleted && saveBtn && document.body.contains(saveBtn)) {
+                    saveBtn.disabled = false;
+                    updateScheduleEditorCopy(editExisting ? 'edit' : 'new', sessionNumber, sessionDate, startTime, endTime);
+                }
             }
         }
 
@@ -2362,6 +2541,7 @@
             document.getElementById('closeScheduleModalBtn')?.addEventListener('click', closeScheduleModal);
             document.getElementById('toggleAddScheduleBtn')?.addEventListener('click', toggleAddScheduleForm);
             document.getElementById('cancelAddScheduleBtn')?.addEventListener('click', toggleAddScheduleForm);
+            document.getElementById('cancelScheduleEditorBtn')?.addEventListener('click', toggleAddScheduleForm);
             document.getElementById('addScheduleForm')?.addEventListener('submit', submitAddScheduleForm);
             document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', closeAssignRequestModal);
             document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', closeAssignRequestModal);
@@ -2413,5 +2593,6 @@
             document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
         });
     </script>
+    <script src="../../js/desk/desk_session_requests.js?v=20260906003"></script>
 </body>
 </html>

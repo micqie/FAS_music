@@ -902,3 +902,81 @@ function initRecordPaymentModal() {
 
 // Initialise after DOMContentLoaded is already wired above — piggyback safely
 document.addEventListener('DOMContentLoaded', initRecordPaymentModal);
+
+function closePaymentDestinationModal() {
+    const modal = document.getElementById('paymentDestinationModal');
+    modal?.classList.add('hidden');
+    modal?.classList.remove('flex');
+    modal?.setAttribute('aria-hidden', 'true');
+}
+
+async function openPaymentDestinationModal() {
+    const modal = document.getElementById('paymentDestinationModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    modal.setAttribute('aria-hidden', 'false');
+    const message = document.getElementById('paymentDestinationMessage');
+    message?.classList.add('hidden');
+    try {
+        const response = await axios.get(`${baseApiUrl}/payment_destination.php`);
+        const recipient = response.data?.recipient || {};
+        document.getElementById('paymentSettingsGcash').value = recipient.gcash_number || '';
+        document.getElementById('paymentSettingsBank').value = recipient.bank_name || '';
+        document.getElementById('paymentSettingsBankName').value = recipient.bank_account_name || '';
+        document.getElementById('paymentSettingsBankNumber').value = recipient.bank_account_number || '';
+        const preview = document.getElementById('paymentSettingsQrPreview');
+        if (preview && recipient.gcash_qr_path) {
+            preview.src = buildPublicFileUrl(recipient.gcash_qr_path);
+            preview.classList.remove('hidden');
+        } else {
+            preview?.classList.add('hidden');
+        }
+    } catch (error) {
+        if (message) {
+            message.textContent = error?.response?.data?.error || 'Unable to load payment details.';
+            message.className = 'rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700';
+        }
+    }
+}
+
+function initPaymentDestinationSettings() {
+    document.getElementById('openPaymentDestinationBtn')?.addEventListener('click', openPaymentDestinationModal);
+    document.getElementById('closePaymentDestinationBtn')?.addEventListener('click', closePaymentDestinationModal);
+    document.getElementById('cancelPaymentDestinationBtn')?.addEventListener('click', closePaymentDestinationModal);
+    document.getElementById('paymentDestinationModal')?.addEventListener('click', event => {
+        if (event.target === event.currentTarget) closePaymentDestinationModal();
+    });
+    document.getElementById('paymentSettingsQr')?.addEventListener('change', event => {
+        const file = event.target.files?.[0];
+        const preview = document.getElementById('paymentSettingsQrPreview');
+        if (!file || !preview) return;
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+    });
+    document.getElementById('paymentDestinationForm')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = document.getElementById('savePaymentDestinationBtn');
+        const message = document.getElementById('paymentDestinationMessage');
+        const formData = new FormData(event.currentTarget);
+        if (button) { button.disabled = true; button.textContent = 'Saving…'; }
+        try {
+            const response = await axios.post(`${baseApiUrl}/payment_destination.php`, formData);
+            if (typeof paymentDestinationRequest !== 'undefined') paymentDestinationRequest = null;
+            if (message) {
+                message.textContent = response.data?.message || 'Payment details saved.';
+                message.className = 'rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700';
+            }
+            window.setTimeout(closePaymentDestinationModal, 900);
+        } catch (error) {
+            if (message) {
+                message.textContent = error?.response?.data?.error || 'Unable to save payment details.';
+                message.className = 'rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700';
+            }
+        } finally {
+            if (button) { button.disabled = false; button.textContent = 'Save'; }
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initPaymentDestinationSettings);

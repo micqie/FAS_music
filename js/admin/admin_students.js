@@ -1,6 +1,15 @@
   let allStudents = [];
         let filteredStudents = [];
 
+        function getAdminStudentDisplayId(student) {
+            const savedCode = String(student?.student_code || '').trim();
+            if (savedCode) return savedCode;
+            const numericId = Number(student?.student_id || 0);
+            const createdAt = new Date(student?.created_at || '');
+            const year = Number.isNaN(createdAt.getTime()) ? new Date().getFullYear() : createdAt.getFullYear();
+            return numericId > 0 ? `STU-${year}-${String(numericId).padStart(4, '0')}` : 'ID unavailable';
+        }
+
         function sortNewestStudentsFirst(rows) {
             return (Array.isArray(rows) ? rows.slice() : []).sort((a, b) => {
                 const timeA = new Date(a?.created_at || 0).getTime();
@@ -41,7 +50,7 @@
             filteredStudents = allStudents.filter(student => {
                 if (branchId && String(student.branch_id || '') !== String(branchId)) return false;
                 if (!search) return true;
-                return [student.first_name, student.last_name, student.email, student.phone, student.branch_name, student.status]
+                return [student.first_name, student.last_name, getAdminStudentDisplayId(student), student.phone, student.branch_name, student.status]
                     .map(value => String(value || '').toLowerCase()).join(' ').includes(search);
             });
             displayFilteredStudents();
@@ -80,15 +89,14 @@
                     ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                     : 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100';
                 
-                // Full name and email for tooltip
                 const fullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
-                const fullEmail = student.email || '';
+                const studentDisplayId = getAdminStudentDisplayId(student);
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-3 py-2.5 table-name-cell">
                             <div class="font-semibold text-slate-900 truncate-text" title="${escapeHtml(fullName)}">${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</div>
-                            <div class="text-xs text-slate-500 truncate-text" title="${escapeHtml(fullEmail)}">${escapeHtml(student.email || '')}</div>
+                            <div class="text-xs font-medium text-slate-500 truncate-text" title="${escapeHtml(studentDisplayId)}">${escapeHtml(studentDisplayId)}</div>
                         </td>
                         <td class="px-3 py-2.5 text-slate-700 table-phone-cell truncate-text whitespace-nowrap" title="${escapeHtml(student.phone || '')}">${escapeHtml(student.phone || '—')}</td>
                         <td class="px-3 py-2.5 text-slate-700 table-text-cell truncate-text" title="${escapeHtml(student.branch_name || 'N/A')}">${escapeHtml(student.branch_name || 'N/A')}</td>

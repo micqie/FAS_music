@@ -2553,6 +2553,7 @@ CREATE TABLE `tbl_users` (
   `user_id` int(11) NOT NULL,
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
+  `must_change_password` tinyint(1) NOT NULL DEFAULT 0,
   `role_id` int(11) NOT NULL,
   `branch_id` int(11) DEFAULT NULL,
   `first_name` varchar(50) DEFAULT NULL,

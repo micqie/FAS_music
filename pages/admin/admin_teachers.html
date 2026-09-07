@@ -334,13 +334,64 @@
         </div>
     </div>
 
+    <div id="adminTeacherAvailabilityModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-gold-600 to-gold-400 px-6 py-5 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="h-11 w-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                        <i class="fas fa-calendar-alt text-white text-lg"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 id="adminAvailabilityTitle" class="text-xl font-bold text-white truncate">Instructor Availability</h3>
+                        <p id="adminAvailabilityMeta" class="text-sm text-white/85 truncate">Manage weekly teaching hours</p>
+                    </div>
+                </div>
+                <button type="button" id="closeAdminAvailabilityBtn" class="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 text-white transition shrink-0" aria-label="Close availability editor">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="overflow-y-auto p-6 bg-slate-50">
+                <div class="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    <i class="fas fa-circle-info mr-2"></i>Enable each teaching day and set one continuous time block. Admins can manage instructors from every branch.
+                </div>
+                <div id="adminAvailabilityStatus" class="hidden mb-4 rounded-xl border px-4 py-3 text-sm"></div>
+                <div id="adminAvailabilityGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+
+            <div class="border-t border-slate-200 bg-white px-6 py-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <button type="button" id="cancelAdminAvailabilityBtn" class="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">Cancel</button>
+                <button type="button" id="saveAdminAvailabilityBtn" class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-gold-500 to-gold-400 text-black text-sm font-bold shadow-lg shadow-gold-500/20 hover:from-gold-400 hover:to-gold-500 transition disabled:opacity-50">
+                    <i class="fas fa-save"></i><span id="saveAdminAvailabilityText">Save Availability</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <template id="adminAvailabilityCardTemplate">
+        <div class="admin-availability-card rounded-2xl border-2 border-slate-200 bg-white p-4 transition">
+            <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" class="admin-availability-enabled h-5 w-5 rounded border-slate-300 text-gold-500 focus:ring-gold-400">
+                <span class="admin-availability-day font-bold text-slate-900"></span>
+            </label>
+            <div class="mt-4 grid grid-cols-2 gap-3">
+                <label class="text-xs font-semibold text-slate-600">Start Time
+                    <input type="time" class="admin-availability-start mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-gold-400 focus:outline-none focus:ring-2 focus:ring-gold-400/30">
+                </label>
+                <label class="text-xs font-semibold text-slate-600">End Time
+                    <input type="time" class="admin-availability-end mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-gold-400 focus:outline-none focus:ring-2 focus:ring-gold-400/30">
+                </label>
+            </div>
+        </div>
+    </template>
+
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="../../js/admin/admin_responsive.js"></script>
 <script src="../../js/index.js"></script>
     <script src="../../js/session_timeout.js"></script>
     <script src="../../js/shared/teacher_form_ui.js"></script>
-   <script src="../../js/admin/admin_teachers.js"></script>
+   <script src="../../js/admin/admin_teachers.js?v=20260904001"></script>
    <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/intlTelInput.min.js"></script>
        <script src="../../js/intl-phone-input.js"></script>
 

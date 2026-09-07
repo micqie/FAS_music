@@ -36,6 +36,126 @@ class StudentsApi
     private $conn;
     private $phpMailerLoaded = false;
     private $lastMailError = null;
+    private $existingTableCache = [];
+    private $existingColumnCache = [];
+
+    private function pendingReservationMinutes()
+    {
+        $value = getenv('FAS_PENDING_RESERVATION_MINUTES');
+        $minutes = $value === false ? 1440 : (int)$value;
+        return max(5, min(10080, $minutes));
+    }
+
+    private function decodeRequestMeta($value)
+    {
+        $decoded = json_decode((string)$value, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function reservationIsActive($row, $meta = null)
+    {
+        $meta = is_array($meta) ? $meta : $this->decodeRequestMeta($row['request_notes'] ?? '');
+        if (!empty($meta['is_walkin_request'])) return false;
+        $state = (string)($row['schedule_request_status'] ?? $meta['schedule_request_status'] ?? 'Pending');
+        if ($state !== 'Pending') return false;
+        $expiresAt = trim((string)($row['reservation_expires_at'] ?? $meta['reservation_expires_at'] ?? ''));
+        if ($expiresAt === '' && !empty($row['created_at'])) {
+            $expiresAt = date('Y-m-d H:i:s', strtotime((string)$row['created_at']) + ($this->pendingReservationMinutes() * 60));
+        }
+        return $expiresAt !== '' && strtotime($expiresAt) !== false && strtotime($expiresAt) > time();
+    }
+
+    private function expirePendingScheduleReservations()
+    {
+        if (!$this->tableExists('tbl_enrollments')) return;
+        $stmt = $this->conn->query("SELECT enrollment_id, request_notes, created_at, schedule_request_status, reservation_expires_at FROM tbl_enrollments WHERE status = 'Pending'");
+        $update = $this->conn->prepare("UPDATE tbl_enrollments SET status = 'Expired', schedule_request_status = 'Expired', reservation_expires_at = NULL, request_notes = ? WHERE enrollment_id = ? AND status = 'Pending'");
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $meta = $this->decodeRequestMeta($row['request_notes'] ?? '');
+            if (!empty($meta['is_walkin_request'])) continue;
+            $expiresAt = trim((string)($row['reservation_expires_at'] ?? $meta['reservation_expires_at'] ?? ''));
+            if ($expiresAt === '' && !empty($row['created_at'])) $expiresAt = date('Y-m-d H:i:s', strtotime((string)$row['created_at']) + ($this->pendingReservationMinutes() * 60));
+            if (($row['schedule_request_status'] ?? $meta['schedule_request_status'] ?? 'Pending') === 'Pending' && $expiresAt !== '' && strtotime($expiresAt) <= time()) {
+                $meta['schedule_request_status'] = 'Expired';
+                $meta['reservation_expired_at'] = date('Y-m-d H:i:s');
+                $update->execute([json_encode($meta), (int)$row['enrollment_id']]);
+            }
+        }
+    }
+
+    private function getPendingReservationConflicts($teacherId, $sessionDate, $dayOfWeek, $startTime, $endTime, $excludeRequestIds = [], $lockRows = false)
+    {
+        if ((int)$teacherId < 1 || !$this->tableExists('tbl_enrollments')) return [];
+        $sql = "
+            SELECT e.enrollment_id AS request_id, e.request_notes, e.created_at, e.schedule_request_status, e.reservation_expires_at,
+                   s.student_id, s.first_name, s.last_name, s.email, s.branch_id,
+                   e.enrolled_by_type, g.first_name AS guardian_first_name,
+                   g.last_name AS guardian_last_name, g.email AS guardian_email,
+                   b.branch_name, sp.package_name,
+                   i.instrument_name, it.type_name,
+                   CONCAT_WS(' ', t.first_name, t.last_name) AS instructor_name
+            FROM tbl_enrollments e
+            INNER JOIN tbl_students s ON s.student_id = e.student_id
+            LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
+            LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
+            LEFT JOIN tbl_instruments i ON i.instrument_id = e.instrument_id
+            LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
+            LEFT JOIN tbl_teachers t ON t.teacher_id = ?
+            LEFT JOIN tbl_student_guardians sg ON sg.student_guardian_id = e.student_guardian_id
+            LEFT JOIN tbl_guardians g ON g.guardian_id = sg.guardian_id
+            WHERE e.status = 'Pending'
+        ";
+        $params = [(int)$teacherId];
+        $excludeIds = $this->normalizeExcludedIds($excludeRequestIds);
+        if ($excludeIds) {
+            $sql .= ' AND e.enrollment_id NOT IN (' . implode(',', array_fill(0, count($excludeIds), '?')) . ')';
+            $params = array_merge($params, $excludeIds);
+        }
+        $sql .= ' ORDER BY e.enrollment_id ASC';
+        if ($lockRows && $this->conn->inTransaction()) $sql .= ' FOR UPDATE';
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        $conflicts = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $meta = $this->decodeRequestMeta($row['request_notes'] ?? '');
+            if (!$this->reservationIsActive($row, $meta)) continue;
+            $slots = is_array($meta['preferred_slots'] ?? null) ? $meta['preferred_slots'] : [];
+            foreach ($slots as $slot) {
+                $existingTeacher = (int)($slot['teacher_id'] ?? $meta['preferred_teacher_id'] ?? 0);
+                $existingDate = trim((string)($slot['session_date'] ?? $meta['preferred_date'] ?? ''));
+                $existingDay = trim((string)($slot['day_of_week'] ?? $meta['preferred_day_of_week'] ?? ''));
+                $existingStart = trim((string)($slot['start_time'] ?? $meta['preferred_start_time'] ?? ''));
+                $existingEnd = trim((string)($slot['end_time'] ?? $meta['preferred_end_time'] ?? ''));
+                if ($existingTeacher !== (int)$teacherId || $existingStart === '' || $existingEnd === '') continue;
+                $sameSchedule = ($sessionDate !== '' && $existingDate === $sessionDate)
+                    || ($dayOfWeek !== '' && $existingDay === $dayOfWeek);
+                if (!$sameSchedule || !($startTime < $existingEnd && $endTime > $existingStart)) continue;
+                $conflicts[] = [
+                    'request_id' => (int)$row['request_id'],
+                    'requester' => strcasecmp((string)($row['enrolled_by_type'] ?? ''), 'Guardian') === 0
+                        ? trim(($row['guardian_first_name'] ?? '') . ' ' . ($row['guardian_last_name'] ?? ''))
+                        : trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')),
+                    'student_id' => (int)($row['student_id'] ?? 0),
+                    'email' => strcasecmp((string)($row['enrolled_by_type'] ?? ''), 'Guardian') === 0
+                        ? ($row['guardian_email'] ?? '')
+                        : ($row['email'] ?? ''),
+                    'instructor' => $row['instructor_name'] ?? ($slot['teacher_name'] ?? 'Instructor'),
+                    'teacher_id' => $existingTeacher,
+                    'session_date' => $existingDate,
+                    'day_of_week' => $existingDay,
+                    'start_time' => $existingStart,
+                    'end_time' => $existingEnd,
+                    'branch_id' => (int)($row['branch_id'] ?? 0),
+                    'branch' => $row['branch_name'] ?? '',
+                    'instrument' => $row['type_name'] ?: ($row['instrument_name'] ?? ''),
+                    'submitted_at' => $row['created_at'] ?? '',
+                    'reservation_expires_at' => $row['reservation_expires_at'] ?? $meta['reservation_expires_at'] ?? null
+                ];
+                break;
+            }
+        }
+        return $conflicts;
+    }
 
     public function __construct($pdo)
     {
@@ -44,6 +164,7 @@ class StudentsApi
         $this->ensureEnrollmentAssignedTeacherColumn();
         $this->ensureEnrollmentFixedScheduleColumns();
         $this->ensureEnrollmentScheduleSlotsTable();
+        $this->ensurePendingScheduleReservationColumns();
         $this->ensureSessionSchedulingColumns();
         $this->ensureStudentProgressTable();
         $this->ensureStudentSessionExtensionRequestsTable();
@@ -51,6 +172,27 @@ class StudentsApi
         $this->ensureLearningProgressTable();
         $this->ensureScheduleOperationLookupTable();
         $this->ensureSessionRescheduleWorkflow();
+    }
+
+    private function ensurePendingScheduleReservationColumns()
+    {
+        if (!$this->tableExists('tbl_enrollments')) return;
+        try {
+            if (!$this->tableHasColumn('tbl_enrollments', 'schedule_request_status')) {
+                $this->conn->exec("ALTER TABLE tbl_enrollments ADD COLUMN schedule_request_status ENUM('Pending','Schedule Conflict','Suggested','Approved','Rejected','Expired') NULL AFTER schedule_status");
+                $this->existingColumnCache['tbl_enrollments.schedule_request_status'] = true;
+            }
+            if (!$this->tableHasColumn('tbl_enrollments', 'reservation_expires_at')) {
+                $this->conn->exec("ALTER TABLE tbl_enrollments ADD COLUMN reservation_expires_at DATETIME NULL AFTER schedule_request_status");
+                $this->existingColumnCache['tbl_enrollments.reservation_expires_at'] = true;
+            }
+            $indexStmt = $this->conn->query("SHOW INDEX FROM tbl_enrollments WHERE Key_name = 'idx_pending_schedule_reservation'");
+            if (!$indexStmt->fetch(PDO::FETCH_ASSOC)) {
+                $this->conn->exec("ALTER TABLE tbl_enrollments ADD INDEX idx_pending_schedule_reservation (status, schedule_request_status, reservation_expires_at)");
+            }
+        } catch (PDOException $e) {
+            error_log('Unable to initialize pending schedule reservation columns: ' . $e->getMessage());
+        }
     }
 
     private function ensurePhpMailerLoaded()
@@ -1255,6 +1397,7 @@ class StudentsApi
                     ts.end_time,
                     ts.status,
                     ts.attendance_status,
+                    ts.counted_in,
                     ts.instructor_completed_at,
                     ts.absence_notice,
                     ts.attendance_notes,
@@ -1754,17 +1897,11 @@ class StudentsApi
                     $instrumentInfo['type_name'] ?? ''
                 ]);
                 $candidateTeacherIds = array_map(function ($t) {
-                    if ($this->isGeneralTeacherSpecialization($t['specialization'] ?? '')) {
-                        return 0;
-                    }
                     return (int)($t['teacher_id'] ?? 0);
                 }, $teacherCandidates);
             } elseif (!empty($allInstrumentIds)) {
                 $teacherCandidates = $this->buildTeacherCandidates($branchId, $allInstrumentIds, $allInstrumentKeywords);
                 $candidateTeacherIds = array_map(function ($t) {
-                    if ($this->isGeneralTeacherSpecialization($t['specialization'] ?? '')) {
-                        return 0;
-                    }
                     return (int)($t['teacher_id'] ?? 0);
                 }, $teacherCandidates);
             }
@@ -1773,7 +1910,7 @@ class StudentsApi
                 throw new InvalidArgumentException("Selected teacher is not eligible for the instrument row on {$day}");
             }
 
-            if (!$this->teacherHasAvailabilityForSlot($slotTeacherId, $this->nextDateForDayOfWeek(date('Y-m-d'), $day), $start, $end)) {
+            if (!$this->teacherHasAvailabilityForSlot($slotTeacherId, $this->nextDateForDayOfWeek(date('Y-m-d'), $day), $start, $end, $branchId)) {
                 throw new InvalidArgumentException("Teacher is not available for {$day} {$start}-{$end}");
             }
             if ($this->hasTeacherRecurringScheduleConflict($slotTeacherId, $day, $start, $end, $excludeEnrollmentIds)) {
@@ -2433,7 +2570,7 @@ class StudentsApi
         return 0;
     }
 
-    private function teacherHasAvailabilityForSlot($teacherId, $sessionDate, $startTime, $endTime)
+    private function teacherHasAvailabilityForSlot($teacherId, $sessionDate, $startTime, $endTime, $branchId = 0)
     {
         if ($teacherId < 1 || !$this->tableExists('tbl_teacher_availability')) {
             return true;
@@ -2445,7 +2582,7 @@ class StudentsApi
         }
 
         try {
-            $stmt = $this->conn->prepare("
+            $sql = "
                 SELECT COUNT(*) AS match_count
                 FROM tbl_teacher_availability
                 WHERE teacher_id = ?
@@ -2453,8 +2590,23 @@ class StudentsApi
                   AND status = 'Available'
                   AND start_time <= ?
                   AND end_time >= ?
-            ");
-            $stmt->execute([(int)$teacherId, $dayOfWeek, $startTime, $endTime]);
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM tbl_teacher_availability blocked
+                      WHERE blocked.teacher_id = tbl_teacher_availability.teacher_id
+                        AND blocked.day_of_week = tbl_teacher_availability.day_of_week
+                        AND blocked.status = 'Unavailable'
+                        AND blocked.start_time < ?
+                        AND blocked.end_time > ?
+                  )
+            ";
+            $params = [(int)$teacherId, $dayOfWeek, $startTime, $endTime, $endTime, $startTime];
+            if ((int)$branchId > 0 && $this->tableHasColumn('tbl_teacher_availability', 'branch_id')) {
+                $sql .= ' AND branch_id = ?';
+                $params[] = (int)$branchId;
+            }
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
             return ((int)$stmt->fetchColumn()) > 0;
         } catch (PDOException $e) {
             return false;
@@ -2665,7 +2817,7 @@ class StudentsApi
         }
     }
 
-    private function buildTeacherAvailableSlots($teacherId, $branchId, $studentId, $roomId = null, $excludeSessionIds = [], $daysAhead = 30)
+    private function buildTeacherAvailableSlots($teacherId, $branchId, $studentId, $roomId = null, $excludeSessionIds = [], $daysAhead = 30, $rangeStartDate = '', $excludeRequestIds = [])
     {
         $teacherId = (int)$teacherId;
         $branchId = (int)$branchId;
@@ -2699,6 +2851,29 @@ class StudentsApi
             $slots = [];
             $today = new DateTimeImmutable('today');
             $now = new DateTimeImmutable();
+            $calendarStartDate = $today;
+            $requestedRangeStart = trim((string)$rangeStartDate);
+            if ($requestedRangeStart !== '') {
+                try {
+                    $parsedRangeStart = new DateTimeImmutable($requestedRangeStart);
+                    $parsedRangeStart = $parsedRangeStart->setTime(0, 0, 0);
+                    if ($parsedRangeStart > $today) {
+                        $calendarStartDate = $parsedRangeStart;
+                    }
+                } catch (Exception $e) {
+                    $calendarStartDate = $today;
+                }
+            }
+            $teacherRecurringConflictCache = [];
+            $studentRecurringConflictCache = [];
+            $roomRecurringConflictCache = [];
+            $reservationEndDate = $calendarStartDate->modify('+' . $daysAhead . ' day')->format('Y-m-d');
+            $pendingReservationSlots = $this->getTeacherReservationSlots(
+                $teacherId,
+                $calendarStartDate->format('Y-m-d'),
+                $reservationEndDate,
+                $excludeRequestIds
+            );
 
             foreach ($availabilityRows as $availability) {
                 $dayOfWeek = trim((string)($availability['day_of_week'] ?? ''));
@@ -2709,7 +2884,7 @@ class StudentsApi
                 }
 
                 for ($offset = 0; $offset <= $daysAhead; $offset++) {
-                    $date = $today->modify('+' . $offset . ' day');
+                    $date = $calendarStartDate->modify('+' . $offset . ' day');
                     if ($date->format('l') !== $dayOfWeek) {
                         continue;
                     }
@@ -2729,15 +2904,15 @@ class StudentsApi
                             $cursor += 3600;
                             continue;
                         }
-                        if (!$this->teacherHasAvailabilityForSlot($teacherId, $slotDate, $slotStart, $slotEnd)) {
-                            $cursor += 3600;
-                            continue;
-                        }
                         if ($this->hasTeacherScheduleConflict($teacherId, $slotDate, $slotStart, $slotEnd, $excludeSessionIds)) {
                             $cursor += 3600;
                             continue;
                         }
-                        if ($this->hasTeacherRecurringScheduleConflict($teacherId, $dayOfWeek, $slotStart, $slotEnd)) {
+                        $recurringKey = $dayOfWeek . '|' . $slotStart . '|' . $slotEnd;
+                        if (!array_key_exists($recurringKey, $teacherRecurringConflictCache)) {
+                            $teacherRecurringConflictCache[$recurringKey] = $this->hasTeacherRecurringScheduleConflict($teacherId, $dayOfWeek, $slotStart, $slotEnd);
+                        }
+                        if ($teacherRecurringConflictCache[$recurringKey]) {
                             $cursor += 3600;
                             continue;
                         }
@@ -2745,7 +2920,10 @@ class StudentsApi
                             $cursor += 3600;
                             continue;
                         }
-                        if ($studentId > 0 && $this->hasStudentRecurringScheduleConflict($studentId, $dayOfWeek, $slotStart, $slotEnd)) {
+                        if ($studentId > 0 && !array_key_exists($recurringKey, $studentRecurringConflictCache)) {
+                            $studentRecurringConflictCache[$recurringKey] = $this->hasStudentRecurringScheduleConflict($studentId, $dayOfWeek, $slotStart, $slotEnd);
+                        }
+                        if ($studentId > 0 && $studentRecurringConflictCache[$recurringKey]) {
                             $cursor += 3600;
                             continue;
                         }
@@ -2753,7 +2931,23 @@ class StudentsApi
                             $cursor += 3600;
                             continue;
                         }
-                        if ($roomId !== null && $roomId > 0 && $this->hasRoomRecurringScheduleConflict($roomId, $dayOfWeek, $slotStart, $slotEnd)) {
+                        if ($roomId !== null && $roomId > 0 && !array_key_exists($recurringKey, $roomRecurringConflictCache)) {
+                            $roomRecurringConflictCache[$recurringKey] = $this->hasRoomRecurringScheduleConflict($roomId, $dayOfWeek, $slotStart, $slotEnd);
+                        }
+                        if ($roomId !== null && $roomId > 0 && $roomRecurringConflictCache[$recurringKey]) {
+                            $cursor += 3600;
+                            continue;
+                        }
+                        $reserved = false;
+                        foreach ($pendingReservationSlots as $reservation) {
+                            if ((string)$reservation['session_date'] === $slotDate
+                                && $slotStart < (string)$reservation['end_time']
+                                && $slotEnd > (string)$reservation['start_time']) {
+                                $reserved = true;
+                                break;
+                            }
+                        }
+                        if ($reserved) {
                             $cursor += 3600;
                             continue;
                         }
@@ -2775,6 +2969,60 @@ class StudentsApi
         } catch (PDOException $e) {
             return [];
         }
+    }
+
+    private function getTeacherReservationSlots($teacherId, $startDate = '', $endDate = '', $excludeRequestIds = [])
+    {
+        if (!$this->tableExists('tbl_enrollments')) return [];
+        $stmt = $this->conn->query("SELECT enrollment_id, request_notes, created_at, schedule_request_status, reservation_expires_at FROM tbl_enrollments WHERE status = 'Pending'");
+        $result = [];
+        $excluded = array_flip($this->normalizeExcludedIds($excludeRequestIds));
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            if (isset($excluded[(int)$row['enrollment_id']])) continue;
+            $meta = $this->decodeRequestMeta($row['request_notes'] ?? '');
+            if (!$this->reservationIsActive($row, $meta)) continue;
+            foreach ((array)($meta['preferred_slots'] ?? []) as $slot) {
+                $date = trim((string)($slot['session_date'] ?? ''));
+                if ((int)($slot['teacher_id'] ?? 0) !== (int)$teacherId || $date === '') continue;
+                $day = trim((string)($slot['day_of_week'] ?? $this->dayOfWeekFromDate($date)));
+                $rangeFrom = $startDate !== '' && $startDate > $date ? $startDate : $date;
+                $rangeTo = $endDate !== '' ? $endDate : $rangeFrom;
+                try {
+                    $cursor = new DateTimeImmutable($rangeFrom);
+                    $limit = new DateTimeImmutable($rangeTo);
+                } catch (Exception $e) { continue; }
+                while ($cursor <= $limit) {
+                    $candidateDate = $cursor->format('Y-m-d');
+                    if ($cursor->format('l') === $day) {
+                        $result[] = [
+                            'request_id' => (int)$row['enrollment_id'],
+                            'session_date' => $candidateDate,
+                            'day_of_week' => $day,
+                            'start_time' => $slot['start_time'] ?? '',
+                            'end_time' => $slot['end_time'] ?? '',
+                            'status' => 'reserved',
+                            'reservation_expires_at' => $row['reservation_expires_at'] ?? $meta['reservation_expires_at'] ?? null
+                        ];
+                    }
+                    $cursor = $cursor->modify('+1 day');
+                }
+            }
+        }
+        return $result;
+    }
+
+    private function getTeacherOccupiedSlots($teacherId, $startDate = '', $endDate = '')
+    {
+        if (!$this->tableExists('tbl_sessions')) return [];
+        $sql = "SELECT session_date, start_time, end_time, status FROM tbl_sessions
+                WHERE teacher_id = ? AND status NOT IN ('Cancelled','No Show','cancelled_by_teacher','rescheduled')";
+        $params = [(int)$teacherId];
+        if ($startDate !== '') { $sql .= ' AND session_date >= ?'; $params[] = $startDate; }
+        if ($endDate !== '') { $sql .= ' AND session_date <= ?'; $params[] = $endDate; }
+        $sql .= ' ORDER BY session_date, start_time';
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     private function getStudentBookedSessionsForTeacher($teacherId, $studentId, $branchId = 0)
@@ -2840,7 +3088,9 @@ class StudentsApi
         $studentId = (int)($_GET['student_id'] ?? 0);
         $roomName = trim((string)($_GET['room_name'] ?? ''));
         $startDate = trim((string)($_GET['start_date'] ?? ''));
+        $endDate = trim((string)($_GET['end_date'] ?? ''));
         $daysAhead = (int)($_GET['days_ahead'] ?? 60); // enough for the visible scheduling window without a full-year scan
+        $excludeRequestId = (int)($_GET['exclude_request_id'] ?? 0);
 
         if ($teacherId < 1) {
             $this->sendJSON(['error' => 'teacher_id is required'], 400);
@@ -2852,7 +3102,26 @@ class StudentsApi
             if ($resolvedRoomId > 0) $roomId = $resolvedRoomId;
         }
 
-        $slots = $this->buildTeacherAvailableSlots($teacherId, $branchId, $studentId, $roomId, [], $daysAhead);
+        if ($startDate !== '' && $endDate !== '') {
+            try {
+                $effectiveStart = new DateTimeImmutable($startDate);
+                $today = new DateTimeImmutable('today');
+                if ($effectiveStart < $today) $effectiveStart = $today;
+                $effectiveEnd = new DateTimeImmutable($endDate);
+                if ($effectiveEnd >= $effectiveStart) {
+                    $daysAhead = min(62, (int)$effectiveStart->diff($effectiveEnd)->format('%a'));
+                }
+            } catch (Exception $e) {
+                // Fall back to the requested days_ahead window.
+            }
+        }
+        $this->expirePendingScheduleReservations();
+        $excludeRequestIds = $excludeRequestId > 0 ? [$excludeRequestId] : [];
+        $slots = $this->buildTeacherAvailableSlots($teacherId, $branchId, $studentId, $roomId, [], $daysAhead, $startDate, $excludeRequestIds);
+        $calendarRangeStart = $startDate !== '' ? $startDate : date('Y-m-d');
+        $calendarRangeEnd = $endDate !== '' ? $endDate : date('Y-m-d', strtotime($calendarRangeStart . ' +' . max(1, $daysAhead) . ' days'));
+        $reservedSlots = $this->getTeacherReservationSlots($teacherId, $calendarRangeStart, $calendarRangeEnd, $excludeRequestIds);
+        $occupiedSlots = $this->getTeacherOccupiedSlots($teacherId, $calendarRangeStart, $calendarRangeEnd);
         $bookedSessions = $this->getStudentBookedSessionsForTeacher($teacherId, $studentId, $branchId);
         $elapsedAvailabilityDates = [];
         try {
@@ -2891,6 +3160,8 @@ class StudentsApi
             'success' => true,
             'teacher_id' => $teacherId,
             'slots' => $slots,
+            'reserved_slots' => $reservedSlots,
+            'occupied_slots' => $occupiedSlots,
             'elapsed_availability_dates' => $elapsedAvailabilityDates,
             'booked_sessions' => $bookedSessions
         ]);
@@ -2899,10 +3170,16 @@ class StudentsApi
     /** Check whether a table exists in current DB */
     private function tableExists($tableName)
     {
+        $cacheKey = (string)$tableName;
+        if (!empty($this->existingTableCache[$cacheKey])) {
+            return true;
+        }
         try {
             $stmt = $this->conn->prepare("SHOW TABLES LIKE ?");
             $stmt->execute([$tableName]);
-            return $stmt->rowCount() > 0;
+            $exists = $stmt->rowCount() > 0;
+            if ($exists) $this->existingTableCache[$cacheKey] = true;
+            return $exists;
         } catch (PDOException $e) {
             return false;
         }
@@ -2914,10 +3191,16 @@ class StudentsApi
         if (!preg_match('/^[A-Za-z0-9_]+$/', (string) $tableName)) {
             return false;
         }
+        $cacheKey = (string)$tableName . '.' . (string)$columnName;
+        if (!empty($this->existingColumnCache[$cacheKey])) {
+            return true;
+        }
         try {
             $stmt = $this->conn->prepare("SHOW COLUMNS FROM `{$tableName}` LIKE ?");
             $stmt->execute([$columnName]);
-            return $stmt->rowCount() > 0;
+            $exists = $stmt->rowCount() > 0;
+            if ($exists) $this->existingColumnCache[$cacheKey] = true;
+            return $exists;
         } catch (PDOException $e) {
             return false;
         }
@@ -3020,6 +3303,28 @@ class StudentsApi
         return sprintf('STU-%04d-%04d', (int)date('Y'), $studentId);
     }
 
+    private function ensureStudentCodesAssigned()
+    {
+        if (!$this->tableHasColumn('tbl_students', 'student_code')) {
+            return;
+        }
+
+        try {
+            $this->conn->exec("
+                UPDATE tbl_students
+                SET student_code = CONCAT(
+                    'STU-',
+                    YEAR(COALESCE(created_at, CURRENT_DATE)),
+                    '-',
+                    LPAD(student_id, 4, '0')
+                )
+                WHERE student_code IS NULL OR TRIM(student_code) = ''
+            ");
+        } catch (PDOException $e) {
+            error_log('Unable to backfill student codes: ' . $e->getMessage());
+        }
+    }
+
     private function buildGuardianUsername($studentId, $guardianEmail)
     {
         $studentId = (int)$studentId;
@@ -3069,9 +3374,14 @@ class StudentsApi
         try {
             $this->ensureSessionPackageColumn();
             $this->ensureStudentRegistrationFeesTable();
+            $this->ensureStudentCodesAssigned();
+            $studentCodeSelect = $this->tableHasColumn('tbl_students', 'student_code')
+                ? 's.student_code'
+                : 'NULL AS student_code';
             $stmt = $this->conn->prepare("
                 SELECT
                     s.student_id,
+                    {$studentCodeSelect},
                     s.first_name,
                     s.last_name,
                     s.email,
@@ -3743,7 +4053,12 @@ class StudentsApi
             $firstEndExpr = "NULL";
             $firstRoomExpr = "NULL";
             $teacherIdExpr = "e.assigned_teacher_id";
+            $usedSessionsExpr = "COALESCE(e.completed_sessions, 0)";
             if ($this->tableExists('tbl_sessions')) {
+                $usedSessionCondition = $this->tableHasColumn('tbl_sessions', 'counted_in')
+                    ? "(COALESCE(used_ts.counted_in, 0) = 1 OR used_ts.status IN ('Completed', 'Late'))"
+                    : "used_ts.status IN ('Completed', 'Late')";
+                $usedSessionsExpr = "GREATEST(COALESCE(e.completed_sessions, 0), (SELECT COUNT(*) FROM tbl_sessions used_ts WHERE used_ts.enrollment_id = e.enrollment_id AND {$usedSessionCondition}))";
                 $todayYmd = date('Y-m-d');
                 $excludedUpcomingStatuses = "'Completed', 'Late', 'Cancelled', 'No Show', 'cancelled_by_teacher', 'rescheduled'";
                 $sessionJoin = "
@@ -3791,6 +4106,7 @@ class StudentsApi
                     e.start_date,
                     e.end_date,
                     e.completed_sessions,
+                    {$usedSessionsExpr} AS used_sessions,
                     {$firstDateExpr} AS first_session_date,
                     {$firstStartExpr} AS first_start_time,
                     {$firstEndExpr} AS first_end_time,
@@ -3799,6 +4115,8 @@ class StudentsApi
                     {$packagePriceExpr} AS total_amount,
                     COALESCE(pay.paid_amount, 0) AS paid_amount,
                     e.status,
+                    e.schedule_request_status,
+                    e.reservation_expires_at,
                     e.allowed_absences,
                     e.used_absences,
                     e.consecutive_absences,
@@ -4964,6 +5282,7 @@ class StudentsApi
             $packages = [];
             $instruments = [];
             $availabilities = [];
+            $teacherCandidates = [];
             $latestRequest = null;
 
             // Packages (session packages first, then lesson packages fallback)
@@ -5104,21 +5423,29 @@ class StudentsApi
                 if ($this->tableExists('tbl_teacher_availability')) {
                     $stmtAvailability = $this->conn->prepare("
                         SELECT DISTINCT
+                            ta.teacher_id,
                             ta.day_of_week,
                             ta.start_time,
-                            ta.end_time
+                            ta.end_time,
+                            t.first_name AS teacher_first_name,
+                            t.last_name AS teacher_last_name
                         FROM tbl_teacher_availability ta
+                        INNER JOIN tbl_teachers t ON t.teacher_id = ta.teacher_id
                         WHERE ta.branch_id = ?
                           AND ta.status = 'Available'
+                          AND t.branch_id = ?
+                          AND t.status = 'Active'
                         ORDER BY
                             FIELD(ta.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'),
                             ta.start_time ASC
                     ");
-                    $stmtAvailability->execute([(int) $student['branch_id']]);
+                    $stmtAvailability->execute([(int) $student['branch_id'], (int) $student['branch_id']]);
                     $availabilities = $stmtAvailability->fetchAll(PDO::FETCH_ASSOC);
+                    $teacherCandidates = $this->buildTeacherCandidates((int) $student['branch_id']);
                 }
             } catch (PDOException $e) {
                 $availabilities = [];
+                $teacherCandidates = [];
             }
 
             // Latest enrollment request (for status display)
@@ -5151,8 +5478,13 @@ class StudentsApi
                     $parts = explode('|', $preferred, 2);
                     $latestRequest['preferred_day_of_week'] = trim($parts[0] ?? '');
                     $latestRequest['preferred_date'] = trim($parts[1] ?? '');
+                    $latestRequest['preferred_date'] = (string)($meta['preferred_date'] ?? $latestRequest['preferred_date']);
+                    $latestRequest['preferred_day_of_week'] = (string)($meta['preferred_day_of_week'] ?? $latestRequest['preferred_day_of_week']);
+                    $latestRequest['preferred_start_time'] = (string)($meta['preferred_start_time'] ?? '');
+                    $latestRequest['preferred_end_time'] = (string)($meta['preferred_end_time'] ?? '');
                     $latestRequest['payment_type'] = (string)($meta['payment_type'] ?? 'Partial Payment');
                     $latestRequest['payment_method'] = (string)($meta['payment_method'] ?? '');
+                    $latestRequest['reference_number'] = (string)($meta['reference_number'] ?? '');
                     $latestRequest['payable_now'] = (float)($meta['payable_now'] ?? 0);
                     $latestRequest['package_total_amount'] = (float)($meta['package_total_amount'] ?? 0);
                     $latestRequest['payment_proof_path'] = $meta['payment_proof_path'] ?? null;
@@ -5194,6 +5526,7 @@ class StudentsApi
                 'default_package_id' => $defaultPackageId,
                 'instruments' => $instruments,
                 'availabilities' => $availabilities,
+                'teacher_candidates' => $teacherCandidates,
                 'latest_request' => $latestRequest,
                 'latest_session_extension_request' => $latestSessionExtensionRequest
             ]);
@@ -5255,7 +5588,7 @@ class StudentsApi
             }
 
             $stmtEnrollment = $this->conn->prepare("
-                SELECT enrollment_id, status
+                SELECT enrollment_id, status, total_sessions, completed_sessions
                 FROM tbl_enrollments
                 WHERE student_id = ? AND status IN ('Active','Completed')
                 ORDER BY enrollment_id DESC
@@ -5265,6 +5598,27 @@ class StudentsApi
             $enrollment = $stmtEnrollment->fetch(PDO::FETCH_ASSOC);
             if (!$enrollment) {
                 $this->sendJSON(['error' => 'An approved enrollment is required before requesting additional sessions.'], 400);
+            }
+
+            $totalSessions = max(0, (int)($enrollment['total_sessions'] ?? 0));
+            $usedSessions = max(0, (int)($enrollment['completed_sessions'] ?? 0));
+            if ($this->tableExists('tbl_sessions')) {
+                $countedCondition = $this->tableHasColumn('tbl_sessions', 'counted_in')
+                    ? "(COALESCE(counted_in, 0) = 1 OR status IN ('Completed', 'Late'))"
+                    : "status IN ('Completed', 'Late')";
+                $stmtUsedSessions = $this->conn->prepare("
+                    SELECT COUNT(*)
+                    FROM tbl_sessions
+                    WHERE enrollment_id = ? AND {$countedCondition}
+                ");
+                $stmtUsedSessions->execute([(int)$enrollment['enrollment_id']]);
+                $usedSessions = max($usedSessions, (int)($stmtUsedSessions->fetchColumn() ?: 0));
+            }
+            if ($totalSessions < 1 || $usedSessions < $totalSessions) {
+                $remainingSessions = max(0, $totalSessions - $usedSessions);
+                $this->sendJSON([
+                    'error' => "Additional sessions can only be requested after all current package sessions are used. {$remainingSessions} session" . ($remainingSessions === 1 ? '' : 's') . ' remaining.'
+                ], 400);
             }
 
             $this->ensureStudentSessionExtensionRequestsTable();
@@ -5362,9 +5716,20 @@ class StudentsApi
         $paymentType = $this->normalizeEnrollmentPaymentType($paymentRaw);
         $paymentMethodRaw = $data['payment_method'] ?? '';
         $paymentMethod = $this->normalizeEnrollmentPaymentMethod($paymentMethodRaw);
+        $referenceNumber = trim((string)($data['reference_number'] ?? ''));
         $isWalkinRequest = !empty($data['is_walkin_request']);
         $preferredDate = !empty($data['preferred_date']) ? $data['preferred_date'] : null;
         $preferredDay = trim($data['preferred_day_of_week'] ?? '');
+        $preferredStartTime = trim((string)($data['preferred_start_time'] ?? ''));
+        $preferredEndTime = trim((string)($data['preferred_end_time'] ?? ''));
+        $preferredTeacherId = (int)($data['preferred_teacher_id'] ?? 0);
+        $preferredSlots = [];
+        if (!empty($data['preferred_slots_json'])) {
+            $decodedPreferredSlots = json_decode((string)$data['preferred_slots_json'], true);
+            $preferredSlots = is_array($decodedPreferredSlots) ? array_values($decodedPreferredSlots) : [];
+        } elseif (is_array($data['preferred_slots'] ?? null)) {
+            $preferredSlots = array_values($data['preferred_slots']);
+        }
         if (!empty($data['instrument_ids_json'])) {
             $decoded = json_decode((string)$data['instrument_ids_json'], true);
             $instrumentIds = is_array($decoded) ? $decoded : [];
@@ -5394,12 +5759,101 @@ class StudentsApi
             if (!$access->fetchColumn()) $this->sendJSON(['error'=>'You can only submit your own enrollment request'],403);
         }
         $validDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+        if (in_array($roleCategory, ['student', 'guardian'], true)) {
+            if (empty($preferredSlots)) {
+                $this->sendJSON(['error' => 'Choose an instructor and at least one preferred class day'], 400);
+            }
+            if (count($preferredSlots) > 7) {
+                $this->sendJSON(['error' => 'You can request up to 7 preferred class days'], 400);
+            }
+
+            $normalizedPreferredSlots = [];
+            $seenPreferredDates = [];
+            $seenRecurringDays = [];
+            foreach ($preferredSlots as $slot) {
+                if (!is_array($slot)) {
+                    $this->sendJSON(['error' => 'Invalid preferred schedule entry'], 400);
+                }
+                $slotDate = trim((string)($slot['session_date'] ?? ''));
+                $slotStart = trim((string)($slot['start_time'] ?? ''));
+                $slotEnd = trim((string)($slot['end_time'] ?? ''));
+                $slotTeacherId = (int)($slot['teacher_id'] ?? 0);
+                $slotDateObject = $slotDate ? DateTime::createFromFormat('Y-m-d', $slotDate) : false;
+                if (!$slotDateObject || $slotDateObject->format('Y-m-d') !== $slotDate || $slotDate < date('Y-m-d')) {
+                    $this->sendJSON(['error' => 'Every preferred class day must have a valid upcoming date'], 400);
+                }
+                if ($slotTeacherId < 1 || !preg_match('/^\d{2}:\d{2}(?::\d{2})?$/', $slotStart)) {
+                    $this->sendJSON(['error' => 'Every preferred class day must include an instructor and valid time'], 400);
+                }
+                $slotStartTimestamp = strtotime('2000-01-01 ' . $slotStart);
+                if ($slotEnd === '' && $slotStartTimestamp !== false) {
+                    $slotEnd = date('H:i:s', $slotStartTimestamp + 3600);
+                }
+                $slotEndTimestamp = strtotime('2000-01-01 ' . $slotEnd);
+                if ($slotStartTimestamp === false || $slotEndTimestamp === false || ($slotEndTimestamp - $slotStartTimestamp) !== 3600) {
+                    $this->sendJSON(['error' => 'Every requested class schedule must be a one-hour time slot'], 400);
+                }
+                $slotStart = date('H:i:s', $slotStartTimestamp);
+                $slotEnd = date('H:i:s', $slotEndTimestamp);
+                if (strtotime($slotDate . ' ' . $slotStart) <= time()) {
+                    $this->sendJSON(['error' => 'Every preferred class time must still be upcoming'], 400);
+                }
+                $slotDay = $this->dayOfWeekFromDate($slotDate);
+                if (isset($seenPreferredDates[$slotDate]) || isset($seenRecurringDays[$slotDay])) {
+                    $this->sendJSON(['error' => 'Each preferred class day must use a different weekday'], 400);
+                }
+                $seenPreferredDates[$slotDate] = true;
+                $seenRecurringDays[$slotDay] = true;
+                $normalizedPreferredSlots[] = [
+                    'teacher_id' => $slotTeacherId,
+                    'teacher_name' => trim((string)($slot['teacher_name'] ?? '')),
+                    'session_date' => $slotDate,
+                    'day_of_week' => $slotDay,
+                    'start_time' => $slotStart,
+                    'end_time' => $slotEnd
+                ];
+            }
+            $preferredSlots = $normalizedPreferredSlots;
+            $preferredDate = $preferredSlots[0]['session_date'];
+            $preferredDay = $preferredSlots[0]['day_of_week'];
+            $preferredStartTime = $preferredSlots[0]['start_time'];
+            $preferredEndTime = $preferredSlots[0]['end_time'];
+            $preferredTeacherId = (int)$preferredSlots[0]['teacher_id'];
+
+            $preferredDateObject = $preferredDate ? DateTime::createFromFormat('Y-m-d', (string)$preferredDate) : false;
+            $dateIsValid = $preferredDateObject
+                && $preferredDateObject->format('Y-m-d') === $preferredDate
+                && $preferredDate >= date('Y-m-d');
+            if (!$dateIsValid) {
+                $this->sendJSON(['error' => 'Choose a valid preferred class date that is not in the past'], 400);
+            }
+            $preferredDay = $this->dayOfWeekFromDate($preferredDate);
+            if (!preg_match('/^\d{2}:\d{2}(?::\d{2})?$/', $preferredStartTime)) {
+                $this->sendJSON(['error' => 'Choose a valid preferred class time'], 400);
+            }
+            $startTimestamp = strtotime('2000-01-01 ' . $preferredStartTime);
+            if ($preferredEndTime === '') {
+                $preferredEndTime = date('H:i:s', $startTimestamp + 3600);
+            }
+            $endTimestamp = strtotime('2000-01-01 ' . $preferredEndTime);
+            if ($startTimestamp === false || $endTimestamp === false || ($endTimestamp - $startTimestamp) !== 3600) {
+                $this->sendJSON(['error' => 'The requested class schedule must be a one-hour time slot'], 400);
+            }
+            $preferredStartTime = date('H:i:s', $startTimestamp);
+            $preferredEndTime = date('H:i:s', $endTimestamp);
+            if (strtotime($preferredDate . ' ' . $preferredStartTime) <= time()) {
+                $this->sendJSON(['error' => 'Choose a preferred class time that is still upcoming'], 400);
+            }
+        }
         if ($paymentType === '') {
             // Backward-compatible fallback for cached clients/forms.
             $paymentType = 'Partial Payment';
         }
         if ($paymentMethod === '') {
             $this->sendJSON(['error' => 'payment_method is required'], 400);
+        }
+        if (!$isWalkinRequest && $paymentMethod !== 'Cash' && $referenceNumber === '') {
+            $this->sendJSON(['error' => 'reference_number is required for online enrollment payments'], 400);
         }
 
         $this->ensureStudentInstrumentsTable();
@@ -5537,6 +5991,22 @@ class StudentsApi
                 $this->sendJSON(['error' => 'One or more selected instruments are not available in your branch'], 400);
             }
 
+            if (in_array($roleCategory, ['student', 'guardian'], true)) {
+                $selectedTeacherIds = array_values(array_unique(array_map(function ($slot) {
+                    return (int)($slot['teacher_id'] ?? 0);
+                }, $preferredSlots)));
+                if (count($selectedTeacherIds) !== 1 || $selectedTeacherIds[0] < 1) {
+                    $this->sendJSON(['error' => 'All preferred class days must use the one instructor you selected'], 400);
+                }
+                $eligibleTeachers = $this->buildTeacherCandidates((int)$student['branch_id'], $instrumentIds, []);
+                $eligibleTeacherIds = array_values(array_filter(array_map(function ($teacher) {
+                    return (int)($teacher['teacher_id'] ?? 0);
+                }, $eligibleTeachers), function ($teacherId) { return $teacherId > 0; }));
+                if (!in_array($selectedTeacherIds[0], $eligibleTeacherIds, true)) {
+                    $this->sendJSON(['error' => 'The selected instructor is not active in this branch or does not teach the selected instrument'], 400);
+                }
+            }
+
             if (!$this->tableExists('tbl_enrollments')) {
                 $this->sendJSON(['error' => 'tbl_enrollments table not found'], 500);
             }
@@ -5552,11 +6022,13 @@ class StudentsApi
             }
             $preferredSchedule = null;
             if ($preferredDay !== '' && in_array($preferredDay, $validDays, true)) {
-                $preferredSchedule = $preferredDay;
+                $preferredSchedule = $preferredDay . ($preferredDate ? '|' . $preferredDate : '');
             }
+            $reservationExpiresAt = $isWalkinRequest ? null : date('Y-m-d H:i:s', time() + ($this->pendingReservationMinutes() * 60));
             $requestMeta = json_encode([
                 'payment_type' => $paymentType,
                 'payment_method' => $paymentMethod,
+                'reference_number' => $referenceNumber !== '' ? $referenceNumber : null,
                 'payable_now' => $payableNow,
                 'package_total_amount' => $packagePrice,
                 'base_package_amount' => $basePackagePrice,
@@ -5566,9 +6038,43 @@ class StudentsApi
                 'extra_session_amount' => $extraSessionCount * 650.00,
                 'instrument_ids' => array_values($instrumentIds),
                 'payment_proof_path' => $paymentProofPath,
+                'preferred_date' => $preferredDate,
+                'preferred_day_of_week' => $preferredDay,
+                'preferred_start_time' => $preferredStartTime,
+                'preferred_end_time' => $preferredEndTime,
+                'preferred_teacher_id' => $preferredTeacherId > 0 ? $preferredTeacherId : null,
+                'preferred_slots' => $preferredSlots,
                 'is_walkin_request' => $isWalkinRequest ? 1 : 0,
+                'schedule_request_status' => 'Pending',
+                'reservation_expires_at' => $reservationExpiresAt,
                 'enrollment_mode' => $isInitialEnrollment ? 'initial' : 'extension'
             ]);
+
+            // Acquiring the reservation and inserting its request are atomic. Locking all
+            // pending request rows serializes simultaneous claims for the same instructor.
+            if (!$this->conn->inTransaction()) $this->conn->beginTransaction();
+            $this->conn->query("SELECT enrollment_id FROM tbl_enrollments WHERE status = 'Pending' FOR UPDATE")->fetchAll(PDO::FETCH_COLUMN);
+            $this->expirePendingScheduleReservations();
+            if (!$isWalkinRequest) {
+                foreach ($preferredSlots as $slot) {
+                    $slotConflicts = $this->getPendingReservationConflicts(
+                        (int)$slot['teacher_id'],
+                        (string)$slot['session_date'],
+                        (string)$slot['day_of_week'],
+                        (string)$slot['start_time'],
+                        (string)$slot['end_time'],
+                        [],
+                        false
+                    );
+                    if ($slotConflicts
+                        || !$this->teacherHasAvailabilityForSlot((int)$slot['teacher_id'], (string)$slot['session_date'], (string)$slot['start_time'], (string)$slot['end_time'], (int)$student['branch_id'])
+                        || $this->hasTeacherScheduleConflict((int)$slot['teacher_id'], (string)$slot['session_date'], (string)$slot['start_time'], (string)$slot['end_time'])
+                        || $this->hasTeacherRecurringScheduleConflict((int)$slot['teacher_id'], (string)$slot['day_of_week'], (string)$slot['start_time'], (string)$slot['end_time'])) {
+                        $this->conn->rollBack();
+                        $this->sendJSON(['error' => 'That instructor schedule was just reserved or occupied. Please choose another available slot.', 'conflict_type' => 'schedule'], 409);
+                    }
+                }
+            }
             $stmtPendingEnrollment = $this->conn->prepare("
                 INSERT INTO tbl_enrollments (
                     student_id,
@@ -5582,8 +6088,10 @@ class StudentsApi
                     end_date,
                     total_sessions,
                     completed_sessions,
-                    status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0, 'Pending')
+                    status,
+                    schedule_request_status,
+                    reservation_expires_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0, 'Pending', 'Pending', ?)
             ");
             $stmtPendingEnrollment->execute([
                 $studentId,
@@ -5593,17 +6101,21 @@ class StudentsApi
                 $requestMeta,
                 $roleCategory === 'guardian' ? 'Guardian' : 'Self',
                 $guardianLinkId > 0 ? $guardianLinkId : null,
-                $totalSessions
+                $totalSessions,
+                $reservationExpiresAt
             ]);
             $requestId = (int)$this->conn->lastInsertId();
 
+            if ($this->conn->inTransaction()) $this->conn->commit();
+
             $this->sendJSON([
                 'success' => true,
-                'message' => 'Request submitted. Desk/Admin will review and confirm your package payment.',
+                'message' => 'Enrollment request submitted. The desk will confirm your preferred schedule or adjust it if there is a conflict.',
                 'request_id' => $requestId,
                 'payable_now' => $payableNow
             ]);
         } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }
@@ -5638,10 +6150,19 @@ class StudentsApi
                     s.first_name,
                     s.last_name,
                     s.email,
-                    b.branch_name
+                    b.branch_name,
+                    e.assigned_teacher_id,
+                    e.instrument_id,
+                    e.total_sessions,
+                    CONCAT_WS(' ', t.first_name, t.last_name) AS teacher_name,
+                    COALESCE(i.instrument_name, it.type_name, 'Instrument') AS instrument_name
                 FROM tbl_student_session_extension_requests r
                 INNER JOIN tbl_students s ON r.student_id = s.student_id
                 LEFT JOIN tbl_branches b ON r.branch_id = b.branch_id
+                LEFT JOIN tbl_enrollments e ON e.enrollment_id = r.enrollment_id
+                LEFT JOIN tbl_teachers t ON t.teacher_id = e.assigned_teacher_id
+                LEFT JOIN tbl_instruments i ON i.instrument_id = e.instrument_id
+                LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
                 WHERE r.status = 'Pending'
             ";
             $params = [];
@@ -5666,11 +6187,19 @@ class StudentsApi
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
+        $actor = fas_require_authenticated_user($this->conn);
+        if (!in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin', 'owner', 'manager', 'staff'], true)) {
+            $this->sendJSON(['error' => 'Only authorized desk staff can approve and schedule additional sessions'], 403);
+        }
+        if (!$this->tableExists('tbl_sessions')) {
+            $this->sendJSON(['error' => 'Session scheduling is unavailable'], 500);
+        }
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $requestId = (int)($data['request_id'] ?? 0);
         $branchId = (int)($data['branch_id'] ?? $data['desk_branch_id'] ?? 0);
         $adminNotes = trim((string)($data['admin_notes'] ?? ''));
+        $scheduledSlots = is_array($data['scheduled_slots'] ?? null) ? $data['scheduled_slots'] : [];
 
         if ($requestId < 1) {
             $this->sendJSON(['error' => 'request_id is required'], 400);
@@ -5683,8 +6212,10 @@ class StudentsApi
 
             $stmt = $this->conn->prepare("
                 SELECT r.request_id, r.student_id, r.branch_id, r.enrollment_id,
-                       r.requested_sessions, r.requested_amount, r.status, r.notes
+                       r.requested_sessions, r.requested_amount, r.status, r.notes,
+                       e.assigned_teacher_id, e.instrument_id, e.total_sessions, e.status AS enrollment_status
                 FROM tbl_student_session_extension_requests r
+                LEFT JOIN tbl_enrollments e ON e.enrollment_id = r.enrollment_id
                 WHERE r.request_id = ?
                 LIMIT 1
                 FOR UPDATE
@@ -5724,6 +6255,96 @@ class StudentsApi
             }
 
             $additionalSessions = max(1, (int)($request['requested_sessions'] ?? 1));
+            if (!empty($scheduledSlots) && count($scheduledSlots) !== $additionalSessions) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => "Choose a schedule for all {$additionalSessions} additional session" . ($additionalSessions === 1 ? '' : 's') . '.'], 400);
+            }
+
+            $stmtEnrollmentDetails = $this->conn->prepare("
+                SELECT e.student_id, e.assigned_teacher_id, e.instrument_id, e.total_sessions, e.status, s.branch_id
+                FROM tbl_enrollments e
+                INNER JOIN tbl_students s ON s.student_id = e.student_id
+                WHERE e.enrollment_id = ?
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $stmtEnrollmentDetails->execute([$enrollmentId]);
+            $enrollment = $stmtEnrollmentDetails->fetch(PDO::FETCH_ASSOC);
+            if (!$enrollment || !in_array((string)($enrollment['status'] ?? ''), ['Active', 'Completed'], true)) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'The enrollment is no longer available for scheduling.'], 400);
+            }
+            $teacherId = (int)($enrollment['assigned_teacher_id'] ?? 0);
+            if ($teacherId < 1) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'Assign an instructor to this enrollment before approving additional sessions.'], 400);
+            }
+            $stmtTeacherLock = $this->conn->prepare("SELECT teacher_id FROM tbl_teachers WHERE teacher_id = ? FOR UPDATE");
+            $stmtTeacherLock->execute([$teacherId]);
+
+            // Older admin clients do not yet submit selected slots. Keep them safe
+            // by assigning the earliest conflict-free slots instead of approving
+            // sessions with no schedule.
+            if (empty($scheduledSlots)) {
+                $availableSlots = $this->buildTeacherAvailableSlots(
+                    $teacherId,
+                    (int)$enrollment['branch_id'],
+                    (int)$enrollment['student_id'],
+                    null,
+                    [],
+                    min(365, max(90, $additionalSessions * 14))
+                );
+                if (count($availableSlots) < $additionalSessions) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'There are not enough conflict-free instructor slots to schedule this request.'], 409);
+                }
+                $scheduledSlots = array_slice($availableSlots, 0, $additionalSessions);
+            }
+
+            $normalizedSlots = [];
+            $slotKeys = [];
+            foreach ($scheduledSlots as $slot) {
+                $sessionDate = trim((string)($slot['session_date'] ?? ''));
+                $startTime = trim((string)($slot['start_time'] ?? ''));
+                $endTime = trim((string)($slot['end_time'] ?? ''));
+                if ($sessionDate === '' || $startTime === '' || $endTime === ''
+                    || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $sessionDate)
+                    || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $startTime)
+                    || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $endTime)
+                    || strtotime($endTime) <= strtotime($startTime)
+                    || !$this->isFutureOrTodayDate($sessionDate)
+                    || strtotime($sessionDate . ' ' . $startTime) <= time()) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'One of the selected schedules is invalid or already in the past.'], 400);
+                }
+                $slotKey = $sessionDate . '|' . $startTime . '|' . $endTime;
+                if (isset($slotKeys[$slotKey])) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'Each additional session must use a different schedule.'], 400);
+                }
+                foreach ($normalizedSlots as $selectedSlot) {
+                    if ($sessionDate === $selectedSlot['sessionDate']
+                        && $startTime < $selectedSlot['endTime']
+                        && $endTime > $selectedSlot['startTime']) {
+                        $this->conn->rollBack();
+                        $this->sendJSON(['error' => 'Selected additional sessions cannot overlap each other.'], 400);
+                    }
+                }
+                $slotKeys[$slotKey] = true;
+                $dayOfWeek = $this->dayOfWeekFromDate($sessionDate);
+                if (!$this->teacherHasAvailabilityForSlot($teacherId, $sessionDate, $startTime, $endTime, (int)$enrollment['branch_id'])
+                    || $this->hasTeacherScheduleConflict($teacherId, $sessionDate, $startTime, $endTime)
+                    || $this->hasTeacherRecurringScheduleConflict($teacherId, $dayOfWeek, $startTime, $endTime, [$enrollmentId])
+                    || $this->hasStudentScheduleConflict((int)$enrollment['student_id'], $sessionDate, $startTime, $endTime)
+                    || $this->hasStudentRecurringScheduleConflict((int)$enrollment['student_id'], $dayOfWeek, $startTime, $endTime, [$enrollmentId])
+                    || !empty($this->getPendingReservationConflicts($teacherId, $sessionDate, $dayOfWeek, $startTime, $endTime))) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'A selected schedule is no longer available. Choose another slot and try again.'], 409);
+                }
+                $normalizedSlots[] = compact('sessionDate', 'startTime', 'endTime');
+            }
+
+            $oldTotalSessions = max(0, (int)($enrollment['total_sessions'] ?? 0));
             $stmtEnrollmentUpdate = $this->conn->prepare("
                 UPDATE tbl_enrollments
                 SET total_sessions = COALESCE(total_sessions, 0) + ?,
@@ -5735,6 +6356,25 @@ class StudentsApi
             if ($stmtEnrollmentUpdate->rowCount() === 0) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Unable to update the purchased session balance.'], 400);
+            }
+
+            $stmtInsertSession = $this->conn->prepare("
+                INSERT INTO tbl_sessions (
+                    enrollment_id, teacher_id, session_number, session_date, start_time, end_time,
+                    session_type, instrument_id, status, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, 'Regular', ?, 'Scheduled', ?)
+            ");
+            foreach ($normalizedSlots as $index => $slot) {
+                $stmtInsertSession->execute([
+                    $enrollmentId,
+                    $teacherId,
+                    $oldTotalSessions + $index + 1,
+                    $slot['sessionDate'],
+                    $slot['startTime'],
+                    $slot['endTime'],
+                    !empty($enrollment['instrument_id']) ? (int)$enrollment['instrument_id'] : null,
+                    'Scheduled during additional-session approval'
+                ]);
             }
 
             $meta = [];
@@ -5762,7 +6402,7 @@ class StudentsApi
             $this->conn->commit();
             $this->sendJSON([
                 'success' => true,
-                'message' => "Approved {$additionalSessions} additional session" . ($additionalSessions === 1 ? '' : 's') . '. The learning progress record was preserved.'
+                'message' => "Approved and scheduled {$additionalSessions} additional session" . ($additionalSessions === 1 ? '' : 's') . '. The learning progress record was preserved.'
             ]);
         } catch (PDOException $e) {
             if ($this->conn->inTransaction()) {
@@ -5849,7 +6489,9 @@ class StudentsApi
 
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
         $this->ensureSessionPackagesTable();
+        $this->ensureStudentCodesAssigned();
         try {
+            $this->expirePendingScheduleReservations();
             $paymentsHasType = $this->tableExists('tbl_payments') && $this->tableHasColumn('tbl_payments', 'payment_type');
             $paySummaryPaymentTypeSelect = $paymentsHasType
                 ? "SUBSTRING_INDEX(GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC), ',', 1) AS payment_type"
@@ -5864,6 +6506,8 @@ class StudentsApi
                     e.preferred_schedule,
                     e.request_notes,
                     e.status,
+                    e.schedule_request_status,
+                    e.reservation_expires_at,
                     e.created_at,
                     s.first_name,
                     s.last_name,
@@ -5901,18 +6545,29 @@ class StudentsApi
                 $row['instrument_ids'] = $ids;
                 $row['payment_type'] = (string)($meta['payment_type'] ?? 'Partial Payment');
                 $row['payment_method'] = (string)($meta['payment_method'] ?? '');
+                $row['reference_number'] = (string)($meta['reference_number'] ?? '');
                 $row['payable_now'] = (float)($meta['payable_now'] ?? 0);
                 $row['package_total_amount'] = (float)($meta['package_total_amount'] ?? ($row['requested_amount'] ?? 0));
                 $row['payment_proof_path'] = $meta['payment_proof_path'] ?? null;
                 $row['admin_notes'] = $meta['admin_notes'] ?? null;
+                $row['schedule_request_status'] = (string)($row['schedule_request_status'] ?? $meta['schedule_request_status'] ?? 'Pending');
+                $row['reservation_expires_at'] = $row['reservation_expires_at'] ?? $meta['reservation_expires_at'] ?? null;
+                $row['suggested_slots'] = is_array($meta['suggested_slots'] ?? null) ? $meta['suggested_slots'] : [];
+                $row['is_walkin_request'] = !empty($meta['is_walkin_request']);
                 $row['assigned_teacher_id'] = null;
-                $row['preferred_start_time'] = null;
-                $row['preferred_end_time'] = null;
+                $row['preferred_start_time'] = (string)($meta['preferred_start_time'] ?? '');
+                $row['preferred_end_time'] = (string)($meta['preferred_end_time'] ?? '');
+                $row['preferred_teacher_id'] = (int)($meta['preferred_teacher_id'] ?? 0);
+                $row['preferred_slots'] = is_array($meta['preferred_slots'] ?? null)
+                    ? array_values($meta['preferred_slots'])
+                    : [];
 
                 $preferred = (string)($row['preferred_schedule'] ?? '');
                 $parts = explode('|', $preferred, 2);
                 $row['preferred_day_of_week'] = trim($parts[0] ?? '');
                 $row['preferred_date'] = trim($parts[1] ?? '');
+                $row['preferred_date'] = (string)($meta['preferred_date'] ?? $row['preferred_date']);
+                $row['preferred_day_of_week'] = (string)($meta['preferred_day_of_week'] ?? $row['preferred_day_of_week']);
 
                 $row['instruments'] = [];
                 $instrumentKeywords = [];
@@ -5968,6 +6623,9 @@ class StudentsApi
         $this->ensureSessionPackagesTable();
 
         try {
+            $studentCodeSelect = $this->tableHasColumn('tbl_students', 'student_code')
+                ? 's.student_code'
+                : 'NULL AS student_code';
             $paymentsHasType = $this->tableExists('tbl_payments') && $this->tableHasColumn('tbl_payments', 'payment_type');
             $paySummaryPaymentTypeSelect = $paymentsHasType
                 ? "SUBSTRING_INDEX(GROUP_CONCAT(p.payment_type ORDER BY p.payment_date DESC, p.payment_id DESC), ',', 1) AS payment_type"
@@ -5985,10 +6643,12 @@ class StudentsApi
                 SELECT
                     e.enrollment_id,
                     e.student_id,
+                    {$studentCodeSelect},
                     s.first_name,
                     s.last_name,
                     s.email,
                     s.branch_id,
+                    s.created_at AS student_created_at,
                     b.branch_name,
                     e.package_id,
                     e.instrument_id,
@@ -6907,6 +7567,10 @@ class StudentsApi
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
+        $actor = fas_require_authenticated_user($this->conn);
+        if (!in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin','owner','manager','staff'], true)) {
+            $this->sendJSON(['error' => 'Only authorized desk staff can approve schedules'], 403);
+        }
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $requestId = (int) ($data['request_id'] ?? 0);
@@ -6916,6 +7580,8 @@ class StudentsApi
         $assignedRoom = trim($data['assigned_room'] ?? '');
         $assignedSlotsInput = is_array($data['assigned_slots'] ?? null) ? $data['assigned_slots'] : [];
         $adminNotes = trim($data['admin_notes'] ?? '');
+        $overridePendingReservations = !empty($data['override_pending_reservations']);
+        $conflictResolutions = is_array($data['conflict_resolutions'] ?? null) ? $data['conflict_resolutions'] : [];
         if ($requestId < 1) {
             $this->sendJSON(['error' => 'request_id is required'], 400);
         }
@@ -6938,6 +7604,11 @@ class StudentsApi
 
         try {
             $this->conn->beginTransaction();
+
+            // A deterministic lock order prevents two desk users from approving
+            // overlapping requests at the same time.
+            $this->conn->query("SELECT enrollment_id FROM tbl_enrollments WHERE status = 'Pending' ORDER BY enrollment_id FOR UPDATE")->fetchAll(PDO::FETCH_COLUMN);
+            $this->expirePendingScheduleReservations();
 
             $stmtReq = $this->conn->prepare("
                 SELECT
@@ -6984,6 +7655,9 @@ class StudentsApi
                     ]];
                 }
             }
+
+            $requestMetaForConflict = $this->decodeRequestMeta($req['request_notes'] ?? '');
+            $isWalkinRequestForConflict = !empty($requestMetaForConflict['is_walkin_request']);
 
             $instrumentIds = [];
             if (!empty($req['request_notes'])) {
@@ -7034,6 +7708,26 @@ class StudentsApi
                     $instrumentLookup
                 );
             } catch (InvalidArgumentException $e) {
+                $isScheduleConflict = stripos($e->getMessage(), 'conflict') !== false || stripos($e->getMessage(), 'not available') !== false;
+                if ($isScheduleConflict) {
+                    $alternatives = $this->buildTeacherAvailableSlots($teacherId, (int)$req['branch_id'], (int)$req['student_id'], null, [], 45, date('Y-m-d'), [$requestId]);
+                    if (!$isWalkinRequestForConflict) {
+                        $requestMetaForConflict['schedule_request_status'] = 'Schedule Conflict';
+                        $requestMetaForConflict['schedule_conflict_detected_at'] = date('Y-m-d H:i:s');
+                        $requestMetaForConflict['reservation_expires_at'] = null;
+                        $stmtConflict = $this->conn->prepare("UPDATE tbl_enrollments SET schedule_request_status = 'Schedule Conflict', reservation_expires_at = NULL, request_notes = ? WHERE enrollment_id = ? AND status = 'Pending'");
+                        $stmtConflict->execute([json_encode($requestMetaForConflict), $requestId]);
+                        $this->conn->commit();
+                    } else {
+                        $this->conn->rollBack();
+                    }
+                    $this->sendJSON([
+                        'error' => $e->getMessage(),
+                        'conflict_type' => 'occupied_or_unavailable',
+                        'schedule_request_status' => $isWalkinRequestForConflict ? 'Pending' : 'Schedule Conflict',
+                        'alternative_slots' => array_slice($alternatives, 0, 8)
+                    ], 409);
+                }
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => $e->getMessage()], 400);
             }
@@ -7060,6 +7754,105 @@ class StudentsApi
                     $packageSessions = max(1, (int)($pkg['sessions'] ?? 0)); // never 0
                     $packageName     = trim((string)($pkg['package_name'] ?? 'Lesson Package')) ?: 'Lesson Package';
                 }
+            }
+
+            $pendingConflictsById = [];
+            $hardScheduleConflict = '';
+            foreach ($assignedSlotsInput as $slot) {
+                if (!is_array($slot)) continue;
+                $slotTeacherId = (int)($slot['teacher_id'] ?? $teacherId);
+                $slotDate = trim((string)($slot['session_date'] ?? $assignedDate));
+                $slotDay = trim((string)($slot['day_of_week'] ?? $this->dayOfWeekFromDate($slotDate)));
+                $slotStart = strlen(trim((string)($slot['start_time'] ?? ''))) === 5 ? trim((string)$slot['start_time']) . ':00' : trim((string)($slot['start_time'] ?? ''));
+                $slotEnd = strlen(trim((string)($slot['end_time'] ?? ''))) === 5 ? trim((string)$slot['end_time']) . ':00' : trim((string)($slot['end_time'] ?? ''));
+                if ($slotTeacherId > 0 && $slotDate !== '' && $slotStart !== '' && $slotEnd !== '') {
+                    if (!$this->teacherHasAvailabilityForSlot($slotTeacherId, $slotDate, $slotStart, $slotEnd, (int)$req['branch_id'])) {
+                        $hardScheduleConflict = "Instructor is blocked or unavailable for {$slotDay} {$slotStart}-{$slotEnd}";
+                    } elseif ($this->hasTeacherScheduleConflict($slotTeacherId, $slotDate, $slotStart, $slotEnd)) {
+                        $hardScheduleConflict = "Instructor already has a scheduled session on {$slotDate} {$slotStart}-{$slotEnd}";
+                    } elseif ($this->hasTeacherRecurringScheduleConflict($slotTeacherId, $slotDay, $slotStart, $slotEnd)) {
+                        $hardScheduleConflict = "Instructor already has an approved recurring schedule for {$slotDay} {$slotStart}-{$slotEnd}";
+                    }
+                }
+                foreach ($this->getPendingReservationConflicts($slotTeacherId, $slotDate, $slotDay, $slotStart, $slotEnd, [$requestId]) as $conflict) {
+                    $pendingConflictsById[(int)$conflict['request_id']] = $conflict;
+                }
+            }
+            $pendingConflicts = array_values($pendingConflictsById);
+            if ($pendingConflicts && (!$isWalkinRequestForConflict || !$overridePendingReservations)) {
+                foreach ($pendingConflicts as &$conflict) {
+                    $candidateSlots = $this->buildTeacherAvailableSlots(
+                        (int)$conflict['teacher_id'],
+                        (int)$conflict['branch_id'],
+                        (int)$conflict['student_id'],
+                        null,
+                        [],
+                        45,
+                        date('Y-m-d'),
+                        [(int)$conflict['request_id']]
+                    );
+                    $conflict['alternative_slots'] = array_slice(array_values(array_filter($candidateSlots, function ($candidate) use ($assignedSlotsInput) {
+                        foreach ($assignedSlotsInput as $walkinSlot) {
+                            $walkinTeacher = (int)($walkinSlot['teacher_id'] ?? 0);
+                            $candidateTeacher = (int)($candidate['teacher_id'] ?? $walkinTeacher);
+                            if ($candidateTeacher === $walkinTeacher
+                                && (string)($candidate['session_date'] ?? '') === (string)($walkinSlot['session_date'] ?? '')
+                                && (string)($candidate['start_time'] ?? '') < (string)($walkinSlot['end_time'] ?? '')
+                                && (string)($candidate['end_time'] ?? '') > (string)($walkinSlot['start_time'] ?? '')) return false;
+                        }
+                        return true;
+                    })), 0, 8);
+                    foreach ($conflict['alternative_slots'] as &$alternative) {
+                        $alternative['teacher_id'] = (int)$conflict['teacher_id'];
+                    }
+                    unset($alternative);
+                }
+                unset($conflict);
+                if (!$isWalkinRequestForConflict) {
+                    $requestMetaForConflict['schedule_request_status'] = 'Schedule Conflict';
+                    $requestMetaForConflict['schedule_conflict_detected_at'] = date('Y-m-d H:i:s');
+                    $requestMetaForConflict['reservation_expires_at'] = null;
+                    $updateConflict = $this->conn->prepare("UPDATE tbl_enrollments SET schedule_request_status = 'Schedule Conflict', reservation_expires_at = NULL, request_notes = ? WHERE enrollment_id = ? AND status = 'Pending'");
+                    $updateConflict->execute([json_encode($requestMetaForConflict), $requestId]);
+                    $this->conn->commit();
+                } else {
+                    $this->conn->rollBack();
+                }
+                $this->sendJSON([
+                    'error' => $isWalkinRequestForConflict ? 'This walk-in schedule overlaps a pending online reservation.' : 'This request can no longer be approved because the schedule is reserved.',
+                    'conflict_type' => 'pending_online_request',
+                    'requires_override' => $isWalkinRequestForConflict,
+                    'conflicts' => $pendingConflicts
+                ], 409);
+            }
+            if ($pendingConflicts && $isWalkinRequestForConflict && $overridePendingReservations) {
+                $resolutionsById = [];
+                foreach ($conflictResolutions as $resolution) {
+                    if (is_array($resolution) && (int)($resolution['request_id'] ?? 0) > 0 && is_array($resolution['suggested_slot'] ?? null)) {
+                        $resolutionsById[(int)$resolution['request_id']] = $resolution['suggested_slot'];
+                    }
+                }
+                foreach ($pendingConflicts as $conflict) {
+                    $conflictId = (int)$conflict['request_id'];
+                    if (empty($resolutionsById[$conflictId])) {
+                        $this->conn->rollBack();
+                        $this->sendJSON(['error' => 'Suggest another available schedule for every affected online requester before continuing.'], 400);
+                    }
+                }
+            }
+            if ($hardScheduleConflict !== '') {
+                $alternatives = $this->buildTeacherAvailableSlots($teacherId, (int)$req['branch_id'], (int)$req['student_id'], null, [], 45, date('Y-m-d'), [$requestId]);
+                if (!$isWalkinRequestForConflict) {
+                    $requestMetaForConflict['schedule_request_status'] = 'Schedule Conflict';
+                    $requestMetaForConflict['schedule_conflict_detected_at'] = date('Y-m-d H:i:s');
+                    $requestMetaForConflict['reservation_expires_at'] = null;
+                    $stmtConflict = $this->conn->prepare("UPDATE tbl_enrollments SET schedule_request_status = 'Schedule Conflict', reservation_expires_at = NULL, request_notes = ? WHERE enrollment_id = ? AND status = 'Pending'");
+                    $stmtConflict->execute([json_encode($requestMetaForConflict), $requestId]);
+                    $this->conn->commit();
+                } else {
+                    $this->conn->rollBack();
+                }
+                $this->sendJSON(['error' => $hardScheduleConflict, 'conflict_type' => 'occupied_or_unavailable', 'schedule_request_status' => $isWalkinRequestForConflict ? 'Pending' : 'Schedule Conflict', 'alternative_slots' => array_slice($alternatives, 0, 8)], 409);
             }
 
             $basePackagePrice = $packagePrice;
@@ -7126,6 +7919,7 @@ class StudentsApi
                 $paymentType = 'Partial Payment';
             }
             $paymentMethod = $this->normalizeEnrollmentPaymentMethod($requestMeta['payment_method'] ?? '');
+            $referenceNumber = trim((string)($requestMeta['reference_number'] ?? ''));
             $paymentProofPath = trim((string)($requestMeta['payment_proof_path'] ?? ''));
             $isWalkinRequest = !empty($requestMeta['is_walkin_request']);
             $payableNow = (float)($requestMeta['payable_now'] ?? 0);
@@ -7162,6 +7956,9 @@ class StudentsApi
             $requestMeta['payable_now'] = $payableNow;
             $requestMeta['package_total_amount'] = (float)$packagePrice;
             $requestMeta['payment_proof_path'] = $paymentProofPath;
+            $requestMeta['schedule_request_status'] = 'Approved';
+            $requestMeta['reservation_expires_at'] = null;
+            $requestMeta['approved_at'] = date('Y-m-d H:i:s');
             $enrollmentHasPaymentType = $this->tableHasColumn('tbl_enrollments', 'payment_type');
             $paymentTypeSql = $enrollmentHasPaymentType ? "payment_type = ?," : "";
             $allowedAbsences = $this->getAllowedAbsencesForSessionCount((int)$packageSessions);
@@ -7203,6 +8000,8 @@ class StudentsApi
                     used_absences = 0,
                     consecutive_absences = 0,
                     schedule_status = 'Active',
+                    schedule_request_status = 'Approved',
+                    reservation_expires_at = NULL,
                     fixed_schedule_locked = 1,
                     completed_sessions = 0,
                     {$paymentTypeSql}
@@ -7236,6 +8035,10 @@ class StudentsApi
                 if ($this->tableHasColumn('tbl_payments', 'payment_type')) {
                     $paymentColumns[] = 'payment_type';
                     $paymentValues[] = $paymentType;
+                }
+                if ($this->tableHasColumn('tbl_payments', 'reference_number')) {
+                    $paymentColumns[] = 'reference_number';
+                    $paymentValues[] = $referenceNumber !== '' ? $referenceNumber : null;
                 }
                 if ($this->tableHasColumn('tbl_payments', 'status')) {
                     $paymentColumns[] = 'status';
@@ -7288,6 +8091,36 @@ class StudentsApi
                 ], 400);
             }
 
+            if (!empty($pendingConflicts) && $isWalkinRequestForConflict && $overridePendingReservations) {
+                $resolutionUpdate = $this->conn->prepare("SELECT request_notes FROM tbl_enrollments WHERE enrollment_id = ? AND status = 'Pending' FOR UPDATE");
+                $saveResolution = $this->conn->prepare("UPDATE tbl_enrollments SET schedule_request_status = 'Schedule Conflict', reservation_expires_at = NULL, request_notes = ? WHERE enrollment_id = ? AND status = 'Pending'");
+                foreach ($pendingConflicts as $conflict) {
+                    $conflictId = (int)$conflict['request_id'];
+                    $suggested = $resolutionsById[$conflictId] ?? [];
+                    $suggestedTeacher = (int)($suggested['teacher_id'] ?? 0);
+                    $suggestedDate = trim((string)($suggested['session_date'] ?? ''));
+                    $suggestedStart = trim((string)($suggested['start_time'] ?? ''));
+                    $suggestedEnd = trim((string)($suggested['end_time'] ?? ''));
+                    $suggestedDay = $this->dayOfWeekFromDate($suggestedDate);
+                    if ($suggestedTeacher < 1 || $suggestedDate === '' || $suggestedStart === '' || $suggestedEnd === ''
+                        || !$this->teacherHasAvailabilityForSlot($suggestedTeacher, $suggestedDate, $suggestedStart, $suggestedEnd, (int)$conflict['branch_id'])
+                        || $this->hasTeacherScheduleConflict($suggestedTeacher, $suggestedDate, $suggestedStart, $suggestedEnd)
+                        || $this->hasTeacherRecurringScheduleConflict($suggestedTeacher, $suggestedDay, $suggestedStart, $suggestedEnd)
+                        || $this->getPendingReservationConflicts($suggestedTeacher, $suggestedDate, $suggestedDay, $suggestedStart, $suggestedEnd, [$conflictId])) {
+                        $this->conn->rollBack();
+                        $this->sendJSON(['error' => 'A suggested replacement is no longer available. Choose another slot and try again.'], 409);
+                    }
+                    $resolutionUpdate->execute([$conflictId]);
+                    $affectedMeta = $this->decodeRequestMeta($resolutionUpdate->fetchColumn());
+                    $affectedMeta['schedule_request_status'] = 'Schedule Conflict';
+                    $affectedMeta['reservation_expires_at'] = null;
+                    $affectedMeta['schedule_conflict_detected_at'] = date('Y-m-d H:i:s');
+                    $affectedMeta['conflicted_by_walkin_request_id'] = $requestId;
+                    $affectedMeta['suggested_slots'] = [$suggested];
+                    $saveResolution->execute([json_encode($affectedMeta), $conflictId]);
+                }
+            }
+
             $this->conn->commit();
 
             $this->sendJSON([
@@ -7305,6 +8138,10 @@ class StudentsApi
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+        $actor = fas_require_authenticated_user($this->conn);
+        if (!in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin','owner','manager','staff'], true)) {
+            $this->sendJSON(['error' => 'Only authorized desk staff can reject requests'], 403);
         }
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
@@ -7349,9 +8186,14 @@ class StudentsApi
                 if (is_array($decoded)) $meta = $decoded;
             }
             if ($adminNotes !== '') $meta['admin_notes'] = $adminNotes;
+            $meta['schedule_request_status'] = 'Rejected';
+            $meta['reservation_expires_at'] = null;
+            $meta['rejected_at'] = date('Y-m-d H:i:s');
             $stmt = $this->conn->prepare("
                 UPDATE tbl_enrollments
                 SET status = 'Cancelled',
+                    schedule_request_status = 'Rejected',
+                    reservation_expires_at = NULL,
                     request_notes = ?
                 WHERE enrollment_id = ?
                   AND status = 'Pending'
@@ -7617,6 +8459,57 @@ class StudentsApi
                 $this->conn->exec("ALTER TABLE tbl_enrollments ADD COLUMN absence_reset_at DATETIME NULL AFTER consecutive_absences");
             }
         } catch (PDOException $e) { /* keep payment endpoints available */ }
+    }
+
+    public function suggestPackageRequest()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->sendJSON(['error' => 'Method not allowed'], 405);
+        $actor = fas_require_authenticated_user($this->conn);
+        if (!in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin','owner','manager','staff'], true)) {
+            $this->sendJSON(['error' => 'Only authorized desk staff can suggest schedules'], 403);
+        }
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $requestId = (int)($data['request_id'] ?? 0);
+        $deskBranchId = (int)($data['branch_id'] ?? 0);
+        $suggested = is_array($data['suggested_slot'] ?? null) ? $data['suggested_slot'] : [];
+        $teacherId = (int)($suggested['teacher_id'] ?? 0);
+        $date = trim((string)($suggested['session_date'] ?? ''));
+        $start = trim((string)($suggested['start_time'] ?? ''));
+        $end = trim((string)($suggested['end_time'] ?? ''));
+        $day = $this->dayOfWeekFromDate($date);
+        if ($requestId < 1 || $teacherId < 1 || $date === '' || $start === '' || $end === '') {
+            $this->sendJSON(['error' => 'request_id and a complete suggested_slot are required'], 400);
+        }
+        try {
+            $this->conn->beginTransaction();
+            $this->conn->query("SELECT enrollment_id FROM tbl_enrollments WHERE status = 'Pending' ORDER BY enrollment_id FOR UPDATE")->fetchAll(PDO::FETCH_COLUMN);
+            $stmt = $this->conn->prepare("SELECT e.request_notes, s.branch_id FROM tbl_enrollments e INNER JOIN tbl_students s ON s.student_id = e.student_id WHERE e.enrollment_id = ? AND e.status = 'Pending' FOR UPDATE");
+            $stmt->execute([$requestId]);
+            $requestRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$requestRow) { $this->conn->rollBack(); $this->sendJSON(['error' => 'Pending request not found'], 404); }
+            if ($deskBranchId > 0 && (int)$requestRow['branch_id'] !== $deskBranchId) { $this->conn->rollBack(); $this->sendJSON(['error' => 'Request does not belong to your branch'], 403); }
+            $notes = $requestRow['request_notes'] ?? '';
+            if (!$this->teacherHasAvailabilityForSlot($teacherId, $date, $start, $end, (int)$requestRow['branch_id'])
+                || $this->hasTeacherScheduleConflict($teacherId, $date, $start, $end)
+                || $this->hasTeacherRecurringScheduleConflict($teacherId, $day, $start, $end)
+                || $this->getPendingReservationConflicts($teacherId, $date, $day, $start, $end, [$requestId])) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'That suggested schedule is no longer available.'], 409);
+            }
+            $meta = $this->decodeRequestMeta($notes);
+            $suggested['day_of_week'] = $day;
+            $meta['schedule_request_status'] = 'Suggested';
+            $meta['suggested_slots'] = [$suggested];
+            $meta['reservation_expires_at'] = null;
+            $meta['suggested_at'] = date('Y-m-d H:i:s');
+            $update = $this->conn->prepare("UPDATE tbl_enrollments SET schedule_request_status = 'Suggested', reservation_expires_at = NULL, request_notes = ? WHERE enrollment_id = ? AND status = 'Pending'");
+            $update->execute([json_encode($meta), $requestId]);
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'message' => 'A new schedule was suggested to the requester.']);
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
     }
 
     // ── Student submits freeze payment (online or walkin intent) ──
@@ -8207,6 +9100,9 @@ switch ($action) {
         break;
     case 'reject-package-request':
         $studentsApi->rejectPackageRequest();
+        break;
+    case 'suggest-package-request':
+        $studentsApi->suggestPackageRequest();
         break;
     case 'schedule-session':
         $studentsApi->scheduleEnrollmentSession();

@@ -302,3 +302,182 @@
         width: min(78vw, 512px) !important;
     }
 }
+
+/* Forced password-change dialog */
+.fas-change-password-popup {
+    width: min(92vw, 35rem) !important;
+    padding: 0 !important;
+    border: 1px solid #e4e4e7 !important;
+    border-radius: 1.5rem !important;
+    overflow: hidden !important;
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.24) !important;
+}
+
+.fas-change-password-title {
+    margin: 0 !important;
+    padding: 1.75rem 2rem 0 !important;
+    color: #18181b !important;
+    font-family: 'Inter', system-ui, sans-serif !important;
+    font-size: 1.55rem !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+    text-align: left !important;
+}
+
+.fas-change-password-content {
+    margin: 0 !important;
+    padding: 1rem 2rem 0 !important;
+}
+
+.fas-change-password-form { text-align: left; }
+
+.fas-change-password-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid #fde68a;
+    border-radius: 0.875rem;
+    background: #fffbeb;
+    color: #713f12;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.fas-change-password-notice i { margin-top: 0.18rem; color: #b8860b; }
+.fas-change-password-notice p { margin: 0; }
+
+.fas-change-password-label {
+    display: block;
+    margin: 0 0 0.45rem;
+    color: #3f3f46;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.fas-change-password-field { position: relative; }
+
+.fas-change-password-field input {
+    width: 100%;
+    height: 3rem;
+    margin: 0;
+    padding: 0 3rem 0 0.9rem;
+    border: 1px solid #d4d4d8;
+    border-radius: 0.75rem;
+    outline: none;
+    background: #fff;
+    color: #18181b;
+    font-size: 0.92rem;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.fas-change-password-field input:focus {
+    border-color: #b8860b;
+    box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.14);
+}
+
+.fas-change-password-field button {
+    position: absolute;
+    top: 50%;
+    right: 0.65rem;
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    transform: translateY(-50%);
+    border: 0;
+    border-radius: 0.6rem;
+    background: transparent;
+    color: #71717a;
+    cursor: pointer;
+}
+
+.fas-change-password-field button:hover { background: #f4f4f5; color: #27272a; }
+
+.fas-password-requirements {
+    margin: 0.75rem 0 1.1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid #e4e4e7;
+    border-radius: 0.875rem;
+    background: #fafafa;
+}
+
+.fas-password-requirements > p {
+    margin: 0 0 0.55rem;
+    color: #71717a;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.fas-password-requirements > p.is-complete { color: #15803d; }
+
+.fas-password-requirements ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fas-password-requirements li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #71717a;
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+.fas-password-requirements li span { width: 0.9rem; color: #a1a1aa; font-weight: 800; }
+.fas-password-requirements li.is-met,
+.fas-password-requirements li.is-met span { color: #15803d; }
+
+.fas-password-match-feedback {
+    min-height: 1.1rem;
+    margin: 0.45rem 0 0;
+    color: #71717a;
+    font-size: 0.75rem;
+}
+
+.fas-password-match-feedback.is-match { color: #15803d; font-weight: 700; }
+.fas-password-match-feedback.is-mismatch { color: #dc2626; }
+
+.fas-change-password-popup .swal2-actions {
+    width: 100%;
+    margin: 1.25rem 0 0 !important;
+    padding: 0 2rem 1.75rem;
+}
+
+.fas-change-password-confirm {
+    display: inline-flex !important;
+    min-width: 12rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    margin: 0 !important;
+    padding: 0.8rem 1.35rem !important;
+    border: 0 !important;
+    border-radius: 0.75rem !important;
+    background: linear-gradient(135deg, #d4af37, #b8860b) !important;
+    color: #18181b !important;
+    font-size: 0.85rem !important;
+    font-weight: 800 !important;
+    box-shadow: 0 10px 24px rgba(184, 134, 11, 0.22) !important;
+}
+
+.fas-change-password-confirm:hover { filter: brightness(1.04); }
+.fas-change-password-confirm:disabled { cursor: not-allowed; filter: grayscale(0.45); opacity: 0.55; box-shadow: none !important; }
+
+@media (max-width: 520px) {
+    .fas-change-password-title {
+        padding: 1.4rem 1.25rem 0 !important;
+        font-size: 1.3rem !important;
+    }
+    .fas-change-password-content { padding: 0.9rem 1.25rem 0 !important; }
+    .fas-password-requirements ul { grid-template-columns: 1fr; }
+    .fas-change-password-popup .swal2-actions { padding: 0 1.25rem 1.4rem; }
+    .fas-change-password-confirm { width: 100%; }
+}

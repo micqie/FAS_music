@@ -157,6 +157,24 @@ class User
         }
     }
 
+    private function ensureUserPasswordChangeColumn()
+    {
+        if ($this->hasUserColumn('must_change_password')) {
+            return true;
+        }
+
+        try {
+            $this->conn->exec("
+                ALTER TABLE tbl_users
+                ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER password
+            ");
+        } catch (PDOException $e) {
+            error_log('Unable to add tbl_users.must_change_password: ' . $e->getMessage());
+        }
+
+        return $this->hasUserColumn('must_change_password');
+    }
+
     private function tableHasColumn($tableName, $columnName)
     {
         try {
@@ -321,7 +339,7 @@ class User
         $studentId = 0;
         if (ctype_digit($loginInput)) {
             $studentId = (int) $loginInput;
-        } elseif (preg_match('/^STU-(\d{4})-(\d{4,})$/', $loginInput, $matches)) {
+        } elseif (preg_match('/^STU-(\d{4})-(\d{4,})$/i', $loginInput, $matches)) {
             $studentId = (int) $matches[2];
         }
 
@@ -355,7 +373,7 @@ class User
             return true;
         }
 
-        return preg_match('/^STU-\d{4}-\d{4,}$/', $loginInput) === 1;
+        return preg_match('/^STU-\d{4}-\d{4,}$/i', $loginInput) === 1;
     }
 
     private function getStudentAccountMetaForUser(array $user): ?array
@@ -1250,6 +1268,9 @@ class User
         }
         $data = json_decode($json, true);
         $username = trim((string) ($data['username'] ?? ''));
+        if (filter_var($username, FILTER_VALIDATE_EMAIL) !== false) {
+            $username = strtolower($username);
+        }
         $password = $data['password'] ?? '';
 
         if ($username === '' || $password === '' || $password === null) {
@@ -1259,6 +1280,7 @@ class User
             $this->ensureUserVerificationColumns();
             $this->ensureWalkInAccountsSynced();
             $this->ensureUserSecurityColumns();
+            $hasPasswordChangeFlag = $this->ensureUserPasswordChangeColumn();
             $isStudentLogin = $this->isStudentLoginIdentifier($username);
             $studentLoginEmail = $this->resolveStudentLoginEmail($username);
             $resolvedUsername = $studentLoginEmail ?: $this->resolveWalkInLoginIdentifier($username);
@@ -1277,6 +1299,9 @@ class User
             $selectSecurity = $hasSecurityColumns
                 ? ", u.failed_login_attempts, u.account_locked_at, u.account_locked_reason, u.failed_login_last_at"
                 : ", 0 AS failed_login_attempts, NULL AS account_locked_at, NULL AS account_locked_reason, NULL AS failed_login_last_at";
+            $selectPasswordChange = $hasPasswordChangeFlag
+                ? ", u.must_change_password"
+                : ", 0 AS must_change_password";
             $joinBranch = $hasUserBranch ? " LEFT JOIN tbl_branches b ON b.branch_id = u.branch_id " : "";
             $roleOrderSql = $isStudentLogin
                 ? "CASE WHEN LOWER(r.role_name) = 'student' THEN 0 ELSE 1 END, "
@@ -1286,20 +1311,20 @@ class User
 
             $stmt = $this->conn->prepare("
                 SELECT u.user_id, u.username, u.password, u.first_name, u.last_name,
-                       u.email, u.phone, u.status, r.role_name{$selectBranch}{$selectVerification}{$selectSecurity}
+                       u.email, u.phone, u.status, r.role_name{$selectBranch}{$selectVerification}{$selectSecurity}{$selectPasswordChange}
                 FROM tbl_users u
                 INNER JOIN tbl_roles r ON u.role_id = r.role_id
                 {$joinBranch}
                 WHERE (
                     BINARY u.username = BINARY ?
-                    OR BINARY u.email = BINARY ?
+                    OR LOWER(TRIM(COALESCE(u.email, ''))) = LOWER(?)
                     OR BINARY u.username = BINARY ?
-                    OR BINARY u.email = BINARY ?
+                    OR LOWER(TRIM(COALESCE(u.email, ''))) = LOWER(?)
                 )
                 " . ($isStudentLogin ? " AND LOWER(r.role_name) = 'student' " : "") . "
                 ORDER BY {$roleOrderSql}
                     CASE WHEN BINARY u.username = BINARY ? THEN 0 ELSE 1 END,
-                    CASE WHEN BINARY u.email = BINARY ? THEN 0 ELSE 1 END,
+                    CASE WHEN LOWER(TRIM(COALESCE(u.email, ''))) = LOWER(?) THEN 0 ELSE 1 END,
                     u.user_id ASC
                 LIMIT 1
             ");
@@ -1402,8 +1427,9 @@ class User
                 $this->sendJSON(['error' => 'Your account was deactivated. Please contact the administrator.'], 403);
             }
 
-            // Detect default/temporary passwords for non-admin roles (first-login change requirement)
-            $mustChangePassword = false;
+            // Admin-issued passwords are explicitly flagged as temporary. Keep the
+            // legacy default-password check for accounts created before this flag.
+            $mustChangePassword = !empty($user['must_change_password']);
             $roleName = (string)($user['role_name'] ?? '');
             $defaultPasswords = ['fas@123', 'fasmusic@2020', 'fasmusic2020'];
             $isDefaultPassword = false;
@@ -1808,6 +1834,11 @@ class User
         }
 
         try {
+            $hasPasswordChangeFlag = $this->ensureUserPasswordChangeColumn();
+            if ($isAdminOverride && !$hasPasswordChangeFlag) {
+                $this->sendJSON(['error' => 'Unable to enable the required password change for this account'], 500);
+            }
+
             $stmt = $this->conn->prepare("SELECT user_id, password FROM tbl_users WHERE user_id = ?");
             $stmt->execute([$userId]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1854,8 +1885,14 @@ class User
             $currentUser = $stmtCurrent->fetch(PDO::FETCH_ASSOC) ?: [];
 
             $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
-            $update = $this->conn->prepare("UPDATE tbl_users SET password = ? WHERE user_id = ?");
-            $update->execute([$hashed, $userId]);
+            if ($hasPasswordChangeFlag) {
+                $mustChangePassword = $isAdminOverride ? 1 : 0;
+                $update = $this->conn->prepare("UPDATE tbl_users SET password = ?, must_change_password = ? WHERE user_id = ?");
+                $update->execute([$hashed, $mustChangePassword, $userId]);
+            } else {
+                $update = $this->conn->prepare("UPDATE tbl_users SET password = ? WHERE user_id = ?");
+                $update->execute([$hashed, $userId]);
+            }
 
             AuditLogs::record(
                 $this->conn,

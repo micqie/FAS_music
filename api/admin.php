@@ -988,7 +988,11 @@ class Admin
 
             $stmt = $this->conn->prepare("
                 UPDATE tbl_students
-                SET status = 'Active'
+                SET status = 'Active'" . ($this->hasStudentColumn('student_code') ? ",
+                    student_code = COALESCE(
+                        NULLIF(TRIM(student_code), ''),
+                        CONCAT('STU-', YEAR(COALESCE(created_at, CURRENT_DATE)), '-', LPAD(student_id, 4, '0'))
+                    )" : "") . "
                 WHERE student_id = ?
             ");
             $stmt->execute([$data['student_id']]);
@@ -1279,7 +1283,11 @@ class Admin
             if ($newStatus === 'Approved') {
                 $stmtActivateStudent = $this->conn->prepare("
                     UPDATE tbl_students
-                    SET status = 'Active'
+                    SET status = 'Active'" . ($this->hasStudentColumn('student_code') ? ",
+                        student_code = COALESCE(
+                            NULLIF(TRIM(student_code), ''),
+                            CONCAT('STU-', YEAR(COALESCE(created_at, CURRENT_DATE)), '-', LPAD(student_id, 4, '0'))
+                        )" : "") . "
                     WHERE student_id = ?
                 ");
                 $stmtActivateStudent->execute([$data['student_id']]);
@@ -1496,9 +1504,26 @@ class Admin
             }
             $hasUserBranch = $this->hasUserColumn('branch_id');
             $hasSecurityColumns = $this->hasUserColumn('failed_login_attempts');
+            $hasStudentCode = $this->hasStudentColumn('student_code');
+            $hasStudentUserId = $this->hasStudentColumn('student_user_id');
+            if ($hasStudentCode) {
+                $this->conn->exec("
+                    UPDATE tbl_students
+                    SET student_code = CONCAT(
+                        'STU-', YEAR(COALESCE(created_at, CURRENT_DATE)), '-', LPAD(student_id, 4, '0')
+                    )
+                    WHERE student_code IS NULL OR TRIM(student_code) = ''
+                ");
+            }
             $userBranchIdSql = $hasUserBranch ? "u.branch_id" : "NULL";
             $userBranchJoinSql = $hasUserBranch ? "LEFT JOIN tbl_branches bu ON u.branch_id = bu.branch_id" : "";
             $userBranchNameSql = $hasUserBranch ? "bu.branch_name," : "";
+            $studentCodeSql = $hasStudentCode ? "s.student_code" : "NULL";
+            $studentIdSql = $hasStudentCode ? "s.student_id" : "NULL";
+            $studentCreatedAtSql = $hasStudentCode ? "s.created_at" : "NULL";
+            $studentJoinSql = $hasStudentUserId
+                ? "LEFT JOIN tbl_students s ON s.student_user_id = u.user_id OR (s.student_user_id IS NULL AND s.email = u.email)"
+                : "LEFT JOIN tbl_students s ON s.email = u.email";
             $securitySelect = $hasSecurityColumns
                 ? ", u.failed_login_attempts, u.account_locked_at, u.account_locked_reason, u.failed_login_last_at"
                 : ", 0 AS failed_login_attempts, NULL AS account_locked_at, NULL AS account_locked_reason, NULL AS failed_login_last_at";
@@ -1512,6 +1537,9 @@ class Admin
                     u.email,
                     u.phone,
                     u.status,
+                    {$studentIdSql} AS student_id,
+                    {$studentCodeSql} AS student_code,
+                    {$studentCreatedAtSql} AS student_created_at,
                     COALESCE({$userBranchIdSql}, t.branch_id, s.branch_id, gb.branch_id) AS branch_id,
                     CASE
                         WHEN LOWER(TRIM(r.role_name)) = 'manager' THEN 'Branch Manager'
@@ -1526,7 +1554,7 @@ class Admin
                 LEFT JOIN tbl_teachers t ON t.user_id = u.user_id
                 LEFT JOIN tbl_branches bt ON t.branch_id = bt.branch_id
                 {$userBranchJoinSql}
-                LEFT JOIN tbl_students s ON s.email = u.email
+                {$studentJoinSql}
                 LEFT JOIN tbl_branches bs ON s.branch_id = bs.branch_id
                 LEFT JOIN (
                     SELECT
@@ -1776,6 +1804,21 @@ class Admin
             $stmtCurrent = $this->conn->prepare("SELECT username, email FROM tbl_users WHERE user_id = ? LIMIT 1");
             $stmtCurrent->execute([$userId]);
             $currentUser = $stmtCurrent->fetch(PDO::FETCH_ASSOC) ?: [];
+            if (empty($currentUser)) {
+                $this->sendJSON(['error' => 'User not found'], 404);
+            }
+            $currentEmail = trim((string)($currentUser['email'] ?? ''));
+            $currentIdentifier = $currentEmail !== '' ? $currentEmail : trim((string)($currentUser['username'] ?? ''));
+            $hasLockedRealEmail = filter_var($currentIdentifier, FILTER_VALIDATE_EMAIL)
+                && !$this->isWalkInSystemEmail($currentIdentifier);
+            if ($hasLockedRealEmail && strcasecmp($email, $currentIdentifier) !== 0) {
+                $this->sendJSON([
+                    'error' => 'This real email address is locked because it is linked to existing account records.'
+                ], 409);
+            }
+            if ($hasLockedRealEmail) {
+                $email = $currentIdentifier;
+            }
             if ($email === '' && $this->isWalkInSystemEmail($currentUser['username'] ?? '')) {
                 $email = (string)($currentUser['username'] ?? '');
             }

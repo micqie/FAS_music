@@ -368,8 +368,8 @@
             const btnPending = document.getElementById('btnPending');
             const btnActive = document.getElementById('btnActive');
 
-            const activeBtnClass = 'px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-black font-bold text-sm shadow-sm transition';
-            const normalBtnClass = 'px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-semibold text-sm transition';
+            const activeBtnClass = 'px-3 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black font-bold text-xs shadow-sm transition';
+            const normalBtnClass = 'px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-semibold text-xs transition';
 
             if (mode === 'active') {
                 if (title) title.textContent = 'Active Registrations';

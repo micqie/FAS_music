@@ -104,6 +104,20 @@
             return row;
         }
 
+        function isAdminRealEmail(value) {
+            const email = String(value || '').trim();
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !/@fas\.com$/i.test(email);
+        }
+
+        function getAdminUserStudentNumber(user) {
+            const savedCode = String(user?.student_code || '').trim();
+            if (savedCode) return savedCode;
+            const studentId = Number(user?.student_id || 0);
+            const createdAt = new Date(user?.student_created_at || '');
+            const year = Number.isNaN(createdAt.getTime()) ? new Date().getFullYear() : createdAt.getFullYear();
+            return studentId > 0 ? `STU-${year}-${String(studentId).padStart(4, '0')}` : '';
+        }
+
         function renderAdminUsersRoleFilterOptions(roles) {
             const roleFilter = document.getElementById('adminUsersRoleFilter');
             if (!roleFilter) return;
@@ -283,6 +297,8 @@
             const firstName = document.getElementById('adminUserEditFirstName');
             const lastName = document.getElementById('adminUserEditLastName');
             const email = document.getElementById('adminUserEditEmail');
+            const emailLabel = document.getElementById('adminUserEditEmailLabel');
+            const emailHint = document.getElementById('adminUserEditEmailHint');
             const phone = document.getElementById('adminUserEditPhone');
             const role = document.getElementById('adminUserEditRole');
             const status = document.getElementById('adminUserEditStatus');
@@ -296,6 +312,17 @@
             firstName.value = user.first_name || '';
             lastName.value = user.last_name || '';
             email.value = user.email || user.username || '';
+            const realEmailLocked = isAdminRealEmail(email.value);
+            email.readOnly = realEmailLocked;
+            email.dataset.originalEmail = email.value;
+            email.dataset.realEmailLocked = realEmailLocked ? '1' : '0';
+            email.setAttribute('aria-readonly', realEmailLocked ? 'true' : 'false');
+            email.classList.toggle('bg-slate-100', realEmailLocked);
+            email.classList.toggle('text-slate-500', realEmailLocked);
+            email.classList.toggle('cursor-not-allowed', realEmailLocked);
+            email.classList.toggle('bg-white', !realEmailLocked);
+            if (emailLabel) emailLabel.textContent = realEmailLocked ? 'Email (Locked)' : 'Email *';
+            if (emailHint) emailHint.classList.toggle('hidden', !realEmailLocked);
             if (phone) phone.value = user.phone || '';
             if (role) role.value = user.role_name || '';
             if (status) status.value = user.status || 'Inactive';
@@ -587,7 +614,9 @@
                         user_id: userId,
                         first_name: firstName.value.trim(),
                         last_name: lastName.value.trim(),
-                        email: email.value.trim(),
+                        email: email.dataset.realEmailLocked === '1'
+                            ? String(email.dataset.originalEmail || email.value).trim()
+                            : email.value.trim(),
                         phone: phone ? phone.value.trim() : ''
                     };
 
@@ -897,8 +926,9 @@
                 rows = rows.filter(r => {
                     const name = `${r.first_name || ''} ${r.last_name || ''}`.toLowerCase();
                     const email = (r.email || '').toLowerCase();
+                    const studentNumber = getAdminUserStudentNumber(r).toLowerCase();
                     const branch = (r.branch_name || '').toLowerCase();
-                    return name.includes(searchValue) || email.includes(searchValue) || branch.includes(searchValue);
+                    return name.includes(searchValue) || email.includes(searchValue) || studentNumber.includes(searchValue) || branch.includes(searchValue);
                 });
             }
             adminUsersTableState.filtered = rows;
@@ -965,6 +995,8 @@
                 }
                 const statusLabel = isLockedAccount ? 'Deactivated' : statusValue;
                 const email = user.email || '';
+                const isStudent = role.toLowerCase() === 'student';
+                const accountIdentifier = isStudent ? (getAdminUserStudentNumber(user) || user.username || '—') : email;
                 const statusNote = isLockedAccount
                     ? `Deactivated after ${failedAttempts || 5} failed login attempts.`
                     : ((failedAttempts > 0 && !isActive) ? `${failedAttempts} failed login attempt${failedAttempts === 1 ? '' : 's'} recorded.` : '');
@@ -973,7 +1005,7 @@
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-6 py-4 table-name-cell">
                             <div class="font-semibold text-slate-900 truncate-text" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-                            <div class="text-xs text-slate-500 truncate-text" title="${escapeHtml(email)}">${escapeHtml(email)}</div>
+                            <div class="text-xs text-slate-500 truncate-text" title="${escapeHtml(accountIdentifier)}">${escapeHtml(accountIdentifier)}</div>
                         </td>
                         <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${escapeHtml(role)}">${escapeHtml(role)}</td>
                         <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${escapeHtml(branch)}">${escapeHtml(branch)}</td>

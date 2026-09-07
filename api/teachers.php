@@ -1405,8 +1405,10 @@ class TeachersApi
                 $this->sendJSON(['error' => 'Unable to resolve your account'], 404);
             }
 
-            if (!$this->isManagerRole($requester['role_name'] ?? '')) {
-                $this->sendJSON(['error' => 'Only branch managers can edit teacher availability'], 403);
+            $requesterRole = $this->normalizeRoleName($requester['role_name'] ?? '');
+            $isAdmin = $requesterRole === 'admin';
+            if (!$isAdmin && !$this->isManagerRole($requesterRole)) {
+                $this->sendJSON(['error' => 'Only administrators and branch managers can edit teacher availability'], 403);
             }
 
             $teacherStmt = $this->conn->prepare("
@@ -1421,13 +1423,15 @@ class TeachersApi
                 $this->sendJSON(['error' => 'Teacher not found'], 404);
             }
 
-            $requesterBranchId = (int)($requester['branch_id'] ?? 0);
             $teacherBranchId = (int)($teacher['branch_id'] ?? 0);
-            if ($requesterBranchId < 1) {
-                $this->sendJSON(['error' => 'Your account is not linked to a branch'], 403);
-            }
-            if ($teacherBranchId > 0 && $requesterBranchId !== $teacherBranchId) {
-                $this->sendJSON(['error' => 'You can only edit teachers in your branch'], 403);
+            if (!$isAdmin) {
+                $requesterBranchId = (int)($requester['branch_id'] ?? 0);
+                if ($requesterBranchId < 1) {
+                    $this->sendJSON(['error' => 'Your account is not linked to a branch'], 403);
+                }
+                if ($teacherBranchId > 0 && $requesterBranchId !== $teacherBranchId) {
+                    $this->sendJSON(['error' => 'You can only edit teachers in your branch'], 403);
+                }
             }
 
             $normalized = [];

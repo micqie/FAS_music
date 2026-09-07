@@ -99,7 +99,7 @@ function renderWeeklySchedule(rows = []) {
                         ${timeLabel}
                     </span>
                 </div>
-                <div class="text-sm text-slate-500">${enabled ? (row.note || '') : (row.reason || 'Managed by branch manager')}</div>
+                <div class="text-sm text-slate-500">${enabled ? (row.note || '') : (row.reason || 'Managed by administration')}</div>
             </div>
         `;
     }).join('');
@@ -202,4 +202,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     bindCalendarControls();
     await loadAvailability();
+});
+
+window.addEventListener('fas:instructor-availability-updated', event => {
+    const rows = Array.isArray(event.detail?.rows) ? event.detail.rows : [];
+    availabilityState.rows = rows;
+    renderWeeklySchedule(rows);
+    renderCalendar();
 });

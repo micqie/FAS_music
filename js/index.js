@@ -117,6 +117,143 @@ let appBaseUrl;
     }
 })();
 
+// Let students and guardians verify newly selected proof files without leaving
+// the form. Event delegation also covers enrollment dialogs rendered later.
+(function initSelectedProofPreview() {
+    const previewableInputIds = new Set([
+        'regPayProof',
+        'regAgeProof',
+        'guardian-new-registration-proof',
+        'guardian-new-id-proof',
+        'studentRequestPaymentProof'
+    ]);
+    const existingButtonIds = {
+        regPayProof: 'regPayProofViewBtn',
+        regAgeProof: 'regAgeProofViewBtn'
+    };
+    let activeObjectUrl = '';
+
+    const closePreview = () => {
+        const modal = document.getElementById('selectedProofPreviewModal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        const image = modal.querySelector('[data-proof-preview-image]');
+        const frame = modal.querySelector('[data-proof-preview-frame]');
+        if (image) image.removeAttribute('src');
+        if (frame) frame.removeAttribute('src');
+        if (activeObjectUrl) {
+            URL.revokeObjectURL(activeObjectUrl);
+            activeObjectUrl = '';
+        }
+    };
+
+    const ensureModal = () => {
+        let modal = document.getElementById('selectedProofPreviewModal');
+        if (modal) return modal;
+
+        modal = document.createElement('div');
+        modal.id = 'selectedProofPreviewModal';
+        modal.className = 'fixed inset-0 hidden items-center justify-center bg-black/75 p-3 backdrop-blur-sm sm:p-5';
+        modal.style.zIndex = '20000';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'selectedProofPreviewTitle');
+        modal.innerHTML = `
+            <div class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900">
+                <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-white/10">
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-gold-600">Selected file</p>
+                        <p id="selectedProofPreviewTitle" class="truncate text-sm font-semibold text-zinc-900 dark:text-white"></p>
+                    </div>
+                    <button type="button" data-proof-preview-close aria-label="Close preview" class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-100 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="flex min-h-[260px] flex-1 items-center justify-center overflow-auto bg-zinc-100 p-3 dark:bg-black/30 sm:min-h-[420px]">
+                    <img data-proof-preview-image alt="Selected proof preview" class="hidden max-h-[75vh] max-w-full object-contain">
+                    <iframe data-proof-preview-frame title="Selected PDF preview" class="hidden h-[72vh] w-full rounded-lg bg-white"></iframe>
+                    <p data-proof-preview-message class="hidden px-5 text-center text-sm text-zinc-600 dark:text-zinc-300"></p>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal || event.target.closest('[data-proof-preview-close]')) closePreview();
+        });
+        return modal;
+    };
+
+    const openPreview = (file) => {
+        if (!(file instanceof File)) return;
+        closePreview();
+        const modal = ensureModal();
+        const title = modal.querySelector('#selectedProofPreviewTitle');
+        const image = modal.querySelector('[data-proof-preview-image]');
+        const frame = modal.querySelector('[data-proof-preview-frame]');
+        const message = modal.querySelector('[data-proof-preview-message]');
+        const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+        const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(file.name);
+
+        title.textContent = file.name;
+        image.classList.add('hidden');
+        frame.classList.add('hidden');
+        message.classList.add('hidden');
+        activeObjectUrl = URL.createObjectURL(file);
+        if (isPdf) {
+            frame.src = activeObjectUrl;
+            frame.classList.remove('hidden');
+        } else if (isImage) {
+            image.src = activeObjectUrl;
+            image.classList.remove('hidden');
+        } else {
+            URL.revokeObjectURL(activeObjectUrl);
+            activeObjectUrl = '';
+            message.textContent = 'A preview is not available for this file type. Please choose a JPG, PNG, WEBP, or PDF file.';
+            message.classList.remove('hidden');
+        }
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    };
+
+    const previewButtonFor = (input) => {
+        const existingId = existingButtonIds[input.id];
+        let button = existingId ? document.getElementById(existingId) : null;
+        if (button) return button;
+        button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'mt-2 hidden max-w-full items-center gap-1.5 text-left text-xs font-semibold text-gold-600 hover:underline dark:text-gold-400';
+        button.dataset.selectedProofPreviewButton = input.id;
+        const namedDisplay = input.id === 'studentRequestPaymentProof'
+            ? (document.getElementById('studentRequestProofFileName') || document.getElementById('guardianEnrollmentProofName'))
+            : null;
+        const anchor = namedDisplay || (input.classList.contains('hidden') ? input.closest('label') : input);
+        anchor?.insertAdjacentElement('afterend', button);
+        return button;
+    };
+
+    document.addEventListener('change', (event) => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || input.type !== 'file' || !previewableInputIds.has(input.id)) return;
+        const file = input.files?.[0] || null;
+        const button = previewButtonFor(input);
+        if (!button) return;
+        button.textContent = file ? `View selected file: ${file.name}` : '';
+        button.classList.toggle('hidden', !file);
+        button.classList.toggle('inline-flex', Boolean(file));
+        button.onclick = file ? () => openPreview(input.files?.[0]) : null;
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !document.getElementById('selectedProofPreviewModal')?.classList.contains('hidden')) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            closePreview();
+        }
+    }, true);
+
+    window.openSelectedProofFilePreview = openPreview;
+})();
+
 // Keep password feedback consistent across account creation, reset, and
 // change-password forms. The observer also covers dialogs rendered later by
 // SweetAlert and role-specific page scripts.
@@ -1294,16 +1431,28 @@ function initLoginForm() {
             const data = response.data || {};
 
             if (response.status === 200 && data.success && data.user) {
-                // If student is using default password, force change on first login
+                // Temporary passwords issued by an administrator must be replaced
+                // before the user can continue to a dashboard.
                 if (data.must_change_password) {
-                    await Swal.fire({
-                        icon: 'info',
-                        title: 'Change Your Password',
-                        text: 'You are using the default password. You must change it now to continue.',
-                        confirmButtonColor: '#b8860b'
-                    });
+                    const passwordChanged = await promptPasswordChange(data.user, password);
 
-                    await promptPasswordChange(data.user, password);
+                    if (!passwordChanged) {
+                        if (loginBtn) loginBtn.disabled = false;
+                        if (loginBtnText) loginBtnText.textContent = 'Sign In';
+                        if (loginBtnIcon) {
+                            loginBtnIcon.classList.remove('fa-spinner', 'fa-spin');
+                            loginBtnIcon.classList.add('fa-sign-in-alt');
+                        }
+                        return;
+                    }
+
+                    // The login request created a server session so the password
+                    // change could be authenticated. End it before asking the user
+                    // to sign in with the new password.
+                    await axios.post(`${baseApiUrl}/users.php?action=logout`, {}, {
+                        validateStatus: () => true
+                    });
+                    Auth.clearStoredUser();
 
                     // Ask user to log in again after password change
                     Swal.fire({
@@ -1521,7 +1670,6 @@ function initRegisterForm() {
                 const data = response.data || {};
 
                 if (response.status === 200 && data.success) {
-                    const studentLoginId = data.student_login_identifier || `STU-${new Date().getFullYear()}-${String(data.student_id || '').padStart(4, '0')}`;
                     const verificationEmail = data.verification_email || payload.student_email;
                     setStudentRegistrationPassword(payload.password || '');
                     registerForm.reset();
@@ -1530,14 +1678,14 @@ function initRegisterForm() {
                         icon: 'success',
                         title: 'Check Your Email',
                         html: `
-                            <div class="text-left text-sm leading-6">
-                                <p>Your student account is ready.</p>
-                                <p class="mt-2">We sent a verification code to <strong>${escapeHtml(verificationEmail)}</strong>.</p>
-                                <p class="mt-3">Your Username / Student ID is:</p>
-                                <p class="mt-2 text-2xl font-extrabold">${escapeHtml(studentLoginId)}</p>
-                                <p class="mt-2">Use this username and the password you created to sign in to the Student Dashboard after verifying your email.</p>
-                            </div>
+                            <p class="text-sm leading-6 text-slate-600">
+                                We sent a verification code to<br>
+                                <strong class="text-slate-900">${escapeHtml(verificationEmail)}</strong>.
+                            </p>
                         `,
+                        width: '30rem',
+                        padding: '1.5rem',
+                        confirmButtonText: 'Continue',
                         confirmButtonColor: '#b8860b'
                     });
                     await showRegisterMessage(
@@ -2458,21 +2606,119 @@ function initScrollAnimations() {
 async function promptPasswordChange(user, currentPassword) {
     try {
         const { value: formValues } = await Swal.fire({
-            title: 'Change Your Password',
-            html:
-                '<div class="text-left text-sm mb-3">' +
-                    '<p class="mb-1">For security, please change your temporary password now.</p>' +
-                    '<ul class="list-disc list-inside text-xs text-zinc-300">' +
-                        '<li>At least 8 characters</li>' +
-                        '<li>Include uppercase, lowercase, number and special character (!@#$%^&*)</li>' +
-                    '</ul>' +
-                '</div>' +
-               '<input id="swal-new-password" class="swal2-input" type="password" placeholder="New password">' +
-    '<i id="newPasswordEye" class="fas fa-eye" style="cursor:pointer;" onclick="togglePassword(\'swal-new-password\', \'newPasswordEye\')"></i>' +
-    '<input id="swal-confirm-password" class="swal2-input" type="password" placeholder="Confirm new password">' +
-    '<i id="confirmPasswordEye" class="fas fa-eye" style="cursor:pointer;" onclick="togglePassword(\'swal-confirm-password\', \'confirmPasswordEye\')"></i>',
+            title: 'Create a new password',
+            html: `
+                <div class="fas-change-password-form">
+                    <div class="fas-change-password-notice">
+                        <i class="fas fa-shield-halved" aria-hidden="true"></i>
+                        <p>Your administrator issued a temporary password. Create a secure password that only you know.</p>
+                    </div>
+
+                    <label class="fas-change-password-label" for="swal-new-password">New password</label>
+                    <div class="fas-change-password-field">
+                        <input id="swal-new-password" data-password-strength-ready="1" type="password" autocomplete="new-password" placeholder="Enter a new password">
+                        <button type="button" data-password-toggle="swal-new-password" aria-label="Show new password">
+                            <i class="fas fa-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <div class="fas-password-requirements" aria-live="polite">
+                        <p id="password-requirement-summary">0 of 5 password requirements met</p>
+                        <ul>
+                            <li data-password-rule="length"><span>○</span>8 or more characters</li>
+                            <li data-password-rule="uppercase"><span>○</span>One uppercase letter</li>
+                            <li data-password-rule="lowercase"><span>○</span>One lowercase letter</li>
+                            <li data-password-rule="number"><span>○</span>One number</li>
+                            <li data-password-rule="special"><span>○</span>One special character (!@#$%^&*)</li>
+                        </ul>
+                    </div>
+
+                    <label class="fas-change-password-label" for="swal-confirm-password">Confirm new password</label>
+                    <div class="fas-change-password-field">
+                        <input id="swal-confirm-password" data-password-strength-ready="1" type="password" autocomplete="new-password" placeholder="Enter the same password again">
+                        <button type="button" data-password-toggle="swal-confirm-password" aria-label="Show confirmed password">
+                            <i class="fas fa-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <p id="password-match-feedback" class="fas-password-match-feedback" aria-live="polite">Re-enter your new password to confirm it.</p>
+                </div>`,
             focusConfirm: false,
+            confirmButtonText: '<i class="fas fa-lock" aria-hidden="true"></i><span>Update Password</span>',
             allowOutsideClick: false,
+            allowEscapeKey: false,
+            customClass: {
+                popup: 'fas-change-password-popup',
+                title: 'fas-change-password-title',
+                htmlContainer: 'fas-change-password-content',
+                confirmButton: 'fas-change-password-confirm'
+            },
+            didOpen: () => {
+                const newInput = document.getElementById('swal-new-password');
+                const confirmInput = document.getElementById('swal-confirm-password');
+                const matchFeedback = document.getElementById('password-match-feedback');
+                const requirementSummary = document.getElementById('password-requirement-summary');
+                const tests = {
+                    length: value => value.length >= 8,
+                    uppercase: value => /[A-Z]/.test(value),
+                    lowercase: value => /[a-z]/.test(value),
+                    number: value => /[0-9]/.test(value),
+                    special: value => /[!@#$%^&*]/.test(value)
+                };
+
+                const updateFeedback = () => {
+                    const password = newInput?.value || '';
+                    const confirmation = confirmInput?.value || '';
+                    let completed = 0;
+                    Object.entries(tests).forEach(([rule, test]) => {
+                        const item = document.querySelector(`[data-password-rule="${rule}"]`);
+                        const passed = test(password);
+                        if (passed) completed++;
+                        item?.classList.toggle('is-met', passed);
+                        const icon = item?.querySelector('span');
+                        if (icon) icon.textContent = passed ? '✓' : '○';
+                    });
+
+                    if (requirementSummary) {
+                        requirementSummary.textContent = completed === 5
+                            ? 'Great — your password meets every requirement.'
+                            : `${completed} of 5 password requirements met`;
+                        requirementSummary.classList.toggle('is-complete', completed === 5);
+                    }
+
+                    if (!matchFeedback) return;
+                    if (!confirmation) {
+                        matchFeedback.textContent = 'Re-enter your new password to confirm it.';
+                        matchFeedback.className = 'fas-password-match-feedback';
+                    } else if (password === confirmation) {
+                        matchFeedback.textContent = '✓ Passwords match';
+                        matchFeedback.className = 'fas-password-match-feedback is-match';
+                    } else {
+                        matchFeedback.textContent = 'Passwords do not match yet.';
+                        matchFeedback.className = 'fas-password-match-feedback is-mismatch';
+                    }
+
+                    const confirmButton = Swal.getConfirmButton();
+                    if (confirmButton) {
+                        confirmButton.disabled = completed !== 5 || !confirmation || password !== confirmation;
+                    }
+                };
+
+                document.querySelectorAll('[data-password-toggle]').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const input = document.getElementById(button.dataset.passwordToggle || '');
+                        if (!input) return;
+                        const show = input.type === 'password';
+                        input.type = show ? 'text' : 'password';
+                        button.setAttribute('aria-label', `${show ? 'Hide' : 'Show'} password`);
+                        button.querySelector('i')?.classList.toggle('fa-eye', !show);
+                        button.querySelector('i')?.classList.toggle('fa-eye-slash', show);
+                    });
+                });
+                newInput?.addEventListener('input', updateFeedback);
+                confirmInput?.addEventListener('input', updateFeedback);
+                updateFeedback();
+                newInput?.focus();
+            },
             preConfirm: () => {
                 const newPass = document.getElementById('swal-new-password').value || '';
                 const confirmPass = document.getElementById('swal-confirm-password').value || '';
@@ -2499,7 +2745,7 @@ async function promptPasswordChange(user, currentPassword) {
         });
 
         if (!formValues) {
-            return;
+            return false;
         }
 
         const response = await axios.post(`${baseApiUrl}/users.php?action=change-password`, {
@@ -2517,7 +2763,7 @@ async function promptPasswordChange(user, currentPassword) {
                 text: result.error || 'Unable to change password. Please try again.',
                 confirmButtonColor: '#b8860b'
             });
-            return;
+            return false;
         }
 
         await Swal.fire({
@@ -2526,6 +2772,7 @@ async function promptPasswordChange(user, currentPassword) {
             text: 'Your password has been changed successfully.',
             confirmButtonColor: '#b8860b'
         });
+        return true;
     } catch (err) {
         console.error('Error changing password:', err);
         await Swal.fire({
@@ -2534,6 +2781,7 @@ async function promptPasswordChange(user, currentPassword) {
             text: 'An unexpected error occurred. Please try again.',
             confirmButtonColor: '#b8860b'
         });
+        return false;
     }
 }
 
@@ -2653,7 +2901,9 @@ async function fetchStudentPortalDataByEmail(email) {
     const url = `${baseApiUrl}/students.php?action=get-student-portal&email=${encodeURIComponent(email)}`;
     try {
         const res = await axios.get(url);
-        return res.data;
+        const data = res.data;
+        if (data?.success && data?.student) capturePortalDecisionState(data, 'student');
+        return data;
     } catch (error) {
         const message = String(error?.response?.data?.error || '');
         if (error?.response?.status === 404 && message.toLowerCase().includes('student not found for this email')) {
@@ -2916,7 +3166,7 @@ function getStudentCertificateState(portal) {
 function isStudentEnrollmentCompleted(portal) {
     const enrollment = portal?.current_enrollment || null;
     const purchased = Number(enrollment?.package_sessions || portal?.student?.package_sessions || 0);
-    const used = Number(enrollment?.completed_sessions || 0);
+    const used = Number(enrollment?.used_sessions || enrollment?.completed_sessions || 0);
     return String(enrollment?.status || '').trim().toLowerCase() === 'completed'
         || (purchased > 0 && used >= purchased);
 }
@@ -3269,7 +3519,11 @@ function printStudentCertificate() {
 async function fetchGuardianPortalDataByEmail(email) {
     const url = `${baseApiUrl}/students.php?action=get-guardian-portal&email=${encodeURIComponent(email)}`;
     const res = await axios.get(url);
-    return res.data;
+    const data = res.data;
+    if (data?.success && Array.isArray(data.students)) {
+        data.students.forEach(item => capturePortalDecisionState(item, 'guardian'));
+    }
+    return data;
 }
 
 async function fetchAttendanceSummary(studentId) {
@@ -3481,6 +3735,160 @@ function buildPublicFileUrl(filePath) {
     return `${appBase}/${cleanPath}`;
 }
 
+const paymentDestinationControlIds = [
+    'guardian-new-payment-method',
+    'regPayMethod',
+    'studentRequestPaymentMethod',
+    'fpMethod',
+    'guardianAdditionalPaymentMethod',
+    'studentAdditionalSessionsPaymentMethod',
+    'studentSessionExtensionPaymentMethod'
+];
+let paymentDestinationRequest = null;
+
+function fetchPaymentDestination() {
+    if (!paymentDestinationRequest) {
+        paymentDestinationRequest = axios.get(`${baseApiUrl}/payment_destination.php`)
+            .then(response => response.data?.success ? response.data.recipient : null)
+            .catch(() => null);
+    }
+    return paymentDestinationRequest;
+}
+
+function renderPaymentDestination(container, method, recipient) {
+    if (!container) return;
+    const selectedMethod = String(method || '').trim().toLowerCase();
+    if (!selectedMethod) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+    if (selectedMethod === 'cash') {
+        container.innerHTML = '<span class="font-semibold"><i class="fas fa-store mr-1.5"></i>Pay at your selected branch</span>';
+        return;
+    }
+
+    const contact = String(recipient?.contact_number || '').trim();
+    const gcash = String(recipient?.gcash_number || contact).trim();
+    const gcashQrPath = String(recipient?.gcash_qr_path || '').trim();
+    const bankName = String(recipient?.bank_name || '').trim();
+    const bankAccountName = String(recipient?.bank_account_name || '').trim();
+    const bankAccountNumber = String(recipient?.bank_account_number || '').trim();
+
+    let heading = 'Payment destination';
+    let details = '';
+    let copyValue = '';
+    if (selectedMethod === 'gcash') {
+        heading = 'GCash';
+        copyValue = gcash;
+        details = gcash
+            ? `<span class="font-extrabold text-zinc-900 dark:text-white">${escapeHtml(gcash)}</span>`
+            : 'Contact the branch desk for the current GCash number.';
+    } else if (selectedMethod.includes('bank')) {
+        heading = 'Bank transfer destination';
+        if (bankAccountNumber) {
+            copyValue = bankAccountNumber;
+            details = `${bankName ? `<strong class="text-zinc-900 dark:text-white">${escapeHtml(bankName)}</strong><span class="mx-1">•</span>` : ''}${escapeHtml(bankAccountName)}<span class="mx-1">•</span><span class="font-bold text-gold-700 dark:text-gold-300">${escapeHtml(bankAccountNumber)}</span>`;
+        } else {
+            copyValue = contact;
+            details = contact
+                ? `<span class="font-extrabold text-zinc-900 dark:text-white">${escapeHtml(contact)}</span>`
+                : 'Contact the branch desk for the current bank account details before sending.';
+        }
+    } else {
+        details = contact
+            ? `<span class="font-extrabold text-zinc-900 dark:text-white">${escapeHtml(contact)}</span>`
+            : 'Contact the branch desk before sending your payment.';
+        copyValue = contact;
+    }
+
+    container.innerHTML = `
+        <div class="flex min-w-0 items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+                <div class="text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-gold-300">${escapeHtml(heading)}</div>
+                <div class="mt-1 break-all text-sm text-zinc-700 dark:text-zinc-200">${details}</div>
+                ${copyValue ? `<button type="button" class="payment-destination-copy mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-bold text-amber-800 hover:bg-amber-100 dark:text-gold-200" data-copy-value="${escapeHtml(copyValue)}"><i class="fas fa-copy"></i>Copy</button>` : ''}
+            </div>
+            ${selectedMethod === 'gcash' && gcash ? (gcashQrPath
+                ? `<img src="${escapeHtml(buildPublicFileUrl(gcashQrPath))}" alt="GCash payment QR" class="h-16 w-16 shrink-0 rounded-lg border border-amber-200 bg-white object-contain p-1">`
+                : '<div class="payment-gcash-qr h-16 w-16 shrink-0 rounded-lg border border-amber-200 bg-white p-1" aria-label="GCash number QR code"></div>') : ''}
+        </div>
+    `;
+    const qrTarget = container.querySelector('.payment-gcash-qr');
+    if (qrTarget && typeof QRCode !== 'undefined') {
+        new QRCode(qrTarget, { text: gcash, width: 54, height: 54, colorDark: '#111827', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    }
+    container.querySelector('.payment-destination-copy')?.addEventListener('click', async event => {
+        const button = event.currentTarget;
+        const value = String(button?.dataset?.copyValue || '');
+        if (!value) return;
+        try {
+            await navigator.clipboard.writeText(value);
+            const original = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check mr-1"></i>Copied';
+            window.setTimeout(() => { if (button.isConnected) button.innerHTML = original; }, 1500);
+        } catch (_) {
+            // The number remains visible for manual copying when clipboard access is unavailable.
+        }
+    });
+}
+
+function mountPaymentDestinationControl(select) {
+    if (!(select instanceof HTMLSelectElement) || select.dataset.paymentDestinationMounted === '1') return;
+    select.dataset.paymentDestinationMounted = '1';
+    const container = document.createElement('div');
+    const isEnrollmentPayment = select.id === 'studentRequestPaymentMethod';
+    container.className = 'payment-destination-reference hidden rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-100';
+    container.dataset.paymentRecipientFor = select.id;
+    if (isEnrollmentPayment && select.parentElement) {
+        const paymentGrid = select.closest('.grid');
+        if (paymentGrid) {
+            [
+                { control: document.getElementById('studentRequestPaymentMode'), label: 'Payment Type' },
+                { control: select, label: 'Payment Method' }
+            ].forEach(item => {
+                if (!item.control || item.control.parentElement !== paymentGrid) return;
+                const wrapper = document.createElement('div');
+                const label = document.createElement('label');
+                label.className = 'mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400';
+                label.textContent = item.label;
+                paymentGrid.insertBefore(wrapper, item.control);
+                wrapper.appendChild(label);
+                wrapper.appendChild(item.control);
+            });
+            // Keep the payment destination outside either field cell. Otherwise
+            // the QR card stretches one grid row and leaves a large blank area
+            // below Payment Type.
+            paymentGrid.insertAdjacentElement('afterend', container);
+        } else {
+            select.insertAdjacentElement('afterend', container);
+        }
+    } else {
+        select.insertAdjacentElement('afterend', container);
+    }
+    const refresh = async () => renderPaymentDestination(container, select.value, await fetchPaymentDestination());
+    select.addEventListener('change', refresh);
+    void refresh();
+}
+
+function initPaymentDestinationReferences() {
+    const selector = paymentDestinationControlIds.map(id => `#${id}`).join(',');
+    const scan = root => {
+        if (root instanceof Element && root.matches(selector)) mountPaymentDestinationControl(root);
+        root.querySelectorAll?.(selector).forEach(mountPaymentDestinationControl);
+    };
+    scan(document);
+    if (!window.__paymentDestinationObserver) {
+        window.__paymentDestinationObserver = new MutationObserver(mutations => {
+            mutations.forEach(mutation => mutation.addedNodes.forEach(node => {
+                if (node instanceof Element) scan(node);
+            }));
+        });
+        window.__paymentDestinationObserver.observe(document.body, { childList: true, subtree: true });
+    }
+}
+
 function formatTime12Hour(timeString) {
     if (!timeString) return '—';
     const parts = String(timeString).split(':');
@@ -3590,6 +3998,17 @@ function renderStudentRequestStatus(latestRequest) {
         ? 'Full Payment'
         : (paymentTypeRaw.includes('install') ? 'Installment' : 'Partial Payment');
     const notes = latestRequest.admin_notes ? `<div class="text-xs text-zinc-400 mt-1">Admin note: ${escapeHtml(latestRequest.admin_notes)}</div>` : '';
+    const preferredDate = latestRequest.preferred_date ? formatDateLong(latestRequest.preferred_date) : '';
+    const preferredDay = String(latestRequest.preferred_day_of_week || '');
+    const preferredStart = latestRequest.preferred_start_time ? formatTime12Hour(latestRequest.preferred_start_time) : '';
+    const preferredEnd = latestRequest.preferred_end_time ? formatTime12Hour(latestRequest.preferred_end_time) : '';
+    const preferenceInfo = preferredDate || preferredDay || preferredStart
+        ? `<div class="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2 text-xs text-amber-200">
+            <span class="font-semibold">Requested schedule:</span>
+            ${escapeHtml([preferredDate || preferredDay, preferredStart && preferredEnd ? `${preferredStart} - ${preferredEnd}` : preferredStart].filter(Boolean).join(' • '))}
+            ${status === 'Pending' ? '<div class="mt-1 text-zinc-400">Waiting for the desk to confirm or adjust this time.</div>' : ''}
+        </div>`
+        : '';
     const assignedTeacherName = `${latestRequest.assigned_teacher_first_name || ''} ${latestRequest.assigned_teacher_last_name || ''}`.trim();
     const assignedDate = latestRequest.assigned_date ? formatDateLong(latestRequest.assigned_date) : '';
     const assignedDay = latestRequest.assigned_day_of_week || '';
@@ -3614,6 +4033,7 @@ function renderStudentRequestStatus(latestRequest) {
             </div>
             <div class="mt-2 text-sm text-zinc-200">${packageName} • ${amount}</div>
             <div class="mt-1 text-xs text-zinc-400">Payment mode: <span class="text-zinc-200 font-semibold">${escapeHtml(paymentModeLabel)}</span></div>
+            ${preferenceInfo}
             ${assignmentInfo}
             ${notes}
             ${isRejected ? '<div class="mt-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">Your request was rejected. You can submit a new enrollment request below.</div>' : ''}
@@ -3951,7 +4371,9 @@ function applyGuardianPortalIdentity(user, guardianOrPortal = null) {
 async function fetchGuardianAbsenceRequests(email) {
     const url = `${baseApiUrl}/attendance.php?action=guardian-absence-list&guardian_email=${encodeURIComponent(email)}`;
     const res = await axios.get(url);
-    return res.data;
+    const data = res.data;
+    if (data?.success && Array.isArray(data.requests)) captureGuardianAbsenceDecisionState(data.requests);
+    return data;
 }
 
 async function submitGuardianAbsenceRequest(payload) {
@@ -4241,13 +4663,36 @@ function getGuardianStudentName(item, index) {
     return `${s.first_name || ''} ${s.last_name || ''}`.trim() || `Student ${index + 1}`;
 }
 
+function getSessionChronologicalSortValue(row) {
+    const sessionDate = String(row?.session_date || '').trim();
+    if (!sessionDate) return Number.MAX_SAFE_INTEGER;
+    const timestamp = new Date(`${sessionDate}T${row?.start_time || '00:00:00'}`).getTime();
+    return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
+}
+
+function compareSessionRowsChronologically(a, b) {
+    const timeDifference = getSessionChronologicalSortValue(a) - getSessionChronologicalSortValue(b);
+    if (timeDifference !== 0) return timeDifference;
+    const sessionDifference = Number(a?.session_number || 0) - Number(b?.session_number || 0);
+    if (sessionDifference !== 0) return sessionDifference;
+    return Number(a?.session_id || 0) - Number(b?.session_id || 0);
+}
+
 function getGuardianSessionRows(item) {
     const rows = Array.isArray(item?.current_session_grades) ? item.current_session_grades.slice() : [];
-    return rows.sort((a, b) => {
-        const aTime = new Date(`${a?.session_date || ''}T${a?.start_time || '00:00:00'}`).getTime() || 0;
-        const bTime = new Date(`${b?.session_date || ''}T${b?.start_time || '00:00:00'}`).getTime() || 0;
-        return aTime - bTime;
-    });
+    return rows.sort(compareSessionRowsChronologically);
+}
+
+function isPackageSessionUsed(row) {
+    const status = String(row?.status || '').trim().toLowerCase();
+    const attendance = String(row?.attendance_status || '').trim().toLowerCase();
+    return Number(row?.counted_in || 0) === 1
+        || ['completed', 'late'].includes(status)
+        || ['present', 'late'].includes(attendance);
+}
+
+function getUsedPackageSessionCount(item) {
+    return getGuardianSessionRows(item).filter(isPackageSessionUsed).length;
 }
 
 function getGuardianLatestCompletedSessionRow(item) {
@@ -4618,6 +5063,9 @@ function renderGuardianStudentModal(item, index) {
     const paymentState = enrollment?.payment_status || s.registration_status || 'Pending';
     const instrumentsLabel = getGuardianInstrumentLabel(item);
     const sessionRows = getGuardianSessionRows(item);
+    const usedPackageSessions = Math.max(Number(enrollment?.used_sessions || enrollment?.completed_sessions || 0), getUsedPackageSessionCount(item));
+    const canRequestAdditionalSessions = Number(pkgSessions || 0) > 0 && usedPackageSessions >= Number(pkgSessions || 0);
+    const packageSessionsRemaining = Math.max(0, Number(pkgSessions || 0) - usedPackageSessions);
     const additionalRequest = item?.latest_session_extension_request || null;
     const hasPendingAdditionalRequest = String(additionalRequest?.status || '') === 'Pending';
     const learningProgress = Array.isArray(item?.learning_progress) ? item.learning_progress : [];
@@ -4634,8 +5082,8 @@ function renderGuardianStudentModal(item, index) {
         ${freezeNotice ? `<div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 dark:border-rose-500/30 dark:bg-rose-500/10"><div class="flex items-start gap-3"><i class="fas fa-snowflake mt-0.5 text-rose-500"></i><div><div class="text-sm font-bold text-rose-800 dark:text-rose-200">Account frozen</div><div class="mt-0.5 text-xs text-rose-600 dark:text-rose-300">A ₱${freezeNotice.amount || 100} online reservation payment is needed to restore attendance access.</div></div></div>${freezePaymentPending ? '<span class="rounded-lg bg-amber-100 px-3 py-2 text-xs font-bold text-amber-800">Awaiting desk approval</span>' : `<button type="button" onclick="openGuardianFreezePayment(${index})" class="rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-500"><i class="fas fa-credit-card mr-1"></i>Pay online</button>`}</div>` : ''}
         <div class="flex flex-wrap items-center justify-between gap-2"><div class="text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(branch)} <span class="mx-1">·</span> ID ${escapeHtml(String(studentId))}</div><span class="rounded-full px-3 py-1 text-xs font-bold ${badgeClassForRegistrationStatus(regStatus)}">${escapeHtml(regStatus)}</span></div>
         ${canRequestEnrollment ? `<div class="flex flex-col gap-3 rounded-xl border border-gold-200 bg-gold-50 p-4 dark:border-gold-500/20 dark:bg-gold-500/10 sm:flex-row sm:items-center sm:justify-between"><div><div class="font-bold text-zinc-900 dark:text-white">No enrollment yet</div><div class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-300">Start with 12 sessions and one instrument.</div></div><button type="button" onclick="openGuardianEnrollmentRequest(${index})" class="rounded-xl bg-gold-500 px-5 py-2.5 text-sm font-extrabold text-black hover:bg-gold-400"><i class="fas fa-paper-plane mr-2"></i>Enroll Student</button></div>` : ''}
-        ${enrollmentStatus === 'Pending' ? `<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"><i class="fas fa-clock mr-2"></i>Enrollment request awaiting review.</div>` : ''}
-        ${enrollment ? `<div class="grid gap-3 sm:grid-cols-2"><section class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/20"><div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Enrollment</div><div class="mt-1 font-bold text-zinc-900 dark:text-white">${escapeHtml(pkgName)}</div><div class="mt-1 text-xs text-zinc-500">${pkgSessions || '—'} sessions · ${escapeHtml(instrumentsLabel)}</div>${pkgBalance > 0 ? `<div class="mt-2 text-xs font-bold text-gold-600">${formatCurrencyPHP(pkgBalance)} balance</div>` : '<div class="mt-2 text-xs font-bold text-emerald-600">Paid</div>'}${['Active', 'Completed'].includes(enrollmentStatus) ? `<button type="button" onclick="openGuardianAdditionalSessions(${index})" ${hasPendingAdditionalRequest ? 'disabled' : ''} class="mt-3 rounded-lg bg-gold-500 px-3 py-2 text-xs font-bold text-black hover:bg-gold-400 disabled:opacity-50">${hasPendingAdditionalRequest ? 'Additional Sessions Pending' : 'Request Additional Sessions'}</button>` : ''}</section><section class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/20"><div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Sessions</div><div class="mt-2 flex gap-6"><div><div id="guardianModalProgressAttended-${studentId}" class="text-2xl font-black text-zinc-900 dark:text-white">—</div><div class="text-[10px] text-zinc-500">Attended</div></div><div><div id="guardianModalProgressRemaining-${studentId}" class="text-2xl font-black text-zinc-900 dark:text-white">—</div><div class="text-[10px] text-zinc-500">Remaining</div></div></div><div id="guardianModalProgressLast-${studentId}" class="mt-2 text-xs text-zinc-500">—</div></section></div><section class="rounded-xl border border-zinc-200 px-4 py-3 dark:border-white/10"><div class="flex gap-3"><i class="fas fa-calendar-day mt-1 text-gold-600"></i><div><div class="text-sm font-bold text-zinc-900 dark:text-white">${scheduleDate ? escapeHtml(scheduleDate) : 'Schedule pending'}${scheduleTime !== 'Not set' ? ` · ${escapeHtml(scheduleTime)}` : ''}</div><div class="mt-0.5 text-xs text-zinc-500">${escapeHtml(teacherName)}</div></div></div></section>` : ''}
+        ${enrollmentStatus === 'Pending' ? `<div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"><span><i class="fas fa-clock mr-2"></i>Enrollment and preferred schedule are awaiting desk confirmation.</span><button type="button" onclick="openGuardianEnrollmentRequest(${index})" class="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-white/10 dark:text-amber-200">View Request</button></div>` : ''}
+        ${enrollment ? `<div class="grid gap-3 sm:grid-cols-2"><section class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/20"><div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Enrollment</div><div class="mt-1 font-bold text-zinc-900 dark:text-white">${escapeHtml(pkgName)}</div><div class="mt-1 text-xs text-zinc-500">${pkgSessions || '—'} sessions · ${escapeHtml(instrumentsLabel)}</div>${pkgBalance > 0 ? `<div class="mt-2 text-xs font-bold text-gold-600">${formatCurrencyPHP(pkgBalance)} balance</div>` : '<div class="mt-2 text-xs font-bold text-emerald-600">Paid</div>'}${canRequestAdditionalSessions ? `<button type="button" onclick="openGuardianAdditionalSessions(${index})" ${hasPendingAdditionalRequest ? 'disabled' : ''} class="mt-3 rounded-lg bg-gold-500 px-3 py-2 text-xs font-bold text-black hover:bg-gold-400 disabled:opacity-50">${hasPendingAdditionalRequest ? 'Additional Sessions Pending' : 'Request Additional Sessions'}</button>` : ''}</section><section class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/20"><div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Sessions</div><div class="mt-2 flex gap-6"><div><div id="guardianModalProgressAttended-${studentId}" class="text-2xl font-black text-zinc-900 dark:text-white">—</div><div class="text-[10px] text-zinc-500">Attended</div></div><div><div id="guardianModalProgressRemaining-${studentId}" class="text-2xl font-black text-zinc-900 dark:text-white">—</div><div class="text-[10px] text-zinc-500">Remaining</div></div></div><div id="guardianModalProgressLast-${studentId}" class="mt-2 text-xs text-zinc-500">—</div></section></div><section class="rounded-xl border border-zinc-200 px-4 py-3 dark:border-white/10"><div class="flex gap-3"><i class="fas fa-calendar-day mt-1 text-gold-600"></i><div><div class="text-sm font-bold text-zinc-900 dark:text-white">${scheduleDate ? escapeHtml(scheduleDate) : 'Schedule pending'}${scheduleTime !== 'Not set' ? ` · ${escapeHtml(scheduleTime)}` : ''}</div><div class="mt-0.5 text-xs text-zinc-500">${escapeHtml(teacherName)}</div></div></div></section>` : ''}
         ${hasMoreDetails ? `<details class="group rounded-xl border border-zinc-200 dark:border-white/10"><summary class="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-bold text-zinc-800 dark:text-white"><span><i class="fas fa-folder-open mr-2 text-gold-600"></i>View sessions and progress</span><i class="fas fa-chevron-down text-xs text-zinc-400 transition group-open:rotate-180"></i></summary><div class="space-y-4 border-t border-zinc-200 p-4 dark:border-white/10">
             ${learningProgress.length ? `<section><div class="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">Learning progress</div><div class="space-y-2">${learningProgress.map(row => `<div class="rounded-lg bg-zinc-50 px-3 py-3 dark:bg-white/5"><div class="flex items-center justify-between gap-2"><div class="text-sm font-bold text-zinc-900 dark:text-white">${escapeHtml(row.instrument_name || 'Instrument')} · ${escapeHtml(row.level_name || 'Level not set')}</div><span class="text-xs text-zinc-500">${escapeHtml(row.assessment_readiness || 'Not Ready')}</span></div>${row.current_topic ? `<div class="mt-1 text-xs text-zinc-500">${escapeHtml(row.current_topic)}</div>` : ''}</div>`).join('')}</div></section>` : ''}
             ${recentSessions.length ? `<section><div class="mb-2 flex justify-between"><div class="text-xs font-bold uppercase tracking-wider text-zinc-500">Recent sessions</div><span class="text-xs text-zinc-400">${sessionRows.length} total</span></div><div class="space-y-2">${recentSessions.map((row, sessionIndex) => `<button type="button" onclick="openGuardianSessionDetails(${index}, ${sessionIndex})" class="flex w-full items-center justify-between rounded-lg bg-zinc-50 px-3 py-3 text-left dark:bg-white/5"><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Session ${escapeHtml(String(row.session_number || ''))}</div><div class="text-xs text-zinc-500">${escapeHtml(row.session_date ? formatDateShort(row.session_date) : 'Date pending')}</div></div><span class="text-xs font-bold text-gold-600">View</span></button>`).join('')}</div></section>` : ''}
@@ -4682,7 +5130,7 @@ function renderGuardianStudentModal(item, index) {
                     <div class="text-sm text-zinc-600 dark:text-zinc-300">Sessions: <span class="text-zinc-900 dark:text-white font-semibold">${pkgSessions ? `${pkgSessions} sessions` : '—'}</span></div>
                     <div class="text-sm text-zinc-600 dark:text-zinc-300">Paid: <span class="text-zinc-900 dark:text-white font-semibold">${formatCurrencyPHP(pkgPaid)}</span></div>
                     <div class="text-sm text-zinc-600 dark:text-zinc-300">Balance: <span class="text-gold-500 font-semibold">${formatCurrencyPHP(pkgBalance)}</span></div>
-                    ${enrollment && ['Active', 'Completed'].includes(String(enrollment.status || '')) ? `
+                    ${enrollment && canRequestAdditionalSessions ? `
                         <button type="button" onclick="openGuardianAdditionalSessions(${index})" ${hasPendingAdditionalRequest ? 'disabled' : ''} class="mt-4 w-full rounded-xl bg-gold-500 px-3 py-2.5 text-xs font-extrabold text-black transition hover:bg-gold-400 disabled:cursor-not-allowed disabled:opacity-50">
                             ${hasPendingAdditionalRequest ? 'Additional Sessions Pending' : 'Request Additional Sessions'}
                         </button>
@@ -5080,7 +5528,7 @@ async function guardianRegisterNewStudent() {
                     <div class="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
                         <div class="space-y-4">
                             <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
-                                <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                                <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-white/10">
                                     <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">1</span></div>
                                     <p class="text-sm font-semibold text-zinc-900 dark:text-white">Student Details</p>
                                 </div>
@@ -5126,7 +5574,7 @@ async function guardianRegisterNewStudent() {
                         </div>
 
                         <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden xl:self-start">
-                            <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                            <div class="flex items-center gap-2.5 px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-white/10">
                                 <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">2</span></div>
                                 <p class="text-sm font-semibold text-zinc-900 dark:text-white">Registration Payment</p>
                             </div>
@@ -5701,6 +6149,504 @@ async function initGuardianAbsencePage() {
 }
 
 let studentRequestAvailableInstruments = [];
+const studentInstructorAvailabilityState = {
+    student: null,
+    candidates: [],
+    availabilityRows: [],
+    eligibleCandidates: [],
+    selectedTeacherId: 0,
+    selectedTeacherName: '',
+    slots: [],
+    reservedSlots: [],
+    occupiedSlots: [],
+    month: '',
+    selectedDate: '',
+    selectedSlot: null,
+    selectedSlots: [],
+    sessionCount: 12,
+    activeSlotIndex: -1,
+    requestToken: 0,
+    applySlot: null,
+    requestController: null,
+    slotCache: new Map()
+};
+
+function getStudentRequestSelectedTypeIds() {
+    return Array.from(document.querySelectorAll('#studentRequestInstrumentContainer select.student-request-instrument-type'))
+        .map(select => Number(select.value || 0))
+        .filter(typeId => typeId > 0);
+}
+
+function isGeneralInstructorSpecialization(value) {
+    const text = String(value || '').toLowerCase();
+    return text.includes('general')
+        || text.includes('all around')
+        || text.includes('all-around')
+        || text.includes('all instruments');
+}
+
+function getInstructorSpecializationTypeIds(candidate) {
+    const raw = candidate?.specialization_type_ids;
+    const values = Array.isArray(raw) ? raw : String(raw || '').split(',');
+    return values.map(value => Number(value || 0)).filter(value => value > 0);
+}
+
+function getEligibleStudentRequestInstructors(candidates, availabilityRows, selectedTypeIds) {
+    const requestedTypes = new Set((Array.isArray(selectedTypeIds) ? selectedTypeIds : []).map(Number));
+    if (!requestedTypes.size) return [];
+    const availableTeacherIds = new Set((Array.isArray(availabilityRows) ? availabilityRows : [])
+        .map(row => Number(row.teacher_id || 0))
+        .filter(id => id > 0));
+
+    return (Array.isArray(candidates) ? candidates : []).filter(candidate => {
+        const teacherId = Number(candidate.teacher_id || 0);
+        if (!teacherId || !availableTeacherIds.has(teacherId)) return false;
+        if (isGeneralInstructorSpecialization(candidate.specialization)) return true;
+        return getInstructorSpecializationTypeIds(candidate).some(typeId => requestedTypes.has(typeId));
+    });
+}
+
+function ensureStudentInstructorAvailabilityModal() {
+    if (document.getElementById('studentInstructorAvailabilityModal')) return;
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="studentInstructorAvailabilityModal" class="fixed inset-0 z-[100] hidden bg-black/65 p-3 backdrop-blur-sm sm:p-5" aria-hidden="true">
+            <div class="mx-auto flex h-full max-h-[900px] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-zinc-950">
+                <div class="flex items-center justify-between gap-4 border-b border-zinc-200 px-4 py-4 dark:border-white/10 sm:px-6">
+                    <div>
+                        <div class="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-600">Instructor availability</div>
+                        <h3 class="mt-1 text-lg font-black text-zinc-900 dark:text-white sm:text-xl">Choose an available instructor</h3>
+                        <p id="studentInstructorAvailabilityContext" class="mt-1 text-xs text-zinc-500 dark:text-zinc-400"></p>
+                    </div>
+                    <button type="button" id="closeStudentInstructorAvailabilityBtn" class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-100 dark:border-white/10 dark:hover:bg-white/10" aria-label="Close instructor availability">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]">
+                    <aside class="min-h-0 overflow-y-auto border-b border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/5 md:border-b-0 md:border-r">
+                        <label for="studentAvailableInstructorSelect" class="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-500">Available instructor</label>
+                        <select id="studentAvailableInstructorSelect" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm font-bold text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:text-white"><option value="">Select instructor...</option></select>
+                        <div class="mt-5 mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">Preferred class days</div>
+                        <div id="studentSelectedAvailabilitySlots" class="space-y-2"></div>
+                        <button type="button" id="studentAddAvailabilityDayBtn" class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-300 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"><i class="fas fa-plus"></i>Add another day</button>
+                    </aside>
+                    <section class="min-h-0 overflow-y-auto p-4 sm:p-6">
+                        <div class="mb-4 flex items-center justify-between gap-3">
+                            <button type="button" id="studentInstructorCalendarPrev" class="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold text-zinc-600 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-300"><i class="fas fa-chevron-left mr-1"></i>Prev</button>
+                            <div id="studentInstructorCalendarMonth" class="text-sm font-black text-zinc-900 dark:text-white"></div>
+                            <button type="button" id="studentInstructorCalendarNext" class="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold text-zinc-600 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-300">Next<i class="fas fa-chevron-right ml-1"></i></button>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                        </div>
+                        <div id="studentInstructorCalendarGrid" class="mt-2 grid grid-cols-7 gap-1.5"></div>
+                        <div id="studentInstructorCalendarStatus" class="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-500 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400" aria-live="polite">Select an instructor to display available dates.</div>
+                        <div id="studentInstructorTimeSlots" class="mt-4"></div>
+                    </section>
+                </div>
+                <div class="flex flex-col gap-3 border-t border-zinc-200 px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div class="text-xs text-zinc-500 dark:text-zinc-400">The desk will make the final instructor and room confirmation.</div>
+                    <div class="flex gap-2"><button type="button" id="cancelStudentInstructorScheduleBtn" class="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-bold text-zinc-600 dark:border-white/10 dark:text-zinc-300">Cancel</button><button type="button" id="confirmStudentInstructorScheduleBtn" class="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700">Use Selected Schedule</button></div>
+                </div>
+            </div>
+        </div>
+    `);
+
+    const modal = document.getElementById('studentInstructorAvailabilityModal');
+    document.getElementById('closeStudentInstructorAvailabilityBtn')?.addEventListener('click', closeStudentInstructorAvailabilityModal);
+    modal?.addEventListener('click', event => {
+        if (event.target === modal) closeStudentInstructorAvailabilityModal();
+    });
+    document.getElementById('studentAvailableInstructorSelect')?.addEventListener('change', event => {
+        void selectStudentAvailableInstructor(Number(event.target.value || 0));
+    });
+    document.getElementById('studentAddAvailabilityDayBtn')?.addEventListener('click', addAnotherStudentAvailabilityDay);
+    document.getElementById('studentSelectedAvailabilitySlots')?.addEventListener('click', event => {
+        const removeButton = event.target.closest('[data-remove-student-slot]');
+        if (removeButton) {
+            removeStudentAvailabilitySlot(Number(removeButton.dataset.removeStudentSlot));
+            return;
+        }
+        const datesButton = event.target.closest('[data-view-student-slot-dates]');
+        if (datesButton) {
+            openStudentRecurringDatesModal(Number(datesButton.dataset.viewStudentSlotDates));
+            return;
+        }
+        const editButton = event.target.closest('[data-edit-student-slot]');
+        if (editButton) editStudentAvailabilitySlot(Number(editButton.dataset.editStudentSlot));
+    });
+    document.getElementById('cancelStudentInstructorScheduleBtn')?.addEventListener('click', closeStudentInstructorAvailabilityModal);
+    document.getElementById('confirmStudentInstructorScheduleBtn')?.addEventListener('click', confirmStudentInstructorSchedule);
+    document.getElementById('studentInstructorCalendarGrid')?.addEventListener('click', event => {
+        const button = event.target.closest('[data-student-availability-date]');
+        if (button && !button.disabled) selectStudentInstructorAvailabilityDate(button.dataset.studentAvailabilityDate || '');
+    });
+    document.getElementById('studentInstructorTimeSlots')?.addEventListener('click', event => {
+        const button = event.target.closest('[data-student-availability-slot]');
+        if (!button) return;
+        const slot = studentInstructorAvailabilityState.slots[Number(button.dataset.studentAvailabilitySlot)] || null;
+        if (slot && typeof studentInstructorAvailabilityState.applySlot === 'function') {
+            studentInstructorAvailabilityState.applySlot(slot, studentInstructorAvailabilityState.selectedTeacherName);
+        }
+    });
+    document.getElementById('studentInstructorCalendarPrev')?.addEventListener('click', () => shiftStudentInstructorCalendar(-1));
+    document.getElementById('studentInstructorCalendarNext')?.addEventListener('click', () => shiftStudentInstructorCalendar(1));
+}
+
+function setStudentInstructorAvailabilityModalOpen(open) {
+    const modal = document.getElementById('studentInstructorAvailabilityModal');
+    if (!modal) return;
+    modal.classList.toggle('hidden', !open);
+    modal.setAttribute('aria-hidden', open ? 'false' : 'true');
+}
+
+function closeStudentInstructorAvailabilityModal() {
+    studentInstructorAvailabilityState.requestToken += 1;
+    if (studentInstructorAvailabilityState.requestController) {
+        studentInstructorAvailabilityState.requestController.abort();
+        studentInstructorAvailabilityState.requestController = null;
+    }
+    setStudentInstructorAvailabilityModalOpen(false);
+}
+
+function getStudentInstructorMonthLabel(monthKey) {
+    const [year, month] = String(monthKey || '').split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+function shiftStudentInstructorCalendar(delta) {
+    const [year, month] = String(studentInstructorAvailabilityState.month || '').split('-').map(Number);
+    const date = new Date(year || new Date().getFullYear(), (month || (new Date().getMonth() + 1)) - 1, 1);
+    date.setMonth(date.getMonth() + delta);
+    const nextMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const now = new Date();
+    const currentMonth = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 7);
+    if (nextMonth < currentMonth) return;
+    studentInstructorAvailabilityState.month = nextMonth;
+    renderStudentInstructorAvailabilityCalendar();
+    if (studentInstructorAvailabilityState.selectedTeacherId) {
+        void loadStudentInstructorAvailabilityMonth();
+    }
+}
+
+function renderStudentAvailableInstructorList() {
+    const select = document.getElementById('studentAvailableInstructorSelect');
+    if (!select) return;
+    const rows = studentInstructorAvailabilityState.eligibleCandidates;
+    select.innerHTML = `<option value="">${rows.length ? 'Select instructor...' : 'No matching instructors available'}</option>` + rows.map(candidate => `<option value="${Number(candidate.teacher_id || 0)}">${escapeHtml(candidate.teacher_name || 'Instructor')}</option>`).join('');
+    select.value = studentInstructorAvailabilityState.selectedTeacherId ? String(studentInstructorAvailabilityState.selectedTeacherId) : '';
+    renderStudentSelectedAvailabilitySlots();
+}
+
+function renderStudentSelectedAvailabilitySlots() {
+    const container = document.getElementById('studentSelectedAvailabilitySlots');
+    const addButton = document.getElementById('studentAddAvailabilityDayBtn');
+    if (!container) return;
+    const state = studentInstructorAvailabilityState;
+    if (!state.selectedSlots.length) {
+        container.innerHTML = '<div class="rounded-xl border border-dashed border-zinc-300 px-3 py-4 text-center text-xs text-zinc-500 dark:border-white/10">Choose a green date and time.</div>';
+    } else {
+        const projections = buildProjectedRecurringDates(state.selectedSlots, state.sessionCount);
+        const recurringDays = state.selectedSlots.map(slot => `Every ${slot.day_of_week || getDayOfWeekFromDate(slot.session_date)}`);
+        container.innerHTML = `<div class="rounded-lg bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">Repeats weekly: ${escapeHtml(recurringDays.join(', '))}</div>${state.selectedSlots.map((slot, index) => `<div class="rounded-xl border ${index === state.activeSlotIndex ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-500/10' : 'border-zinc-200 bg-white dark:border-white/10 dark:bg-zinc-900'} p-3"><div class="flex items-start justify-between gap-2"><button type="button" data-view-student-slot-dates="${index}" class="min-w-0 flex-1 text-left"><span class="block text-xs font-black text-zinc-900 dark:text-white">${escapeHtml(slot.day_of_week || getDayOfWeekFromDate(slot.session_date))}</span><span class="mt-1 block text-[11px] text-zinc-500">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</span><span class="mt-1 block text-[10px] font-bold text-emerald-700 dark:text-emerald-400"><i class="fas fa-calendar-days mr-1"></i>View ${projections[index]?.length || 0} lesson dates</span></button><div class="flex gap-2"><button type="button" data-edit-student-slot="${index}" class="text-zinc-400 hover:text-blue-600" aria-label="Edit preferred day"><i class="fas fa-pen"></i></button><button type="button" data-remove-student-slot="${index}" class="text-zinc-400 hover:text-red-500" aria-label="Remove preferred day"><i class="fas fa-times"></i></button></div></div></div>`).join('')}`;
+    }
+    if (addButton) addButton.disabled = !state.selectedTeacherId || !state.selectedSlots.length || state.selectedSlots.length >= 7 || state.activeSlotIndex === -1;
+}
+
+function buildProjectedRecurringDates(slots, sessionCount = 12) {
+    const rows = Array.isArray(slots) ? slots : [];
+    const projections = rows.map(() => []);
+    const queue = rows.map((slot, index) => ({
+        index,
+        nextDate: String(slot.session_date || '').slice(0, 10),
+        startTime: String(slot.start_time || '').slice(0, 5)
+    })).filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.nextDate));
+    const total = Math.max(1, Math.min(100, Number(sessionCount || 12)));
+    for (let session = 0; session < total && queue.length; session += 1) {
+        queue.sort((a, b) => a.nextDate.localeCompare(b.nextDate) || a.startTime.localeCompare(b.startTime) || a.index - b.index);
+        const current = queue[0];
+        projections[current.index].push(current.nextDate);
+        const next = new Date(`${current.nextDate}T00:00:00`);
+        next.setDate(next.getDate() + 7);
+        current.nextDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+    }
+    return projections;
+}
+
+function openStudentRecurringDatesModal(index) {
+    const state = studentInstructorAvailabilityState;
+    const slot = state.selectedSlots[index];
+    if (!slot || typeof Swal === 'undefined') return;
+    const dates = buildProjectedRecurringDates(state.selectedSlots, state.sessionCount)[index] || [];
+    const day = slot.day_of_week || getDayOfWeekFromDate(slot.session_date);
+    Swal.fire({
+        title: `Every ${day}`,
+        html: `<div class="text-left"><div class="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><strong>${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</strong><div class="mt-1 text-xs">Projected dates within the selected package schedule.</div></div><div class="max-h-72 space-y-2 overflow-y-auto">${dates.map((date, dateIndex) => `<div class="flex items-center gap-3 rounded-lg border border-zinc-200 px-3 py-2"><span class="grid h-7 w-7 place-items-center rounded-full bg-emerald-100 text-xs font-black text-emerald-700">${dateIndex + 1}</span><span class="text-sm font-semibold text-zinc-800">${escapeHtml(formatDateLong(date) || date)}</span></div>`).join('') || '<div class="text-sm text-zinc-500">No projected dates yet.</div>'}</div></div>`,
+        confirmButtonText: 'Close',
+        confirmButtonColor: '#059669',
+        width: '32rem'
+    });
+}
+
+window.openStudentRecurringDatesModal = openStudentRecurringDatesModal;
+
+function addAnotherStudentAvailabilityDay() {
+    const state = studentInstructorAvailabilityState;
+    if (!state.selectedTeacherId || !state.selectedSlots.length || state.selectedSlots.length >= 7) return;
+    state.activeSlotIndex = -1;
+    state.selectedDate = '';
+    renderStudentSelectedAvailabilitySlots();
+    renderStudentInstructorAvailabilityCalendar();
+}
+
+function editStudentAvailabilitySlot(index) {
+    const state = studentInstructorAvailabilityState;
+    const slot = state.selectedSlots[index];
+    if (!slot) return;
+    state.activeSlotIndex = index;
+    state.selectedDate = slot.session_date;
+    state.month = String(slot.session_date || '').slice(0, 7) || state.month;
+    renderStudentSelectedAvailabilitySlots();
+    renderStudentInstructorAvailabilityCalendar();
+    void loadStudentInstructorAvailabilityMonth();
+}
+
+function removeStudentAvailabilitySlot(index) {
+    const state = studentInstructorAvailabilityState;
+    state.selectedSlots.splice(index, 1);
+    state.activeSlotIndex = state.selectedSlots.length ? Math.min(index, state.selectedSlots.length - 1) : -1;
+    state.selectedDate = state.activeSlotIndex >= 0 ? state.selectedSlots[state.activeSlotIndex].session_date : '';
+    renderStudentSelectedAvailabilitySlots();
+    renderStudentInstructorAvailabilityCalendar();
+}
+
+function confirmStudentInstructorSchedule() {
+    const state = studentInstructorAvailabilityState;
+    if (!state.selectedTeacherId || !state.selectedSlots.length) {
+        showMessage('Select an instructor and at least one available class day.', 'error');
+        return;
+    }
+    if (typeof state.confirmSlots === 'function') state.confirmSlots(state.selectedSlots.slice(), state.selectedTeacherName);
+    closeStudentInstructorAvailabilityModal();
+}
+
+function renderStudentInstructorAvailabilityCalendar(statusMessage = '') {
+    const grid = document.getElementById('studentInstructorCalendarGrid');
+    const label = document.getElementById('studentInstructorCalendarMonth');
+    const status = document.getElementById('studentInstructorCalendarStatus');
+    if (!grid || !label || !status) return;
+    const monthKey = studentInstructorAvailabilityState.month || new Date().toISOString().slice(0, 7);
+    studentInstructorAvailabilityState.month = monthKey;
+    label.textContent = getStudentInstructorMonthLabel(monthKey);
+    const prevButton = document.getElementById('studentInstructorCalendarPrev');
+    if (prevButton) {
+        const localNow = new Date();
+        const localMonth = new Date(localNow.getTime() - localNow.getTimezoneOffset() * 60000).toISOString().slice(0, 7);
+        prevButton.disabled = monthKey <= localMonth;
+        prevButton.classList.toggle('opacity-40', prevButton.disabled);
+        prevButton.classList.toggle('cursor-not-allowed', prevButton.disabled);
+    }
+    const [year, month] = monthKey.split('-').map(Number);
+    const first = new Date(year, month - 1, 1);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const grouped = studentInstructorAvailabilityState.slots.reduce((result, slot, index) => {
+        const key = String(slot.session_date || '');
+        if (!result[key]) result[key] = [];
+        result[key].push({ slot, index });
+        return result;
+    }, {});
+    const reservedDates = new Set(studentInstructorAvailabilityState.reservedSlots.map(slot => String(slot.session_date || '')));
+    const occupiedDates = new Set(studentInstructorAvailabilityState.occupiedSlots.map(slot => String(slot.session_date || '')));
+    const todayKey = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    let html = Array.from({ length: first.getDay() }, () => '<div class="h-14"></div>').join('');
+    for (let day = 1; day <= daysInMonth; day += 1) {
+        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const available = (grouped[dateKey] || []).length;
+        const reserved = reservedDates.has(dateKey);
+        const occupied = occupiedDates.has(dateKey);
+        const selected = dateKey === studentInstructorAvailabilityState.selectedDate;
+        const dateDay = getDayOfWeekFromDate(dateKey);
+        const usedByAnotherSlot = studentInstructorAvailabilityState.selectedSlots.some((slot, index) => {
+            if (index === studentInstructorAvailabilityState.activeSlotIndex) return false;
+            return (slot.day_of_week || getDayOfWeekFromDate(slot.session_date)) === dateDay;
+        });
+        const disabled = !studentInstructorAvailabilityState.selectedTeacherId || !available || dateKey < todayKey || usedByAnotherSlot;
+        const colorClass = available && !disabled
+            ? (reserved ? 'border-amber-300 bg-amber-100 hover:bg-amber-200 dark:border-amber-500/30 dark:bg-amber-500/10' : (selected ? 'border-gold-500 bg-amber-50 ring-1 ring-gold-500/30 dark:bg-gold-500/10' : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10'))
+            : occupied ? 'cursor-not-allowed border-red-300 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-500/10' : reserved ? 'cursor-not-allowed border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10' : 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400 dark:border-white/5 dark:bg-white/[.02] dark:text-zinc-700';
+        html += `<button type="button" data-student-availability-date="${dateKey}" ${disabled ? 'disabled' : ''} class="h-14 rounded-lg border p-1.5 text-left transition ${colorClass}">
+            <div class="flex items-start justify-between gap-1"><span class="text-sm font-bold ${available && !disabled ? 'text-zinc-900 dark:text-white' : ''}">${day}</span>${available && !disabled ? `<span class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${available}</span>` : ''}</div>
+            ${available && !disabled ? `<div class="mt-1 text-[9px] font-bold ${reserved ? 'text-amber-800' : 'text-emerald-700 dark:text-emerald-400'}">${reserved ? 'Reserved + open' : 'Available'}</div>` : reserved ? '<div class="mt-1 text-[9px] font-bold text-amber-800">Reserved</div>' : occupied ? '<div class="mt-1 text-[9px] font-bold text-red-700">Occupied</div>' : '<div class="mt-1 text-[9px] font-bold text-zinc-500">Unavailable</div>'}
+        </button>`;
+    }
+    grid.innerHTML = html;
+    if (statusMessage) status.innerHTML = statusMessage;
+    else if (!studentInstructorAvailabilityState.selectedTeacherId) status.textContent = 'Select an instructor to display available dates.';
+    else if (!studentInstructorAvailabilityState.slots.length) status.textContent = 'This instructor has no open one-hour slots in the current scheduling window.';
+    else status.textContent = 'Green: available · Yellow: pending reservation · Red: occupied · Gray: unavailable.';
+    const inlineTimes = document.getElementById('studentInstructorTimeSlots');
+    if (inlineTimes) inlineTimes.innerHTML = '';
+}
+
+function renderStudentInstructorTimeSlots(grouped = null) {
+    const container = document.getElementById('studentInstructorTimeSlots');
+    if (!container) return;
+    const dateKey = studentInstructorAvailabilityState.selectedDate;
+    const rows = grouped?.[dateKey] || studentInstructorAvailabilityState.slots
+        .map((slot, index) => ({ slot, index }))
+        .filter(item => String(item.slot.session_date || '') === dateKey);
+    if (!dateKey || !rows.length) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = `<div class="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">Available times for ${escapeHtml(formatDateLong(dateKey) || dateKey)}</div><div class="grid grid-cols-1 gap-2 sm:grid-cols-2">${rows.map(item => `<button type="button" data-student-availability-slot="${item.index}" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-400 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10"><span class="block font-bold text-emerald-800 dark:text-emerald-300">${escapeHtml(`${formatTime12Hour(item.slot.start_time)} - ${formatTime12Hour(item.slot.end_time)}`)}</span><span class="mt-1 block text-xs text-zinc-500 dark:text-zinc-400">Use this preferred time</span></button>`).join('')}</div>`;
+}
+
+function selectStudentInstructorAvailabilityDate(dateKey) {
+    studentInstructorAvailabilityState.selectedDate = String(dateKey || '');
+    renderStudentInstructorAvailabilityCalendar();
+    openStudentInstructorTimePickerModal(dateKey);
+}
+
+function openStudentInstructorTimePickerModal(dateKey) {
+    const normalizedDate = String(dateKey || '').trim();
+    if (!normalizedDate || typeof Swal === 'undefined') return;
+    const rows = studentInstructorAvailabilityState.slots
+        .filter(slot => String(slot.session_date || '') === normalizedDate)
+        .sort((a, b) => String(a.start_time || '').localeCompare(String(b.start_time || '')));
+    const reservedRows = studentInstructorAvailabilityState.reservedSlots.filter(slot => String(slot.session_date || '') === normalizedDate);
+    const occupiedRows = studentInstructorAvailabilityState.occupiedSlots.filter(slot => String(slot.session_date || '') === normalizedDate);
+    if (!rows.length) return;
+    Swal.fire({
+        title: formatDateLong(normalizedDate) || normalizedDate,
+        html: `<div class="mb-4 text-sm text-zinc-500">Green: available · Yellow: temporarily reserved · Red: occupied</div><div class="grid grid-cols-1 gap-2 text-left sm:grid-cols-2">${rows.map((slot, index) => `<button type="button" class="student-time-picker-option rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-400 hover:bg-emerald-100" data-slot-index="${index}"><div class="font-black text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs text-zinc-500">Select this preferred time</div></button>`).join('')}${reservedRows.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="font-black text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-amber-700">Pending reservation</div></div>`).join('')}${occupiedRows.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="font-black text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-red-700">Occupied</div></div>`).join('')}</div>`,
+        showConfirmButton: false,
+        showCloseButton: true,
+        width: '42rem',
+        customClass: { popup: 'rounded-3xl', htmlContainer: 'm-0', title: 'text-lg font-bold' },
+        didOpen: () => {
+            Swal.getPopup()?.querySelectorAll('.student-time-picker-option').forEach(button => {
+                button.addEventListener('click', () => {
+                    const slot = rows[Number(button.dataset.slotIndex)];
+                    if (slot && typeof studentInstructorAvailabilityState.applySlot === 'function') {
+                        studentInstructorAvailabilityState.applySlot(slot, studentInstructorAvailabilityState.selectedTeacherName);
+                    }
+                    Swal.close();
+                });
+            });
+        }
+    });
+}
+
+async function selectStudentAvailableInstructor(teacherId) {
+    const candidate = studentInstructorAvailabilityState.eligibleCandidates.find(row => Number(row.teacher_id) === Number(teacherId));
+    if (!candidate) return;
+    const previousTeacherId = Number(studentInstructorAvailabilityState.selectedTeacherId || 0);
+    studentInstructorAvailabilityState.selectedTeacherId = Number(teacherId);
+    studentInstructorAvailabilityState.selectedTeacherName = String(candidate.teacher_name || 'Instructor');
+    if (previousTeacherId !== Number(teacherId)) {
+        studentInstructorAvailabilityState.selectedSlots = [];
+        studentInstructorAvailabilityState.activeSlotIndex = -1;
+    }
+    studentInstructorAvailabilityState.slots = [];
+    studentInstructorAvailabilityState.reservedSlots = [];
+    studentInstructorAvailabilityState.occupiedSlots = [];
+    studentInstructorAvailabilityState.selectedDate = '';
+    renderStudentAvailableInstructorList();
+    await loadStudentInstructorAvailabilityMonth();
+}
+
+async function loadStudentInstructorAvailabilityMonth() {
+    const state = studentInstructorAvailabilityState;
+    const teacherId = Number(state.selectedTeacherId || 0);
+    if (!teacherId || !state.month) return;
+    const [year, month] = state.month.split('-').map(Number);
+    const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const branchId = Number(state.student?.branch_id || 0);
+    const studentId = Number(state.student?.student_id || 0);
+    const cacheKey = `${teacherId}|${branchId}|${studentId}|${state.month}`;
+    const cached = state.slotCache.get(cacheKey);
+    if (cached && (Date.now() - Number(cached.savedAt || 0)) < 60000) {
+        state.slots = Array.isArray(cached.slots) ? cached.slots : [];
+        state.reservedSlots = Array.isArray(cached.reservedSlots) ? cached.reservedSlots : [];
+        state.occupiedSlots = Array.isArray(cached.occupiedSlots) ? cached.occupiedSlots : [];
+        renderStudentInstructorAvailabilityCalendar();
+        return;
+    }
+
+    if (state.requestController) state.requestController.abort();
+    state.requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    state.slots = [];
+    state.reservedSlots = [];
+    state.occupiedSlots = [];
+    renderStudentInstructorAvailabilityCalendar(`<i class="fas fa-spinner fa-spin mr-2 text-emerald-600"></i>Loading ${escapeHtml(state.selectedTeacherName)}'s available dates...`);
+    const token = ++state.requestToken;
+    try {
+        const params = new URLSearchParams({
+            action: 'get-teacher-available-slots',
+            teacher_id: String(teacherId),
+            branch_id: String(branchId),
+            student_id: String(studentId),
+            start_date: monthStart,
+            end_date: monthEnd
+        });
+        const response = await axios.get(`${baseApiUrl}/students.php?${params.toString()}`, {
+            timeout: 15000,
+            signal: state.requestController?.signal
+        });
+        if (token !== state.requestToken || teacherId !== Number(state.selectedTeacherId) || state.month !== `${year}-${String(month).padStart(2, '0')}`) return;
+        state.slots = response.data?.success && Array.isArray(response.data.slots) ? response.data.slots : [];
+        state.reservedSlots = response.data?.success && Array.isArray(response.data.reserved_slots) ? response.data.reserved_slots : [];
+        state.occupiedSlots = response.data?.success && Array.isArray(response.data.occupied_slots) ? response.data.occupied_slots : [];
+        state.slotCache.set(cacheKey, { savedAt: Date.now(), slots: state.slots.slice(), reservedSlots: state.reservedSlots.slice(), occupiedSlots: state.occupiedSlots.slice() });
+        renderStudentInstructorAvailabilityCalendar();
+    } catch (error) {
+        if (token !== state.requestToken || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') return;
+        state.slots = [];
+        state.reservedSlots = [];
+        state.occupiedSlots = [];
+        renderStudentInstructorAvailabilityCalendar('<i class="fas fa-triangle-exclamation mr-2 text-red-500"></i>Unable to load this instructor’s availability. Please try again.');
+    } finally {
+        if (token === state.requestToken) state.requestController = null;
+    }
+}
+
+function openStudentAvailableInstructors() {
+    const selectedTypeIds = getStudentRequestSelectedTypeIds();
+    if (!selectedTypeIds.length) {
+        showMessage('Choose an instrument type first.', 'error');
+        return;
+    }
+    ensureStudentInstructorAvailabilityModal();
+    const state = studentInstructorAvailabilityState;
+    state.eligibleCandidates = getEligibleStudentRequestInstructors(state.candidates, state.availabilityRows, selectedTypeIds);
+    const savedTeacherId = Number(state.selectedSlots[0]?.teacher_id || state.selectedTeacherId || 0);
+    const savedTeacher = state.eligibleCandidates.find(candidate => Number(candidate.teacher_id) === savedTeacherId);
+    state.selectedTeacherId = savedTeacher ? savedTeacherId : 0;
+    state.selectedTeacherName = savedTeacher ? String(savedTeacher.teacher_name || 'Instructor') : '';
+    if (!savedTeacher) {
+        state.selectedSlots = [];
+        state.activeSlotIndex = -1;
+    }
+    state.slots = [];
+    state.reservedSlots = [];
+    state.occupiedSlots = [];
+    state.selectedDate = '';
+    const preferredDate = String(document.getElementById('studentRequestPreferredDate')?.value || '');
+    state.month = (preferredDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
+    const typeNames = Array.from(document.querySelectorAll('#studentRequestInstrumentContainer select.student-request-instrument-type'))
+        .filter(select => select.value)
+        .map(select => select.selectedOptions?.[0]?.textContent || '')
+        .filter(Boolean);
+    const context = document.getElementById('studentInstructorAvailabilityContext');
+    if (context) context.textContent = `${state.student?.branch_name || 'Student branch'} • ${typeNames.join(', ')}`;
+    renderStudentAvailableInstructorList();
+    renderStudentInstructorAvailabilityCalendar();
+    setStudentInstructorAvailabilityModalOpen(true);
+    if (state.selectedTeacherId) void loadStudentInstructorAvailabilityMonth();
+}
 
 function getStudentRequestAvailableTypes() {
     const seen = new Set();
@@ -5742,7 +6688,6 @@ function renderStudentRequestInstrumentSelectors(maxInstruments, instruments) {
                         ${typeOptionsHtml}
                     </select>
                 </div>
-                <p class="text-xs text-slate-500">We’ll assign an available instrument from the selected type behind the scenes.</p>
             </div>
         `;
     }
@@ -5772,6 +6717,9 @@ function onStudentRequestInstrumentTypeChange(slot) {
         }
     }
     onStudentRequestInstrumentDropdownChange(slot);
+    if (typeof window.refreshStudentInstructorAvailabilityControl === 'function') {
+        window.refreshStudentInstructorAvailabilityControl();
+    }
 }
 
 // Sync disabled state of type dropdowns so already-used types are greyed out
@@ -5888,12 +6836,60 @@ async function fetchStudentRequestMetaByEmail(email, options = {}) {
 
 function ensureGuardianEnrollmentModal() {
     if (document.getElementById('studentRequestModal')) return;
-    document.body.insertAdjacentHTML('beforeend', `<div id="studentRequestModal" class="fixed inset-0 z-[80] hidden overflow-y-auto bg-black/60 p-0 backdrop-blur-sm sm:p-4" aria-hidden="true"><div class="flex min-h-full items-stretch justify-center sm:items-center"><div class="flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-obsidian sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-zinc-200 dark:sm:border-white/10"><div class="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-white/10"><div><div class="text-[10px] font-bold uppercase tracking-[.22em] text-gold-600">Enrollment Request</div><h2 id="guardianEnrollmentStudentName" class="mt-1 text-lg font-black text-zinc-900 dark:text-white">Enroll Student</h2></div><button type="button" onclick="closeStudentRequestModal()" class="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-100 dark:border-white/10 dark:hover:bg-white/10"><i class="fas fa-times"></i></button></div><div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"><div id="studentRequestStatus"></div><form id="studentPackageRequestForm" class="mt-4 space-y-4"><div class="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_300px]"><div class="space-y-4"><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">1.</span>Choose the 12-session package</div><select id="studentRequestPackage" class="hidden"><option value="">Select package</option></select><div id="studentRequestPackageCards" class="space-y-2"></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">2.</span>Choose payment</div><div class="grid gap-3 sm:grid-cols-2"><select id="studentRequestPaymentMode" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="Partial Payment">Partial Payment</option><option value="Full Payment">Full Payment</option></select><select id="studentRequestPaymentMethod" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="">Select payment method</option><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option></select></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">3.</span>Choose one instrument</div><div id="studentRequestInstrumentContainer"></div><label class="mt-4 block text-xs font-bold uppercase tracking-wider text-zinc-500">Payment proof</label><input id="studentRequestPaymentProof" name="package_payment_proof_file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="mt-2 w-full rounded-xl border border-dashed border-zinc-300 p-3 text-sm dark:border-zinc-700"><p id="guardianEnrollmentProofName" class="mt-1 hidden text-xs text-gold-600"></p></section></div><aside class="self-start rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/5"><div class="text-sm font-extrabold text-zinc-900 dark:text-white">Payment Summary</div><div id="studentRequestAmount" class="mt-3 text-sm"></div></aside></div><div id="studentAvailabilityCalendar" class="hidden"></div><div id="studentRequestAutoDay" class="mt-3 text-xs text-zinc-500"></div><div class="mt-5 flex flex-col-reverse gap-2 border-t border-zinc-200 pt-4 dark:border-white/10 sm:flex-row sm:justify-end"><button type="button" onclick="closeStudentRequestModal()" class="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-bold dark:border-white/10">Cancel</button><button id="studentSubmitRequestBtn" type="submit" class="rounded-xl bg-gold-500 px-6 py-3 text-sm font-extrabold text-black hover:bg-gold-400"><i class="fas fa-paper-plane mr-2"></i>Submit Request</button></div></form></div></div></div></div>`);
-    document.getElementById('studentRequestPaymentProof')?.addEventListener('change', event => {
-        const label = document.getElementById('guardianEnrollmentProofName');
-        const file = event.target.files?.[0];
-        if (label) { label.textContent = file ? file.name : ''; label.classList.toggle('hidden', !file); }
-    });
+    document.body.insertAdjacentHTML('beforeend', `<div id="studentRequestModal" class="fixed inset-0 z-[80] hidden overflow-y-auto bg-black/60 p-0 backdrop-blur-sm sm:p-4" aria-hidden="true"><div class="flex min-h-full items-stretch justify-center sm:items-center"><div class="flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-obsidian sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-zinc-200 dark:sm:border-white/10"><div class="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-white/10"><div><div class="text-[10px] font-bold uppercase tracking-[.22em] text-gold-600">Enrollment Request</div><h2 id="guardianEnrollmentStudentName" class="mt-1 text-lg font-black text-zinc-900 dark:text-white">Enroll Student</h2></div><button type="button" onclick="closeStudentRequestModal()" class="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-100 dark:border-white/10 dark:hover:bg-white/10"><i class="fas fa-times"></i></button></div><div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"><div id="studentRequestStatus"></div><form id="studentPackageRequestForm" class="mt-4 space-y-4"><div class="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_300px]"><div class="space-y-4"><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">1.</span>Choose the 12-session package</div><select id="studentRequestPackage" class="hidden"><option value="">Select package</option></select><div id="studentRequestPackageCards" class="space-y-2"></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">2.</span>Choose payment</div><div class="grid gap-3 sm:grid-cols-2"><select id="studentRequestPaymentMode" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="Partial Payment">Partial Payment</option><option value="Full Payment">Full Payment</option></select><select id="studentRequestPaymentMethod" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="">Select payment method</option><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option></select></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">3.</span>Choose one instrument</div><div id="studentRequestInstrumentContainer"></div><label class="mt-4 block text-xs font-bold uppercase tracking-wider text-zinc-500">Payment proof</label><input id="studentRequestPaymentProof" name="package_payment_proof_file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="mt-2 w-full rounded-xl border border-dashed border-zinc-300 p-3 text-sm dark:border-zinc-700"><p id="guardianEnrollmentProofName" class="mt-1 hidden text-xs text-gold-600"></p></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-1 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">4.</span>Request a class schedule</div><p class="mb-3 text-xs text-zinc-500 dark:text-zinc-400">Select a preferred date and an available one-hour window.</p><div class="grid gap-3 sm:grid-cols-2"><div><label for="studentRequestPreferredDate" class="mb-1 block text-xs font-bold text-zinc-500">Preferred date</label><input id="studentRequestPreferredDate" type="date" required class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"></div><div><label for="studentRequestPreferredTime" class="mb-1 block text-xs font-bold text-zinc-500">Preferred time</label><select id="studentRequestPreferredTime" required class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="">Choose a date first</option></select></div></div><div id="studentRequestScheduleHint" class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-200">The desk will confirm this request or adjust it if an instructor or room is unavailable.</div></section></div><aside class="self-start rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/5"><div class="text-sm font-extrabold text-zinc-900 dark:text-white">Payment Summary</div><div id="studentRequestAmount" class="mt-3 text-sm"></div></aside></div><div id="studentAvailabilityCalendar" class="hidden"></div><div id="studentRequestAutoDay" class="mt-3 text-xs text-zinc-500"></div><div class="mt-5 flex flex-col-reverse gap-2 border-t border-zinc-200 pt-4 dark:border-white/10 sm:flex-row sm:justify-end"><button type="button" onclick="closeStudentRequestModal()" class="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-bold dark:border-white/10">Cancel</button><button id="studentSubmitRequestBtn" type="submit" class="rounded-xl bg-gold-500 px-6 py-3 text-sm font-extrabold text-black hover:bg-gold-400"><i class="fas fa-paper-plane mr-2"></i>Submit Request</button></div></form></div></div></div></div>`);
+    const scheduleHint = document.getElementById('studentRequestScheduleHint');
+    const guardianModalPanel = document.getElementById('studentRequestModal')?.querySelector(':scope > div > div');
+    if (guardianModalPanel) {
+        guardianModalPanel.classList.remove('sm:max-w-4xl', 'sm:max-h-[92vh]');
+        guardianModalPanel.classList.add('sm:max-w-5xl', 'sm:max-h-[94vh]');
+    }
+    const guardianModalBody = guardianModalPanel?.lastElementChild;
+    const guardianRequestForm = document.getElementById('studentPackageRequestForm');
+    const guardianRequestGrid = guardianRequestForm?.querySelector(':scope > div');
+    const guardianRequestSteps = guardianRequestGrid?.firstElementChild;
+    const guardianPaymentSummary = guardianRequestGrid?.querySelector('aside');
+    guardianModalBody?.classList.add('lg:overflow-hidden', 'lg:flex', 'lg:flex-col');
+    guardianRequestForm?.classList.add('lg:flex', 'lg:min-h-0', 'lg:flex-1', 'lg:flex-col');
+    guardianRequestGrid?.classList.add('grid', 'grid-cols-1', 'gap-4', 'lg:min-h-0', 'lg:flex-1', 'lg:grid-cols-[minmax(0,1fr)_300px]');
+    guardianRequestSteps?.classList.add('lg:overflow-y-auto', 'lg:overscroll-contain', 'lg:pr-2');
+    if (guardianPaymentSummary) {
+        guardianPaymentSummary.id = 'studentRequestPaymentSummaryPanel';
+        guardianPaymentSummary.classList.add('lg:sticky', 'lg:top-0', 'lg:max-h-full', 'lg:overflow-y-auto');
+    }
+    const guardianPaymentMethod = document.getElementById('studentRequestPaymentMethod');
+    const guardianPaymentGrid = guardianPaymentMethod?.parentElement;
+    if (guardianPaymentGrid && !document.getElementById('studentRequestReferenceNumber')) {
+        const evidenceGrid = document.createElement('div');
+        evidenceGrid.className = 'mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2';
+        evidenceGrid.innerHTML = `<div><label for="studentRequestReferenceNumber" class="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Reference Number</label><input id="studentRequestReferenceNumber" type="text" autocomplete="off" placeholder="Transaction / reference no." class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-gold-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"></div>`;
+        const guardianProofInput = document.getElementById('studentRequestPaymentProof');
+        const guardianProofLabel = guardianProofInput?.previousElementSibling;
+        const guardianProofName = document.getElementById('guardianEnrollmentProofName');
+        if (guardianProofInput) {
+            const proofWrap = document.createElement('div');
+            if (guardianProofLabel) {
+                guardianProofLabel.className = 'mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400';
+                guardianProofLabel.textContent = 'Payment Proof';
+                proofWrap.appendChild(guardianProofLabel);
+            }
+            guardianProofInput.className = 'w-full rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900';
+            proofWrap.appendChild(guardianProofInput);
+            if (guardianProofName) proofWrap.appendChild(guardianProofName);
+            evidenceGrid.appendChild(proofWrap);
+        }
+        guardianPaymentGrid.insertAdjacentElement('afterend', evidenceGrid);
+    }
+    const guardianPreferredDate = document.getElementById('studentRequestPreferredDate');
+    const guardianScheduleSection = guardianPreferredDate?.closest('section');
+    const guardianScheduleGrid = guardianPreferredDate?.closest('.grid');
+    if (guardianScheduleGrid) {
+        guardianScheduleGrid.outerHTML = '<input id="studentRequestPreferredDate" type="hidden"><select id="studentRequestPreferredTime" class="hidden" aria-hidden="true"><option value=""></option></select><div id="studentRequestSelectedScheduleSummary" class="mb-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3 text-sm text-zinc-500 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">No preferred schedule selected yet.</div>';
+    }
+    guardianScheduleSection?.querySelector('p')?.remove();
+    if (scheduleHint && !document.getElementById('studentViewAvailableInstructorsBtn')) {
+        scheduleHint.insertAdjacentHTML('afterend', `<button type="button" id="studentViewAvailableInstructorsBtn" class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/15"><i class="fas fa-chalkboard-user"></i>View Available Instructors</button>`);
+    }
+    scheduleHint?.remove();
 }
 
 async function openGuardianEnrollmentRequest(index) {
@@ -5936,34 +6932,41 @@ function initStudentAdditionalSessionAction(student, portal, requestMeta, attend
     const addBtn = document.getElementById('studentAddAnotherSessionBtn');
     if (!statusEl || !addBtn) return;
 
-    const latest = requestMeta?.latest_request || null;
+    const latest = requestMeta?.latest_session_extension_request || null;
     const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
     const currentEnrollment = portal?.current_enrollment || null;
     const totalSessions = Number(currentEnrollment?.package_sessions || student?.package_sessions || 0);
-    const attendedSessions = Number(attendanceSummary?.summary?.present_count || 0) + Number(attendanceSummary?.summary?.late_count || 0);
+    const attendedSessions = Math.max(
+        Number(currentEnrollment?.used_sessions || currentEnrollment?.completed_sessions || 0),
+        Number(attendanceSummary?.summary?.present_count || 0) + Number(attendanceSummary?.summary?.late_count || 0)
+    );
     const remainingSessions = totalSessions > 0 ? Math.max(0, totalSessions - attendedSessions) : 0;
+    const canRequestAdditionalSessions = totalSessions > 0 && remainingSessions === 0;
 
     if (hasPendingRequest) {
         statusEl.textContent = 'You already have a pending request. Please wait for approval.';
+    } else if (canRequestAdditionalSessions) {
+        statusEl.textContent = `${attendedSessions} of ${totalSessions} sessions used. You can now request additional sessions.`;
     } else if (totalSessions > 0) {
-        statusEl.textContent = `${attendedSessions} of ${totalSessions} sessions done. ${remainingSessions} left. You can still request an extra session below.`;
+        statusEl.textContent = `${attendedSessions} of ${totalSessions} sessions used. Additional sessions become available after the remaining ${remainingSessions} session${remainingSessions === 1 ? '' : 's'} are used.`;
     } else {
         statusEl.textContent = 'Finish your current package before adding more sessions.';
     }
+
+    addBtn.classList.toggle('hidden', !canRequestAdditionalSessions && !hasPendingRequest);
+    addBtn.disabled = hasPendingRequest || !canRequestAdditionalSessions;
 
     addBtn.onclick = () => {
         if (hasPendingRequest) {
             showMessage('Please wait for your pending request to be approved.', 'error');
             return;
         }
-
-        const requestModal = document.getElementById('studentSessionExtensionModal');
-        if (requestModal) {
-            openStudentSessionExtensionModal();
+        if (!canRequestAdditionalSessions) {
+            showMessage(`Finish the remaining ${remainingSessions} session${remainingSessions === 1 ? '' : 's'} before requesting more.`, 'error');
             return;
         }
 
-        showMessage('Unable to open the session request modal right now.', 'error');
+        window.location.href = 'student_profile.html#studentAdditionalSessionsCard';
     };
 }
 
@@ -5975,19 +6978,36 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
     const instrumentsContainer = document.getElementById('studentRequestInstrumentContainer');
     const paymentModeEl = document.getElementById('studentRequestPaymentMode');
     const paymentMethodEl = document.getElementById('studentRequestPaymentMethod');
+    const referenceNumberEl = document.getElementById('studentRequestReferenceNumber');
     const availabilityCalendar = document.getElementById('studentAvailabilityCalendar');
     const form = document.getElementById('studentPackageRequestForm');
     const submitBtn = document.getElementById('studentSubmitRequestBtn');
     const paymentProofEl = document.getElementById('studentRequestPaymentProof');
+    const paymentProofNameEl = document.getElementById('studentRequestProofFileName') || document.getElementById('guardianEnrollmentProofName');
     const autoDayEl = document.getElementById('studentRequestAutoDay');
+    const preferredDateEl = document.getElementById('studentRequestPreferredDate');
+    const preferredTimeEl = document.getElementById('studentRequestPreferredTime');
+    const scheduleHintEl = document.getElementById('studentRequestScheduleHint');
+    const viewInstructorsBtn = document.getElementById('studentViewAvailableInstructorsBtn');
+    const selectedScheduleSummaryEl = document.getElementById('studentRequestSelectedScheduleSummary');
 
-    if (!statusEl || !packageSelect || !packageCardsContainer || !amountEl || !instrumentsContainer || !paymentModeEl || !paymentMethodEl || !availabilityCalendar || !form || !submitBtn) {
+    if (!statusEl || !packageSelect || !packageCardsContainer || !amountEl || !instrumentsContainer || !paymentModeEl || !paymentMethodEl || !availabilityCalendar || !form || !submitBtn || !preferredDateEl || !preferredTimeEl) {
         return;
+    }
+    if (paymentProofEl) {
+        paymentProofEl.onchange = event => {
+            const file = event.target.files?.[0];
+            if (paymentProofNameEl) {
+                paymentProofNameEl.textContent = file ? `Selected: ${file.name}` : '';
+                paymentProofNameEl.classList.toggle('hidden', !file);
+            }
+        };
     }
 
     const packages = Array.isArray(requestMeta?.packages) ? requestMeta.packages : [];
     const instruments = Array.isArray(requestMeta?.instruments) ? requestMeta.instruments : [];
     const availabilities = Array.isArray(requestMeta?.availabilities) ? requestMeta.availabilities : [];
+    const teacherCandidates = Array.isArray(requestMeta?.teacher_candidates) ? requestMeta.teacher_candidates : [];
     const latest = requestMeta?.latest_request || null;
     // Only consider it "pending" if status is actually 'Pending' - not 'Cancelled' or 'Rejected'
     const hasPendingRequest = latest && String(latest.status || '') === 'Pending';
@@ -6005,6 +7025,194 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
 
     statusEl.innerHTML = renderStudentRequestStatus(latest);
     availabilityCalendar.innerHTML = '';
+
+    const toLocalDateValue = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayYmd = toLocalDateValue(today);
+    preferredDateEl.min = todayYmd;
+
+    const getRequestedTimeOptions = (dateValue) => {
+        const dayName = getDayOfWeekFromDate(dateValue);
+        const slots = [];
+        const seen = new Set();
+        const selectedTypeIds = getStudentRequestSelectedTypeIds();
+        const eligibleTeacherIds = new Set(
+            getEligibleStudentRequestInstructors(teacherCandidates, availabilities, selectedTypeIds)
+                .map(candidate => Number(candidate.teacher_id || 0))
+        );
+        availabilities
+            .filter(row => String(row.day_of_week || '') === dayName && eligibleTeacherIds.has(Number(row.teacher_id || 0)))
+            .forEach(row => {
+                const startParts = String(row.start_time || '').split(':').map(Number);
+                const endParts = String(row.end_time || '').split(':').map(Number);
+                let cursor = (startParts[0] * 60) + startParts[1];
+                const end = (endParts[0] * 60) + endParts[1];
+                while (Number.isFinite(cursor) && Number.isFinite(end) && cursor + 60 <= end) {
+                    const startValue = `${String(Math.floor(cursor / 60)).padStart(2, '0')}:${String(cursor % 60).padStart(2, '0')}`;
+                    const endMinutes = cursor + 60;
+                    const endValue = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
+                    const key = `${startValue}|${endValue}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        slots.push({ start: startValue, end: endValue });
+                    }
+                    cursor += 60;
+                }
+            });
+        return slots
+            .filter(slot => {
+                if (dateValue !== todayYmd) return true;
+                const now = new Date();
+                const currentMinutes = (now.getHours() * 60) + now.getMinutes();
+                const [hours, minutes] = slot.start.split(':').map(Number);
+                return ((hours * 60) + minutes) > currentMinutes;
+            })
+            .sort((a, b) => a.start.localeCompare(b.start));
+    };
+
+    const refreshRequestedTimes = (preserveValue = '') => {
+        const dayName = getDayOfWeekFromDate(preferredDateEl.value);
+        const hasInstrument = getStudentRequestSelectedTypeIds().length > 0;
+        const slots = getRequestedTimeOptions(preferredDateEl.value);
+        preferredTimeEl.innerHTML = slots.length
+            ? '<option value="">Select preferred time</option>' + slots.map(slot => `<option value="${slot.start}|${slot.end}">${escapeHtml(formatTime12Hour(slot.start))} - ${escapeHtml(formatTime12Hour(slot.end))}</option>`).join('')
+            : `<option value="">${hasInstrument ? 'No instructor time windows for this date' : 'Choose an instrument first'}</option>`;
+        if (preserveValue && slots.some(slot => `${slot.start}|${slot.end}` === preserveValue)) {
+            preferredTimeEl.value = preserveValue;
+        }
+        if (autoDayEl) {
+            autoDayEl.textContent = dayName ? `${dayName} request — subject to desk confirmation.` : 'Choose a preferred class date.';
+        }
+        if (scheduleHintEl) {
+            scheduleHintEl.innerHTML = !hasInstrument
+                ? '<i class="fas fa-circle-info mr-1"></i>Choose an instrument first to see matching instructor availability.'
+                : slots.length
+                ? '<i class="fas fa-circle-info mr-1"></i>This is a request. The desk will confirm it or adjust the instructor, room, or time if there is a conflict.'
+                : '<i class="fas fa-triangle-exclamation mr-1"></i>No instructor availability is listed for this day. Please choose another date.';
+        }
+        if (viewInstructorsBtn) {
+            const eligibleCount = getEligibleStudentRequestInstructors(teacherCandidates, availabilities, getStudentRequestSelectedTypeIds()).length;
+            viewInstructorsBtn.disabled = !hasInstrument;
+            viewInstructorsBtn.innerHTML = `<i class="fas fa-chalkboard-user"></i>${hasInstrument ? `View Available Instructors${eligibleCount ? ` (${eligibleCount})` : ''}` : 'Choose an Instrument First'}`;
+        }
+    };
+
+    if (Number(studentInstructorAvailabilityState.student?.student_id || 0) !== Number(student?.student_id || 0)) {
+        studentInstructorAvailabilityState.slotCache.clear();
+        if (studentInstructorAvailabilityState.requestController) {
+            studentInstructorAvailabilityState.requestController.abort();
+            studentInstructorAvailabilityState.requestController = null;
+        }
+    }
+    studentInstructorAvailabilityState.selectedSlot = null;
+    studentInstructorAvailabilityState.selectedSlots = [];
+    studentInstructorAvailabilityState.activeSlotIndex = -1;
+    studentInstructorAvailabilityState.selectedTeacherId = 0;
+    studentInstructorAvailabilityState.selectedTeacherName = '';
+    studentInstructorAvailabilityState.student = student;
+    studentInstructorAvailabilityState.candidates = teacherCandidates;
+    studentInstructorAvailabilityState.availabilityRows = availabilities;
+    studentInstructorAvailabilityState.applySlot = (slot, teacherName) => {
+        const state = studentInstructorAvailabilityState;
+        const dateValue = String(slot.session_date || '');
+        const timeValue = `${String(slot.start_time || '').slice(0, 5)}|${String(slot.end_time || '').slice(0, 5)}`;
+        const candidateSlot = {
+            teacher_id: Number(state.selectedTeacherId || 0),
+            teacher_name: String(teacherName || state.selectedTeacherName || 'Instructor'),
+            session_date: dateValue,
+            day_of_week: String(slot.day_of_week || getDayOfWeekFromDate(dateValue)),
+            start_time: String(slot.start_time || '').slice(0, 5),
+            end_time: String(slot.end_time || '').slice(0, 5)
+        };
+        const duplicateIndex = state.selectedSlots.findIndex((saved, index) => index !== state.activeSlotIndex && (saved.day_of_week || getDayOfWeekFromDate(saved.session_date)) === candidateSlot.day_of_week);
+        if (duplicateIndex >= 0) {
+            showPortalToast(
+                `${candidateSlot.day_of_week} is already in your weekly schedule. Choose another weekday.`,
+                'warning',
+                'Day already selected'
+            );
+            return;
+        }
+        if (state.activeSlotIndex >= 0 && state.selectedSlots[state.activeSlotIndex]) {
+            state.selectedSlots[state.activeSlotIndex] = candidateSlot;
+        } else {
+            state.selectedSlots.push(candidateSlot);
+            state.activeSlotIndex = state.selectedSlots.length - 1;
+        }
+        preferredDateEl.value = dateValue;
+        refreshRequestedTimes(timeValue);
+        if (!Array.from(preferredTimeEl.options).some(option => option.value === timeValue)) {
+            preferredTimeEl.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(timeValue)}">${escapeHtml(formatTime12Hour(slot.start_time))} - ${escapeHtml(formatTime12Hour(slot.end_time))}</option>`);
+        }
+        preferredTimeEl.value = timeValue;
+        studentInstructorAvailabilityState.selectedSlot = {
+            teacherId: Number(studentInstructorAvailabilityState.selectedTeacherId || 0),
+            date: dateValue,
+            start: String(slot.start_time || '').slice(0, 5),
+            end: String(slot.end_time || '').slice(0, 5)
+        };
+        renderStudentSelectedAvailabilitySlots();
+        renderStudentInstructorAvailabilityCalendar();
+        if (scheduleHintEl) {
+            scheduleHintEl.innerHTML = `<i class="fas fa-circle-check mr-1 text-emerald-600"></i>${state.selectedSlots.length} preferred class day${state.selectedSlots.length === 1 ? '' : 's'} selected with ${escapeHtml(teacherName || 'the instructor')}.`;
+        }
+    };
+    studentInstructorAvailabilityState.confirmSlots = (slots, teacherName) => {
+        const first = slots[0];
+        if (!first) return;
+        preferredDateEl.value = first.session_date;
+        const firstTime = `${first.start_time}|${first.end_time}`;
+        preferredTimeEl.innerHTML = `<option value="${escapeHtml(firstTime)}">${escapeHtml(formatTime12Hour(first.start_time))} - ${escapeHtml(formatTime12Hour(first.end_time))}</option>`;
+        preferredTimeEl.value = firstTime;
+        if (selectedScheduleSummaryEl) {
+            const projections = buildProjectedRecurringDates(slots, studentInstructorAvailabilityState.sessionCount);
+            const recurringLabel = slots.map(item => `Every ${item.day_of_week || getDayOfWeekFromDate(item.session_date)}`).join(', ');
+            selectedScheduleSummaryEl.innerHTML = `<div class="font-bold text-zinc-900 dark:text-white">${slots.length} preferred weekly class day${slots.length === 1 ? '' : 's'}</div><div class="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">Repeats weekly: ${escapeHtml(recurringLabel)}</div><div class="mt-2 flex flex-wrap gap-2">${slots.map((item, index) => `<button type="button" onclick="openStudentRecurringDatesModal(${index})" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-xs text-emerald-800 hover:bg-emerald-100"><strong class="block">${escapeHtml(item.day_of_week || getDayOfWeekFromDate(item.session_date))}</strong><span>${escapeHtml(`${formatTime12Hour(item.start_time)} - ${formatTime12Hour(item.end_time)}`)} · ${projections[index]?.length || 0} dates</span></button>`).join('')}</div><div class="mt-2 text-xs text-emerald-700 dark:text-emerald-400">Preferred instructor: ${escapeHtml(teacherName || first.teacher_name || 'Instructor')}</div>`;
+        }
+    };
+    if (viewInstructorsBtn) viewInstructorsBtn.onclick = openStudentAvailableInstructors;
+    window.refreshStudentInstructorAvailabilityControl = () => {
+        const state = studentInstructorAvailabilityState;
+        state.selectedSlots = [];
+        state.activeSlotIndex = -1;
+        state.selectedTeacherId = 0;
+        state.selectedTeacherName = '';
+        state.selectedSlot = null;
+        preferredDateEl.value = '';
+        preferredTimeEl.innerHTML = '<option value=""></option>';
+        if (selectedScheduleSummaryEl) {
+            selectedScheduleSummaryEl.textContent = 'No preferred schedule selected yet.';
+        }
+        if (scheduleHintEl) {
+            scheduleHintEl.innerHTML = '<i class="fas fa-circle-info mr-1"></i>Open instructor availability to choose your preferred class day or add multiple days.';
+        }
+        refreshRequestedTimes('');
+    };
+
+    let initialPreferredDate = String(latest?.preferred_date || '');
+    if (!initialPreferredDate || initialPreferredDate < todayYmd) {
+        initialPreferredDate = todayYmd;
+        for (let offset = 0; offset < 14; offset += 1) {
+            const candidate = new Date(today);
+            candidate.setDate(today.getDate() + offset);
+            const candidateValue = toLocalDateValue(candidate);
+            if (getRequestedTimeOptions(candidateValue).length) {
+                initialPreferredDate = candidateValue;
+                break;
+            }
+        }
+    }
+    preferredDateEl.value = initialPreferredDate;
+    const latestTimeValue = latest?.preferred_start_time && latest?.preferred_end_time
+        ? `${String(latest.preferred_start_time).slice(0, 5)}|${String(latest.preferred_end_time).slice(0, 5)}`
+        : '';
+    refreshRequestedTimes(latestTimeValue);
 
     packageSelect.innerHTML = '<option value="">Select package...</option>' + filteredPackages.map(pkg => {
         const sessions = Number(pkg.sessions || 0);
@@ -6092,37 +7300,35 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
 
     const updateRequestPackageUI = () => {
         const { maxInst, price, sessions, label } = getSelectedPackageData();
+        studentInstructorAvailabilityState.sessionCount = Math.max(1, Number(sessions || 12));
         const paymentType = String(paymentModeEl.value || 'Partial Payment');
         const registrationFeeDue = getRegistrationFeeDueAmount(student);
         const payableNow = computeStudentRequestPayableNow(price, sessions, paymentType, registrationFeeDue);
-        const enrollmentNow = computeStudentRequestPayableNow(price, sessions, paymentType);
         const partialNow = computeStudentRequestPayableNow(price, sessions, 'Partial Payment', 0);
-        const fullNow = computeStudentRequestPayableNow(price, sessions, 'Full Payment', 0);
 
         if (!price) {
             amountEl.innerHTML = `<p class="text-sm text-zinc-400 dark:text-zinc-500">Select a package to see your payment breakdown.</p>`;
         } else {
             const regFeeRow = registrationFeeDue > 0 ? `
-                <div class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-white/8">
+                <div class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-white/10">
                     <div>
                         <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Registration Fee</p>
                         <p class="text-xs text-zinc-400">One-time lifetime fee</p>
                     </div>
                     <span class="text-sm font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(registrationFeeDue)}</span>
                 </div>` : `
-                <div class="flex items-center gap-2 py-2 border-b border-zinc-100 dark:border-white/8">
+                <div class="flex items-center gap-2 py-2 border-b border-zinc-100 dark:border-white/10">
                     <i class="fas fa-circle-check text-emerald-500 text-sm"></i>
                     <p class="text-sm text-emerald-700 dark:text-emerald-400 font-semibold">Registration fee already paid ✓</p>
                 </div>`;
 
             amountEl.innerHTML = `
-                <div class="space-y-4">
+                <div class="space-y-3">
                     <div>
-                        <div class="text-xs uppercase tracking-[0.25em] text-gold-600 dark:text-gold-400 font-bold">Summary</div>
-                        <h3 class="mt-2 text-lg font-extrabold text-zinc-900 dark:text-white">${escapeHtml(label || 'Selected package')}</h3>
-                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${sessions} sessions</p>
+                        <h3 class="text-base font-extrabold text-zinc-900 dark:text-white">${escapeHtml(String(label || 'Selected package').split('—')[0].trim())}</h3>
+                        <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">${sessions} sessions</p>
                     </div>
-                    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-4 py-3 space-y-2">
+                    <div class="rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 px-3 py-3 space-y-2">
                         <div class="flex items-center justify-between text-sm">
                             <span class="text-zinc-500 dark:text-zinc-400">Package price</span>
                             <span class="font-semibold text-zinc-900 dark:text-white">${formatCurrencyPHP(price)}</span>
@@ -6131,34 +7337,13 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
                             <span class="text-zinc-500 dark:text-zinc-400">Payment mode</span>
                             <span class="font-semibold text-zinc-900 dark:text-white">${escapeHtml(paymentType)}</span>
                         </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-zinc-500 dark:text-zinc-400">Partial now</span>
-                            <span class="font-semibold text-zinc-900 dark:text-white">${formatCurrencyPHP(partialNow)}</span>
-                        </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-zinc-500 dark:text-zinc-400">Full payment</span>
-                            <span class="font-semibold text-zinc-900 dark:text-white">${formatCurrencyPHP(fullNow)}</span>
+                        <div class="flex items-center justify-between border-t border-zinc-200 pt-2 text-sm dark:border-white/10">
+                            <span class="font-black text-zinc-900 dark:text-white">Due now</span>
+                            <span class="text-lg font-black text-gold-600 dark:text-gold-400">${formatCurrencyPHP(payableNow)}</span>
                         </div>
                     </div>
                     ${regFeeRow}
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-white/8">
-                            <div>
-                                <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Lesson Package</p>
-                                <p class="text-xs text-zinc-400">${sessions} sessions · ${paymentType}</p>
-                            </div>
-                            <span class="text-sm font-bold text-zinc-900 dark:text-white">${formatCurrencyPHP(enrollmentNow)}</span>
-                        </div>
-                        <div class="flex items-center justify-between pt-1">
-                            <p class="text-sm font-black text-zinc-900 dark:text-white">Due now</p>
-                            <span class="text-lg font-black text-gold-600 dark:text-gold-400">${formatCurrencyPHP(payableNow)}</span>
-                        </div>
-                        <div class="text-xs text-zinc-500 dark:text-zinc-400">
-                            ${paymentType === 'Full Payment'
-                                ? 'You will settle the full package and registration fee now.'
-                                : `You will still have ${formatCurrencyPHP(Math.max(0, price - partialNow))} left on the package after this payment.`}
-                        </div>
-                    </div>
+                    ${paymentType === 'Full Payment' ? '' : `<div class="text-xs text-zinc-500 dark:text-zinc-400">Package balance after payment: ${formatCurrencyPHP(Math.max(0, price - partialNow))}</div>`}
                 </div>`;
         }
 
@@ -6167,6 +7352,7 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
             : '<div class="text-sm text-zinc-400 dark:text-zinc-500 text-center py-3">Choose a package first.</div>';
 
         renderPackageCards();
+        refreshRequestedTimes('');
     };
 
     packageSelect.onchange = () => {
@@ -6176,10 +7362,6 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
     paymentModeEl.onchange = updateRequestPackageUI;
     renderPackageCards();
     updateRequestPackageUI();
-
-    if (autoDayEl) {
-        autoDayEl.textContent = 'Final schedule will be based on instructor availability and branch assignment.';
-    }
 
     const regStatus = String(student.registration_status || 'Pending');
     const profileComplete = isRegistrationProfileComplete(student);
@@ -6220,15 +7402,26 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
         const packageId = parseInt(packageSelect.value, 10);
         const paymentType = String(paymentModeEl.value || '').trim();
         const paymentMethod = String(paymentMethodEl.value || '').trim();
+        const referenceNumber = String(referenceNumberEl?.value || '').trim();
         const instrumentIds = getStudentRequestSelectedInstrumentIds();
         const uniqueInstrumentIds = Array.from(new Set(instrumentIds));
+        const preferredDate = String(preferredDateEl.value || '').trim();
+        const [preferredStartTime = '', preferredEndTime = ''] = String(preferredTimeEl.value || '').split('|');
+        const preferredDay = getDayOfWeekFromDate(preferredDate);
+        const preferredSlots = studentInstructorAvailabilityState.selectedSlots.slice();
+        const preferredTeacherId = Number(preferredSlots[0]?.teacher_id || 0);
 
-        if (!packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1) {
-            showMessage('Please complete package, instruments, payment mode, and payment method.', 'error');
+        if (!packageId || !paymentType || !paymentMethod || uniqueInstrumentIds.length < 1 || !preferredSlots.length || !preferredDate || !preferredStartTime || !preferredEndTime) {
+            showMessage('Please complete the package, instrument, payment, and preferred schedule.', 'error');
             return;
         }
         if (!['Full Payment', 'Partial Payment', 'Installment'].includes(paymentType)) {
             showMessage('Invalid payment mode selected.', 'error');
+            return;
+        }
+        if (paymentMethod !== 'Cash' && !referenceNumber) {
+            showMessage('Enter the transaction or reference number.', 'warning');
+            referenceNumberEl?.focus();
             return;
         }
         const paymentProofFile = paymentProofEl && paymentProofEl.files && paymentProofEl.files[0] ? paymentProofEl.files[0] : null;
@@ -6255,7 +7448,16 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
             requestFormData.append('package_id', String(packageId));
             requestFormData.append('payment_type', paymentType);
             requestFormData.append('payment_method', paymentMethod);
+            requestFormData.append('reference_number', referenceNumber);
             requestFormData.append('instrument_ids_json', JSON.stringify(uniqueInstrumentIds));
+            requestFormData.append('preferred_date', preferredDate);
+            requestFormData.append('preferred_day_of_week', preferredDay);
+            requestFormData.append('preferred_start_time', preferredStartTime);
+            requestFormData.append('preferred_end_time', preferredEndTime);
+            if (preferredTeacherId > 0) {
+                requestFormData.append('preferred_teacher_id', String(preferredTeacherId));
+            }
+            requestFormData.append('preferred_slots_json', JSON.stringify(preferredSlots));
             if (paymentProofFile) {
                 requestFormData.append('package_payment_proof_file', paymentProofFile);
             }
@@ -6370,6 +7572,7 @@ function openStudentRequestModal() {
 }
 
 function closeStudentRequestModal() {
+    closeStudentInstructorAvailabilityModal();
     setStudentModalState('studentRequestModal', false);
 }
 
@@ -6725,7 +7928,7 @@ function renderStudentRegistrationModal(student, portal) {
 
                     <!-- 1. Student Details -->
                     <div class="rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden min-w-0">
-                        <div class="flex items-center gap-2 sm:gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                        <div class="flex items-center gap-2 sm:gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-white/10">
                             <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">1</span></div>
                             <p class="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white">Student Details</p>
                         </div>
@@ -6799,7 +8002,7 @@ function renderStudentRegistrationModal(student, portal) {
 
                     <!-- 2. Guardian -->
                     <div class="rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden min-w-0">
-                        <div class="flex items-center gap-2 sm:gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                        <div class="flex items-center gap-2 sm:gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-white/10">
                             <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">2</span></div>
                             <p class="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white flex-1 min-w-0">Guardian</p>
                             <span id="guardianRequiredBadge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">Required</span>
@@ -6858,7 +8061,7 @@ function renderStudentRegistrationModal(student, portal) {
 
                 <!-- RIGHT: Registration Payment -->
                 <div class="rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden min-w-0 lg:self-start">
-                    <div class="flex items-center gap-2 sm:gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 bg-zinc-50 dark:bg-white/3 border-b border-zinc-100 dark:border-white/8">
+                    <div class="flex items-center gap-2 sm:gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-white/10">
                         <div class="h-5 w-5 rounded-full bg-gold-500 flex items-center justify-center shrink-0"><span class="text-black text-[9px] font-black">3</span></div>
                         <p class="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white">Registration Payment</p>
                     </div>
@@ -7163,8 +8366,15 @@ function renderStudentActionBanner(student, meta, portal) {
         actions = `<button type="button" onclick="openStudentRegistrationModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Check Status</button>`;
     } else if (profileComplete && regPaid && hasPendingReq) {
         title = 'Class request sent';
-        text = 'Please wait for staff approval.';
-        actions = `<a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">Sessions</a>`;
+        const requestDate = latestReq.preferred_date ? formatDateLong(latestReq.preferred_date) : (latestReq.preferred_day_of_week || 'your preferred date');
+        const requestStart = latestReq.preferred_start_time ? formatTime12Hour(latestReq.preferred_start_time) : '';
+        const requestEnd = latestReq.preferred_end_time ? formatTime12Hour(latestReq.preferred_end_time) : '';
+        const requestTime = requestStart && requestEnd ? `, ${requestStart} - ${requestEnd}` : '';
+        text = `Requested: ${requestDate}${requestTime}. The desk will confirm it or adjust it if there is a conflict.`;
+        actions = `
+            <button type="button" onclick="openStudentRequestModal()" class="px-5 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-black text-sm font-extrabold transition">View Request</button>
+            <a href="student_sessions.html" class="px-5 py-3 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-100 text-sm font-semibold transition">Sessions</a>
+        `;
     } else if (profileComplete && regPaid) {
         title = 'Request your classes';
         text = 'Choose your package and instrument.';
@@ -7259,7 +8469,7 @@ function renderStudentOnboardingSteps(student, meta, portal) {
     const allStepsList = `
         <div id="allOnboardingSteps" class="hidden mt-4 space-y-2 border-t border-zinc-200 dark:border-white/10 pt-4">
             <!-- Step 1 -->
-            <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${currentStep > 1 ? 'bg-emerald-500/8 border border-emerald-500/15' : currentStep === 1 ? 'bg-gold-500/10 border border-gold-500/25' : 'bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/10 opacity-50'}">
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${currentStep > 1 ? 'bg-emerald-500/8 border border-emerald-500/15' : currentStep === 1 ? 'bg-gold-500/10 border border-gold-500/25' : 'bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 opacity-50'}">
                 <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${currentStep > 1 ? 'bg-emerald-500' : currentStep === 1 ? 'bg-gold-500' : 'bg-zinc-300 dark:bg-zinc-600'}">
                     ${currentStep > 1 ? '<i class="fas fa-check text-white text-[10px]"></i>' : '<span class="text-white text-[10px] font-black">1</span>'}
                 </div>
@@ -7269,7 +8479,7 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                 ${currentStep > 1 ? renderOnboardingStatusBadge('Done', 'green') : currentStep === 1 ? renderOnboardingStatusBadge('Do This First', 'amber') : ''}
             </div>
             <!-- Step 2 -->
-            <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${currentStep > 2 ? 'bg-emerald-500/8 border border-emerald-500/15' : currentStep === 2 ? 'bg-gold-500/10 border border-gold-500/25' : 'bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/10 opacity-50'}">
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${currentStep > 2 ? 'bg-emerald-500/8 border border-emerald-500/15' : currentStep === 2 ? 'bg-gold-500/10 border border-gold-500/25' : 'bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 opacity-50'}">
                 <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${currentStep > 2 ? 'bg-emerald-500' : currentStep === 2 ? 'bg-gold-500' : 'bg-zinc-300 dark:bg-zinc-600'}">
                     ${currentStep > 2 ? '<i class="fas fa-check text-white text-[10px]"></i>' : '<span class="text-white text-[10px] font-black">2</span>'}
                 </div>
@@ -7279,7 +8489,7 @@ function renderStudentOnboardingSteps(student, meta, portal) {
                 ${currentStep > 2 ? renderOnboardingStatusBadge('Approved', 'green') : currentStep === 2 ? renderOnboardingStatusBadge('Waiting', 'amber') : ''}
             </div>
             <!-- Step 3 -->
-            <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${currentStep > 3 ? 'bg-emerald-500/8 border border-emerald-500/15' : currentStep === 3 ? 'bg-gold-500/10 border border-gold-500/25' : 'bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/10 opacity-50'}">
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${currentStep > 3 ? 'bg-emerald-500/8 border border-emerald-500/15' : currentStep === 3 ? 'bg-gold-500/10 border border-gold-500/25' : 'bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 opacity-50'}">
                 <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${currentStep > 3 ? 'bg-emerald-500' : currentStep === 3 ? 'bg-gold-500' : 'bg-zinc-300 dark:bg-zinc-600'}">
                     ${currentStep > 3 ? '<i class="fas fa-check text-white text-[10px]"></i>' : '<span class="text-white text-[10px] font-black">3</span>'}
                 </div>
@@ -7527,42 +8737,6 @@ function wireStudentOnboardingActions(student, meta, portal) {
     };
     document.getElementById('regPayMethod')?.addEventListener('change', updateRegistrationReferenceUI);
     updateRegistrationReferenceUI();
-
-    // File link for proof of payment - clickable to view
-    if (regPayProof) {
-        regPayProof.addEventListener('change', () => {
-            const file = regPayProof.files?.[0];
-            const link = document.getElementById('regPayProofLink');
-            const nameSpan = document.getElementById('regPayProofName');
-
-            if (file && link && nameSpan) {
-                const objectURL = URL.createObjectURL(file);
-                link.href = objectURL;
-                nameSpan.textContent = file.name;
-                link.classList.remove('hidden');
-            } else if (link) {
-                link.classList.add('hidden');
-            }
-        });
-    }
-
-    // File link for proof of ID - clickable to view
-    if (regAgeProof) {
-        regAgeProof.addEventListener('change', () => {
-            const file = regAgeProof.files?.[0];
-            const link = document.getElementById('regAgeProofLink');
-            const nameSpan = document.getElementById('regAgeProofName');
-
-            if (file && link && nameSpan) {
-                const objectURL = URL.createObjectURL(file);
-                link.href = objectURL;
-                nameSpan.textContent = file.name;
-                link.classList.remove('hidden');
-            } else if (link) {
-                link.classList.add('hidden');
-            }
-        });
-    }
 
     if (submitAllBtn) {
         submitAllBtn.onclick = async () => {
@@ -8340,11 +9514,7 @@ async function initStudentSessionsPage() {
         setText('gradedSessionCount', String(gradedRows.length));
         setText('currentGradeAverage', averageGrade ? `${averageGrade}/5` : 'Pending');
 
-        const sortedRows = [...rows].sort((a, b) => {
-            const aTime = new Date(`${a?.session_date || ''}T${a?.start_time || '00:00:00'}`).getTime() || 0;
-            const bTime = new Date(`${b?.session_date || ''}T${b?.start_time || '00:00:00'}`).getTime() || 0;
-            return bTime - aTime;
-        });
+        const sortedRows = [...rows].sort(compareSessionRowsChronologically);
 
         window.__studentGradesRows = sortedRows;
         window.__studentSessionsRows = sortedRows;
@@ -8684,12 +9854,7 @@ async function initStudentGradesPage() {
             return;
         }
 
-        const sortedRows = [...rows].sort((a, b) => {
-            const aTime = new Date(`${a?.session_date || ''}T${a?.start_time || '00:00:00'}`).getTime() || 0;
-            const bTime = new Date(`${b?.session_date || ''}T${b?.start_time || '00:00:00'}`).getTime() || 0;
-            if (aTime !== bTime) return aTime - bTime;
-            return Number(a?.session_number || 0) - Number(b?.session_number || 0);
-        });
+        const sortedRows = [...rows].sort(compareSessionRowsChronologically);
         setText('studentSessionsCount', `${sortedRows.length} total`);
         const sortedGradedRows = sortedRows.filter(row => Number(row.progress_id || 0) > 0);
         const sortedPendingRows = sortedRows.filter(row => Number(row.progress_id || 0) < 1);
@@ -8865,6 +10030,16 @@ async function initStudentAttendancePage() {
 
     const rows = Array.isArray(listRes.attendance) ? listRes.attendance : [];
     const sortedRows = [...rows].sort((a, b) => {
+        const recordedStatuses = new Set([
+            'present', 'late', 'absent', 'excused', 'ci', 'teacher absent',
+            'completed', 'no show', 'cancelled', 'cancelled_by_teacher'
+        ]);
+        const aIsRecorded = recordedStatuses.has(String(a?.status || '').trim().toLowerCase());
+        const bIsRecorded = recordedStatuses.has(String(b?.status || '').trim().toLowerCase());
+
+        // Keep actual attendance visible above future scheduled sessions.
+        if (aIsRecorded !== bIsRecorded) return aIsRecorded ? -1 : 1;
+
         const aTime = new Date(`${a?.session_date || ''}T${a?.start_time || '00:00:00'}`).getTime() || 0;
         const bTime = new Date(`${b?.session_date || ''}T${b?.start_time || '00:00:00'}`).getTime() || 0;
         return bTime - aTime;
@@ -9070,6 +10245,13 @@ async function openGuardianAdditionalSessions(index) {
         showMessage('This student needs an approved enrollment first.', 'error');
         return;
     }
+    const totalSessions = Number(enrollment.package_sessions || enrollment.total_sessions || 0);
+    const usedSessions = Math.max(Number(enrollment.used_sessions || enrollment.completed_sessions || 0), getUsedPackageSessionCount(item));
+    if (totalSessions < 1 || usedSessions < totalSessions) {
+        const remaining = Math.max(0, totalSessions - usedSessions);
+        showMessage(`Additional sessions become available after the current package is fully used. ${remaining} session${remaining === 1 ? '' : 's'} remaining.`, 'error');
+        return;
+    }
     if (String(item?.latest_session_extension_request?.status || '') === 'Pending') {
         showMessage('An additional-session request is already pending for this student.', 'error');
         return;
@@ -9162,15 +10344,15 @@ function bindStudentAdditionalSessionsForm(student, enrollment, requestMeta) {
     const form = document.getElementById('studentAdditionalSessionsForm');
     if (!card || !form) return;
 
-    const approvedEnrollment = enrollment && ['Active', 'Completed'].includes(String(enrollment.status || ''));
-    card.classList.toggle('hidden', !approvedEnrollment);
-    if (!approvedEnrollment) return;
-
-    const total = Number(enrollment.package_sessions || 0);
-    const base = Number(enrollment.base_package_sessions || total || 0);
+    const total = Number(enrollment?.package_sessions || 0);
+    const base = Number(enrollment?.base_package_sessions || total || 0);
     const additional = Math.max(0, total - base);
-    const used = Math.max(0, Number(enrollment.completed_sessions || 0));
+    const used = Math.max(0, Number(enrollment?.used_sessions || enrollment?.completed_sessions || 0));
     const remaining = Math.max(0, total - used);
+    const approvedEnrollment = enrollment && ['Active', 'Completed'].includes(String(enrollment.status || ''));
+    const canRequestAdditionalSessions = approvedEnrollment && total > 0 && remaining === 0;
+    card.classList.toggle('hidden', !canRequestAdditionalSessions);
+    if (!canRequestAdditionalSessions) return;
     const balanceEl = document.getElementById('studentAdditionalSessionBalance');
     if (balanceEl) {
         balanceEl.innerHTML = [
@@ -10062,6 +11244,10 @@ async function loadStudentsForAdmin() {
 
 // Show message (SweetAlert)
 function showMessage(message, type = 'error') {
+    if (window.__portalBackgroundRefresh && type === 'error') {
+        console.warn('Background portal refresh:', message);
+        return;
+    }
     if (typeof Swal !== 'undefined') {
         Swal.fire({
             icon: type === 'success' ? 'success' : 'error',
@@ -10096,6 +11282,305 @@ function showPortalToast(message, type = 'info', title = '') {
 
     alert(message);
     return Promise.resolve();
+}
+
+// Track server-side decisions while a student or guardian portal is open.
+// The first response establishes a baseline; later responses produce a toast
+// only when a status actually changes, so refresh polling never repeats alerts.
+const portalDecisionSnapshots = new Map();
+const guardianAbsenceDecisionSnapshots = new Map();
+let portalDecisionToastQueue = Promise.resolve();
+let instructorAvailabilitySnapshot = null;
+
+function queuePortalDecisionToast(message, type, title) {
+    portalDecisionToastQueue = portalDecisionToastQueue
+        .catch(() => undefined)
+        .then(() => showPortalToast(message, type, title));
+}
+
+function normalizePortalDecisionStatus(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function buildPortalDecisionSnapshot(portal) {
+    const student = portal?.student || {};
+    const enrollmentRows = [portal?.current_enrollment, ...(Array.isArray(portal?.enrollment_history) ? portal.enrollment_history : [])]
+        .filter(Boolean);
+    const enrollments = {};
+    enrollmentRows.forEach(row => {
+        const enrollmentId = Number(row?.enrollment_id || 0);
+        if (enrollmentId < 1 || enrollments[enrollmentId]) return;
+        enrollments[enrollmentId] = {
+            status: normalizePortalDecisionStatus(row.status),
+            scheduleRequestStatus: normalizePortalDecisionStatus(row.schedule_request_status),
+            scheduleStatus: normalizePortalDecisionStatus(row.schedule_status),
+            paidAmount: Number(row.paid_amount || 0),
+            packageName: String(row.package_name || 'lesson package')
+        };
+    });
+    const extension = portal?.latest_session_extension_request || null;
+    return {
+        studentId: Number(student.student_id || 0),
+        studentName: `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student',
+        registrationStatus: normalizePortalDecisionStatus(student.registration_status),
+        registrationPaymentStatus: normalizePortalDecisionStatus(student.registration_payment_status),
+        enrollments,
+        extension: extension ? {
+            requestId: Number(extension.request_id || 0),
+            status: normalizePortalDecisionStatus(extension.status),
+            requestedSessions: Number(extension.requested_sessions || 0)
+        } : null
+    };
+}
+
+function capturePortalDecisionState(portal, context = 'student') {
+    const current = buildPortalDecisionSnapshot(portal);
+    if (current.studentId < 1) return;
+    const key = `${context}:${current.studentId}`;
+    const previous = portalDecisionSnapshots.get(key);
+    portalDecisionSnapshots.set(key, current);
+    if (!previous) return;
+
+    const subject = context === 'guardian' ? current.studentName : 'Your';
+    const possessive = context === 'guardian' ? `${current.studentName}'s` : 'Your';
+    let notice = null;
+
+    if (previous.registrationStatus !== current.registrationStatus) {
+        if (['approved', 'fee paid'].includes(current.registrationStatus)) {
+            notice = { title: 'Registration Approved', type: 'success', message: `${possessive} registration has been approved. Enrollment is now available.` };
+        } else if (current.registrationStatus === 'rejected') {
+            notice = { title: 'Registration Rejected', type: 'error', message: `${possessive} registration was not approved. Check the registration page for details.` };
+        }
+    }
+
+    Object.entries(current.enrollments).some(([enrollmentId, enrollment]) => {
+        if (notice) return true;
+        const before = previous.enrollments?.[enrollmentId];
+        if (!before) return false;
+
+        if (before.status !== enrollment.status) {
+            if (enrollment.status === 'active') {
+                notice = { title: 'Enrollment Approved', type: 'success', message: `${possessive} ${enrollment.packageName} enrollment and schedule are approved.` };
+                return true;
+            }
+            if (enrollment.status === 'rejected') {
+                notice = { title: 'Enrollment Rejected', type: 'error', message: `${possessive} enrollment request was rejected. Open Enrollment for details.` };
+                return true;
+            }
+            if (enrollment.status === 'expired') {
+                notice = { title: 'Request Expired', type: 'warning', message: `${possessive} temporary schedule reservation expired. Please choose another available schedule.` };
+                return true;
+            }
+        }
+
+        if (before.scheduleRequestStatus !== enrollment.scheduleRequestStatus) {
+            const scheduleNotices = {
+                approved: { title: 'Schedule Approved', type: 'success', message: `${possessive} requested schedule has been approved.` },
+                suggested: { title: 'New Schedule Suggested', type: 'info', message: `The desk suggested another schedule for ${subject.toLowerCase() === 'your' ? 'you' : current.studentName}. Open Enrollment to review it.` },
+                'schedule conflict': { title: 'Schedule Conflict', type: 'warning', message: `${possessive} requested time is no longer available. Please review the alternative schedule.` },
+                rejected: { title: 'Schedule Request Rejected', type: 'error', message: `${possessive} schedule request was rejected.` },
+                expired: { title: 'Schedule Reservation Expired', type: 'warning', message: `${possessive} temporary reservation expired. Please select another available time.` }
+            };
+            notice = scheduleNotices[enrollment.scheduleRequestStatus] || null;
+            if (notice) return true;
+        }
+
+        if (enrollment.paidAmount > before.paidAmount) {
+            notice = { title: 'Payment Confirmed', type: 'success', message: `${possessive} payment of ${formatCurrencyPHP(enrollment.paidAmount - before.paidAmount)} was confirmed.` };
+            return true;
+        }
+        return false;
+    });
+
+    if (!notice && previous.registrationPaymentStatus !== current.registrationPaymentStatus) {
+        if (current.registrationPaymentStatus === 'paid') {
+            notice = { title: 'Payment Confirmed', type: 'success', message: `${possessive} registration payment was confirmed.` };
+        } else if (current.registrationPaymentStatus === 'rejected') {
+            notice = { title: 'Payment Rejected', type: 'error', message: `${possessive} submitted payment could not be confirmed.` };
+        }
+    }
+
+    if (!notice && previous.extension?.requestId && previous.extension.requestId === current.extension?.requestId
+        && previous.extension.status !== current.extension.status) {
+        if (current.extension.status === 'approved') {
+            notice = { title: 'Additional Sessions Approved', type: 'success', message: `${possessive} request for ${current.extension.requestedSessions || 'additional'} sessions was approved.` };
+        } else if (['rejected', 'declined'].includes(current.extension.status)) {
+            notice = { title: 'Additional Sessions Declined', type: 'error', message: `${possessive} additional-session request was declined.` };
+        }
+    }
+
+    if (notice) queuePortalDecisionToast(notice.message, notice.type, notice.title);
+}
+
+function captureGuardianAbsenceDecisionState(requests) {
+    (Array.isArray(requests) ? requests : []).forEach(row => {
+        const requestId = Number(row?.request_id || 0);
+        if (requestId < 1) return;
+        const currentStatus = normalizePortalDecisionStatus(row.status);
+        const previousStatus = guardianAbsenceDecisionSnapshots.get(requestId);
+        guardianAbsenceDecisionSnapshots.set(requestId, currentStatus);
+        if (!previousStatus || previousStatus === currentStatus) return;
+        const studentName = String(row.student_name || `${row.student_first_name || row.first_name || ''} ${row.student_last_name || row.last_name || ''}`.trim() || 'the student');
+        if (currentStatus === 'approved') {
+            queuePortalDecisionToast(`${studentName}'s absence notice was approved.`, 'success', 'Absence Approved');
+        } else if (['declined', 'rejected'].includes(currentStatus)) {
+            queuePortalDecisionToast(`${studentName}'s absence notice was declined.`, 'error', 'Absence Declined');
+        } else if (currentStatus === 'reviewed') {
+            queuePortalDecisionToast(`${studentName}'s absence notice was reviewed by the desk.`, 'info', 'Absence Reviewed');
+        }
+    });
+}
+
+function buildInstructorAvailabilitySignature(rows) {
+    return (Array.isArray(rows) ? rows : [])
+        .map(row => [
+            String(row.day_of_week || ''),
+            String(row.start_time || '').slice(0, 5),
+            String(row.end_time || '').slice(0, 5),
+            normalizePortalDecisionStatus(row.status),
+            Number(row.branch_id || 0)
+        ].join('|'))
+        .sort()
+        .join('||');
+}
+
+async function refreshInstructorAvailabilityDecisionState() {
+    const user = Auth.getUser();
+    if (getRoleCategory(user?.role_name) !== 'instructor' || !user?.user_id) return;
+    const response = await axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-availability&user_id=${encodeURIComponent(user.user_id)}`);
+    const rows = response.data?.success && Array.isArray(response.data.availability) ? response.data.availability : [];
+    const signature = buildInstructorAvailabilitySignature(rows);
+    const previousSignature = instructorAvailabilitySnapshot;
+    instructorAvailabilitySnapshot = signature;
+    if (previousSignature === null || previousSignature === signature) return;
+
+    queuePortalDecisionToast(
+        'Your assigned weekly days and times were updated by an administrator or branch manager.',
+        'info',
+        'Availability Updated'
+    );
+    window.dispatchEvent(new CustomEvent('fas:instructor-availability-updated', { detail: { rows } }));
+}
+
+function isPortalInteractionInProgress() {
+    if (document.visibilityState !== 'visible') return true;
+    if (document.body?.classList.contains('swal2-shown')) return true;
+    if (typeof Swal !== 'undefined' && typeof Swal.isVisible === 'function' && Swal.isVisible()) return true;
+
+    const activeElement = document.activeElement;
+    if (activeElement && (
+        activeElement.matches?.('input, select, textarea, [contenteditable="true"]')
+        || activeElement.closest?.('form')
+    )) return true;
+
+    const modalIds = [
+        'studentRequestModal',
+        'studentRegistrationModal',
+        'studentInstructorAvailabilityModal',
+        'guardianStudentModal',
+        'guardianAbsenceModal',
+        'proofViewerModal'
+    ];
+    return modalIds.some(id => {
+        const modal = document.getElementById(id);
+        return modal && !modal.classList.contains('hidden') && getComputedStyle(modal).display !== 'none';
+    });
+}
+
+function stopPortalPageAutoRefresh() {
+    if (window.__portalPageAutoRefreshTimer) {
+        window.clearInterval(window.__portalPageAutoRefreshTimer);
+        window.__portalPageAutoRefreshTimer = null;
+    }
+    if (window.__portalPageVisibilityHandler) {
+        document.removeEventListener('visibilitychange', window.__portalPageVisibilityHandler);
+        window.removeEventListener('focus', window.__portalPageVisibilityHandler);
+        window.__portalPageVisibilityHandler = null;
+    }
+}
+
+function startPortalPageAutoRefresh(pageKey, refreshCallback, intervalMs = 10000) {
+    if (typeof refreshCallback !== 'function') return;
+    stopPortalPageAutoRefresh();
+    window.__portalPageAutoRefreshBusy = false;
+    window.__portalPageAutoRefreshLastRun = Date.now();
+
+    const refresh = async () => {
+        if (window.__portalPageAutoRefreshBusy || isPortalInteractionInProgress()) return;
+        window.__portalPageAutoRefreshBusy = true;
+        window.__portalBackgroundRefresh = true;
+        try {
+            await refreshCallback();
+            window.__portalPageAutoRefreshLastRun = Date.now();
+        } catch (error) {
+            console.warn(`Background refresh skipped for ${pageKey}:`, error);
+        } finally {
+            window.__portalBackgroundRefresh = false;
+            window.__portalPageAutoRefreshBusy = false;
+        }
+    };
+
+    window.__portalPageAutoRefreshTimer = window.setInterval(refresh, Math.max(8000, Number(intervalMs || 10000)));
+    window.__portalPageVisibilityHandler = () => {
+        if (document.visibilityState !== 'visible') return;
+        if ((Date.now() - Number(window.__portalPageAutoRefreshLastRun || 0)) < 5000) return;
+        void refresh();
+    };
+    document.addEventListener('visibilitychange', window.__portalPageVisibilityHandler);
+    window.addEventListener('focus', window.__portalPageVisibilityHandler);
+}
+
+function startPortalStatusOnlyWatcher(intervalMs = 10000) {
+    if (window.__portalStatusOnlyTimer) window.clearInterval(window.__portalStatusOnlyTimer);
+    const role = getRoleCategory(Auth.getUser()?.role_name);
+    if (!['student', 'guardian', 'instructor'].includes(role)) return;
+
+    window.__portalStatusOnlyBusy = false;
+    const refresh = async () => {
+        if (window.__portalStatusOnlyBusy || isPortalInteractionInProgress()) return;
+        window.__portalStatusOnlyBusy = true;
+        try {
+            const email = Auth.getUser()?.email || '';
+            if (role === 'instructor') {
+                await refreshInstructorAvailabilityDecisionState();
+            } else {
+                if (!email) return;
+                if (role === 'student') await fetchStudentPortalDataByEmail(email);
+                else await fetchGuardianPortalDataByEmail(email);
+            }
+        } catch (error) {
+            console.warn('Portal status refresh skipped:', error);
+        } finally {
+            window.__portalStatusOnlyBusy = false;
+        }
+    };
+    window.__portalStatusOnlyTimer = window.setInterval(refresh, Math.max(8000, Number(intervalMs || 10000)));
+    if (window.__portalStatusOnlyVisibilityHandler) {
+        document.removeEventListener('visibilitychange', window.__portalStatusOnlyVisibilityHandler);
+        window.removeEventListener('focus', window.__portalStatusOnlyVisibilityHandler);
+    }
+    window.__portalStatusOnlyVisibilityHandler = () => {
+        if (document.visibilityState === 'visible') void refresh();
+    };
+    document.addEventListener('visibilitychange', window.__portalStatusOnlyVisibilityHandler);
+    window.addEventListener('focus', window.__portalStatusOnlyVisibilityHandler);
+    if (role === 'instructor') void refresh();
+}
+
+async function refreshCurrentPortalPage() {
+    if (document.getElementById('studentDashboardRoot')) return initStudentDashboardPage();
+    if (document.getElementById('studentSessionsRoot')) return initStudentSessionsPage();
+    if (document.getElementById('studentGradesRoot')) return initStudentGradesPage();
+    if (document.getElementById('studentAttendanceRoot')) return initStudentAttendancePage();
+    if (document.getElementById('studentQrRoot')) return initStudentQrPage();
+    if (document.getElementById('studentProfileRoot')) return initStudentProfilePage();
+    if (document.getElementById('guardianDashboardRoot')) return initGuardianDashboardPage();
+    if (document.getElementById('guardianStudentsRoot')) return initGuardianStudentsPage();
+    if (document.getElementById('guardianPaymentsRoot')) return initGuardianPaymentsPage();
+    if (document.getElementById('guardianProfileRoot')) return initGuardianProfilePage();
+    if (document.getElementById('guardianAbsenceRoot')) return initGuardianAbsencePage();
+    if (typeof window.loadStudentSongs === 'function') return window.loadStudentSongs();
+    return undefined;
 }
 
 function getFreezeRestoreToastKey(context, enrollmentId) {
@@ -10398,7 +11883,7 @@ function startGuardianSessionRefreshWatcher() {
                 const notified = notifyGuardianSessionCompletions(portal.students);
                 if (notified) {
                     stopGuardianSessionRefreshWatcher();
-                    window.location.reload();
+                    await refreshCurrentPortalPage();
                 }
             }
         } catch (e) {
@@ -10439,7 +11924,7 @@ function startStudentFreezeRefreshWatcher() {
             const restored = await refreshStudentFreezeStatusAndNotify();
             if (restored) {
                 stopStudentFreezeRefreshWatcher();
-                window.location.reload();
+                await refreshCurrentPortalPage();
             }
         } finally {
             window.__studentFreezeRefreshBusy = false;
@@ -10467,7 +11952,7 @@ function startGuardianFreezeRefreshWatcher() {
             const restored = await refreshGuardianFreezeStatusAndNotify();
             if (restored) {
                 stopGuardianFreezeRefreshWatcher();
-                window.location.reload();
+                await refreshCurrentPortalPage();
             }
         } finally {
             window.__guardianFreezeRefreshBusy = false;
@@ -10777,22 +12262,22 @@ function renderRegistrationsTable() {
 
         // Create button-style proof links that open in modal
         const registrationProofLink = reg.registration_proof_path
-            ? `<button type="button" class="view-proof-btn inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700
-                         hover:bg-blue-100 border border-blue-200 text-[10px] font-semibold transition-colors mt-1"
+            ? `<button type="button" class="view-proof-btn inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700
+                         hover:bg-blue-100 border border-blue-200 text-[10px] font-semibold transition-colors"
                          data-proof-url="${buildPublicFileUrl(reg.registration_proof_path)}" data-proof-title="Payment Proof">
                   <i class="fas fa-receipt"></i>
-                  <span>Payment proof</span>
+                  <span>Payment</span>
                </button>`
             : (registrationSource === 'walkin'
                 ? '<div class="text-[10px] text-slate-400 mt-1 italic">Walk-in payment handled at branch</div>'
                 : '<div class="text-[10px] text-slate-400 mt-1 italic">No proof uploaded</div>');
 
         const ageProofLink = reg.age_verification_proof_path
-            ? `<button type="button" class="view-proof-btn inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700
-                         hover:bg-emerald-100 border border-emerald-200 text-[10px] font-semibold transition-colors mt-1"
+            ? `<button type="button" class="view-proof-btn inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700
+                         hover:bg-emerald-100 border border-emerald-200 text-[10px] font-semibold transition-colors"
                          data-proof-url="${buildPublicFileUrl(reg.age_verification_proof_path)}" data-proof-title="ID Proof">
                   <i class="fas fa-id-card"></i>
-                  <span>Proof ID</span>
+                  <span>ID</span>
                </button>`
             : (registrationSource === 'walkin'
                 ? '<div class="text-[10px] text-slate-400 mt-1 italic">Proof ID not required for walk-in</div>'
@@ -10800,36 +12285,34 @@ function renderRegistrationsTable() {
 
         return `
             <tr class="hover:bg-gold-500/5 transition">
-                <td class="px-6 py-4 table-name-cell">
-                    <div class="font-medium text-slate-900 wrap-text" style="color:#0f172a;" title="${escapeHtml(reg.first_name + ' ' + reg.last_name)}">${escapeHtml(reg.first_name || '')} ${escapeHtml(reg.last_name || '')}</div>
-                    <div class="text-sm text-slate-500 truncate-text" style="color:#64748b;" title="Student ID: ${escapeHtml(studentLoginId || 'Not assigned')}"> ${escapeHtml(studentLoginId || 'Not assigned')}</div>
-                    <div class="mt-2"><span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold ${sourceBadgeClass}">${sourceLabel}</span></div>
+                <td class="px-4 py-2.5 table-name-cell">
+                    <div class="text-sm font-semibold text-slate-900 wrap-text" style="color:#0f172a;" title="${escapeHtml(reg.first_name + ' ' + reg.last_name)}">${escapeHtml(reg.first_name || '')} ${escapeHtml(reg.last_name || '')}</div>
+                    <div class="mt-1 flex flex-wrap items-center gap-1.5"><span class="text-xs text-slate-500 truncate-text" style="color:#64748b;" title="Student ID: ${escapeHtml(studentLoginId || 'Not assigned')}">${escapeHtml(studentLoginId || 'Not assigned')}</span><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${sourceBadgeClass}">${sourceLabel}</span></div>
                 </td>
-                <td class="px-6 py-4 table-text-cell">
-                    <div class="text-slate-900 wrap-text" style="color:#0f172a;" title="${escapeHtml((reg.guardian_first_name || '') + ' ' + (reg.guardian_last_name || ''))}">${escapeHtml(reg.guardian_first_name || '')} ${escapeHtml(reg.guardian_last_name || '')}</div>
-                    <div class="text-sm text-slate-500 truncate-text" style="color:#64748b;" title="${escapeHtml(reg.guardian_phone || '')}">${escapeHtml(reg.guardian_phone || '')}</div>
+                <td class="px-4 py-2.5 table-text-cell">
+                    <div class="text-sm font-medium text-slate-900 wrap-text" style="color:#0f172a;" title="${escapeHtml((reg.guardian_first_name || '') + ' ' + (reg.guardian_last_name || ''))}">${escapeHtml(reg.guardian_first_name || '')} ${escapeHtml(reg.guardian_last_name || '')}</div>
+                    <div class="text-xs text-slate-500 truncate-text" style="color:#64748b;" title="${escapeHtml(reg.guardian_phone || '')}">${escapeHtml(reg.guardian_phone || '')}</div>
                 </td>
-                <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" style="color:#334155;" title="${escapeHtml(reg.branch_name || '')}">${escapeHtml(reg.branch_name || '')}</td>
-                <td class="px-6 py-4 table-money-cell">
-                    <div class="text-slate-900 font-medium" style="color:#0f172a;">₱${parseFloat(reg.registration_fee_amount || 0).toFixed(2)}</div>
-                    ${remaining > 0 ? `<div class="text-sm text-red-600">Remaining: ₱${remaining.toFixed(2)}</div>` : ''}
-                    ${registrationProofLink}
-                    ${ageProofLink}
+                <td class="px-4 py-2.5 text-sm text-slate-700 table-text-cell truncate-text" style="color:#334155;" title="${escapeHtml(reg.branch_name || '')}">${escapeHtml(reg.branch_name || '')}</td>
+                <td class="px-4 py-2.5 table-money-cell">
+                    <div class="text-sm text-slate-900 font-semibold" style="color:#0f172a;">₱${parseFloat(reg.registration_fee_amount || 0).toFixed(2)}</div>
+                    ${remaining > 0 ? `<div class="text-xs text-red-600">Remaining: ₱${remaining.toFixed(2)}</div>` : ''}
+                    <div class="mt-1 flex flex-wrap gap-1">${registrationProofLink}${ageProofLink}</div>
                 </td>
-                <td class="px-6 py-4 table-status-cell">
-                    <span class="px-2 py-1 rounded text-xs font-semibold ${statusClass}">
+                <td class="px-4 py-2.5 table-status-cell">
+                    <span class="px-2 py-1 rounded text-[11px] font-semibold ${statusClass}">
                         ${escapeHtml(displayStatus)}
                     </span>
                 </td>
-                <td class="px-6 py-4 text-slate-600 text-sm table-date-cell" style="color:#475569;">
+                <td class="px-4 py-2.5 text-slate-600 text-xs table-date-cell" style="color:#475569;">
                     ${new Date(reg.created_at).toLocaleDateString()}
                 </td>
-                <td class="px-6 py-4 table-actions-cell-wide">
-                   <div class="flex items-center gap-2">
+                <td class="px-4 py-2.5 table-actions-cell-wide">
+                   <div class="flex items-center gap-1.5 whitespace-nowrap">
 
     <!-- VIEW -->
     <button onclick="viewDetails(${reg.student_id})"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5
+        class="inline-flex items-center gap-1 px-2.5 py-1.5
                bg-blue-50 text-blue-600 border border-blue-100
                hover:bg-blue-600 hover:text-white
                rounded-lg text-xs font-semibold
@@ -10842,7 +12325,7 @@ function renderRegistrationsTable() {
 
         <!-- PAY -->
         <button onclick="openPaymentModal(${reg.student_id})"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5
+            class="inline-flex items-center gap-1 px-2.5 py-1.5
                    bg-amber-50 text-amber-600 border border-amber-100
                    hover:bg-amber-500 hover:text-white
                    rounded-lg text-xs font-semibold
@@ -10853,7 +12336,7 @@ function renderRegistrationsTable() {
 
         <!-- REJECT -->
         <button onclick="rejectRegistration(${reg.student_id})"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5
+            class="inline-flex items-center gap-1 px-2.5 py-1.5
                    bg-red-50 text-red-600 border border-red-100
                    hover:bg-red-600 hover:text-white
                    rounded-lg text-xs font-semibold
@@ -11264,6 +12747,8 @@ async function openPaymentModal(studentId, options = {}) {
             const paymentMethodReadonlyWrap = document.getElementById('paymentMethodReadonlyWrap');
             const paymentMethodSelectWrap = document.getElementById('paymentMethodSelectWrap');
             const paymentMethodReadonlyHint = document.getElementById('paymentMethodReadonlyHint');
+            const paymentReferenceWrap = document.getElementById('paymentReferenceWrap');
+            const paymentReferenceDisplay = document.getElementById('paymentReferenceDisplay');
             const modal = document.getElementById('paymentModal');
 
             if (!paymentStudentInfoEl || !paymentAmountEl || !paymentMethodEl || !modal) {
@@ -11301,6 +12786,15 @@ async function openPaymentModal(studentId, options = {}) {
                     ? ''
                     : 'This method was already selected by the student during registration.';
             }
+            const submittedReferenceNumber = String(receiptPayment?.reference_number || '').trim();
+            if (paymentReferenceWrap) {
+                paymentReferenceWrap.classList.toggle('hidden', registrationSource === 'walkin');
+            }
+            if (paymentReferenceDisplay) {
+                paymentReferenceDisplay.textContent = submittedReferenceNumber || 'Not provided';
+                paymentReferenceDisplay.classList.toggle('text-zinc-500', !submittedReferenceNumber);
+                paymentReferenceDisplay.classList.toggle('text-blue-900', Boolean(submittedReferenceNumber));
+            }
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -11325,6 +12819,8 @@ function closePaymentModal() {
     const paymentMethodSelectEl = document.getElementById('paymentMethodSelect');
     const paymentMethodReadonlyWrap = document.getElementById('paymentMethodReadonlyWrap');
     const paymentMethodSelectWrap = document.getElementById('paymentMethodSelectWrap');
+    const paymentReferenceWrap = document.getElementById('paymentReferenceWrap');
+    const paymentReferenceDisplay = document.getElementById('paymentReferenceDisplay');
 
     if (paymentForm) paymentForm.reset();
     if (paymentAmountEl) paymentAmountEl.value = '';
@@ -11333,6 +12829,8 @@ function closePaymentModal() {
     if (paymentMethodEl) paymentMethodEl.value = '';
     if (paymentMethodDisplayEl) paymentMethodDisplayEl.textContent = 'Not available';
     if (paymentMethodSelectEl) paymentMethodSelectEl.value = '';
+    if (paymentReferenceWrap) paymentReferenceWrap.classList.add('hidden');
+    if (paymentReferenceDisplay) paymentReferenceDisplay.textContent = 'Not provided';
     if (paymentMethodReadonlyWrap) paymentMethodReadonlyWrap.classList.remove('hidden');
     if (paymentMethodSelectWrap) paymentMethodSelectWrap.classList.add('hidden');
     currentStudentId = null;
@@ -11786,6 +13284,7 @@ function enforceAdminFixedPageSizes() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    initPaymentDestinationReferences();
     if (window.__fasAuthReady) {
         await window.__fasAuthReady;
     }
@@ -11892,25 +13391,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } else if (studentDashboard) {
         initStudentDashboardPage();
+        startPortalPageAutoRefresh('student-dashboard', initStudentDashboardPage);
     } else if (studentProfile) {
         initStudentProfilePage();
     } else if (studentSessions) {
         initStudentSessionsPage();
+        startPortalPageAutoRefresh('student-sessions', initStudentSessionsPage);
     } else if (studentGrades) {
         initStudentGradesPage();
+        startPortalPageAutoRefresh('student-grades', initStudentGradesPage);
     } else if (studentAttendance) {
         initStudentAttendancePage();
+        startPortalPageAutoRefresh('student-attendance', initStudentAttendancePage);
     } else if (studentQr) {
         initStudentQrPage();
     } else if (document.getElementById('guardianDashboardRoot')) {
         initGuardianDashboardPage();
+        startPortalPageAutoRefresh('guardian-dashboard', initGuardianDashboardPage);
     } else if (guardianStudentsRoot) {
         initGuardianStudentsPage();
+        startPortalPageAutoRefresh('guardian-students', initGuardianStudentsPage);
     } else if (guardianPaymentsRoot) {
         initGuardianPaymentsPage();
+        startPortalPageAutoRefresh('guardian-payments', initGuardianPaymentsPage);
     } else if (guardianProfileRoot) {
         initGuardianProfilePage();
     } else if (guardianAbsenceRoot) {
         initGuardianAbsencePage();
+        startPortalPageAutoRefresh('guardian-absence', initGuardianAbsencePage);
     }
+
+    // Profile, QR, songs, instructor, and any other portal page without a page
+    // renderer still receives live decision notifications in the background.
+    if (!window.__portalPageAutoRefreshTimer) startPortalStatusOnlyWatcher();
 });
