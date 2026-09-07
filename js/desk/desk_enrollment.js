@@ -2857,10 +2857,10 @@
             if (parts.length !== 2) return monthKey;
             const year = Number(parts[0]);
             const month = Number(parts[1]);
-            const dt = new Date(year, month - 1, 1);
+            const dt = new Date(Date.UTC(year, month - 1, 15, 12));
             return Number.isNaN(dt.getTime())
                 ? monthKey
-                : dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+                : dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'Asia/Manila' });
         }
 
         function shiftAssignAvailabilityMonth(monthKey, delta) {
@@ -2869,7 +2869,7 @@
             const month = Number(parts[1] || 0);
             const base = !Number.isNaN(year) && !Number.isNaN(month) && month >= 1 && month <= 12
                 ? new Date(year, month - 1, 1)
-                : new Date();
+                : (() => { const now = window.getManilaDateParts(); return new Date(now.year, now.month - 1, 1); })();
             base.setMonth(base.getMonth() + delta);
             return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
         }
@@ -2993,7 +2993,7 @@
             const resolvedInitialDate = String(initialDate || assignRequestAvailabilitySelectedDate || '').trim();
             if (resolvedInitialDate) assignRequestAvailabilitySelectedDate = resolvedInitialDate;
             if (!assignRequestAvailabilityMonth) {
-                assignRequestAvailabilityMonth = (resolvedInitialDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
+                assignRequestAvailabilityMonth = (resolvedInitialDate || window.getManilaYmd()).slice(0, 7);
             }
             renderAssignRequestCalendarMonth();
             updateAssignRequestCalendarAvailability();
@@ -3003,7 +3003,7 @@
             const gridEl = document.getElementById('assignRequestCalendarGrid');
             const labelEl = document.getElementById('assignRequestCalendarMonthLabel');
             if (!gridEl) return;
-            const monthSource = assignRequestAvailabilityMonth || assignRequestAvailabilitySelectedDate || new Date().toISOString().slice(0, 7);
+            const monthSource = assignRequestAvailabilityMonth || assignRequestAvailabilitySelectedDate || window.getManilaMonthKey();
             const monthParts = String(monthSource).slice(0, 7).split('-');
             const monthDate = new Date(Number(monthParts[0]), Number(monthParts[1]) - 1, 1);
             if (Number.isNaN(monthDate.getTime())) {
@@ -3174,7 +3174,7 @@
                     branch_id: Number(activeAssignRequest.branch_id || managerBranchId || 0),
                     student_id: Number(activeAssignRequest.student_id || 0)
                 });
-                const visibleMonth = assignRequestAvailabilityMonth || (selectedDate ? selectedDate.slice(0, 7) : new Date().toISOString().slice(0, 7));
+                const visibleMonth = assignRequestAvailabilityMonth || (selectedDate ? selectedDate.slice(0, 7) : window.getManilaMonthKey());
                 const [visibleYear, visibleMonthNumber] = visibleMonth.split('-').map(Number);
                 const visibleMonthStart = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-01`;
                 const visibleMonthEnd = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-${String(new Date(visibleYear, visibleMonthNumber, 0).getDate()).padStart(2, '0')}`;
@@ -3269,7 +3269,7 @@
                 assignRequestAvailabilityLoadTimer = null;
             }
 
-            const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+            const todayYmd = window.getManilaYmd();
             const preferredRequestSlots = getPendingRequestPreferredSlots(req);
             const requestedDate = String(preferredRequestSlots[0]?.session_date || req.preferred_date || '').trim();
             const initialDate = requestedDate && requestedDate >= todayYmd ? requestedDate : todayYmd;
@@ -3458,7 +3458,7 @@
         async function submitAssignRequestForm(e) {
             e.preventDefault();
             const requestId = Number(document.getElementById('assignRequestId')?.value || 0);
-            const todayYmd = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+            const todayYmd = window.getManilaYmd();
             const slotRows = Array.from(document.querySelectorAll('#assignRequestSlotsContainer .assign-request-slot'));
             const invalidRow = slotRows.find(row => {
                 const teacherId = Number(getAssignRequestRowTeacherId(row) || 0);

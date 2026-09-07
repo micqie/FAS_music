@@ -773,7 +773,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/mode.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../../js/index.js"></script>
+<script src="../../js/index.js?v=20260907003"></script>
     <script>
         let allStudents = [];
         let packagePagePackages = [];
@@ -1413,9 +1413,7 @@
         }
 
         function getTodayInputDate() {
-            const now = new Date();
-            const offsetMs = now.getTimezoneOffset() * 60000;
-            return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+            return window.getManilaYmd();
         }
 
         function buildFixedScheduleText(student) {
@@ -1813,10 +1811,10 @@
             if (parts.length !== 2) return monthKey;
             const year = Number(parts[0]);
             const month = Number(parts[1]);
-            const dt = new Date(year, month - 1, 1);
+            const dt = new Date(Date.UTC(year, month - 1, 15, 12));
             return Number.isNaN(dt.getTime())
                 ? monthKey
-                : dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+                : dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'Asia/Manila' });
         }
 
         function shiftAssignAvailabilityMonth(monthKey, delta) {
@@ -1825,7 +1823,7 @@
             const month = Number(parts[1] || 0);
             const base = !Number.isNaN(year) && !Number.isNaN(month) && month >= 1 && month <= 12
                 ? new Date(year, month - 1, 1)
-                : new Date();
+                : (() => { const now = window.getManilaDateParts(); return new Date(now.year, now.month - 1, 1); })();
             base.setMonth(base.getMonth() + delta);
             return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
         }
@@ -2017,7 +2015,7 @@
             listEl.innerHTML = '<div class="text-sm text-slate-500">Loading available slots...</div>';
 
             try {
-                const visibleMonth = assignRequestAvailabilityMonth || String(startDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
+                const visibleMonth = assignRequestAvailabilityMonth || String(startDate || window.getManilaYmd()).slice(0, 7);
                 const [visibleYear, visibleMonthNumber] = visibleMonth.split('-').map(Number);
                 const monthStart = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-01`;
                 const monthEnd = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-${String(new Date(visibleYear, visibleMonthNumber, 0).getDate()).padStart(2, '0')}`;
@@ -2357,7 +2355,7 @@
             const sessionsTotal = Number(row.sessions || 0);
             const rows = [];
             let nextUnscheduled = 0;
-            const todayMs = new Date().setHours(0, 0, 0, 0);
+            const todayYmd = window.getManilaYmd();
             if (sessionsTotal > 0) {
                 for (let i = 1; i <= sessionsTotal; i += 1) {
                     const slotHistory = sessionsList.filter(s => Number(s.session_number) === i);
@@ -2372,8 +2370,8 @@
                             const roomName = slot?.room_name ? escapeHtml(slot.room_name) : '';
                             const roomText = roomName ? ` • ${roomName}` : '';
                             const normalizedStatus = String(slot?.status || '').toLowerCase();
-                            const slotDateMs = slot?.session_date ? new Date(`${slot.session_date}T00:00:00`).setHours(0, 0, 0, 0) : NaN;
-                            const editableThisSlot = normalizedStatus === 'scheduled' && !Number.isNaN(slotDateMs) && slotDateMs >= todayMs;
+                            const slotDateYmd = String(slot?.session_date || '').slice(0, 10);
+                            const editableThisSlot = normalizedStatus === 'scheduled' && /^\d{4}-\d{2}-\d{2}$/.test(slotDateYmd) && slotDateYmd >= todayYmd;
                             const editBtn = editableThisSlot
                                 ? `<button type="button" class="edit-schedule-btn ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold shadow-sm transition" data-session-number="${i}" data-session-date="${escapeHtml(slot?.session_date || '')}" data-start-time="${escapeHtml(slot?.start_time || '09:00:00')}" data-end-time="${escapeHtml(slot?.end_time || '10:00:00')}"><i class="fas fa-pen"></i><span>Edit Schedule</span></button>`
                                 : '';

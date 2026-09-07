@@ -20,14 +20,19 @@
         return node.innerHTML;
     }
 
-    function localDateKey(date = new Date()) {
-        return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    function manilaDateKey(date = new Date()) {
+        if (typeof window.getManilaYmd === 'function') return window.getManilaYmd(date);
+        const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date).reduce((result, part) => {
+            if (part.type !== 'literal') result[part.type] = part.value;
+            return result;
+        }, {});
+        return `${parts.year}-${parts.month}-${parts.day}`;
     }
 
     function monthLabel(monthKey) {
         const [year, month] = String(monthKey || '').split('-').map(Number);
-        const date = new Date(year, month - 1, 1);
-        return Number.isNaN(date.getTime()) ? monthKey : date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        const date = new Date(Date.UTC(year, month - 1, 15, 12));
+        return Number.isNaN(date.getTime()) ? monthKey : date.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'Asia/Manila' });
     }
 
     function timeLabel(value) {
@@ -110,7 +115,7 @@
             ...reserved.map(slot => ({ slot, label: 'Pending reservation', classes: 'border-amber-300 bg-amber-50 text-amber-800' })),
             ...available.map(slot => ({ slot, label: 'Available', classes: 'border-emerald-300 bg-emerald-50 text-emerald-800' }))
         ].sort((a, b) => String(a.slot.start_time || '').localeCompare(String(b.slot.start_time || '')));
-        container.innerHTML = `<div class="mb-2 text-sm font-black text-slate-900">${esc(new Date(`${state.selectedDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }))}</div><div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">${cards.map(item => `<div class="rounded-xl border px-4 py-3 ${item.classes}"><div class="font-black">${esc(`${timeLabel(item.slot.start_time)} – ${timeLabel(item.slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold">${item.label}</div></div>`).join('') || '<div class="text-sm text-slate-500">No teaching hours or sessions on this date.</div>'}</div>`;
+        container.innerHTML = `<div class="mb-2 text-sm font-black text-slate-900">${esc(new Date(`${state.selectedDate}T12:00:00+08:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' }))}</div><div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">${cards.map(item => `<div class="rounded-xl border px-4 py-3 ${item.classes}"><div class="font-black">${esc(`${timeLabel(item.slot.start_time)} – ${timeLabel(item.slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold">${item.label}</div></div>`).join('') || '<div class="text-sm text-slate-500">No teaching hours or sessions on this date.</div>'}</div>`;
     }
 
     function renderCalendar() {
@@ -174,7 +179,7 @@
         state.teacherName = String(teacherName || 'Instructor');
         state.branchId = Number(branchId || 0);
         state.branchName = String(branchName || '');
-        state.month = localDateKey().slice(0, 7);
+        state.month = manilaDateKey().slice(0, 7);
         state.selectedDate = '';
         document.getElementById('teacherOccupiedCalendarTitle').textContent = `${state.teacherName} Calendar`;
         document.getElementById('teacherOccupiedCalendarMeta').textContent = `${state.branchName || 'All branches'} • Availability and occupied sessions`;

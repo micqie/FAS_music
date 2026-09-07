@@ -3323,6 +3323,49 @@ class StudentsApi
         }
     }
 
+    /**
+     * Attendance makes a session immutable.  tbl_sessions is the primary
+     * source, while tbl_attendance is a backstop for older/check-in records
+     * that may have been written before the session outcome was synchronized.
+     */
+    private function sessionHasRecordedAttendance($session, $studentId = 0)
+    {
+        if (!is_array($session)) {
+            return false;
+        }
+
+        $attendanceStatus = strtolower(trim((string)($session['attendance_status'] ?? '')));
+        if ($attendanceStatus !== '' && $attendanceStatus !== 'pending') {
+            return true;
+        }
+        if ((int)($session['counted_in'] ?? 0) === 1 || !empty($session['instructor_completed_at'])) {
+            return true;
+        }
+
+        $studentId = (int)$studentId;
+        $sessionDate = trim((string)($session['session_date'] ?? ''));
+        if ($studentId < 1 || $sessionDate === '' || !$this->tableExists('tbl_attendance')) {
+            return false;
+        }
+
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT attendance_id
+                FROM tbl_attendance
+                WHERE student_id = ?
+                  AND attended_at >= CONCAT(?, ' 00:00:00')
+                  AND attended_at < DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY)
+                LIMIT 1
+            ");
+            $stmt->execute([$studentId, $sessionDate, $sessionDate]);
+            return $stmt->fetchColumn() !== false;
+        } catch (PDOException $e) {
+            // The session-level attendance fields still enforce the invariant
+            // if a legacy attendance table cannot be queried.
+            return false;
+        }
+    }
+
     private function buildGuardianUsername($studentId, $guardianEmail)
     {
         $studentId = (int)$studentId;
@@ -7389,7 +7432,8 @@ class StudentsApi
             $totalSessions = (int)($enrollment['total_sessions'] ?? 0);
 
             $stmtCheck = $this->conn->prepare("
-                SELECT session_id, session_date, status
+                SELECT session_id, session_date, status, attendance_status,
+                       counted_in, instructor_completed_at
                 FROM tbl_sessions
                 WHERE enrollment_id = ?
                   AND session_number = ?
@@ -7402,6 +7446,21 @@ class StudentsApi
             $existingSessionId = (int)($existingSession['session_id'] ?? 0);
             $existingSessionDate = (string)($existingSession['session_date'] ?? '');
             $existingSessionStatus = (string)($existingSession['status'] ?? '');
+
+            if ($isEditingExisting && $existingSessionId <= 0) {
+                $this->sendJSON(['error' => 'Scheduled session not found for editing'], 404);
+            }
+            if ($existingSessionId > 0 && $this->sessionHasRecordedAttendance($existingSession, (int)$enrollment['student_id'])) {
+                $this->sendJSON([
+                    'error' => 'This session already has recorded attendance and its schedule cannot be changed.',
+                    'error_code' => 'SESSION_ATTENDANCE_LOCKED'
+                ], 409);
+            }
+            // Validate the database record whenever this request will update
+            // it. Do not trust edit_existing: callers may omit or falsify it.
+            if ($existingSessionId > 0 && !$this->canEditScheduledSession($existingSessionDate, $existingSessionStatus)) {
+                $this->sendJSON(['error' => 'Only future scheduled sessions can be edited.'], 400);
+            }
 
             $hasMultiSlots = !empty($this->getEnrollmentScheduleSlots($enrollmentId));
             $canEditRecurringPattern = $this->canEditEnrollmentScheduleBeforeFirstWeek($enrollmentId);
@@ -7492,13 +7551,6 @@ class StudentsApi
                 ");
                 $stmtInst->execute([(int)$enrollment['student_id']]);
                 $instrumentId = (int)($stmtInst->fetchColumn() ?: 0);
-            }
-
-            if ($isEditingExisting && $existingSessionId <= 0) {
-                $this->sendJSON(['error' => 'Scheduled session not found for editing'], 404);
-            }
-            if ($isEditingExisting && !$this->canEditScheduledSession($existingSessionDate, $existingSessionStatus)) {
-                $this->sendJSON(['error' => 'Only future scheduled sessions can be edited.'], 400);
             }
 
             if ($existingSessionId > 0) {
@@ -8271,6 +8323,14 @@ class StudentsApi
             if (!$sourceSession) {
                 $this->conn->rollBack();
                 $this->sendJSON(['error' => 'Session not found'], 404);
+            }
+
+            if ($this->sessionHasRecordedAttendance($sourceSession, (int)($sourceSession['student_id'] ?? 0))) {
+                $this->conn->rollBack();
+                $this->sendJSON([
+                    'error' => 'This session already has recorded attendance and cannot be rescheduled.',
+                    'error_code' => 'SESSION_ATTENDANCE_LOCKED'
+                ], 409);
             }
 
             $status = (string)($sourceSession['status'] ?? '');

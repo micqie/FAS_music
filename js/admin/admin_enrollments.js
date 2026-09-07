@@ -1130,7 +1130,8 @@
 
         function shiftAdminAssignMonth(monthKey, delta) {
             const [year, month] = String(monthKey || '').split('-').map(Number);
-            const date = year && month ? new Date(year, month - 1 + delta, 1) : new Date();
+            const manilaNow = window.getManilaDateParts();
+            const date = year && month ? new Date(year, month - 1 + delta, 1) : new Date(manilaNow.year, manilaNow.month - 1, 1);
             return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         }
 
@@ -1246,7 +1247,7 @@
                 const statusLabel = count ? 'Available' : hasReservation ? 'Reserved' : isOccupied ? 'Occupied' : elapsedToday ? 'Ended today' : 'Unavailable';
                 cells.push(`<button type="button" ${hasScheduleInfo ? `onclick="openAdminAssignAvailabilityDatePicker('${date}')"` : 'disabled'} class="h-14 rounded-lg border p-1.5 text-left transition ${cellClass}"><div class="flex items-start justify-between gap-1"><span class="text-sm font-semibold leading-none ${hasScheduleInfo ? 'text-slate-900' : 'text-slate-400'}">${day}</span>${count ? `<span class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${count}</span>` : ''}${hasReservation || isOccupied ? '<span class="rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-bold text-white">!</span>' : ''}</div><div class="mt-1 text-[9px] font-semibold leading-tight ${count ? 'text-emerald-700' : hasReservation || isOccupied ? 'text-red-700' : elapsedToday ? 'text-amber-600' : 'text-slate-400'}">${statusLabel}</div></button>`);
             }
-            const monthLabel = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+            const monthLabel = new Date(Date.UTC(year, month - 1, 15, 12)).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'Asia/Manila' });
             listEl.innerHTML = `
                 <div class="space-y-3">
                 <div class="flex items-center justify-between gap-3">
@@ -1275,7 +1276,7 @@
             if (adminAssignAvailabilityController) adminAssignAvailabilityController.abort();
             adminAssignAvailabilityController = new AbortController();
             const requestedStartDate = document.getElementById('assignRequestDate')?.value || '';
-            const visibleMonth = adminAssignCalendarMonth || String(requestedStartDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
+            const visibleMonth = adminAssignCalendarMonth || String(requestedStartDate || window.getManilaYmd()).slice(0, 7);
             const [visibleYear, visibleMonthNumber] = visibleMonth.split('-').map(Number);
             const visibleMonthStart = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-01`;
             const visibleMonthEnd = `${visibleYear}-${String(visibleMonthNumber).padStart(2, '0')}-${String(new Date(visibleYear, visibleMonthNumber, 0).getDate()).padStart(2, '0')}`;
@@ -1326,7 +1327,7 @@
             document.getElementById('assignRequestStudentBranch').textContent = request.branch_name || '—';
             document.getElementById('assignRequestStudentPackage').textContent = request.package_name || '—';
             document.getElementById('assignRequestStudentInstrument').textContent = Array.isArray(request.instruments) ? request.instruments.map(item => item.type_name || item.instrument_name || 'Instrument').join(', ') : '—';
-            const today = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+            const today = window.getManilaYmd();
             const dateEl = document.getElementById('assignRequestDate');
             dateEl.min = today;
             dateEl.value = request.preferred_date && request.preferred_date >= today ? request.preferred_date : today;

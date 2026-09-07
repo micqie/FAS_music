@@ -1,6 +1,59 @@
 ﻿// Base API URL (same-origin, deployment-path safe)
 let baseApiUrl;
 let appBaseUrl;
+const FAS_TIME_ZONE = 'Asia/Manila';
+let fasServerClockOffsetMs = 0;
+let fasServerClockSynced = false;
+
+function getCalendarNow() {
+    return new Date(Date.now() + fasServerClockOffsetMs);
+}
+
+function getManilaDateParts(date) {
+    const sourceDate = date instanceof Date ? date : getCalendarNow();
+    try {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: FAS_TIME_ZONE,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+        }).formatToParts(sourceDate).reduce((result, part) => {
+            if (part.type !== 'literal') result[part.type] = part.value;
+            return result;
+        }, {});
+        return {
+            year: Number(parts.year), month: Number(parts.month), day: Number(parts.day),
+            hour: Number(parts.hour), minute: Number(parts.minute), second: Number(parts.second)
+        };
+    } catch (_) {
+        const manila = new Date(sourceDate.getTime() + (8 * 60 * 60 * 1000));
+        return {
+            year: manila.getUTCFullYear(), month: manila.getUTCMonth() + 1, day: manila.getUTCDate(),
+            hour: manila.getUTCHours(), minute: manila.getUTCMinutes(), second: manila.getUTCSeconds()
+        };
+    }
+}
+
+function getManilaYmd(date) {
+    const parts = getManilaDateParts(date);
+    return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+}
+
+function getManilaMonthKey(date) {
+    return getManilaYmd(date).slice(0, 7);
+}
+
+function addDaysToYmd(ymd, days) {
+    const [year, month, day] = String(ymd || '').split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day + Number(days || 0), 12));
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
+window.FAS_TIME_ZONE = FAS_TIME_ZONE;
+window.getCalendarNow = getCalendarNow;
+window.getManilaDateParts = getManilaDateParts;
+window.getManilaYmd = getManilaYmd;
+window.getManilaMonthKey = getManilaMonthKey;
+window.addDaysToYmd = addDaysToYmd;
 (function initApiBaseUrl() {
     // Derive app base from where this script is served (works even if folder is renamed).
     const defaultAppBaseUrl = (() => {
@@ -45,6 +98,21 @@ let appBaseUrl;
     // Keep global access explicit for inline page scripts
     window.baseApiUrl = baseApiUrl;
     window.appBaseUrl = appBaseUrl;
+
+    // The calendar's "today" follows the application server, which is set to
+    // Asia/Manila. The local clock is only a fallback if this small sync call
+    // is unavailable (for example, while offline).
+    window.fasServerTimeReady = fetch(`${baseApiUrl}/server_time.php`, { credentials: 'same-origin' })
+        .then((response) => response.ok ? response.json() : null)
+        .then((payload) => {
+            const serverEpochMs = Date.parse(String(payload?.now || ''));
+            if (!Number.isNaN(serverEpochMs)) {
+                fasServerClockOffsetMs = serverEpochMs - Date.now();
+                fasServerClockSynced = true;
+            }
+            return fasServerClockSynced;
+        })
+        .catch(() => false);
 
     // Wire axios if available
     if (typeof axios !== 'undefined') {
@@ -3909,7 +3977,7 @@ function formatDateLong(dateString) {
     let dt;
     const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (ymd) {
-        dt = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+        dt = new Date(`${raw}T12:00:00+08:00`);
     } else {
         dt = new Date(raw);
     }
@@ -3919,7 +3987,8 @@ function formatDateLong(dateString) {
         weekday: 'long',
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: FAS_TIME_ZONE
     });
 }
 
@@ -3929,10 +3998,10 @@ function formatDateShort(dateString) {
     if (!raw) return '';
     const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
     const date = ymd
-        ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))
+        ? new Date(`${ymd[1]}-${ymd[2]}-${ymd[3]}T12:00:00+08:00`)
         : new Date(raw);
     if (Number.isNaN(date.getTime())) return raw;
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: FAS_TIME_ZONE });
 }
 
 function getDayOfWeekFromDate(dateString) {
@@ -3941,12 +4010,12 @@ function getDayOfWeekFromDate(dateString) {
     const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     let dt;
     if (ymd) {
-        dt = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+        dt = new Date(`${raw}T12:00:00+08:00`);
     } else {
         dt = new Date(raw);
     }
     if (Number.isNaN(dt.getTime())) return '';
-    return dt.toLocaleDateString('en-US', { weekday: 'long' });
+    return dt.toLocaleDateString('en-US', { weekday: 'long', timeZone: FAS_TIME_ZONE });
 }
 
 function getRegistrationFeeDueAmount(studentOrMeta = null) {
@@ -4569,7 +4638,7 @@ function openAbsenceModal(studentId, studentName = '') {
     const resolvedName = studentName || (student ? getGuardianAbsenceStudentSummary(student, matchIndex).studentName : 'Student');
     modalStudentName.textContent = resolvedName;
     if (dateInput && !dateInput.value) {
-        dateInput.value = new Date().toISOString().slice(0, 10);
+        dateInput.value = getManilaYmd();
     }
     if (reasonInput) reasonInput.value = '';
     if (notesInput) notesInput.value = '';
@@ -4726,10 +4795,7 @@ function isGuardianUpcomingSessionRow(row) {
         return false;
     }
     if (!row?.session_date) return false;
-    const sessionDate = new Date(`${row.session_date}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return sessionDate >= today;
+    return String(row.session_date).slice(0, 10) >= getManilaYmd();
 }
 
 function getNextUpcomingSession(item) {
@@ -6104,7 +6170,7 @@ async function initGuardianAbsencePage() {
 
         const dateInput = document.getElementById('guardianAbsenceSessionDate');
         if (dateInput && !dateInput.value) {
-            dateInput.value = new Date().toISOString().slice(0, 10);
+            dateInput.value = getManilaYmd();
         }
 
     const form = document.getElementById('guardianAbsenceForm');
@@ -6130,7 +6196,7 @@ async function initGuardianAbsencePage() {
             if (data?.success) {
                 showMessage(data.message || 'Absence request submitted.', 'success');
                 form.reset();
-                if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+                if (dateInput) dateInput.value = getManilaYmd();
                 closeAbsenceModal();
 
                 const refreshed = await fetchGuardianAbsenceRequests(Auth.getUser()?.email || '');
@@ -6311,17 +6377,17 @@ function closeStudentInstructorAvailabilityModal() {
 
 function getStudentInstructorMonthLabel(monthKey) {
     const [year, month] = String(monthKey || '').split('-').map(Number);
-    const date = new Date(year, month - 1, 1);
-    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const date = new Date(Date.UTC(year, month - 1, 15, 12));
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: FAS_TIME_ZONE });
 }
 
 function shiftStudentInstructorCalendar(delta) {
     const [year, month] = String(studentInstructorAvailabilityState.month || '').split('-').map(Number);
-    const date = new Date(year || new Date().getFullYear(), (month || (new Date().getMonth() + 1)) - 1, 1);
+    const manilaNow = getManilaDateParts();
+    const date = new Date(year || manilaNow.year, (month || manilaNow.month) - 1, 1);
     date.setMonth(date.getMonth() + delta);
     const nextMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const now = new Date();
-    const currentMonth = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 7);
+    const currentMonth = getManilaMonthKey();
     if (nextMonth < currentMonth) return;
     studentInstructorAvailabilityState.month = nextMonth;
     renderStudentInstructorAvailabilityCalendar();
@@ -6436,14 +6502,13 @@ function renderStudentInstructorAvailabilityCalendar(statusMessage = '') {
     const label = document.getElementById('studentInstructorCalendarMonth');
     const status = document.getElementById('studentInstructorCalendarStatus');
     if (!grid || !label || !status) return;
-    const monthKey = studentInstructorAvailabilityState.month || new Date().toISOString().slice(0, 7);
+    const monthKey = studentInstructorAvailabilityState.month || getManilaMonthKey();
     studentInstructorAvailabilityState.month = monthKey;
     label.textContent = getStudentInstructorMonthLabel(monthKey);
     const prevButton = document.getElementById('studentInstructorCalendarPrev');
     if (prevButton) {
-        const localNow = new Date();
-        const localMonth = new Date(localNow.getTime() - localNow.getTimezoneOffset() * 60000).toISOString().slice(0, 7);
-        prevButton.disabled = monthKey <= localMonth;
+        const manilaMonth = getManilaMonthKey();
+        prevButton.disabled = monthKey <= manilaMonth;
         prevButton.classList.toggle('opacity-40', prevButton.disabled);
         prevButton.classList.toggle('cursor-not-allowed', prevButton.disabled);
     }
@@ -6469,7 +6534,7 @@ function renderStudentInstructorAvailabilityCalendar(statusMessage = '') {
     const occupiedDates = new Set(state.occupiedSlots
         .filter(slot => !ownBookedKeys.has(`${String(slot.session_date || '')}|${String(slot.start_time || '')}|${String(slot.end_time || '')}`))
         .map(slot => String(slot.session_date || '')));
-    const todayKey = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const todayKey = getManilaYmd();
     let html = Array.from({ length: first.getDay() }, () => '<div class="h-14"></div>').join('');
     for (let day = 1; day <= daysInMonth; day += 1) {
         const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -6660,7 +6725,7 @@ function openStudentAvailableInstructors() {
     state.bookedSessions = [];
     state.selectedDate = '';
     const preferredDate = String(document.getElementById('studentRequestPreferredDate')?.value || '');
-    state.month = (preferredDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
+    state.month = (preferredDate || getManilaYmd()).slice(0, 7);
     const typeNames = Array.from(document.querySelectorAll('#studentRequestInstrumentContainer select.student-request-instrument-type'))
         .filter(select => select.value)
         .map(select => select.selectedOptions?.[0]?.textContent || '')
@@ -7051,15 +7116,7 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
     statusEl.innerHTML = renderStudentRequestStatus(latest);
     availabilityCalendar.innerHTML = '';
 
-    const toLocalDateValue = (date) => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-    };
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayYmd = toLocalDateValue(today);
+    const todayYmd = getManilaYmd();
     preferredDateEl.min = todayYmd;
 
     const getRequestedTimeOptions = (dateValue) => {
@@ -7093,8 +7150,8 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
         return slots
             .filter(slot => {
                 if (dateValue !== todayYmd) return true;
-                const now = new Date();
-                const currentMinutes = (now.getHours() * 60) + now.getMinutes();
+                const manilaNow = getManilaDateParts();
+                const currentMinutes = (manilaNow.hour * 60) + manilaNow.minute;
                 const [hours, minutes] = slot.start.split(':').map(Number);
                 return ((hours * 60) + minutes) > currentMinutes;
             })
@@ -7224,9 +7281,7 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
     if (!initialPreferredDate || initialPreferredDate < todayYmd) {
         initialPreferredDate = todayYmd;
         for (let offset = 0; offset < 14; offset += 1) {
-            const candidate = new Date(today);
-            candidate.setDate(today.getDate() + offset);
-            const candidateValue = toLocalDateValue(candidate);
+            const candidateValue = addDaysToYmd(todayYmd, offset);
             if (getRequestedTimeOptions(candidateValue).length) {
                 initialPreferredDate = candidateValue;
                 break;
@@ -11708,10 +11763,7 @@ function writeGuardianSessionToastState(sessionId, state) {
 }
 
 function getLocalYmd(date = new Date()) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return getManilaYmd(date);
 }
 
 function isGuardianSessionCompletionTrackable(row) {
@@ -13310,6 +13362,9 @@ function enforceAdminFixedPageSizes() {
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     initPaymentDestinationReferences();
+    if (window.fasServerTimeReady) {
+        await window.fasServerTimeReady;
+    }
     if (window.__fasAuthReady) {
         await window.__fasAuthReady;
     }
