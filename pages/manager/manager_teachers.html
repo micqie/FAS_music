@@ -462,6 +462,7 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/index.js"></script>
     <script src="../../js/shared/teacher_form_ui.js"></script>
+    <script src="../../js/shared/teacher_occupied_calendar.js?v=20260907001"></script>
     <script src="../../js/manager/dashboard.js"></script>
     <script src="../../js/session_timeout.js"></script>
     <script>
@@ -797,6 +798,11 @@
                                 title="Manage availability">
                                 <i class="fas fa-calendar-alt"></i> Schedule
                             </button>
+                            <button onclick="openManagerTeacherCalendar(${Number(t.teacher_id)})"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold transition-colors"
+                                title="View occupied calendar">
+                                <i class="fas fa-calendar-days"></i> Calendar
+                            </button>
                             <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" 
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${t.status === 'Active' ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'} text-xs font-bold transition-colors"
                                 title="${t.status === 'Active' ? 'Deactivate' : 'Activate'} teacher">
@@ -807,6 +813,13 @@
                     </td>
                 </tr>`;
             }).join('');
+        }
+
+        function openManagerTeacherCalendar(teacherId) {
+            const teacher = allTeachers.find(item => Number(item.teacher_id) === Number(teacherId));
+            if (!teacher || typeof window.openTeacherOccupiedCalendar !== 'function') return;
+            const name = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Instructor';
+            window.openTeacherOccupiedCalendar(teacher.teacher_id, name, teacher.branch_id || managerBranchId, teacher.branch_name || managerBranchName || '');
         }
 
         function openTeacherModal() {

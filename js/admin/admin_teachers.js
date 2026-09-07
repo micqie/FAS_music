@@ -138,6 +138,7 @@
                         <div class="table-button-group">
                             <button onclick="openEditTeacher(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold">Edit</button>
                             <button onclick="openAdminTeacherAvailability(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 text-xs font-bold"><i class="fas fa-calendar-alt mr-1"></i>Schedule</button>
+                            <button onclick="openAdminTeacherCalendar(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-bold"><i class="fas fa-calendar-days mr-1"></i>Calendar</button>
                             <button onclick="openTeacherPasswordModal(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-bold">Password</button>
                             <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" class="px-3 py-1.5 rounded-lg ${t.status === 'Active' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'} text-xs font-bold">${t.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
                         </div>
@@ -390,6 +391,13 @@
                 return;
             }
             await loadTeachers();
+        }
+
+        function openAdminTeacherCalendar(teacherId) {
+            const teacher = allTeachers.find(item => Number(item.teacher_id) === Number(teacherId));
+            if (!teacher || typeof window.openTeacherOccupiedCalendar !== 'function') return;
+            const name = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Instructor';
+            window.openTeacherOccupiedCalendar(teacher.teacher_id, name, teacher.branch_id, teacher.branch_name || '');
         }
 
         function setAdminAvailabilityStatus(message, type = 'error') {
