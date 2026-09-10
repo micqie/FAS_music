@@ -1,4 +1,10 @@
-let scanner = null;
+let cameraStream = null;
+let scanAnimationFrame = 0;
+let scanCanvas = null;
+let scanContext = null;
+let barcodeDetector = null;
+let frameDecodeBusy = false;
+let scannerStarting = false;
 let invalidScanCount = 0;
 let lastScannedPayload = '';
 let lastScanTime = 0;
@@ -81,8 +87,13 @@ function formatDateTime(ts) {
 function setStatus(message, type = 'info') {
     const el = document.getElementById('scannerStatus');
     if (!el) return;
-    const colors = { info: 'text-slate-200', success: 'text-emerald-300', warn: 'text-amber-300', error: 'text-red-300' };
-    el.className = colors[type] || colors.info;
+    const colors = {
+        info: 'bg-white text-slate-700',
+        success: 'bg-emerald-50 text-emerald-700',
+        warn: 'bg-amber-50 text-amber-700',
+        error: 'bg-rose-50 text-rose-700'
+    };
+    el.className = `scanner-status-pill absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1.5 text-center text-[11px] font-semibold ${colors[type] || colors.info}`;
     el.textContent = message;
 }
 
@@ -100,6 +111,17 @@ function showScannerNetworkHelp(message) {
 
 function scannerSecureContextAvailable() {
     return window.isSecureContext || isLocalScannerHost();
+}
+
+function getScannerMixedContentError() {
+    if (window.location.protocol !== 'https:') return '';
+    try {
+        const apiUrl = new URL(String(window.baseApiUrl || baseApiUrl || ''), window.location.href);
+        if (apiUrl.protocol === 'http:') {
+            return 'This HTTPS scanner is configured to call an HTTP API. The browser will block that mixed-content request. Use the same-origin /api URL or enable HTTPS for the API.';
+        }
+    } catch (_) {}
+    return '';
 }
 
 // Clock
@@ -140,17 +162,18 @@ function renderRecentScans(rows) {
         const name = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim() || 'Student';
         const status = String(r.status || 'Present');
         const time = formatTime(r.attended_at);
-        const badgeClass = status === 'Late' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+        const badgeClass = status === 'Late' ? 'text-amber-700' : 'text-sky-700';
+        const initials = `${String(r.first_name || '').charAt(0)}${String(r.last_name || '').charAt(0)}`.toUpperCase() || 'ST';
         return `
-            <div class="user-card flex items-center justify-between border border-slate-200 rounded-xl px-4 py-3">
-                <div class="flex items-center gap-3">
-                    <div class="h-9 w-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="fas fa-check"></i></div>
-                    <div>
-                        <div class="font-semibold text-slate-900">${name}</div>
-                        <div class="text-xs text-slate-500">${time}</div>
+            <div class="user-card flex items-center justify-between gap-3 rounded-xl px-2 py-2 hover:bg-slate-50">
+                <div class="flex min-w-0 items-center gap-2.5">
+                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">${escapeHtml(initials)}</div>
+                    <div class="min-w-0">
+                        <div class="truncate text-xs font-semibold text-slate-800">${name}</div>
+                        <div class="text-[10px] text-slate-400">Student check-in</div>
                     </div>
                 </div>
-                <span class="px-3 py-1 rounded-full text-xs font-semibold ${badgeClass}">${escapeHtml(status)}</span>
+                <div class="shrink-0 text-right"><div class="text-[10px] font-semibold ${badgeClass}">${escapeHtml(status)}</div><div class="text-[9px] text-slate-400">${time}</div></div>
             </div>`;
     }).join('');
 }
@@ -169,6 +192,8 @@ async function fetchRecentScans() {
 
 async function postScanPayload(payload) {
     try {
+        const mixedContentError = getScannerMixedContentError();
+        if (mixedContentError) return { success: false, error: mixedContentError };
         const branchId = getDeskBranchId();
         const res = await axios.post(`${baseApiUrl}/attendance.php?action=scan-qr`, {
             payload,
@@ -182,6 +207,8 @@ async function postScanPayload(payload) {
 
 async function postRecordByEmail(email) {
     try {
+        const mixedContentError = getScannerMixedContentError();
+        if (mixedContentError) return { success: false, error: mixedContentError };
         const branchId = getDeskBranchId();
         const res = await axios.post(`${baseApiUrl}/attendance.php?action=record-by-email`, {
             email: email.trim(),
@@ -269,43 +296,140 @@ async function handleManualEntry(email) {
     handleApiResponse(data, null, null, true);
 }
 
-function initScanner() {
+function stopScanner() {
+    if (scanAnimationFrame) {
+        cancelAnimationFrame(scanAnimationFrame);
+        scanAnimationFrame = 0;
+    }
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
     const preview = document.getElementById('preview');
-    if (!scannerSecureContextAvailable()) {
-        setStatus('Live camera is blocked on an HTTP IP address. Take/upload a QR photo or use manual email entry.', 'warn');
-        showScannerNetworkHelp('<strong>Live camera needs HTTPS.</strong> You opened the scanner through a network IP using HTTP. Use the photo button below, or configure a trusted HTTPS certificate for this IP/device.');
-        return;
-    }
-    if (!preview || typeof Instascan === 'undefined') {
-        setStatus('Instascan library not available.', 'error');
-        return;
-    }
+    if (preview) preview.srcObject = null;
+    frameDecodeBusy = false;
+}
 
-    scanner = new Instascan.Scanner({ video: preview });
+async function prepareBarcodeDetector() {
+    if (typeof window.BarcodeDetector !== 'function') return null;
+    try {
+        if (typeof window.BarcodeDetector.getSupportedFormats === 'function') {
+            const formats = await window.BarcodeDetector.getSupportedFormats();
+            if (!formats.includes('qr_code')) return null;
+        }
+        return new window.BarcodeDetector({ formats: ['qr_code'] });
+    } catch (_) {
+        return null;
+    }
+}
 
-    Instascan.Camera.getCameras().then(cameras => {
-        if (cameras.length === 0) {
-            setStatus('No camera found. Use manual entry by email.', 'warn');
+async function decodeLiveFrame(preview) {
+    if (frameDecodeBusy || preview.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA) return;
+    frameDecodeBusy = true;
+    try {
+        let payload = '';
+        if (barcodeDetector) {
+            const codes = await barcodeDetector.detect(preview);
+            payload = String(codes?.[0]?.rawValue || '').trim();
+        } else if (typeof jsQR === 'function') {
+            const sourceWidth = preview.videoWidth || 0;
+            const sourceHeight = preview.videoHeight || 0;
+            if (!sourceWidth || !sourceHeight) return;
+            const maxSide = 960;
+            const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+            const width = Math.max(1, Math.round(sourceWidth * scale));
+            const height = Math.max(1, Math.round(sourceHeight * scale));
+            if (!scanCanvas) scanCanvas = document.createElement('canvas');
+            scanCanvas.width = width;
+            scanCanvas.height = height;
+            scanContext = scanCanvas.getContext('2d', { willReadFrequently: true });
+            if (!scanContext) return;
+            scanContext.drawImage(preview, 0, 0, width, height);
+            const pixels = scanContext.getImageData(0, 0, width, height);
+            const result = jsQR(pixels.data, width, height, { inversionAttempts: 'attemptBoth' });
+            payload = String(result?.data || '').trim();
+        }
+        if (payload) await handleScan(payload);
+    } catch (error) {
+        // A single undecodable video frame is normal; keep scanning.
+        if (error?.name !== 'NotFoundError') console.debug('QR frame decode:', error);
+    } finally {
+        frameDecodeBusy = false;
+    }
+}
+
+function scanVideoLoop(preview) {
+    let lastFrameAt = 0;
+    const tick = timestamp => {
+        if (!cameraStream || document.visibilityState === 'hidden') {
+            scanAnimationFrame = 0;
             return;
         }
-        const back = cameras.find(c => (c.name || '').toLowerCase().includes('back'));
-        const cam = back || cameras[0];
-        scanner.start(cam).then(() => {
-            setStatus('Scanner is live. Point at QR code or type email below.', 'info');
-        }).catch(e => {
-            setStatus('Camera access denied or failed. Use manual entry.', 'warn');
-            console.warn('Scanner start:', e);
+        if (timestamp - lastFrameAt >= 120) {
+            lastFrameAt = timestamp;
+            decodeLiveFrame(preview);
+        }
+        scanAnimationFrame = requestAnimationFrame(tick);
+    };
+    scanAnimationFrame = requestAnimationFrame(tick);
+}
+
+async function initScanner() {
+    const preview = document.getElementById('preview');
+    if (!scannerSecureContextAvailable()) {
+        setStatus('Live camera is blocked because this network page uses insecure HTTP. Use the photo fallback or reopen it with trusted HTTPS.', 'warn');
+        showScannerNetworkHelp('<strong>Insecure page:</strong> Camera access requires a secure context. Open this page with <code>https://</code> using the trusted local certificate. The photo upload/capture fallback remains available below.');
+        return;
+    }
+    if (!preview || !navigator.mediaDevices?.getUserMedia) {
+        setStatus('Camera access is not supported by this browser. Use a QR photo or manual email entry.', 'error');
+        return;
+    }
+    if (scannerStarting || cameraStream) return;
+    scannerStarting = true;
+    try {
+        const mixedContentError = getScannerMixedContentError();
+        if (mixedContentError) showScannerNetworkHelp(`<strong>API configuration error:</strong> ${escapeHtml(mixedContentError)}`);
+        barcodeDetector = await prepareBarcodeDetector();
+        if (!barcodeDetector && typeof jsQR !== 'function') {
+            setStatus('QR decoder failed to load. Refresh with an internet connection or use manual email entry.', 'error');
+            return;
+        }
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
         });
-    }).catch(e => {
-        setStatus('Camera access denied. Use manual entry by email.', 'warn');
-        console.warn('Camera error:', e);
-    });
-
-    scanner.addListener('scan', content => {
-        if (content && content.trim()) handleScan(content.trim());
-    });
-
-    scanner.addListener('scan-error', () => {});
+        preview.srcObject = cameraStream;
+        await preview.play();
+        setStatus('Scanner is live. Point the camera at a student QR code.', 'success');
+        scanVideoLoop(preview);
+    } catch (error) {
+        stopScanner();
+        const denied = error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError';
+        const missing = error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError';
+        const busy = error?.name === 'NotReadableError' || error?.name === 'TrackStartError' || error?.name === 'AbortError';
+        setStatus(denied
+            ? 'Camera permission was denied. Allow camera access in the address bar and reload.'
+            : (missing
+                ? 'No camera is available on this device. Use a QR photo or manual email entry.'
+                : (busy
+                    ? 'The camera is already being used by another app or browser tab. Close it there, then retry.'
+                    : 'Camera could not start. Use a QR photo or manual email entry.')), 'warn');
+        showScannerNetworkHelp(denied
+            ? '<strong>Camera permission denied.</strong> Open this site\'s permissions from the lock icon, allow Camera, then reload the page.'
+            : (missing
+                ? '<strong>No camera available.</strong> Connect or enable a camera, or use the photo upload/capture fallback.'
+                : (busy
+                    ? '<strong>Camera in use.</strong> Close other camera apps and browser tabs, then reload the page.'
+                    : `<strong>Camera error:</strong> ${escapeHtml(error?.message || 'Unable to start the camera.')}`)));
+        console.warn('Camera start:', error);
+    } finally {
+        scannerStarting = false;
+    }
 }
 
 async function decodeQrImageFile(file) {
@@ -317,11 +441,25 @@ async function decodeQrImageFile(file) {
 
     setStatus('Reading QR image...', 'info');
     try {
-        const bitmap = await createImageBitmap(file);
+        let bitmap;
+        let objectUrl = '';
+        if (typeof createImageBitmap === 'function') {
+            bitmap = await createImageBitmap(file);
+        } else {
+            objectUrl = URL.createObjectURL(file);
+            bitmap = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('The selected image could not be loaded'));
+                img.src = objectUrl;
+            });
+        }
         const maxSide = 1600;
-        const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-        const width = Math.max(1, Math.round(bitmap.width * scale));
-        const height = Math.max(1, Math.round(bitmap.height * scale));
+        const sourceWidth = bitmap.width || bitmap.naturalWidth;
+        const sourceHeight = bitmap.height || bitmap.naturalHeight;
+        const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+        const width = Math.max(1, Math.round(sourceWidth * scale));
+        const height = Math.max(1, Math.round(sourceHeight * scale));
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
@@ -329,6 +467,7 @@ async function decodeQrImageFile(file) {
         if (!context) throw new Error('Canvas is unavailable');
         context.drawImage(bitmap, 0, 0, width, height);
         if (typeof bitmap.close === 'function') bitmap.close();
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
         const imageData = context.getImageData(0, 0, width, height);
         const result = jsQR(imageData.data, width, height, { inversionAttempts: 'attemptBoth' });
         if (!result?.data) {
@@ -355,15 +494,18 @@ function initImageScanner() {
 function initManualEntry() {
     const input = document.getElementById('user_email');
     if (!input) return;
+    const submit = () => {
+        const email = input.value.trim();
+        if (!email) return;
+        handleManualEntry(email);
+        input.value = '';
+    };
     input.addEventListener('keydown', e => {
         if (e.key !== 'Enter') return;
         e.preventDefault();
-        const email = input.value.trim();
-        if (email) {
-            handleManualEntry(email);
-            input.value = '';
-        }
+        submit();
     });
+    document.getElementById('manualCheckinBtn')?.addEventListener('click', submit);
 }
 
 function initDeskScanner() {
@@ -406,15 +548,10 @@ function initDeskScanner() {
 }
 
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && scanner) {
-        Instascan.Camera.getCameras().then(cameras => {
-            if (cameras.length > 0) {
-                const back = cameras.find(c => (c.name || '').toLowerCase().includes('back'));
-                const cam = back || cameras[0];
-                scanner.start(cam).catch(() => {});
-            }
-        }).catch(() => {});
-    }
+    if (document.visibilityState === 'hidden') stopScanner();
+    else if (getDeskBranchId()) initScanner();
 });
+
+window.addEventListener('pagehide', stopScanner);
 
 document.addEventListener('DOMContentLoaded', initDeskScanner);

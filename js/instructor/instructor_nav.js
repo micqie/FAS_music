@@ -18,6 +18,47 @@
         return document.querySelector('body > nav');
     }
 
+    function instructorProfileHtml(compact = false) {
+        return `
+            <a href="instructor_profile.html" class="instructor-sidebar-profile block rounded-2xl border border-white/10 bg-white/5 px-4 ${compact ? 'py-3' : 'py-4'} text-center transition hover:border-gold-500/30 hover:bg-white/10">
+                <div class="mx-auto ${compact ? 'h-14 w-14' : 'h-20 w-20'} rounded-full border-2 border-gold-500/40 bg-[#1a1d23] flex items-center justify-center shadow-lg shadow-black/20">
+                    <i class="fas fa-user-circle ${compact ? 'text-5xl' : 'text-7xl'} text-gold-400"></i>
+                </div>
+                <p class="instructor-shell-name mt-3 truncate text-sm font-bold text-white">Instructor</p>
+                <p class="instructor-shell-email mt-1 truncate text-xs text-slate-400">—</p>
+                <p class="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-gold-400">Instructor</p>
+            </a>`;
+    }
+
+    function mountSidebarProfiles() {
+        const sidebar = document.querySelector('body > aside');
+        const sidebarContent = sidebar?.firstElementChild;
+        if (sidebar && sidebarContent && !sidebar.querySelector('[data-instructor-shell-profile]')) {
+            sidebar.classList.add('instructor-sidebar');
+            const oldTitle = Array.from(sidebarContent.children).find(child =>
+                /Instructor Panel/i.test(child.textContent || '')
+            );
+            if (oldTitle) oldTitle.classList.add('instructor-sidebar-title');
+            const mount = document.createElement('div');
+            mount.setAttribute('data-instructor-shell-profile', 'desktop');
+            mount.innerHTML = instructorProfileHtml(true);
+            sidebarContent.appendChild(mount);
+        }
+
+        const mobilePanel = document.querySelector('#instructorMobileMenu > div:last-child');
+        if (mobilePanel && !mobilePanel.querySelector('[data-instructor-shell-profile]')) {
+            const oldTitle = Array.from(mobilePanel.children).find(child =>
+                /Instructor Panel/i.test(child.textContent || '')
+            );
+            if (oldTitle) oldTitle.hidden = true;
+            const mount = document.createElement('div');
+            mount.className = 'mb-4';
+            mount.setAttribute('data-instructor-shell-profile', 'mobile');
+            mount.innerHTML = instructorProfileHtml(true);
+            mobilePanel.insertBefore(mount, mobilePanel.firstChild);
+        }
+    }
+
     function getMobileMenu() {
         return document.getElementById('instructorMobileMenu');
     }
@@ -140,6 +181,9 @@
         const menuEmail = document.getElementById('instrProfileMenuEmail');
         if (menuName)  menuName.textContent  = name;
         if (menuEmail) menuEmail.textContent = user?.email || user?.username || '—';
+
+        document.querySelectorAll('.instructor-shell-name').forEach(node => { node.textContent = name; });
+        document.querySelectorAll('.instructor-shell-email').forEach(node => { node.textContent = user?.email || user?.username || '—'; });
     }
 
     async function promptInstructorPasswordChange() {
@@ -213,6 +257,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         syncTopNavLayout();
         window.toggleInstructorMenu = toggleMobileMenu;
+        mountSidebarProfiles();
         mountDropdown();
         syncNav();
 

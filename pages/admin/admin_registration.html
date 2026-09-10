@@ -5,17 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registrations</title>
     <!-- Tailwind CSS - Using CDN for development (warning is expected) -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../../css/tailwind-admin.min.css?v=20260909001">
+    <script>window.tailwind = window.tailwind || {};</script>
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../css/admin-responsive.css"><link rel="stylesheet" href="../../css/table-responsive.css">
+    <link rel="stylesheet" href="../../assets/vendor/fontawesome/css/all.min.css?v=20260909001">
+    <link rel="stylesheet" href="../../css/admin-responsive.css?v=20260910012"><link rel="stylesheet" href="../../css/table-responsive.css">
     <style>
         .registration-compact th { padding: .65rem .75rem !important; font-size: .68rem !important; }
         .registration-compact td { padding: .65rem .75rem !important; font-size: .78rem !important; vertical-align: middle; }
         .registration-compact td .text-sm { font-size: .72rem !important; }
     </style>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/css/intlTelInput.css">
-<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/intlTelInput.min.js"></script>
+    <link rel="stylesheet" href="../../assets/vendor/intl-tel-input/css/intlTelInput.css?v=20260909001">
+<script src="../../assets/vendor/intl-tel-input/js/intlTelInput.min.js?v=20260909001"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -31,7 +32,6 @@
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .dark-glass { background: rgba(15, 17, 21, 0.9); backdrop-filter: blur(10px); }
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: white !important; }
@@ -497,11 +497,11 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../../assets/vendor/js/axios.min.js?v=20260909001"></script>
+    <script src="../../assets/vendor/js/sweetalert2.min.js?v=20260909001"></script>
     <script src="../../js/birthdate_validation.js"></script>
-    <script src="../../js/admin/admin_responsive.js"></script>
-    <script src="../../js/index.js?v=20260829008"></script>
+<script src="../../js/admin/admin_responsive.js?v=20260910008"></script>
+    <script src="../../js/index.js?v=20260910002"></script>
     <script src="../../js/admin/admin_registration.js?v=20260829008"></script>
      <script src="../../js/intl-phone-input.js"></script>
     <script src="../../js/session_timeout.js"></script>

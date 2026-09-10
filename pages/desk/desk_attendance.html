@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
  <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../css/desk-premium.css">
+    <link rel="stylesheet" href="../../css/desk-premium.css?v=20260910001">
     <script>
         tailwind.config = {
             theme: {
@@ -48,6 +48,26 @@
         .swal2-popup.attendance-details-compact .swal2-html-container { margin: 0 !important; }
         .swal2-popup.attendance-details-compact .swal2-actions { margin: .75rem 0 0 !important; }
         .swal2-popup.attendance-details-compact .swal2-confirm { padding: .5rem 1.5rem !important; }
+        .swal2-popup.attendance-room-assignment-compact {
+            max-height: calc(100dvh - 1rem);
+            padding: .85rem !important;
+        }
+        .swal2-popup.attendance-room-assignment-compact .swal2-title {
+            padding: 0 0 .55rem !important;
+            font-size: 1.35rem !important;
+            line-height: 1.2 !important;
+        }
+        .swal2-popup.attendance-room-assignment-compact .swal2-html-container {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .swal2-popup.attendance-room-assignment-compact .swal2-actions {
+            margin: .65rem 0 0 !important;
+        }
+        .swal2-popup.attendance-room-assignment-compact .swal2-actions button {
+            margin: 0 .25rem !important;
+            padding: .55rem 1.15rem !important;
+        }
 
         @media (max-width: 767px) {
             .attendance-action {
@@ -288,8 +308,8 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../../js/index.js"></script>
     <script src="../../js/session_timeout.js"></script>
-    <script src="../../js/desk/desk_nav.js"></script>
+    <script src="../../js/desk/desk_nav.js?v=20260910001"></script>
     <script src="../../js/branch_room_occupancy.js"></script>
-    <script src="../../js/desk/desk_attendance.js?v=20260828002"></script>
+    <script src="../../js/desk/desk_attendance.js?v=20260910005"></script>
 </body>
 </html>

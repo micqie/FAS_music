@@ -10,7 +10,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../css/portal.css">
+    <link rel="stylesheet" href="../../css/portal.css?v=20260910002">
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -39,9 +39,13 @@
 <body class="portal-easy bg-[#f6f2e8] dark:bg-obsidian text-zinc-900 dark:text-white antialiased min-h-screen">
     <nav class="portal-nav fixed inset-x-0 top-0 z-50 border-b border-zinc-200 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-3 sm:gap-6">
-            <a href="../../index.html" class="h-10 flex items-center">
+            <a href="student_dashboard.html" class="h-10 flex items-center">
                 <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto dark:brightness-200">
             </a>
+            <div class="hidden md:block">
+                <div class="text-xs uppercase tracking-[0.25em] text-gold-400/90 font-bold">Student Portal</div>
+                <div class="text-sm text-zinc-500 dark:text-zinc-300">My Songs</div>
+            </div>
         </div>
         <div class="flex items-center gap-3">
             <button id="studentMobileMenuToggle" class="md:hidden h-10 w-10 rounded-full border border-zinc-300 dark:border-white/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200" aria-label="Open menu">
@@ -270,7 +274,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="../../js/portal_sidebar.js"></script>
-    <script src="../../js/index.js?v=20260906011"></script>
+    <script src="../../js/index.js?v=20260910002"></script>
     <script src="../../js/mode.js"></script>
     <script src="../../js/student/student_shell.js"></script>
     <script src="../../js/student/student_songs.js"></script>

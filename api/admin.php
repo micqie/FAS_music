@@ -1792,7 +1792,6 @@ class Admin
         $userId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
         $firstName = $this->normalizePersonName($data['first_name'] ?? '');
         $lastName = $this->normalizePersonName($data['last_name'] ?? '');
-        $email = trim((string)($data['email'] ?? ''));
         $phone = trim((string)($data['phone'] ?? ''));
         $branchId = isset($data['branch_id']) && $data['branch_id'] !== '' ? (int)$data['branch_id'] : 0;
 
@@ -1809,71 +1808,31 @@ class Admin
             }
             $currentEmail = trim((string)($currentUser['email'] ?? ''));
             $currentIdentifier = $currentEmail !== '' ? $currentEmail : trim((string)($currentUser['username'] ?? ''));
-            $hasLockedRealEmail = filter_var($currentIdentifier, FILTER_VALIDATE_EMAIL)
-                && !$this->isWalkInSystemEmail($currentIdentifier);
-            if ($hasLockedRealEmail && strcasecmp($email, $currentIdentifier) !== 0) {
-                $this->sendJSON([
-                    'error' => 'This real email address is locked because it is linked to existing account records.'
-                ], 409);
-            }
-            if ($hasLockedRealEmail) {
-                $email = $currentIdentifier;
-            }
-            if ($email === '' && $this->isWalkInSystemEmail($currentUser['username'] ?? '')) {
-                $email = (string)($currentUser['username'] ?? '');
-            }
-            if ($email === '' && $this->isWalkInSystemEmail($currentUser['email'] ?? '')) {
-                $email = (string)($currentUser['email'] ?? '');
-            }
-
-            if ($email === '') {
-                $this->sendJSON(['error' => 'Email or walk-in login is required'], 400);
-            }
-
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL) && !$this->isWalkInSystemEmail($email)) {
-                $this->sendJSON(['error' => 'Invalid email address'], 400);
-            }
-
-            // Prevent duplicate username/email (exclude current user)
-            $stmtCheck = $this->conn->prepare("
-                SELECT user_id FROM tbl_users
-                WHERE (LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?)) AND user_id <> ?
-                LIMIT 1
-            ");
-            $stmtCheck->execute([$email, $email, $userId]);
-            $exists = $stmtCheck->fetch(PDO::FETCH_ASSOC);
-            if ($exists) {
-                $this->sendJSON(['error' => 'Email already exists'], 409);
-            }
 
             $hasBranchCol = $this->hasUserColumn('branch_id');
             if ($hasBranchCol) {
                 $stmt = $this->conn->prepare("
                     UPDATE tbl_users
-                    SET first_name = ?, last_name = ?, email = ?, phone = ?, username = ?, branch_id = ?
+                    SET first_name = ?, last_name = ?, phone = ?, branch_id = ?
                     WHERE user_id = ?
                 ");
                 $stmt->execute([
                     $firstName,
                     $lastName,
-                    $email,
                     $phone,
-                    $email,
                     $branchId > 0 ? $branchId : null,
                     $userId
                 ]);
             } else {
                 $stmt = $this->conn->prepare("
                     UPDATE tbl_users
-                    SET first_name = ?, last_name = ?, email = ?, phone = ?, username = ?
+                    SET first_name = ?, last_name = ?, phone = ?
                     WHERE user_id = ?
                 ");
                 $stmt->execute([
                     $firstName,
                     $lastName,
-                    $email,
                     $phone,
-                    $email,
                     $userId
                 ]);
             }
@@ -1883,9 +1842,9 @@ class Admin
                 $this->conn,
                 'User Updated',
                 'Users',
-                "User profile updated for user ID {$userId} ({$email}).",
-                'user', $userId, $email,
-                'info', ['email' => $currentUser['email'] ?? ''], ['first_name' => $firstName, 'last_name' => $lastName, 'email' => $email],
+                "User profile updated for user ID {$userId} ({$currentIdentifier}).",
+                'user', $userId, $currentIdentifier,
+                'info', ['email' => $currentUser['email'] ?? ''], ['first_name' => $firstName, 'last_name' => $lastName, 'email' => $currentUser['email'] ?? ''],
                 $pById, $pByName, $pByRole, $pByEmail
             );
 

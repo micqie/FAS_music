@@ -1225,7 +1225,17 @@ class TeachersApi
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
 
-        $teacherId = $this->resolveTeacherId((int)($_GET['teacher_id'] ?? 0), (int)($_GET['user_id'] ?? 0));
+        $authenticatedUser = fas_require_authenticated_user($this->conn, ['instructor']);
+        $roleCategory = fas_normalize_role_category($authenticatedUser['role_name'] ?? '');
+
+        // An instructor must never be able to select another instructor by
+        // changing a query-string ID. Admin callers keep the existing explicit
+        // teacher lookup used by oversight screens.
+        if ($roleCategory === 'instructor') {
+            $teacherId = $this->resolveTeacherId(0, (int)($authenticatedUser['user_id'] ?? 0));
+        } else {
+            $teacherId = $this->resolveTeacherId((int)($_GET['teacher_id'] ?? 0), (int)($_GET['user_id'] ?? 0));
+        }
         $filter = strtolower(trim((string)($_GET['filter'] ?? 'all')));
         // week_start: YYYY-MM-DD — if provided, fetch that specific Mon–Sun week
         $weekStartRaw = trim((string)($_GET['week_start'] ?? ''));
@@ -1258,7 +1268,10 @@ class TeachersApi
                     ts.session_date,
                     ts.start_time,
                     ts.end_time,
+                    ts.session_type,
                     ts.status,
+                    ts.attendance_status,
+                    ts.counted_in,
                     ts.notes,
                     ts.needs_rescheduling,
                     ts.cancellation_reason,
@@ -1268,6 +1281,17 @@ class TeachersApi
                     s.student_id,
                     s.first_name AS student_first_name,
                     s.last_name AS student_last_name,
+                    s.phone AS student_phone,
+                    e.status AS enrollment_status,
+                    e.schedule_status,
+                    e.total_sessions AS package_sessions,
+                    e.completed_sessions,
+                    COALESCE(package_usage.used_sessions, 0) AS package_used_sessions,
+                    COALESCE(package_usage.scheduled_sessions, 0) AS package_scheduled_sessions,
+                    e.fixed_day_of_week,
+                    e.fixed_start_time,
+                    e.fixed_end_time,
+                    COALESCE(sp.package_name, CONCAT(e.total_sessions, ' Session Package')) AS package_name,
                     COALESCE(inst.instrument_name, CONCAT('Instrument #', COALESCE(ts.instrument_id, e.instrument_id))) AS instrument_name,
                     COALESCE(it.type_name, '') AS instrument_type,
                     COALESCE(rm.room_name, '') AS room_name
@@ -1276,7 +1300,16 @@ class TeachersApi
                 INNER JOIN tbl_students s ON s.student_id = e.student_id
                 LEFT JOIN tbl_instruments inst ON inst.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
                 LEFT JOIN tbl_instrument_types it ON it.type_id = inst.type_id
+                LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
                 LEFT JOIN tbl_rooms rm ON rm.room_id = ts.room_id
+                LEFT JOIN (
+                    SELECT
+                        enrollment_id,
+                        COUNT(DISTINCT CASE WHEN counted_in = 1 THEN session_number END) AS used_sessions,
+                        COUNT(DISTINCT CASE WHEN status NOT IN ('Cancelled', 'cancelled_by_teacher', 'rescheduled') THEN session_number END) AS scheduled_sessions
+                    FROM tbl_sessions
+                    GROUP BY enrollment_id
+                ) package_usage ON package_usage.enrollment_id = e.enrollment_id
                 WHERE ts.teacher_id = ?
             ";
             $params = [$teacherId];
@@ -1708,11 +1741,10 @@ class TeachersApi
         $lastName = trim((string)($data['last_name'] ?? ''));
         $branchId = (int)($data['branch_id'] ?? 0);
         $specializationIds = $this->normalizeGeneralSpecializationSelection($data['specialization_ids'] ?? []);
-        $email = trim((string)($data['email'] ?? ''));
         $phone = trim((string)($data['phone'] ?? ''));
         $employmentType = trim((string)($data['employment_type'] ?? 'Full-time'));
         $status = trim((string)($data['status'] ?? 'Active'));
-        $userId = isset($data['user_id']) && (int)$data['user_id'] > 0 ? (int)$data['user_id'] : null;
+        $newPassword = (string)($data['new_password'] ?? '');
 
         if ($teacherId < 1) {
             $this->sendJSON(['error' => 'teacher_id is required'], 400);
@@ -1735,8 +1767,8 @@ class TeachersApi
         if (!in_array($status, ['Active', 'Inactive'], true)) {
             $this->sendJSON(['error' => 'Invalid status'], 400);
         }
-        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $this->sendJSON(['error' => 'Invalid email format'], 400);
+        if ($newPassword !== '') {
+            $this->validateStrongPassword($newPassword);
         }
 
         try {
@@ -1757,47 +1789,12 @@ class TeachersApi
             }
 
             $existingUserId = (int)($existingTeacher['user_id'] ?? 0);
-            if ($userId === null || $userId < 1) {
-                $userId = $existingUserId > 0 ? $existingUserId : null;
-            }
-
-            if ($email !== '') {
-                $dupTeacher = $this->conn->prepare("
-                    SELECT teacher_id
-                    FROM tbl_teachers
-                    WHERE LOWER(TRIM(email)) = LOWER(?)
-                      AND teacher_id <> ?
-                    LIMIT 1
-                ");
-                $dupTeacher->execute([$email, $teacherId]);
-                if ($dupTeacher->fetchColumn()) {
-                    $this->conn->rollBack();
-                    $this->sendJSON(['error' => 'Email is already used by another teacher'], 400);
-                }
-            }
-
-            if ($userId !== null && $userId > 0) {
-                $dupUser = $this->conn->prepare("
-                    SELECT user_id
-                    FROM tbl_users
-                    WHERE (
-                        (email IS NOT NULL AND email <> '' AND LOWER(TRIM(email)) = LOWER(?))
-                        OR LOWER(TRIM(username)) = LOWER(?)
-                    )
-                      AND user_id <> ?
-                    LIMIT 1
-                ");
-                $dupUser->execute([$email, $email, $userId]);
-                if ($email !== '' && $dupUser->fetchColumn()) {
-                    $this->conn->rollBack();
-                    $this->sendJSON(['error' => 'Email is already used by another user account'], 400);
-                }
-            }
+            $userId = $existingUserId > 0 ? $existingUserId : null;
 
             $stmt = $this->conn->prepare("
                 UPDATE tbl_teachers
                 SET user_id = ?, branch_id = ?, first_name = ?, last_name = ?,
-                    email = ?, phone = ?, employment_type = ?, status = ?
+                    phone = ?, employment_type = ?, status = ?
                 WHERE teacher_id = ?
             ");
             $stmt->execute([
@@ -1805,7 +1802,6 @@ class TeachersApi
                 $branchId,
                 $firstName,
                 $lastName,
-                ($email !== '' ? $email : null),
                 ($phone !== '' ? $phone : null),
                 $employmentType,
                 $status,
@@ -1832,38 +1828,36 @@ class TeachersApi
                 $stmtUser->execute([$userId]);
                 $linkedUser = $stmtUser->fetch(PDO::FETCH_ASSOC);
                 if ($linkedUser) {
-                    $currentUsername = trim((string)($linkedUser['username'] ?? ''));
-                    $newUsername = $currentUsername;
-
-                    if ($email !== '') {
-                        $newUsername = $email;
-                    }
-
-                    if ($newUsername !== $currentUsername && $this->usernameExists($newUsername)) {
-                        $this->conn->rollBack();
-                        $this->sendJSON(['error' => 'Email is already used by another login account'], 400);
-                    }
-
                     $stmtUpdateUser = $this->conn->prepare("
                         UPDATE tbl_users
-                        SET username = ?,
-                            first_name = ?,
+                        SET first_name = ?,
                             last_name = ?,
-                            email = ?,
                             phone = ?,
                             status = ?
                         WHERE user_id = ?
                     ");
                     $stmtUpdateUser->execute([
-                        $newUsername,
                         $firstName,
                         $lastName,
-                        ($email !== '' ? $email : null),
                         ($phone !== '' ? $phone : null),
                         $status,
                         $userId
                     ]);
                 }
+            }
+
+            $passwordUpdated = false;
+            if ($newPassword !== '') {
+                $account = $this->ensureTeacherUserAccount($teacherId, $newPassword);
+                $passwordUserId = (int)($account['user_id'] ?? 0);
+                if ($passwordUserId < 1) {
+                    $this->conn->rollBack();
+                    $this->sendJSON(['error' => 'Unable to resolve teacher user account'], 500);
+                }
+                $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+                $stmtPassword = $this->conn->prepare("UPDATE tbl_users SET password = ? WHERE user_id = ?");
+                $stmtPassword->execute([$hashedPassword, $passwordUserId]);
+                $passwordUpdated = true;
             }
 
             $stmtDeleteMap = $this->conn->prepare("DELETE FROM tbl_teacher_specializations WHERE teacher_id = ?");
@@ -1878,7 +1872,7 @@ class TeachersApi
             }
 
             $this->conn->commit();
-            $this->sendJSON(['success' => true]);
+            $this->sendJSON(['success' => true, 'password_updated' => $passwordUpdated]);
         } catch (PDOException $e) {
             if ($this->conn->inTransaction()) {
                 $this->conn->rollBack();

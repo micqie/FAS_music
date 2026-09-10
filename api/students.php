@@ -6784,6 +6784,7 @@ class StudentsApi
                             s.start_time,
                             s.end_time,
                             s.room_id,
+                            s.instrument_id,
                             s.session_type,
                             s.status,
                             s.attendance_status,
@@ -6801,10 +6802,14 @@ class StudentsApi
                             s.teacher_id,
                             t.first_name AS teacher_first_name,
                             t.last_name AS teacher_last_name,
-                            r.room_name
+                            r.room_name,
+                            si.instrument_name,
+                            sit.type_name AS instrument_type_name
                         FROM tbl_sessions s
                         LEFT JOIN tbl_teachers t ON t.teacher_id = s.teacher_id
                         LEFT JOIN tbl_rooms r ON r.room_id = s.room_id
+                        LEFT JOIN tbl_instruments si ON si.instrument_id = s.instrument_id
+                        LEFT JOIN tbl_instrument_types sit ON sit.type_id = si.type_id
                         WHERE s.enrollment_id IN ({$placeholders})
                         ORDER BY s.enrollment_id ASC, s.session_number ASC, s.session_id ASC
                     ");

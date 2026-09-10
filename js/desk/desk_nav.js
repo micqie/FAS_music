@@ -20,31 +20,31 @@
 
         mount.outerHTML = `
             <header id="deskTopNav" class="desk-topnav sticky top-0 z-40 shrink-0 border-b border-white/10 px-4 sm:px-6 lg:px-8">
-                <div class="min-h-16 py-3 flex items-center justify-between gap-3">
+                <div class="desk-topnav-inner min-h-16 py-3 flex items-center justify-between gap-3">
 
                     <!-- Left: hamburger + logo -->
-                    <div class="flex items-center gap-3 shrink-0">
+                    <div class="desk-topnav-left flex items-center gap-3 min-w-0">
                         <button id="deskMenuToggle" aria-label="Open navigation menu"
                             class="h-10 w-10 flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white hover:bg-white/10 active:scale-95 transition shrink-0">
                             <i class="fas fa-bars text-base"></i>
                         </button>
-                        <a href="desk_scanner.html" class="h-9 flex items-center shrink-0" aria-label="Father & Sons Music home">
+                        <a href="desk_scanner.html" class="desk-topnav-logo h-9 flex items-center shrink-0" aria-label="Father & Sons Music home">
                             <img src="../../assets/fas-logo.png" alt="FAS Music" class="h-full w-auto brightness-200 object-contain">
                         </a>
                     </div>
 
                     <!-- Right: branch pill + user block + profile dropdown -->
-                    <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <div class="desk-topnav-right flex items-center gap-2 sm:gap-3 min-w-0">
 
                         <!-- Branch pill — styled exactly like screenshot -->
                         <div id="deskTopNavBranch"
-                            class="flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-2.5 shrink-0">
+                            class="desk-topnav-branch flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-2.5 min-w-0">
                             <i class="fas fa-location-dot text-gold-400 text-sm"></i>
                             <span id="deskTopNavBranchName" class="text-sm font-semibold text-white whitespace-nowrap">—</span>
                         </div>
 
                         <!-- User block + dropdown trigger -->
-                        <details class="relative group/desk-profile shrink-0">
+                        <details class="desk-topnav-profile relative group/desk-profile shrink-0">
                             <summary class="desk-profile-trigger list-none cursor-pointer rounded-full outline-none" aria-label="Account menu">
                                 <div class="flex items-center gap-2.5 rounded-full border border-white/10 bg-white/5 pl-1.5 pr-3 py-1.5 hover:bg-white/10 transition">
                                     <!-- Circle avatar -->
@@ -204,6 +204,10 @@
 
         const branchName = user?.branch_name || '';
         if (branchNameEl) branchNameEl.textContent = branchName || '—';
+        if (branchWrap) {
+            branchWrap.title = branchName || 'Branch not assigned';
+            branchWrap.setAttribute('aria-label', `Branch: ${branchName || 'not assigned'}`);
+        }
         // Keep the branch badge always visible — don't hide it
         if (branchWrap) branchWrap.classList.remove('hidden');
 

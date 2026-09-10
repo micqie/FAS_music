@@ -5,20 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Desk Scanner | Father & Sons Music</title>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/schmich/instascan-builds@master/instascan.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
+                        obsidian: '#0f1115',
+                        darkSlate: '#1a1d23'
+                    }
+                }
+            }
+        };
+    </script>
  <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../css/desk-premium.css">
+    <link rel="stylesheet" href="../../css/desk-premium.css?v=20260910001">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
         :root { --nav-bg: #0b0f18; --gold: #d4af37; }
         body { font-family: 'Space Grotesk', sans-serif; }
-        .glass-panel { background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(9, 12, 20, 0.92)); }
-        .scanner-frame { border: 2px solid rgba(212, 175, 55, 0.8); border-radius: 24px; position: relative; overflow: hidden; }
-        #preview { width: 100%; max-height: 320px; object-fit: cover; transform: scaleX(1); }
+        .scanner-panel { background: rgba(255, 255, 255, 0.96); }
+        .scanner-frame { width: 100%; height: 15rem; border: 1px solid #263548; border-radius: 14px; position: relative; overflow: hidden; background: #111923; }
+        #preview { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        .scanner-status-pill { max-width: calc(100% - 2rem); background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px); }
+        .scanner-mobile-fallback { display: none; }
+        @media (min-width: 1024px) {
+            .scanner-layout { min-height: calc(100dvh - 8.75rem); }
+            .scanner-panel { display: flex; min-height: 0; flex-direction: column; }
+            .scanner-frame { height: auto; min-height: 15rem; flex: 1 1 auto; }
+            .scanner-side { display: flex; min-height: 0; flex-direction: column; }
+            .scanner-recent { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; }
+            .scanner-recent #activeUsers { min-height: 0; max-height: none; flex: 1 1 auto; }
+        }
+        @media (max-width: 767px) {
+            .scanner-frame { height: 14rem; }
+            .scanner-mobile-fallback { display: flex; }
+        }
         .user-card { animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
@@ -73,52 +99,56 @@
         <div id="deskTopNavMount"></div>
         <main class="desk-main flex-1 px-4 sm:px-6 lg:px-8 py-6">
             <div class="max-w-6xl mx-auto">
-                <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Music Attendance Scanner</h1>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-2xl font-mono font-bold text-slate-800" id="clock">00:00:00</div>
-                        <div class="text-sm text-slate-500" id="date">—</div>
-                    </div>
-                </div>
+                <h1 class="mb-3 text-sm font-semibold text-slate-700">Scan student's QR code for attendance</h1>
+                <div class="scanner-layout grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.8fr)] gap-4 items-stretch">
+                    <section class="scanner-panel rounded-2xl border border-slate-200 p-4 shadow-sm">
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="font-mono text-xl font-bold leading-none tracking-tight text-slate-900 sm:text-2xl" id="clock">00:00:00</div>
+                                <div class="mt-1 text-xs font-medium text-slate-500" id="date">—</div>
+                            </div>
+                            <div class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold text-sky-700">
+                                <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span> Camera is on
+                            </div>
+                        </div>
 
-                <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    <div class="xl:col-span-2 glass-panel rounded-3xl border border-white/10 p-6 shadow-xl">
-                        <h3 class="text-center text-white font-semibold mb-4">Scan QR Code</h3>
-                        <div class="scanner-frame bg-slate-900/60 p-4">
-                            <video id="preview" class="rounded-xl" autoplay muted playsinline></video>
+                        <div class="scanner-frame">
+                            <video id="preview" autoplay muted playsinline aria-label="Live QR scanner camera"></video>
+                            <div id="scannerStatus" class="scanner-status-pill absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1.5 text-center text-[11px] font-semibold text-slate-700">Starting camera...</div>
                         </div>
                         <div id="scannerNetworkHelp" class="mt-3 hidden rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"></div>
-                        <div class="mt-4">
+                        <div class="scanner-mobile-fallback mt-4 flex-wrap gap-2">
                             <label for="qr_image_file" class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gold-400 bg-gold-400/10 px-4 py-3 text-sm font-semibold text-gold-400 transition hover:bg-gold-400/20">
                                 <i class="fas fa-camera"></i>
                                 Take or upload a QR photo
                             </label>
                             <input type="file" id="qr_image_file" accept="image/*" capture="environment" class="hidden">
-                            <p class="mt-2 text-xs text-slate-400">Use this when the live camera is blocked on an HTTP IP address.</p>
+                            <p class="basis-full mt-1 text-xs text-slate-400">Use the photo option when the live camera is blocked on an HTTP IP address.</p>
                         </div>
                         <div class="mt-4">
-                            <label for="user_email" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Manual entry by email</label>
-                            <input type="email" id="user_email" placeholder="Type student email and press Enter"
-                                class="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-[var(--gold)]">
-                        </div>
-                        <div class="mt-3 text-sm text-slate-300" id="scannerStatus">Starting camera...</div>
-                    </div>
-
-                    <div class="space-y-6">
-                        <div class="desk-stat-card bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                            <div class="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">Today</div>
-                            <div class="mt-4 space-y-2 text-sm">
-                                <div class="flex justify-between"><span class="text-slate-500">Check-ins</span><span id="summaryTotal" class="font-semibold">0</span></div>
-                                <div class="flex justify-between"><span class="text-slate-500">On Time</span><span id="summaryOnTime" class="font-semibold text-emerald-600">0</span></div>
-                                <div class="flex justify-between"><span class="text-slate-500">Invalid</span><span id="summaryInvalid" class="font-semibold text-red-600">0</span></div>
+                            <label for="user_email" class="mb-1.5 block text-xs font-semibold text-slate-700">Or check in by email</label>
+                            <div class="flex gap-2">
+                                <input type="email" id="user_email" placeholder="student@example.com"
+                                    class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100">
+                                <button type="button" id="manualCheckinBtn" class="shrink-0 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200">Time in</button>
                             </div>
+                            <p class="mt-1.5 text-[10px] text-slate-400">The student name will be matched automatically.</p>
                         </div>
-                        <div class="desk-stat-card bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                            <div class="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold mb-3">Recent check-ins</div>
-                            <div id="activeUsers" class="space-y-3 max-h-[320px] overflow-y-auto"></div>
-                        </div>
+                    </section>
+
+                    <div class="scanner-side space-y-4">
+                        <section class="desk-stat-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="text-xs font-semibold text-slate-700">Today so far</div>
+                            <div class="mt-3 grid grid-cols-3 gap-2">
+                                <div class="rounded-xl bg-slate-50 px-3 py-3"><div id="summaryTotal" class="text-2xl font-bold leading-none text-slate-900">0</div><div class="mt-1 text-[10px] text-slate-500">Checked in</div></div>
+                                <div class="rounded-xl bg-emerald-50 px-3 py-3"><div id="summaryOnTime" class="text-2xl font-bold leading-none text-emerald-700">0</div><div class="mt-1 text-[10px] text-emerald-700">On time</div></div>
+                                <div class="rounded-xl bg-amber-50 px-3 py-3"><div id="summaryInvalid" class="text-2xl font-bold leading-none text-amber-700">0</div><div class="mt-1 text-[10px] text-amber-700">Needs a look</div></div>
+                            </div>
+                        </section>
+                        <section class="scanner-recent desk-stat-card min-h-[18rem] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="mb-3 text-sm font-semibold text-slate-800">Recent check-ins</div>
+                            <div id="activeUsers" class="space-y-1 max-h-[22rem] overflow-y-auto"></div>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -128,7 +158,7 @@
 
     <script src="../../js/index.js"></script>
     <script src="../../js/session_timeout.js"></script>
-    <script src="../../js/desk/desk_nav.js"></script>
-    <script src="../../js/desk/desk_scan.js?v=20260907001"></script>
+    <script src="../../js/desk/desk_nav.js?v=20260910001"></script>
+    <script src="../../js/desk/desk_scan.js?v=20260910006"></script>
 </body>
 </html>

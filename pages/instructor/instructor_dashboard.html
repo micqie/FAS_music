@@ -35,7 +35,7 @@
         }
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css">
-    <link rel="stylesheet" href="../../css/instructor.css">
+    <link rel="stylesheet" href="../../css/instructor.css?v=20260910001">
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
     <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-4 sm:px-6 py-3 flex justify-between items-center shadow-2xl">
@@ -162,17 +162,17 @@
                 </div>
             </section>
 
-            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="self-start lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+            <section class="space-y-4">
+                <div class="bg-white rounded-2xl border border-slate-200 p-5 soft-shadow">
                     <div class="flex items-center justify-between flex-wrap gap-2">
                         <h2 class="text-lg font-bold text-slate-900">Today Sessions</h2>
                         <a href="instructor_sessions.html" class="text-sm font-semibold text-gold-600 hover:text-gold-500">View all</a>
                     </div>
                     <div id="todaySessions" class="mt-5 space-y-4"></div>
                 </div>
-                <div class="self-start bg-white rounded-3xl border border-slate-200 p-6 soft-shadow">
+                <div class="bg-white rounded-2xl border border-slate-200 p-5 soft-shadow">
                     <h2 class="text-lg font-bold text-slate-900">Quick Actions</h2>
-                    <div class="mt-5 space-y-3">
+                    <div class="instructor-quick-actions mt-4">
                         <a href="instructor_students.html" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
                             <span class="text-sm font-semibold text-slate-800">Review Students</span>
                             <i class="fas fa-arrow-right text-slate-400"></i>
@@ -205,8 +205,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="../../js/index.js?v=20260906009"></script>
-    <script src="../../js/instructor/instructor_nav.js"></script>
+    <script src="../../js/index.js?v=20260908003"></script>
+    <script src="../../js/instructor/instructor_nav.js?v=20260910001"></script>
           <script src="../../js/instructor/profile.js"></script>
 
     <script>
@@ -304,8 +304,6 @@
             document.getElementById('statStudents').textContent = String(uniqueStudents.size);
             document.getElementById('statToday').textContent = String(todaySessions.length);
             document.getElementById('statNext').textContent = nextSessionText;
-            document.getElementById('instructorStudentCount').textContent = String(uniqueStudents.size);
-            document.getElementById('instructorUpcomingCount').textContent = String(futureSessions.length);
             renderTodaySessions();
         }
 

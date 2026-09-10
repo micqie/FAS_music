@@ -104,11 +104,6 @@
             return row;
         }
 
-        function isAdminRealEmail(value) {
-            const email = String(value || '').trim();
-            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !/@fas\.com$/i.test(email);
-        }
-
         function getAdminUserStudentNumber(user) {
             const savedCode = String(user?.student_code || '').trim();
             if (savedCode) return savedCode;
@@ -312,17 +307,12 @@
             firstName.value = user.first_name || '';
             lastName.value = user.last_name || '';
             email.value = user.email || user.username || '';
-            const realEmailLocked = isAdminRealEmail(email.value);
-            email.readOnly = realEmailLocked;
-            email.dataset.originalEmail = email.value;
-            email.dataset.realEmailLocked = realEmailLocked ? '1' : '0';
-            email.setAttribute('aria-readonly', realEmailLocked ? 'true' : 'false');
-            email.classList.toggle('bg-slate-100', realEmailLocked);
-            email.classList.toggle('text-slate-500', realEmailLocked);
-            email.classList.toggle('cursor-not-allowed', realEmailLocked);
-            email.classList.toggle('bg-white', !realEmailLocked);
-            if (emailLabel) emailLabel.textContent = realEmailLocked ? 'Email (Locked)' : 'Email *';
-            if (emailHint) emailHint.classList.toggle('hidden', !realEmailLocked);
+            email.readOnly = true;
+            email.setAttribute('aria-readonly', 'true');
+            email.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
+            email.classList.remove('bg-white');
+            if (emailLabel) emailLabel.textContent = 'Email (Locked)';
+            if (emailHint) emailHint.classList.remove('hidden');
             if (phone) phone.value = user.phone || '';
             if (role) role.value = user.role_name || '';
             if (status) status.value = user.status || 'Inactive';
@@ -614,9 +604,6 @@
                         user_id: userId,
                         first_name: firstName.value.trim(),
                         last_name: lastName.value.trim(),
-                        email: email.dataset.realEmailLocked === '1'
-                            ? String(email.dataset.originalEmail || email.value).trim()
-                            : email.value.trim(),
                         phone: phone ? phone.value.trim() : ''
                     };
 

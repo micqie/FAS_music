@@ -37,16 +37,16 @@
         }
         .sidebar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
     </style>
-    <script src="manager_shared.js" defer></script>
+    <script src="manager_shared.js?v=20260908001" defer></script>
     <link rel="stylesheet" href="../../css/table-responsive.css">
     <script src="../../js/table_responsive.js" defer></script>
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
-    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 pl-20 pr-10 py-4 flex justify-between items-center shadow-2xl">
-        <a href="manager_dashboard.html" class="h-12 flex items-center ml-2">
-            <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200 scale-105 origin-left">
+    <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
+        <a href="manager_dashboard.html" class="h-10 flex items-center">
+            <img src="../../assets/fas-logo.png" alt="Logo" class="h-full w-auto brightness-200">
         </a>
-        <div class="flex items-center gap-6">
+        <div class="flex items-center gap-4">
             <div class="hidden md:flex flex-col text-right">
                 <span id="managerNameNav" class="text-sm font-semibold text-white">Manager</span>
                 <span class="text-[10px] uppercase tracking-widest text-gold-400 font-bold">Branch Manager</span>
@@ -312,6 +312,7 @@
                             <i class="fas fa-envelope text-gold-500 mr-1"></i> Email
                         </label>
                         <input id="email" type="email" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all" placeholder="teacher@example.com">
+                        <p id="teacherEmailHint" class="mt-1.5 text-xs text-slate-500">Used as the instructor's contact and login email.</p>
                     </div>
 
                     <!-- Phone -->
@@ -460,7 +461,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="../../js/index.js?v=20260907003"></script>
+    <script src="../../js/index.js?v=20260908003"></script>
     <script src="../../js/shared/teacher_form_ui.js"></script>
     <script src="../../js/shared/teacher_occupied_calendar.js?v=20260907002"></script>
     <script src="../../js/manager/dashboard.js"></script>
@@ -796,12 +797,12 @@
                             <button onclick="openTeacherAvailabilityModal(${Number(t.teacher_id)})" 
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-colors"
                                 title="Manage availability">
-                                <i class="fas fa-calendar-alt"></i> Schedule
+                                <i class="fas fa-calendar-alt"></i> Availability
                             </button>
                             <button onclick="openManagerTeacherCalendar(${Number(t.teacher_id)})"
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold transition-colors"
-                                title="View occupied calendar">
-                                <i class="fas fa-calendar-days"></i> Calendar
+                                title="View teacher schedule">
+                                <i class="fas fa-calendar-days"></i> Schedule
                             </button>
                             <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" 
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${t.status === 'Active' ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'} text-xs font-bold transition-colors"
@@ -832,6 +833,7 @@
             document.getElementById('branchId').value = String(managerBranchId || '');
             document.getElementById('branchNameDisplay').textContent = managerBranchName || '—';
             setSelectedSpecializationIds([]);
+            setTeacherEmailLocked(false);
             if (title) title.textContent = 'Add Teacher';
             if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
         }
@@ -839,6 +841,23 @@
         function closeTeacherModal() {
             const modal = document.getElementById('teacherModal');
             if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+        }
+
+        function setTeacherEmailLocked(locked) {
+            const emailInput = document.getElementById('email');
+            const hint = document.getElementById('teacherEmailHint');
+            if (!emailInput) return;
+            emailInput.readOnly = locked;
+            emailInput.setAttribute('aria-readonly', locked ? 'true' : 'false');
+            emailInput.classList.toggle('bg-slate-100', locked);
+            emailInput.classList.toggle('text-slate-500', locked);
+            emailInput.classList.toggle('cursor-not-allowed', locked);
+            emailInput.classList.toggle('bg-white', !locked);
+            if (hint) {
+                hint.innerHTML = locked
+                    ? '<i class="fas fa-lock mr-1"></i>Email is fixed after account creation to keep linked records consistent.'
+                    : 'Used as the instructor\'s contact and login email.';
+            }
         }
 
         function openEditTeacher(teacherId) {
@@ -855,6 +874,7 @@
                 : String(t.specialization_ids_csv || '').split(',').map(v => Number(v || 0)).filter(v => v > 0);
             setSelectedSpecializationIds(ids);
             document.getElementById('email').value = t.email || '';
+            setTeacherEmailLocked(true);
             document.getElementById('phone').value = t.phone || '';
             document.getElementById('status').value = t.status || 'Active';
             document.getElementById('teacherModalTitle').textContent = 'Edit Teacher';
@@ -880,7 +900,7 @@
                 branch_id: Number(managerBranchId || 0),
                 employment_type: document.getElementById('employmentType').value,
                 specialization_ids: specializationIds,
-                email: document.getElementById('email').value.trim(),
+                ...(!isEdit ? { email: document.getElementById('email').value.trim() } : {}),
                 phone: document.getElementById('phone').value.trim(),
                 status: document.getElementById('status').value,
                 ...(window.TeacherFormUI ? TeacherFormUI.getAccountModePayload(isEdit) : {})

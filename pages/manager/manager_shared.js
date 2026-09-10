@@ -5,17 +5,13 @@
         : 'Branch Manager';
 
     const PROFILE_HTML = `
-        <div class="px-4 mb-4">
-            <div class="flex justify-center">
-                <i class="fas fa-user-circle fa-6x text-gold-400"></i>
+        <div class="manager-sidebar-profile block rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-center transition hover:border-gold-500/30 hover:bg-white/10">
+            <div class="mx-auto h-20 w-20 rounded-full border-2 border-gold-500/40 bg-[#1a1d23] flex items-center justify-center shadow-lg shadow-black/20">
+                <i class="fas fa-user-circle text-7xl leading-none text-gold-400"></i>
             </div>
-            <p class="manager-shell-name text-center text-white font-semibold text-sm mt-3">${displayRoleName} Name</p>
-            <p class="manager-shell-email text-center text-slate-400 text-xs mt-1">email@example.com</p>
-            <p class="text-center text-slate-500 text-xs font-bold tracking-wider mt-2">
-                <span class="uppercase">Branch:</span>
-                <span class="manager-shell-branch text-center font-bold text-white">Branch Name</span>
-            </p>
-            <div class="mt-3 h-2 w-[14rem] rounded-full bg-gold-500"></div>
+            <p class="manager-shell-name mt-3 truncate text-sm font-bold text-white">${displayRoleName}</p>
+            <p class="manager-shell-email mt-1 truncate text-xs text-slate-400">email@example.com</p>
+            <p class="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-gold-400">${displayRoleName}</p>
         </div>
     `;
 

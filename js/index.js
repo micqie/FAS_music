@@ -5,6 +5,135 @@ const FAS_TIME_ZONE = 'Asia/Manila';
 let fasServerClockOffsetMs = 0;
 let fasServerClockSynced = false;
 
+// Keep staff portals on the shared desktop shell. Student pages retain their
+// native full-width top navigation, including the logo at its starting edge.
+(function initPortalShellLayout() {
+    const portalMatch = window.location.pathname.match(/\/pages\/(admin|manager|instructor|student)\//i);
+    if (!portalMatch) return;
+
+    // Admin pages use admin_responsive.js, while student pages intentionally
+    // keep their brand in the full-width top navigation.
+    if (['admin', 'student'].includes(portalMatch[1].toLowerCase())) return;
+
+    const styleId = 'fas-portal-shell-layout';
+    if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            .fas-sidebar-brand {
+                display: none;
+            }
+
+            @media (min-width: 1024px) {
+                body.fas-portal-shell {
+                    --fas-sidebar-width: 18rem;
+                }
+
+                body.fas-portal-shell > nav.fas-portal-topbar:not(#adminDashboardTopNav) {
+                    top: 0 !important;
+                    right: 0 !important;
+                    left: var(--fas-sidebar-width) !important;
+                    width: auto !important;
+                    height: 4rem !important;
+                    min-height: 4rem !important;
+                    padding-top: .75rem !important;
+                    padding-bottom: .75rem !important;
+                }
+
+                body.fas-portal-shell > aside.fas-portal-sidebar {
+                    top: 0 !important;
+                    bottom: 0 !important;
+                    height: 100dvh !important;
+                    padding-top: 0 !important;
+                    z-index: 60 !important;
+                }
+
+                .fas-sidebar-brand {
+                    position: sticky;
+                    top: 0;
+                    z-index: 5;
+                    display: flex;
+                    flex: 0 0 4rem;
+                    height: 4rem;
+                    align-items: center;
+                    justify-content: center;
+                    padding: .65rem 1.5rem;
+                    border-bottom: 1px solid rgba(255, 255, 255, .1);
+                    background: #0b0c0f;
+                    box-sizing: border-box;
+                }
+
+                .fas-sidebar-brand img {
+                    display: block;
+                    width: auto;
+                    height: 2.5rem !important;
+                    max-width: 100%;
+                    object-fit: contain;
+                    filter: brightness(2);
+                }
+
+                body.fas-portal-shell > nav.fas-portal-topbar .fas-topbar-brand {
+                    display: none !important;
+                }
+
+                html:not(.dark) body.fas-student-shell .fas-sidebar-brand {
+                    border-bottom-color: rgb(228 228 231);
+                    background: #fff;
+                }
+
+                html:not(.dark) body.fas-student-shell .fas-sidebar-brand img {
+                    filter: none;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const mountShell = () => {
+        const topbar = Array.from(document.querySelectorAll('body > nav')).find((nav) =>
+            nav.classList.contains('fixed') && nav.querySelector('img[src*="fas-logo"]')
+        );
+        const sidebar = document.querySelector('body > aside.fixed');
+        if (!topbar || !sidebar || sidebar.querySelector(':scope > .fas-sidebar-brand')) return;
+
+        const logoImage = topbar.querySelector('img[src*="fas-logo"]');
+        if (!logoImage) return;
+
+        const portalRole = portalMatch[1].toLowerCase();
+        document.body.classList.add('fas-portal-shell', `fas-${portalRole}-shell`);
+        if (portalRole === 'student') {
+            document.body.classList.add('fas-student-shell');
+        }
+        topbar.classList.add('fas-portal-topbar');
+        sidebar.classList.add('fas-portal-sidebar');
+
+        const topbarBrand = logoImage.closest('a') || logoImage;
+        topbarBrand.classList.add('fas-topbar-brand');
+        const brand = document.createElement('div');
+        brand.className = 'fas-sidebar-brand';
+        const brandLink = document.createElement('a');
+        const dashboardTargets = {
+            admin: 'admin_dashboard.html',
+            manager: 'manager_dashboard.html',
+            instructor: 'instructor_dashboard.html',
+            student: 'student_dashboard.html'
+        };
+        brandLink.href = dashboardTargets[portalRole];
+        brandLink.setAttribute('aria-label', 'Go to dashboard');
+        const clonedLogo = logoImage.cloneNode(true);
+        clonedLogo.removeAttribute('id');
+        brandLink.appendChild(clonedLogo);
+        brand.appendChild(brandLink);
+        sidebar.prepend(brand);
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', mountShell, { once: true });
+    } else {
+        mountShell();
+    }
+})();
+
 function getCalendarNow() {
     return new Date(Date.now() + fasServerClockOffsetMs);
 }
@@ -8325,19 +8454,20 @@ function showImageModal(imageUrl, fileName) {
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'imagePreviewModal';
-        modal.className = 'fixed inset-0 z-[80] hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm';
+        modal.className = 'fixed inset-0 z-[80] hidden items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'imagePreviewFileName');
         modal.innerHTML = `
-            <div class="relative max-w-4xl max-h-[90vh] w-full">
-                <button onclick="document.getElementById('imagePreviewModal').classList.add('hidden'); document.getElementById('imagePreviewModal').classList.remove('flex');" class="absolute -top-12 right-0 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
-                    <i class="fas fa-times text-lg"></i>
-                </button>
-                <div class="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden shadow-2xl">
-                    <div class="p-4 border-b border-zinc-200 dark:border-zinc-700">
-                        <p id="imagePreviewFileName" class="text-sm font-semibold text-zinc-900 dark:text-white truncate"></p>
-                    </div>
-                    <div class="p-4 flex items-center justify-center bg-zinc-50 dark:bg-zinc-800" style="max-height: calc(90vh - 8rem);">
-                        <img id="imagePreviewImg" src="" alt="Preview" class="max-w-full max-h-full object-contain" />
-                    </div>
+            <div class="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900" style="max-height: min(90vh, 90dvh);">
+                <div class="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                    <p id="imagePreviewFileName" class="min-w-0 truncate text-sm font-semibold text-zinc-900 dark:text-white"></p>
+                    <button type="button" data-image-preview-close aria-label="Close image preview" class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700">
+                        <i class="fas fa-times text-base" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-zinc-100 p-3 dark:bg-zinc-800 sm:p-5">
+                    <img id="imagePreviewImg" src="" alt="Preview" class="block h-auto w-auto max-w-full object-contain" style="max-height: calc(min(90vh, 90dvh) - 5.5rem);" />
                 </div>
             </div>
         `;
@@ -8345,10 +8475,7 @@ function showImageModal(imageUrl, fileName) {
 
         // Close on backdrop click
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            }
+            if (e.target === modal || e.target.closest('[data-image-preview-close]')) closeImagePreviewModal();
         });
     }
 
@@ -8361,7 +8488,25 @@ function showImageModal(imageUrl, fileName) {
     // Show modal
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    modal.dataset.previousBodyOverflow = document.body.style.overflow || '';
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('[data-image-preview-close]')?.focus({ preventScroll: true });
 }
+
+function closeImagePreviewModal() {
+    const modal = document.getElementById('imagePreviewModal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.style.overflow = modal.dataset.previousBodyOverflow || '';
+    delete modal.dataset.previousBodyOverflow;
+}
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !document.getElementById('imagePreviewModal')?.classList.contains('hidden')) {
+        closeImagePreviewModal();
+    }
+});
 
 function renderStudentActionBanner(student, meta, portal) {
     const banner = document.getElementById('studentActionBanner');
@@ -12670,17 +12815,17 @@ function openProofViewerModal(proofUrl, title) {
     if (!modal) {
         // Create compact modal with higher z-index
         const modalHTML = `
-            <div id="proofViewerModal" class="fixed inset-0 z-[1300] hidden items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-                <div class="relative w-full max-w-2xl max-h-[80vh] flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden">
-                    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white">
-                        <h3 id="proofViewerTitle" class="text-sm font-bold text-slate-900">Proof</h3>
-                        <button type="button" onclick="closeProofViewerModal()" class="text-slate-400 hover:text-slate-600 text-lg">
-                            <i class="fas fa-times"></i>
+            <div id="proofViewerModal" class="fixed inset-0 z-[1300] hidden items-center justify-center overflow-hidden bg-black/90 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="proofViewerTitle">
+                <div class="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" style="max-height: min(90vh, 90dvh);">
+                    <div class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+                        <h3 id="proofViewerTitle" class="min-w-0 truncate text-sm font-bold text-slate-900">Proof</h3>
+                        <button type="button" data-proof-viewer-close aria-label="Close proof preview" class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <i class="fas fa-times" aria-hidden="true"></i>
                         </button>
                     </div>
-                    <div class="flex-1 min-h-0 bg-slate-100 flex items-center justify-center p-4">
-                        <img id="proofViewerImage" class="max-w-full max-h-full object-contain" style="display: none;" />
-                        <iframe id="proofViewerIframe" class="w-full h-full border-0" style="display: none; min-height: 400px;"></iframe>
+                    <div class="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-slate-100 p-3 sm:p-5">
+                        <img id="proofViewerImage" alt="Proof preview" class="block h-auto w-auto max-w-full object-contain" style="display: none; max-height: calc(min(90vh, 90dvh) - 5.5rem);" />
+                        <iframe id="proofViewerIframe" title="Proof document preview" class="h-full min-h-[260px] w-full border-0 bg-white sm:min-h-[420px]" style="display: none;"></iframe>
                         <div id="proofViewerLoading" class="text-slate-400">
                             <i class="fas fa-spinner fa-spin text-2xl"></i>
                         </div>
@@ -12689,6 +12834,12 @@ function openProofViewerModal(proofUrl, title) {
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', modalHTML);
+        const createdModal = document.getElementById('proofViewerModal');
+        createdModal?.addEventListener('click', (event) => {
+            if (event.target === createdModal || event.target.closest('[data-proof-viewer-close]')) {
+                closeProofViewerModal();
+            }
+        });
     }
 
     const actualModal = document.getElementById('proofViewerModal');
@@ -12732,6 +12883,9 @@ function openProofViewerModal(proofUrl, title) {
     if (actualModal) {
         actualModal.classList.remove('hidden');
         actualModal.classList.add('flex');
+        actualModal.dataset.previousBodyOverflow = document.body.style.overflow || '';
+        document.body.style.overflow = 'hidden';
+        actualModal.querySelector('[data-proof-viewer-close]')?.focus({ preventScroll: true });
     }
 }
 
@@ -12742,11 +12896,20 @@ function closeProofViewerModal() {
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+        document.body.style.overflow = modal.dataset.previousBodyOverflow || '';
+        delete modal.dataset.previousBodyOverflow;
     }
     if (iframe) {
         iframe.src = '';
     }
 }
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !document.getElementById('proofViewerModal')?.classList.contains('hidden')) {
+        event.preventDefault();
+        closeProofViewerModal();
+    }
+});
 
 // Close Details Modal
 function closeDetailsModal() {
@@ -13053,6 +13216,10 @@ async function loadAdminUsers() {
 function initAdminSidebarMenu() {
     const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
     if (!pathname.includes('/pages/admin/')) return;
+
+    // Admin pages have a dedicated responsive shell. Let it be the sole owner
+    // of sidebar and top-nav positioning to prevent two initializers fighting.
+    if (document.querySelector('script[src*="/js/admin/admin_responsive.js"]')) return;
 
     const nav = document.querySelector('body > nav');
     const sidebar = document.querySelector('body > aside');

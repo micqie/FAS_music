@@ -23,6 +23,7 @@
         linear-gradient(180deg, #eef2f7 0%, #f1f5f9 38%, #e8edf4 100%) !important;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
 }
 
 .desk-app .desk-main {
@@ -408,13 +409,33 @@
 
 /* —— Top navigation —— */
 .desk-topnav {
-    position: fixed;
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
-    z-index: 999;
+    z-index: 40;
+    width: 100%;
+    min-width: 0;
     background: linear-gradient(180deg, #0b0f18 0%, #121a2a 100%);
     box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.45);
+}
+
+.desk-topnav .desk-topnav-inner,
+.desk-topnav .desk-topnav-left,
+.desk-topnav .desk-topnav-right {
+    min-width: 0;
+}
+
+.desk-topnav .desk-topnav-logo img {
+    width: auto;
+    max-width: 7.5rem;
+}
+
+.desk-topnav .desk-topnav-right {
+    margin-left: auto;
+}
+
+/* Keep shared header colors consistent even on pages with a minimal Tailwind config. */
+.desk-topnav .text-gold-400 {
+    color: var(--desk-gold) !important;
 }
 
 /* Force the profile dropdown to always be dark — prevent any inherited white bg */
@@ -506,5 +527,56 @@
 @media (max-width: 1023px) {
     .desk-app .desk-main {
         padding-top: 0.75rem;
+    }
+}
+
+@media (max-width: 639px) {
+    .desk-topnav {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+
+    .desk-topnav .desk-topnav-inner {
+        gap: 0.5rem;
+    }
+
+    .desk-topnav .desk-topnav-left,
+    .desk-topnav .desk-topnav-right {
+        gap: 0.5rem;
+    }
+
+    .desk-topnav .desk-topnav-logo {
+        height: 1.9rem !important;
+    }
+
+    .desk-topnav .desk-topnav-logo img {
+        max-width: 5.25rem;
+    }
+
+    .desk-topnav .desk-topnav-branch {
+        padding: 0.55rem 0.7rem !important;
+    }
+
+    .desk-topnav .desk-topnav-branch span {
+        display: block;
+        max-width: 6.5rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 419px) {
+    .desk-topnav .desk-topnav-logo img {
+        max-width: 4.25rem;
+    }
+
+    .desk-topnav .desk-topnav-branch span {
+        max-width: 4.75rem;
+    }
+
+    .desk-topnav .desk-profile-trigger > div {
+        padding-right: 0.375rem !important;
     }
 }

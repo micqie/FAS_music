@@ -28,7 +28,7 @@
         .soft-shadow { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12); }
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css">
-    <link rel="stylesheet" href="../../css/instructor.css">
+    <link rel="stylesheet" href="../../css/instructor.css?v=20260910001">
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
     <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-4 sm:px-6 py-3 flex justify-between items-center shadow-2xl">
@@ -140,7 +140,7 @@
                     <div class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Student</div>
                     <div class="hidden sm:block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Instrument</div>
                     <div class="hidden sm:block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Sessions Left</div>
-                    <div class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400 text-right sm:text-left">Next Lesson</div>
+                    <div class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400 text-right sm:text-left">Schedule</div>
                 </div>
 
                 <!-- Rows injected here -->
@@ -159,6 +159,23 @@
         </div>
     </main>
 
+    <!-- Read-only package session timeline -->
+    <div id="studentSessionsModal" class="fixed inset-0 z-[70] hidden" role="dialog" aria-modal="true" aria-labelledby="studentSessionsTitle">
+        <div class="absolute inset-0 bg-slate-950/65 backdrop-blur-sm" onclick="closeStudentSessions()"></div>
+        <div class="absolute inset-x-3 top-6 bottom-6 sm:inset-x-auto sm:left-1/2 sm:w-[42rem] sm:-translate-x-1/2 rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden">
+            <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-[0.16em] text-gold-600">Package timeline</p>
+                    <h2 id="studentSessionsTitle" class="mt-1 text-xl font-black text-slate-900">Student sessions</h2>
+                    <p id="studentSessionsMeta" class="mt-1 text-xs text-slate-500"></p>
+                </div>
+                <button type="button" onclick="closeStudentSessions()" class="h-9 w-9 shrink-0 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200" aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="studentSessionsProgress" class="border-b border-slate-100 px-5 py-4"></div>
+            <div id="studentSessionsList" class="flex-1 overflow-y-auto px-5 py-4 space-y-2"></div>
+        </div>
+    </div>
+
     <!-- Mobile Bottom Nav -->
     <nav class="instructor-bottom-nav">
         <a href="instructor_dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
@@ -170,8 +187,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="../../js/index.js?v=20260906009"></script>
-    <script src="../../js/instructor/instructor_nav.js"></script>
+    <script src="../../js/index.js?v=20260908003"></script>
+    <script src="../../js/instructor/instructor_nav.js?v=20260910001"></script>
     <script>
         let instructorStudents = [];
         let allSessions = [];
@@ -201,6 +218,69 @@
             if (Number.isNaN(d.getTime())) return '—';
             const dayShort = d.toLocaleDateString(undefined, { weekday: 'short' });
             return `${dayShort} ${fmt12(timeStr)}`;
+        }
+
+        function fmtSessionDate(dateStr) {
+            const d = new Date(`${dateStr}T00:00:00`);
+            if (Number.isNaN(d.getTime())) return dateStr || 'Date unavailable';
+            return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function sessionState(session) {
+            const status = String(session.status || '').toLowerCase();
+            const attendance = String(session.attendance_status || '').toLowerCase();
+            if (status === 'completed' || attendance === 'present') return { label: 'Completed', cls: 'bg-emerald-100 text-emerald-700', icon: 'fa-check' };
+            if (['cancelled', 'cancelled_by_teacher', 'rescheduled'].includes(status)) return { label: status === 'rescheduled' ? 'Rescheduled' : 'Cancelled', cls: 'bg-slate-100 text-slate-600', icon: 'fa-ban' };
+            if (status === 'no show' || attendance === 'absent' || attendance === 'ci') return { label: 'Absent', cls: 'bg-rose-100 text-rose-700', icon: 'fa-user-xmark' };
+            if (status === 'late' || attendance === 'late') return { label: 'Late', cls: 'bg-amber-100 text-amber-700', icon: 'fa-clock' };
+            return { label: 'Scheduled', cls: 'bg-blue-100 text-blue-700', icon: 'fa-calendar-check' };
+        }
+
+        function closeStudentSessions() {
+            document.getElementById('studentSessionsModal')?.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        function openStudentSessions(enrollmentId) {
+            const student = instructorStudents.find(s => Number(s.enrollment_id) === Number(enrollmentId));
+            if (!student) return;
+
+            const sessions = [...student.sessions].sort((a, b) =>
+                Number(a.session_number || 0) - Number(b.session_number || 0)
+                || String(a.session_date).localeCompare(String(b.session_date))
+            );
+            const completed = sessions.filter(s => String(s.status || '').toLowerCase() === 'completed' || String(s.attendance_status || '').toLowerCase() === 'present').length;
+            const total = Number(student.sessions_total || sessions.length);
+            const used = Number(student.sessions_used || 0);
+            const assignedCount = new Set(sessions
+                .filter(s => !['cancelled', 'cancelled_by_teacher', 'rescheduled'].includes(String(s.status || '').toLowerCase()))
+                .map(s => Number(s.session_number || 0))
+                .filter(Boolean)).size;
+
+            document.getElementById('studentSessionsTitle').textContent = student.name;
+            document.getElementById('studentSessionsMeta').textContent = [student.package_name, student.instrument].filter(Boolean).join(' · ');
+            document.getElementById('studentSessionsProgress').innerHTML = `
+                <div class="flex items-center justify-between gap-3 text-sm"><span class="font-bold text-slate-700">${used} of ${total} package sessions used</span><span class="shrink-0 font-black text-slate-900">${completed} completed with you</span></div>
+                <div class="mt-1 text-xs text-slate-500">${assignedCount} session date${assignedCount === 1 ? '' : 's'} assigned to you</div>
+                <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gold-500" style="width:${total ? Math.min(100, (used / total) * 100) : 0}%"></div></div>`;
+            const unscheduledCount = Math.max(0, total - Number(student.package_scheduled_sessions || assignedCount));
+            const timelineHtml = sessions.map((session, index) => {
+                const state = sessionState(session);
+                const number = Number(session.session_number || index + 1);
+                return `<div class="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-black text-white">${number}</div>
+                    <div class="min-w-0 flex-1"><p class="text-sm font-bold text-slate-900">${escapeHtml(fmtSessionDate(session.session_date))}</p><p class="mt-0.5 text-xs text-slate-500">${escapeHtml(fmt12(session.start_time))} – ${escapeHtml(fmt12(session.end_time))}${session.room_name ? ` · ${escapeHtml(session.room_name)}` : ''}</p></div>
+                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black ${state.cls}"><i class="fas ${state.icon}"></i>${state.label}</span>
+                </div>`;
+            }).join('');
+            const unscheduledHtml = unscheduledCount > 0
+                ? `<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs font-semibold text-slate-500">${unscheduledCount} package session${unscheduledCount !== 1 ? 's are' : ' is'} not scheduled yet.</div>`
+                : '';
+            document.getElementById('studentSessionsList').innerHTML = `${timelineHtml}${unscheduledHtml}`
+                || '<div class="py-12 text-center text-sm text-slate-500">No session dates have been scheduled yet.</div>';
+
+            document.getElementById('studentSessionsModal').classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
         }
 
         function sessionsLeftBadge(left, total) {
@@ -234,7 +314,11 @@
             loading?.classList.add('hidden');
             wrap?.classList.remove('hidden');
 
-            if (bar) bar.textContent = `${instructorStudents.length} student${instructorStudents.length !== 1 ? 's' : ''}`;
+            if (bar) {
+                const studentCount = new Set(instructorStudents.map(s => Number(s.student_id))).size;
+                const packageCount = instructorStudents.length;
+                bar.textContent = `${studentCount} student${studentCount !== 1 ? 's' : ''} · ${packageCount} package${packageCount !== 1 ? 's' : ''}`;
+            }
 
             if (!rows.length) {
                 body.innerHTML = '';
@@ -248,10 +332,11 @@
                 const nextLesson = fmtNextLesson(s.next_lesson_date, s.next_lesson_time);
 
                 return `
-                <div class="grid grid-cols-[1fr_auto] sm:grid-cols-[1.6fr_1fr_1fr_1.2fr] gap-x-4 items-center px-5 py-4 hover:bg-slate-50/70 transition cursor-default">
+                <button type="button" onclick="openStudentSessions(${Number(s.enrollment_id)})" class="w-full text-left grid grid-cols-[1fr_auto] sm:grid-cols-[1.6fr_1fr_1fr_1.2fr] gap-x-4 items-center px-5 py-4 hover:bg-slate-50/70 transition focus:outline-none focus:bg-slate-50">
                     <!-- Student name + phone -->
                     <div>
                         <div class="text-sm font-bold text-slate-900">${escapeHtml(s.name)}</div>
+                        <div class="mt-0.5 text-xs text-slate-500">${escapeHtml(s.package_name || `${s.sessions_total}-session package`)}</div>
                         ${s.phone ? `<div class="flex items-center gap-1 mt-0.5 text-xs text-slate-400"><i class="fas fa-phone text-[10px]"></i>${escapeHtml(s.phone)}</div>` : ''}
                     </div>
 
@@ -265,8 +350,9 @@
                     <div class="text-right sm:text-left">
                         <div class="text-sm font-semibold text-slate-800">${escapeHtml(nextLesson)}</div>
                         ${s.instrument ? `<div class="sm:hidden text-xs text-slate-400 mt-0.5">${escapeHtml(s.instrument)}</div>` : ''}
+                        <div class="mt-1 text-[10px] font-bold text-gold-600">View ${Number(s.sessions_assigned || 0)} session date${Number(s.sessions_assigned || 0) === 1 ? '' : 's'} <i class="fas fa-chevron-right ml-1"></i></div>
                     </div>
-                </div>`;
+                </button>`;
             }).join('');
         }
 
@@ -282,7 +368,7 @@
                 const res = await axios.get(`${baseApiUrl}/teachers.php?action=get-teacher-sessions&user_id=${encodeURIComponent(user.user_id)}&filter=all`);
                 allSessions = res.data?.success && Array.isArray(res.data.sessions) ? res.data.sessions : [];
 
-                const byStudent = new Map();
+                const byEnrollment = new Map();
                 const now = new Date();
 
                 allSessions.forEach(session => {
@@ -290,23 +376,32 @@
                     if (!sid) return;
 
                     const st = String(session.status || '').toLowerCase();
-                    const isCancelled = ['cancelled_by_teacher', 'rescheduled'].includes(st);
+                    const isCancelled = ['cancelled', 'cancelled_by_teacher', 'rescheduled'].includes(st);
 
-                    if (!byStudent.has(sid)) {
-                        byStudent.set(sid, {
+                    const enrollmentId = Number(session.enrollment_id || 0);
+                    if (!enrollmentId) return;
+                    if (!byEnrollment.has(enrollmentId)) {
+                        byEnrollment.set(enrollmentId, {
+                            enrollment_id: enrollmentId,
                             student_id: sid,
                             name: `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student',
                             phone: session.student_phone || '',
                             instrument: session.instrument_name || session.instrument_type || '',
-                            sessions_total: 0,
+                            package_name: session.package_name || '',
+                            sessions_total: Number(session.package_sessions || 0),
                             sessions_completed: 0,
+                            sessions_used: Number(session.package_used_sessions || 0),
+                            package_scheduled_sessions: Number(session.package_scheduled_sessions || 0),
+                            sessions_assigned: 0,
                             sessions_left: null,
                             next_lesson_date: '',
                             next_lesson_time: '',
+                            sessions: [],
                         });
                     }
 
-                    const entry = byStudent.get(sid);
+                    const entry = byEnrollment.get(enrollmentId);
+                    entry.sessions.push(session);
 
                     // Update instrument if missing
                     if (!entry.instrument && (session.instrument_name || session.instrument_type)) {
@@ -315,7 +410,6 @@
 
                     // Count totals
                     if (!isCancelled) {
-                        entry.sessions_total += 1;
                         if (st === 'completed') entry.sessions_completed += 1;
                     }
 
@@ -334,11 +428,16 @@
                 });
 
                 // Compute sessions_left
-                byStudent.forEach(entry => {
-                    entry.sessions_left = Math.max(0, entry.sessions_total - entry.sessions_completed);
+                byEnrollment.forEach(entry => {
+                    if (!entry.sessions_total) entry.sessions_total = entry.sessions.filter(s => !['cancelled', 'cancelled_by_teacher', 'rescheduled'].includes(String(s.status || '').toLowerCase())).length;
+                    entry.sessions_assigned = new Set(entry.sessions
+                        .filter(s => !['cancelled', 'cancelled_by_teacher', 'rescheduled'].includes(String(s.status || '').toLowerCase()))
+                        .map(s => Number(s.session_number || 0))
+                        .filter(Boolean)).size;
+                    entry.sessions_left = Math.max(0, entry.sessions_total - entry.sessions_used);
                 });
 
-                instructorStudents = Array.from(byStudent.values())
+                instructorStudents = Array.from(byEnrollment.values())
                     .sort((a, b) => a.name.localeCompare(b.name));
 
             } catch (err) {
@@ -358,6 +457,7 @@
             }
             await loadInstructorStudents();
             document.getElementById('studentSearch')?.addEventListener('input', e => renderStudents(e.target.value));
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') closeStudentSessions(); });
         });
     </script>
     <script src="../../js/session_timeout.js"></script>

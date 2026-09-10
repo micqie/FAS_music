@@ -114,114 +114,88 @@
         function renderTeachers() {
             const tbody = document.getElementById('teachersTable');
             const count = document.getElementById('teacherCount');
+            const totalCount = allTeachers.length;
+            const activeCount = allTeachers.filter(t => t.status === 'Active').length;
+            const inactiveCount = allTeachers.filter(t => t.status === 'Inactive').length;
+            const totalEl = document.getElementById('totalTeachersCount');
+            const activeEl = document.getElementById('activeTeachersCount');
+            const inactiveEl = document.getElementById('inactiveTeachersCount');
+            if (totalEl) totalEl.textContent = totalCount;
+            if (activeEl) activeEl.textContent = activeCount;
+            if (inactiveEl) inactiveEl.textContent = inactiveCount;
             if (!tbody) return;
-            if (count) count.textContent = `${filteredTeachers.length} instructor${filteredTeachers.length === 1 ? '' : 's'}`;
+            if (count) count.textContent = `${filteredTeachers.length} of ${totalCount} teachers shown`;
             if (!filteredTeachers.length) {
-                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500"><i class="fas fa-inbox text-2xl mb-2 text-gold-500/50"></i><p>No teachers found.</p></td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-12 text-center"><div class="flex flex-col items-center justify-center"><div class="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-3"><i class="fas fa-inbox text-2xl text-slate-400"></i></div><p class="text-slate-600 font-medium">No teachers found</p><p class="text-sm text-slate-400 mt-1">Try adjusting your filters</p></div></td></tr>';
                 return;
             }
             tbody.innerHTML = filteredTeachers.map(t => {
                 const fullName = `${t.first_name || ''} ${t.last_name || ''}`.trim();
                 const email = t.email || '';
                 const phone = t.phone || '';
+                const initials = `${(t.first_name || '').charAt(0)}${(t.last_name || '').charAt(0)}`.toUpperCase();
+                const statusColor = t.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200';
+                const statusIcon = t.status === 'Active' ? '<i class="fas fa-check-circle mr-1"></i>' : '<i class="fas fa-pause-circle mr-1"></i>';
                 return `
-                <tr class="hover:bg-slate-50/80 transition">
-                    <td class="px-6 py-4 table-name-cell">
-                        <div class="font-medium text-slate-900 truncate-text" title="${esc(fullName || 'N/A')}">${esc(fullName || 'N/A')}</div>
-                        <div class="text-sm text-slate-500 truncate-text" title="${esc(email)}${phone ? ' • ' + esc(phone) : ''}">${esc(email)}${phone ? ' • ' + esc(phone) : ''}</div>
-                    </td>
-                    <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${esc(t.specialization || 'General')}">${esc(t.specialization || 'General')}</td>
-                    <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text" title="${esc(t.branch_name || 'N/A')}">${esc(t.branch_name || 'N/A')}</td>
-                    <td class="px-6 py-4 text-slate-700 table-text-cell truncate-text">${esc(t.employment_type || 'Full-time')}</td>
-                    <td class="px-6 py-4 table-status-cell"><span class="px-2 py-1 rounded text-xs font-semibold border ${statusBadge(t.status)}">${esc(t.status || 'Inactive')}</span></td>
-                    <td class="px-6 py-4 table-actions-cell-wide">
-                        <div class="table-button-group">
-                            <button onclick="openEditTeacher(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold">Edit</button>
-                            <button onclick="openAdminTeacherAvailability(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 text-xs font-bold"><i class="fas fa-calendar-alt mr-1"></i>Schedule</button>
-                            <button onclick="openAdminTeacherCalendar(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-bold"><i class="fas fa-calendar-days mr-1"></i>Calendar</button>
-                            <button onclick="openTeacherPasswordModal(${Number(t.teacher_id)})" class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-bold">Password</button>
-                            <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" class="px-3 py-1.5 rounded-lg ${t.status === 'Active' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'} text-xs font-bold">${t.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
-                        </div>
-                    </td>
+                <tr class="hover:bg-slate-50 transition-colors group">
+                    <td class="teacher-identity-cell px-6 py-4"><div class="flex items-center gap-3"><div class="h-10 w-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center flex-shrink-0 shadow-sm"><span class="text-white text-sm font-bold">${esc(initials)}</span></div><div class="min-w-0"><div class="teacher-name font-semibold text-slate-900">${esc(fullName || 'N/A')}</div><div class="teacher-contact text-xs text-slate-500">${esc(email || 'No email')}${phone ? ' • ' + esc(phone) : ''}</div></div></div></td>
+                    <td class="px-6 py-4"><div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200"><i class="fas fa-music text-[10px]"></i><span>${esc(t.specialization || 'General')}</span></div></td>
+                    <td class="px-6 py-4"><div class="inline-flex items-center gap-2 text-sm text-slate-700"><i class="fas fa-location-dot text-slate-400"></i>${esc(t.branch_name || 'N/A')}</div></td>
+                    <td class="px-6 py-4"><span class="text-sm text-slate-700">${esc(t.employment_type || 'Full-time')}</span></td>
+                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColor}">${statusIcon}${esc(t.status || 'Inactive')}</span></td>
+                    <td class="teacher-actions-cell px-6 py-4"><div class="teacher-actions">
+                        <button onclick="openEditTeacher(${Number(t.teacher_id)})" class="teacher-action-btn bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors" title="Edit teacher" aria-label="Edit ${esc(fullName || 'teacher')}"><i class="fas fa-edit" aria-hidden="true"></i></button>
+                        <button onclick="openAdminTeacherAvailability(${Number(t.teacher_id)})" class="teacher-action-btn bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors" title="Manage availability" aria-label="Manage availability for ${esc(fullName || 'teacher')}"><i class="fas fa-calendar-alt" aria-hidden="true"></i></button>
+                        <button onclick="openAdminTeacherCalendar(${Number(t.teacher_id)})" class="teacher-action-btn bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors" title="View schedule" aria-label="View schedule for ${esc(fullName || 'teacher')}"><i class="fas fa-calendar-days" aria-hidden="true"></i></button>
+                        <button onclick="toggleTeacherStatus(${Number(t.teacher_id)}, '${t.status === 'Active' ? 'Inactive' : 'Active'}')" class="teacher-action-btn ${t.status === 'Active' ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'} transition-colors" title="${t.status === 'Active' ? 'Deactivate' : 'Activate'} teacher" aria-label="${t.status === 'Active' ? 'Deactivate' : 'Activate'} ${esc(fullName || 'teacher')}"><i class="fas fa-${t.status === 'Active' ? 'times-circle' : 'check-circle'}" aria-hidden="true"></i></button>
+                    </div></td>
                 </tr>`;
             }).join('');
         }
 
-        async function openTeacherPasswordModal(teacherId) {
-            const teacher = allTeachers.find(x => Number(x.teacher_id) === Number(teacherId));
-            if (!teacher) {
-                showMessage('Instructor not found.', 'error');
-                return;
+        function updateTeacherPasswordMatch() {
+            const password = String(document.getElementById('teacherNewPassword')?.value || '');
+            const confirmation = String(document.getElementById('teacherConfirmPassword')?.value || '');
+            const feedback = document.getElementById('teacherPasswordMatch');
+            if (!feedback) return;
+
+            if (!password && !confirmation) {
+                feedback.textContent = 'Enter the password again to confirm it.';
+                feedback.className = 'mt-2 text-xs text-slate-500';
+            } else if (password && password === confirmation) {
+                feedback.textContent = 'Passwords match.';
+                feedback.className = 'mt-2 text-xs font-semibold text-emerald-600';
+            } else {
+                feedback.textContent = 'Passwords do not match.';
+                feedback.className = 'mt-2 text-xs font-semibold text-rose-600';
             }
+        }
 
-            const fullName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Instructor';
-            const result = await Swal.fire({
-                title: 'Change Instructor Password',
-                width: 560,
-                confirmButtonText: 'Update Password',
-                confirmButtonColor: '#b8860b',
-                showCancelButton: true,
-                cancelButtonText: 'Cancel',
-                html: `
-                    <div class="text-left text-sm text-slate-600 mb-4">
-                        Set a new password for <span class="font-semibold text-slate-900">${esc(fullName)}</span>.
-                    </div>
-                    <input id="swal-teacher-password" class="swal2-input" type="password" placeholder="New password">
-                    <input id="swal-teacher-password-confirm" class="swal2-input" type="password" placeholder="Confirm new password">
-                    <div class="text-left text-xs text-slate-500 mt-2 px-1">
-                        Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
-                    </div>
-                `,
-                focusConfirm: false,
-                preConfirm: () => {
-                    const newPassword = String(document.getElementById('swal-teacher-password')?.value || '');
-                    const confirmPassword = String(document.getElementById('swal-teacher-password-confirm')?.value || '');
+        function resetTeacherPasswordFields() {
+            const password = document.getElementById('teacherNewPassword');
+            const confirmation = document.getElementById('teacherConfirmPassword');
+            if (password) {
+                password.value = '';
+                password.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (confirmation) confirmation.value = '';
+            updateTeacherPasswordMatch();
+        }
 
-                    if (!newPassword || !confirmPassword) {
-                        Swal.showValidationMessage('Please fill in both password fields.');
-                        return false;
-                    }
-                    if (newPassword !== confirmPassword) {
-                        Swal.showValidationMessage('Passwords do not match.');
-                        return false;
-                    }
-                    if (newPassword.length < 8) {
-                        Swal.showValidationMessage('Password must be at least 8 characters long.');
-                        return false;
-                    }
-                    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[!@#$%^&*]/.test(newPassword)) {
-                        Swal.showValidationMessage('Password must include uppercase, lowercase, number, and special character.');
-                        return false;
-                    }
-
-                    return { teacherId: Number(teacher.teacher_id || 0), newPassword };
-                }
-            });
-
-            if (!result.isConfirmed || !result.value) return;
-
-            try {
-                const response = await axios.post(`${baseApiUrl}/teachers.php?action=reset-teacher-password`, {
-                    teacher_id: result.value.teacherId,
-                    new_password: result.value.newPassword
-                });
-                const data = response.data || {};
-                if (!data.success) {
-                    showMessage(data.error || 'Failed to update password.', 'error');
-                    return;
-                }
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Password Updated',
-                    text: data.account_created
-                        ? `${fullName}'s login account was created and the password was set successfully.`
-                        : `${fullName}'s password has been changed successfully.`,
-                    confirmButtonColor: '#b8860b'
-                });
-                await loadTeachers();
-            } catch (error) {
-                const message = error?.response?.data?.error || 'Failed to update password.';
-                showMessage(message, 'error');
+        function setTeacherEmailLocked(locked) {
+            const emailInput = document.getElementById('email');
+            const hint = document.getElementById('teacherEmailHint');
+            if (!emailInput) return;
+            emailInput.readOnly = locked;
+            emailInput.setAttribute('aria-readonly', locked ? 'true' : 'false');
+            emailInput.classList.toggle('bg-slate-100', locked);
+            emailInput.classList.toggle('text-slate-500', locked);
+            emailInput.classList.toggle('cursor-not-allowed', locked);
+            emailInput.classList.toggle('bg-white', !locked);
+            if (hint) {
+                hint.innerHTML = locked
+                    ? '<i class="fas fa-lock mr-1"></i>Email is fixed after account creation to keep linked records consistent.'
+                    : 'Used as the instructor\'s contact and login email.';
             }
         }
 
@@ -233,19 +207,23 @@
             if (form) form.reset();
             document.getElementById('teacherId').value = '';
             setSelectedSpecializationIds([]);
-            if (title) title.textContent = 'Add Instructor';
+            if (title) title.textContent = 'Add Teacher';
             if (subtitle) subtitle.textContent = 'Set profile details, specializations, and portal login.';
             // Hide status field — new teachers are always Active
             const statusWrapper = document.getElementById('statusFieldWrapper');
             const statusHidden  = document.getElementById('statusHidden');
             const emailWrapper = document.getElementById('teacherEmailFieldWrapper');
             const realAccountCard = document.getElementById('accountModeRealCard');
+            const credentialsSection = document.getElementById('teacherCredentialsSection');
             if (statusWrapper) statusWrapper.classList.add('hidden');
             if (statusHidden)  statusHidden.value = 'Active';
             if (emailWrapper) emailWrapper.classList.add('hidden');
             if (realAccountCard) realAccountCard.classList.add('hidden');
+            if (credentialsSection) credentialsSection.classList.add('hidden');
+            resetTeacherPasswordFields();
             const emailInput = document.getElementById('email');
             if (emailInput) emailInput.value = '';
+            setTeacherEmailLocked(false);
             if (window.TeacherFormUI) {
                 TeacherFormUI.setAccountMode('system_account', false);
                 TeacherFormUI.previewSystemLogin();
@@ -272,17 +250,21 @@
                 : String(t.specialization_ids_csv || '').split(',').map(v => Number(v || 0)).filter(v => v > 0);
             setSelectedSpecializationIds(ids);
             document.getElementById('email').value = t.email || '';
+            setTeacherEmailLocked(true);
             document.getElementById('phone').value = t.phone || '';
             document.getElementById('status').value = t.status || 'Active';
-            document.getElementById('teacherModalTitle').textContent = 'Edit Instructor';
-            document.getElementById('teacherModalSubtitle').textContent = 'Update instructor profile and specializations.';
+            document.getElementById('teacherModalTitle').textContent = 'Edit Teacher';
+            document.getElementById('teacherModalSubtitle').textContent = 'Update instructor profile, specializations, and credentials.';
             // Show status field in edit mode
             const statusWrapper = document.getElementById('statusFieldWrapper');
             const emailWrapper = document.getElementById('teacherEmailFieldWrapper');
             const realAccountCard = document.getElementById('accountModeRealCard');
+            const credentialsSection = document.getElementById('teacherCredentialsSection');
             if (statusWrapper) statusWrapper.classList.remove('hidden');
             if (emailWrapper) emailWrapper.classList.remove('hidden');
             if (realAccountCard) realAccountCard.classList.remove('hidden');
+            if (credentialsSection) credentialsSection.classList.remove('hidden');
+            resetTeacherPasswordFields();
             if (window.TeacherFormUI) {
                 TeacherFormUI.setAccountMode('real_email', true);
             }
@@ -302,6 +284,30 @@
                 if (mode === 'real_email' && !email) {
                     showMessage('Please enter the instructor email for a real email account.', 'error');
                     return false;
+                }
+            }
+            if (isEdit) {
+                const password = String(document.getElementById('teacherNewPassword')?.value || '');
+                const confirmation = String(document.getElementById('teacherConfirmPassword')?.value || '');
+                if (password || confirmation) {
+                    if (!password || !confirmation) {
+                        showMessage('Please complete both password fields.', 'error');
+                        return false;
+                    }
+                    if (password !== confirmation) {
+                        showMessage('The new passwords do not match.', 'error');
+                        return false;
+                    }
+                    if (
+                        password.length < 8 ||
+                        !/[A-Z]/.test(password) ||
+                        !/[a-z]/.test(password) ||
+                        !/[0-9]/.test(password) ||
+                        !/[!@#$%^&*]/.test(password)
+                    ) {
+                        showMessage('Use a strong password with at least 8 characters, uppercase, lowercase, a number, and a special character.', 'error');
+                        return false;
+                    }
                 }
             }
             return true;
@@ -356,11 +362,12 @@
                 branch_id: Number(document.getElementById('branchId').value || 0),
                 employment_type: document.getElementById('employmentType').value,
                 specialization_ids: getSelectedSpecializationIds(),
-                email: document.getElementById('email').value.trim(),
+                ...(!isEdit ? { email: document.getElementById('email').value.trim() } : {}),
                 phone: document.getElementById('phone').value.trim(),
                 status: isEdit
                     ? document.getElementById('status').value
                     : (document.getElementById('statusHidden')?.value || 'Active'),
+                new_password: isEdit ? String(document.getElementById('teacherNewPassword')?.value || '') : '',
                 ...(window.TeacherFormUI ? TeacherFormUI.getAccountModePayload(isEdit) : {})
             };
             const endpoint = isEdit ? 'update-teacher' : 'add-teacher';
@@ -374,7 +381,9 @@
             if (!isEdit && (data.username || data.login_identifier)) {
                 showTeacherCreatedDialog(data);
             } else {
-                showMessage('Instructor saved successfully', 'success');
+                showMessage(isEdit && payload.new_password
+                    ? 'Instructor details and password updated successfully.'
+                    : 'Instructor saved successfully', 'success');
             }
             await loadTeachers();
         }
@@ -584,6 +593,8 @@
             document.getElementById('branchFilter')?.addEventListener('change', applyFilters);
             document.getElementById('statusFilter')?.addEventListener('change', applyFilters);
             document.getElementById('searchInput')?.addEventListener('input', applyFilters);
+            document.getElementById('teacherNewPassword')?.addEventListener('input', updateTeacherPasswordMatch);
+            document.getElementById('teacherConfirmPassword')?.addEventListener('input', updateTeacherPasswordMatch);
             document.getElementById('closeAdminAvailabilityBtn')?.addEventListener('click', closeAdminTeacherAvailability);
             document.getElementById('cancelAdminAvailabilityBtn')?.addEventListener('click', closeAdminTeacherAvailability);
             document.getElementById('saveAdminAvailabilityBtn')?.addEventListener('click', saveAdminTeacherAvailability);

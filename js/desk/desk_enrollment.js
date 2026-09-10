@@ -21,6 +21,7 @@
         let assignRequestAvailabilityLoadTimer = null;
         let assignRequestAvailabilityRequestToken = 0;
         let assignRequestCalendarInitialized = false;
+        let assignRequestReturnToReviewId = 0;
         const assignRequestTeacherCache = new Map();
         let walkinStudents = [];
         let walkinMeta = null;
@@ -1930,7 +1931,7 @@
                 confirmButtonText: 'Close',
                 confirmButtonColor: '#2563eb',
                 width: '32rem'
-            });
+            }).then(() => reopenPendingRequestReview(requestId));
         }
 
         function getAssignRequestRowTeacherId(row) {
@@ -2212,9 +2213,14 @@
                 if (result.isConfirmed) {
                     void approvePendingRequestedSchedule(requestId);
                 } else if (result.isDenied) {
-                    void openAssignRequestModal(requestId);
+                    void openAssignRequestModal(requestId, { returnToReview: true });
                 }
             });
+        }
+
+        function reopenPendingRequestReview(requestId) {
+            if (!pendingEnrollmentRequestsById[String(requestId)]) return;
+            window.setTimeout(() => openPendingRequestScheduleModal(requestId), 0);
         }
 
         async function approvePendingRequestedSchedule(requestId) {
@@ -2242,7 +2248,8 @@
                     confirmButtonColor: '#d97706',
                     showCancelButton: true
                 });
-                if (result.isConfirmed) void openAssignRequestModal(requestId);
+                if (result.isConfirmed) void openAssignRequestModal(requestId, { returnToReview: true });
+                else reopenPendingRequestReview(requestId);
                 return;
             }
 
@@ -2301,7 +2308,8 @@
                     showCancelButton: true,
                     cancelButtonText: 'Close'
                 });
-                if (conflictResult.isConfirmed) void openAssignRequestModal(requestId);
+                if (conflictResult.isConfirmed) void openAssignRequestModal(requestId, { returnToReview: true });
+                else reopenPendingRequestReview(requestId);
                 return;
             }
 
@@ -2334,31 +2342,31 @@
                 }
                 week.sessions.push({ ...session, session_number: index + 1 });
             });
-            const weeklyScheduleHtml = projectedWeeks.map((week, weekIndex) => `
-                <div class="grid gap-2 border-b border-slate-200 px-3 py-2.5 last:border-b-0 sm:grid-cols-[70px_minmax(0,1fr)] sm:items-start">
-                    <div class="pt-1 text-xs font-black uppercase tracking-wider text-amber-700">Week ${weekIndex + 1}</div>
-                    <div class="grid gap-2 sm:grid-cols-2">${week.sessions.map(session => `
-                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            const weeklyScheduleHtml = projectedWeeks.flatMap((week, weekIndex) => week.sessions.map(session => `
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
                             <div class="flex items-start justify-between gap-2">
                                 <div>
                                     <div class="text-xs font-extrabold text-slate-900">${escapeHtml(formatDateCompact(session.session_date))}</div>
                                     <div class="mt-0.5 text-xs text-slate-700">${escapeHtml(`${formatTime12Hour(session.start_time)} - ${formatTime12Hour(session.end_time)}`)}</div>
                                 </div>
-                                <span class="shrink-0 rounded-full bg-amber-200 px-2 py-0.5 text-[9px] font-bold text-amber-800">Session ${session.session_number}</span>
+                                <span class="shrink-0 rounded-full bg-amber-200 px-2 py-0.5 text-[9px] font-bold text-amber-800">Week ${weekIndex + 1} · S${session.session_number}</span>
                             </div>
                             <div class="mt-1 truncate text-[10px] font-semibold text-emerald-700" title="${escapeHtml(session.instructor_name)}"><i class="fas fa-chalkboard-user mr-1"></i>${escapeHtml(session.instructor_name)}</div>
-                        </div>`).join('')}</div>
-                </div>`).join('');
+                        </div>`)).join('');
             const confirmResult = await Swal.fire({
                 title: 'Approve requested schedule?',
-                width: '64rem',
-                html: `<div class="text-left text-sm text-slate-600"><div class="mb-3 flex flex-wrap items-center justify-between gap-2"><div><span class="font-bold text-slate-900">Instructor:</span> ${escapeHtml(teacherNames.join(', '))}</div><div class="text-xs font-semibold text-amber-700"><i class="fas fa-calendar-check mr-1"></i>${projectedSessions.length} class date${projectedSessions.length === 1 ? '' : 's'}</div></div><div class="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Complete package schedule</div><div class="max-h-[420px] overflow-y-auto rounded-xl border border-slate-200 bg-white">${weeklyScheduleHtml || '<div class="p-4 text-sm text-slate-500">No projected class dates available.</div>'}</div><div class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800"><i class="fas fa-circle-check mr-1"></i>All requested class times are available and passed the conflict check.</div></div>`,
+                width: '48rem',
+                customClass: { popup: 'approve-schedule-compact' },
+                html: `<div class="text-left text-sm text-slate-600"><div class="mb-2 flex flex-wrap items-center justify-between gap-2"><div class="truncate"><span class="font-bold text-slate-900">Instructor:</span> ${escapeHtml(teacherNames.join(', '))}</div><div class="shrink-0 text-xs font-semibold text-amber-700"><i class="fas fa-calendar-check mr-1"></i>${projectedSessions.length} dates</div></div><div class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">Package schedule</div><div class="grid max-h-[260px] grid-cols-1 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 sm:grid-cols-2 lg:grid-cols-3">${weeklyScheduleHtml || '<div class="p-3 text-sm text-slate-500">No projected class dates available.</div>'}</div><div class="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800"><i class="fas fa-circle-check mr-1"></i>All ${projectedSessions.length} dates passed the conflict check.</div></div>`,
                 confirmButtonText: 'Approve Enrollment',
                 confirmButtonColor: '#059669',
                 showCancelButton: true,
                 cancelButtonText: 'Cancel'
             });
-            if (!confirmResult.isConfirmed) return;
+            if (!confirmResult.isConfirmed) {
+                reopenPendingRequestReview(requestId);
+                return;
+            }
 
             await approveStudentRequest({
                 action: 'approve-package-request',
@@ -3217,7 +3225,7 @@
             }
         }
 
-        async function openAssignRequestModal(requestId) {
+        async function openAssignRequestModal(requestId, options = {}) {
             const req = pendingEnrollmentRequestsById[String(requestId)];
             if (!req) {
                 showMessage('Request not found.', 'error');
@@ -3253,6 +3261,7 @@
             if (preferredScheduleEl) preferredScheduleEl.textContent = formatPendingRequestSchedule(req);
             requestIdEl.value = String(requestId);
             activeAssignRequest = req;
+            assignRequestReturnToReviewId = options.returnToReview === true ? Number(requestId) : 0;
             assignRequestAvailabilitySlots = [];
             assignRequestReservedSlots = [];
             assignRequestOccupiedSlots = [];
@@ -3348,6 +3357,13 @@
             assignRequestAvailabilitySelectedDate = '';
             modal.classList.add('hidden');
             modal.classList.remove('flex');
+            assignRequestReturnToReviewId = 0;
+        }
+
+        function cancelAssignRequestModal() {
+            const requestId = assignRequestReturnToReviewId;
+            closeAssignRequestModal();
+            if (requestId > 0) reopenPendingRequestReview(requestId);
         }
 
         async function approveStudentRequest(payload) {
@@ -3974,8 +3990,8 @@
             document.getElementById('closeAssignPackageModalBtn')?.addEventListener('click', closeAssignPackageModal);
             document.getElementById('cancelAssignPackageBtn')?.addEventListener('click', closeAssignPackageModal);
             document.getElementById('assignPackageForm')?.addEventListener('submit', assignPackage);
-            document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', closeAssignRequestModal);
-            document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', closeAssignRequestModal);
+            document.getElementById('closeAssignRequestModalBtn')?.addEventListener('click', cancelAssignRequestModal);
+            document.getElementById('cancelAssignRequestBtn')?.addEventListener('click', cancelAssignRequestModal);
             document.getElementById('submitAssignRequestBtn')?.addEventListener('click', function(e) {
                 e.preventDefault();
                 submitAssignRequestForm(e);

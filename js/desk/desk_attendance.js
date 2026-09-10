@@ -201,7 +201,9 @@
                             endTime: String(slot.end_time || ''),
                             roomId: Number(slot.room_id || 0),
                             roomName: String(slot.room_name || '').trim(),
+                            instrumentId: Number(slot.instrument_id || 0),
                             instrumentName: String(slot.instrument_name || '').trim(),
+                            instrumentTypeName: String(slot.instrument_type_name || '').trim(),
                             branchId: Number(student.branch_id || deskBranchId || 0),
                             teacherName: getTeacherLabel(slot, student),
                             packageName: String(student.package_name || '—'),
@@ -284,14 +286,78 @@
         }
         window.reactivateMistakenAbsence = reactivateMistakenAbsence;
 
-        function getSessionRoomInstrumentLabel(event) {
-            if (!event) return '';
+        function getSessionAttendanceLabel(event) {
+            const state = String(event?.state || 'Scheduled').trim();
+            const normalized = state.toLowerCase();
+            if (normalized === 'completed') return 'Checked in';
+            if (normalized === 'absent') return 'Absent';
+            if (normalized === 'excused') return 'Excused';
+            if (normalized === 'cancelled') return 'Cancelled';
+            return getSessionRoomDisplayLabel(event) ? 'Waiting for student' : 'Scheduled';
+        }
+
+        function renderAssignedSessionSummary(event) {
             const roomLabel = getSessionRoomDisplayLabel(event);
-            const instrumentName = String(event.instrumentName || '').trim();
-            if (roomLabel && instrumentName) {
-                return `${roomLabel} • ${instrumentName}`;
+            if (!roomLabel) return '';
+            return `
+                <button type="button" onclick="openAssignedSessionModal(${Number(event.sessionId || 0)})" class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 transition hover:border-emerald-400 hover:bg-emerald-100">
+                    <i class="fas fa-circle-check" aria-hidden="true"></i>
+                    Already assigned
+                    <i class="fas fa-chevron-right text-[10px] opacity-60" aria-hidden="true"></i>
+                </button>`;
+        }
+
+        function openAssignedSessionModal(sessionId) {
+            const event = attendanceCalendarEvents.find(item => Number(item.sessionId || 0) === Number(sessionId));
+            if (!event) {
+                showMessage('Assigned session details are unavailable.', 'error');
+                return;
             }
-            return roomLabel || instrumentName || '';
+
+            const roomLabel = getSessionRoomDisplayLabel(event) || 'Room pending';
+            const instrumentName = String(event.instrumentName || '').trim() || 'Instrument pending';
+            const instrumentType = String(event.instrumentTypeName || '').trim();
+            const attendanceLabel = getSessionAttendanceLabel(event);
+            const schedule = event.startTime
+                ? `${formatTime12Hour(event.startTime)} - ${formatTime12Hour(event.endTime)}`
+                : 'Time pending';
+
+            Swal.fire({
+                title: 'Assigned session',
+                width: '28rem',
+                confirmButtonText: 'Close',
+                confirmButtonColor: '#0f766e',
+                customClass: { popup: 'attendance-details-compact' },
+                html: `
+                    <div class="text-left">
+                        <div class="mb-3 border-b border-slate-200 pb-3">
+                            <div class="text-base font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
+                            <div class="mt-0.5 text-xs text-slate-500">Session ${event.sessionNumber || '—'}</div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="rounded-xl bg-emerald-50 px-3 py-2.5">
+                                <div class="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">Room</div>
+                                <div class="mt-1 text-sm font-bold text-slate-900">${escapeHtml(roomLabel)}</div>
+                            </div>
+                            <div class="rounded-xl bg-amber-50 px-3 py-2.5">
+                                <div class="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700">Attendance</div>
+                                <div class="mt-1 text-sm font-bold text-slate-900">${escapeHtml(attendanceLabel)}</div>
+                            </div>
+                            <div class="col-span-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                                <div class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Date & time</div>
+                                <div class="mt-1 text-sm font-bold leading-snug text-slate-900">${escapeHtml(formatDateLong(event.dateKey))}</div>
+                                <div class="mt-1.5 inline-flex whitespace-nowrap rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-slate-700 shadow-sm">
+                                    <i class="far fa-clock mr-1.5 text-emerald-600" aria-hidden="true"></i>${escapeHtml(schedule)}
+                                </div>
+                            </div>
+                            <div class="col-span-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                                <div class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Instrument & brand</div>
+                                <div class="mt-1 text-sm font-bold text-slate-900">${escapeHtml(instrumentName)}</div>
+                                ${instrumentType && instrumentType.toLowerCase() !== instrumentName.toLowerCase() ? `<div class="mt-0.5 text-xs text-slate-500">${escapeHtml(instrumentType)}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>`
+            });
         }
 
         async function fetchBranchInstruments(branchId) {
@@ -312,15 +378,8 @@
                 return '';
             }
 
-            const roomLabel = getSessionRoomInstrumentLabel(event);
-            if (roomLabel) {
-                return `
-                    <span class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">
-                        <i class="fas fa-door-closed"></i>
-                        ${escapeHtml(roomLabel)}
-                    </span>
-                `;
-            }
+            const roomLabel = getSessionRoomDisplayLabel(event);
+            if (roomLabel) return renderAssignedSessionSummary(event);
 
             return `
                 <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-200 transition" onclick="openAttendanceRoomAssignment(${Number(event.sessionId)})">
@@ -367,11 +426,8 @@
                     ? branchInstruments.filter(item => allowedInstrumentTypeIds.has(Number(item.type_id || 0)))
                     : branchInstruments;
                 const unavailableRooms = Array.isArray(roomData.unavailable_rooms) ? roomData.unavailable_rooms : [];
-                if (!rooms.length) {
-                    const message = unavailableRooms.length
-                        ? 'All rooms are already booked for this date and time.'
-                        : 'No available rooms found for this branch.';
-                    showMessage(message, 'error');
+                if (!rooms.length && !unavailableRooms.length) {
+                    showMessage('No rooms were found for this branch.', 'error');
                     return;
                 }
                 if (!instruments.length) {
@@ -388,9 +444,34 @@
                     : 'Time pending';
                 const scheduleLabel = scheduleDate ? `${scheduleDate} • ${scheduleTime}` : scheduleTime;
 
-                const roomOptionsHtml = rooms.map(room => `
-                    <option value="${escapeHtml(String(room.room_id || ''))}">${escapeHtml(room.room_name || `Room #${room.room_id}`)}</option>
-                `).join('');
+                const availableRoomCardsHtml = rooms.map(room => {
+                    const roomId = Number(room.room_id || 0);
+                    const roomName = String(room.room_name || `Room #${roomId}`);
+                    return `
+                        <button type="button" role="radio" aria-checked="false" data-attendance-room-id="${roomId}" data-attendance-room-name="${escapeHtml(roomName)}" class="group flex min-h-[58px] items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-emerald-400 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm font-bold text-slate-900">${escapeHtml(roomName)}</span>
+                                <span class="block text-[11px] text-slate-500">Available now</span>
+                            </span>
+                            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>Vacant
+                            </span>
+                        </button>`;
+                }).join('');
+                const occupiedRoomCardsHtml = unavailableRooms.map(room => {
+                    const roomId = Number(room.room_id || 0);
+                    const roomName = String(room.room_name || `Room #${roomId}`);
+                    return `
+                        <button type="button" disabled aria-disabled="true" class="flex min-h-[58px] cursor-not-allowed items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-left opacity-80">
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm font-bold text-slate-700">${escapeHtml(roomName)}</span>
+                                <span class="block text-[11px] text-rose-600">Booked for this time</span>
+                            </span>
+                            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700">
+                                <span class="h-2 w-2 rounded-full bg-rose-500"></span>Occupied
+                            </span>
+                        </button>`;
+                }).join('');
                 const instrumentsByType = instruments.reduce((groups, item) => {
                     const typeName = String(item.type_name || 'Other').trim() || 'Other';
                     if (!groups[typeName]) groups[typeName] = [];
@@ -407,39 +488,52 @@
                 const result = await Swal.fire({
                     title: 'Assign Room & Instrument',
                     html: `
-                        <div class="text-left space-y-4">
-                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div class="space-y-3 text-left">
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Session</div>
                                 <div class="mt-1 text-sm font-semibold text-slate-900">${escapeHtml(event.studentName)}</div>
                                 <div class="mt-1 text-xs text-slate-500">${escapeHtml(scheduleLabel)}</div>
                             </div>
                             <div>
-                                <label class="mb-1 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Room</label>
-                                <select id="attendanceRoomSelect" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-500/20">
-                                    <option value="">Choose a room</option>
-                                    ${roomOptionsHtml}
-                                </select>
+                                <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                    <label class="block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Choose a room</label>
+                                    <div class="flex items-center gap-3 text-[11px] font-semibold text-slate-500">
+                                        <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>${rooms.length} vacant</span>
+                                        <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-rose-500"></span>${unavailableRooms.length} occupied</span>
+                                    </div>
+                                </div>
+                                <input id="attendanceRoomValue" type="hidden" value="">
+                                <div id="attendanceRoomChoices" role="radiogroup" aria-label="Available and occupied rooms" class="grid max-h-36 grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                                    ${availableRoomCardsHtml}
+                                    ${occupiedRoomCardsHtml}
+                                </div>
+                                ${rooms.length ? '<p class="mt-2 text-xs text-slate-500">Select a green vacant room. Occupied rooms cannot be selected.</p>' : '<p class="mt-2 text-xs font-semibold text-rose-600">All rooms are occupied for this session time.</p>'}
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Instrument</label>
-                                <select id="attendanceInstrumentSelect" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-500/20">
+                                <select id="attendanceInstrumentSelect" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-500/20">
                                     <option value="">Choose an instrument</option>
                                     ${instrumentOptionsHtml}
                                 </select>
                                 <p class="mt-1 text-xs text-slate-500">Showing ${escapeHtml(allowedTypesLabel || 'the student\'s selected instrument types')} only.</p>
                             </div>
-                            <div id="attendanceRoomAssignPreview" class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                                Select a room and instrument to continue.
-                            </div>
                         </div>
                     `,
                     showCancelButton: true,
+                    showConfirmButton: rooms.length > 0,
+                    cancelButtonText: rooms.length > 0 ? 'Cancel' : 'Close',
                     confirmButtonText: 'Assign Room & Instrument',
                     confirmButtonColor: '#16a34a',
                     focusConfirm: false,
+                    width: '36rem',
+                    heightAuto: false,
+                    scrollbarPadding: false,
+                    customClass: {
+                        popup: 'attendance-room-assignment-compact'
+                    },
                     preConfirm: () => {
                         const popup = Swal.getPopup();
-                        const selectedRoomId = Number(popup?.querySelector('#attendanceRoomSelect')?.value || 0);
+                        const selectedRoomId = Number(popup?.querySelector('#attendanceRoomValue')?.value || 0);
                         const selectedInstrumentId = Number(popup?.querySelector('#attendanceInstrumentSelect')?.value || instruments[0]?.instrument_id || 0);
                         if (!selectedRoomId) {
                             Swal.showValidationMessage('Please choose a room.');
@@ -454,25 +548,33 @@
                     didOpen: () => {
                         const popup = Swal.getPopup();
                         if (!popup) return;
-                        const roomSelect = popup.querySelector('#attendanceRoomSelect');
+                        const roomValue = popup.querySelector('#attendanceRoomValue');
+                        const roomButtons = Array.from(popup.querySelectorAll('[data-attendance-room-id]'));
                         const instrumentSelect = popup.querySelector('#attendanceInstrumentSelect');
-                        const preview = popup.querySelector('#attendanceRoomAssignPreview');
-                        if (roomSelect && !roomSelect.value && roomSelect.options.length > 1) {
-                            roomSelect.value = roomSelect.options[1].value;
-                        }
                         if (instrumentSelect && !instrumentSelect.value && instrumentSelect.options.length > 1) {
                             instrumentSelect.value = instrumentSelect.options[1].value;
                         }
                         const updatePreview = () => {
-                            const roomLabel = roomSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
+                            const selectedRoom = roomButtons.find(button => button.getAttribute('aria-checked') === 'true');
+                            const roomLabel = selectedRoom?.dataset.attendanceRoomName || '';
                             const instrumentLabel = instrumentSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
-                            if (preview) {
-                                preview.textContent = roomLabel && instrumentLabel
-                                    ? `${roomLabel} • ${instrumentLabel}`
-                                    : 'Select a room and instrument to continue.';
-                            }
+                            popup.dataset.selectedRoomLabel = roomLabel;
+                            popup.dataset.selectedInstrumentLabel = instrumentLabel;
                         };
-                        roomSelect?.addEventListener('change', updatePreview);
+                        roomButtons.forEach(button => {
+                            button.addEventListener('click', () => {
+                                roomButtons.forEach(roomButton => {
+                                    roomButton.setAttribute('aria-checked', 'false');
+                                    roomButton.classList.remove('border-emerald-500', 'bg-emerald-100', 'ring-2', 'ring-emerald-500/20');
+                                    roomButton.classList.add('border-slate-200', 'bg-white');
+                                });
+                                button.setAttribute('aria-checked', 'true');
+                                button.classList.remove('border-slate-200', 'bg-white');
+                                button.classList.add('border-emerald-500', 'bg-emerald-100', 'ring-2', 'ring-emerald-500/20');
+                                if (roomValue) roomValue.value = button.dataset.attendanceRoomId || '';
+                                updatePreview();
+                            });
+                        });
                         instrumentSelect?.addEventListener('change', updatePreview);
                         updatePreview();
                     }
@@ -501,6 +603,7 @@
                 event.roomName = assignedRoomName;
                 event.instrumentId = Number(data.instrument_id || result.value?.instrumentId || 0);
                 event.instrumentName = assignedInstrumentName;
+                event.instrumentTypeName = String(data.instrument_type_name || '').trim();
                 renderSelectedDateSchedule();
                 renderAttendanceCalendar();
 
@@ -1719,3 +1822,4 @@
         window.openSessionDatesModal = openSessionDatesModal;
         window.selectAttendanceCalendarDate = selectAttendanceCalendarDate;
         window.openAttendanceRoomAssignment = openAttendanceRoomAssignment;
+        window.openAssignedSessionModal = openAssignedSessionModal;

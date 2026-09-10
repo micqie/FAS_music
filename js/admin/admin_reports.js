@@ -24,7 +24,7 @@ function showReportsMessage(message, type = 'info') {
         success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
         info: 'border-slate-200 bg-slate-50 text-slate-700'
     };
-    box.className = `mt-4 rounded-2xl border px-4 py-3 text-sm ${styles[type] || styles.info}`;
+    box.className = `mt-3 rounded-xl border px-4 py-2.5 text-sm ${styles[type] || styles.info}`;
     box.textContent = message;
     box.classList.remove('hidden');
 }
@@ -41,6 +41,14 @@ function reportPercent(value) {
 function makeChart(ctx, current, config) {
     if (current) current.destroy();
     return new Chart(ctx, config);
+}
+
+let reportChartResizeFrame = 0;
+function resizeReportCharts() {
+    window.cancelAnimationFrame(reportChartResizeFrame);
+    reportChartResizeFrame = window.requestAnimationFrame(() => {
+        Object.values(reportCharts).forEach(chart => chart?.resize());
+    });
 }
 
 function mapBranches(branches) {
@@ -227,7 +235,6 @@ function updateHeroAndStats(summary) {
     setReportText('reportStatRevenue', reportCurrency(summary.revenue));
     setReportText('reportStatOutstanding', reportCurrency(summary.outstanding));
     setReportText('heroCollectionRate', reportPercent(summary.collectionRate));
-    setReportText('heroCollectionHint', `${summary.activeEnrollments} active enrollment${summary.activeEnrollments === 1 ? '' : 's'} from ${summary.totalRegistrations} tracked registration${summary.totalRegistrations === 1 ? '' : 's'}. ${reportCurrency(summary.revenue)} collected with ${reportCurrency(summary.outstanding)} still outstanding.`);
 }
 
 function renderFunnelChart(summary) {
@@ -236,23 +243,29 @@ function renderFunnelChart(summary) {
     reportCharts.funnel = makeChart(canvas, reportCharts.funnel, {
         type: 'bar',
         data: {
-            labels: ['Tracked Registrations', 'Approved Fees', 'Active Enrollments'],
+            labels: ['Registrations', 'Fees approved', 'Enrollments'],
             datasets: [{
                 label: 'Students / Records',
                 data: [summary.totalRegistrations, summary.approvedFees, summary.activeEnrollments],
                 backgroundColor: ['#cbd5e1', '#d4af37', '#0f766e'],
+                barPercentage: 0.68,
+                categoryPercentage: 0.72,
                 borderRadius: 14,
                 borderSkipped: false
             }]
         },
         options: {
+            responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false }
             },
             scales: {
                 y: { beginAtZero: true, ticks: { precision: 0 } },
-                x: { grid: { display: false } }
+                x: {
+                    grid: { display: false },
+                    ticks: { autoSkip: false, maxRotation: 0, minRotation: 0, font: { size: 10 } }
+                }
             }
         }
     });
@@ -272,9 +285,13 @@ function renderRevenueChart(summary) {
             }]
         },
         options: {
+            responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'bottom' }
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 12, boxHeight: 12, padding: 12, font: { size: 11 } }
+                }
             }
         }
     });
@@ -309,9 +326,13 @@ function renderBranchChart(branchMetrics) {
             ]
         },
         options: {
+            responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'bottom' }
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 12, boxHeight: 12, padding: 12, font: { size: 11 } }
+                }
             },
             scales: {
                 y: { beginAtZero: true },
@@ -335,9 +356,13 @@ function renderPaymentMixChart(summary) {
             }]
         },
         options: {
+            responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'bottom' }
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 12, boxHeight: 12, padding: 12, font: { size: 11 } }
+                }
             }
         }
     });
@@ -573,6 +598,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             downloadCsv('admin-reports.csv', buildReportCsvRows(data));
         });
         refresh();
+        window.addEventListener('resize', resizeReportCharts, { passive: true });
     } catch (error) {
         console.error('Failed to load admin reports:', error);
         showReportsMessage('Failed to load report data. Please refresh and try again.', 'error');
