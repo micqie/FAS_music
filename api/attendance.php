@@ -2,11 +2,12 @@
 require_once 'db_connect.php';
 require_once 'auth_session.php';
 require_once 'xss_protection.php';  // XSS Protection utilities
+require_once 'offline_idempotency.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Idempotency-Key');
 
 // Send security headers
 XSSProtection::sendSecurityHeaders();
@@ -27,6 +28,7 @@ class AttendanceApi
 
     public function sendJSON($data, $status = 200)
     {
+        fas_idempotency_finalize($data, (int)$status);
         http_response_code($status);
         echo json_encode($data);
         exit;
@@ -2278,12 +2280,14 @@ class AttendanceApi
         }
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
-        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $authenticatedUser = fas_require_authenticated_user($this->conn, ['instructor']);
+        $teacherId = $this->resolveTeacherId(0, (int)($authenticatedUser['user_id'] ?? 0));
         $sessionId = (int)($data['session_id'] ?? 0);
         $attendance = strtolower(trim((string)($data['attendance_status'] ?? '')));
         if ($teacherId < 1 || $sessionId < 1 || !in_array($attendance, ['present', 'late', 'absent'], true)) {
             $this->sendJSON(['success' => false, 'error' => 'Instructor, session, and a valid attendance status are required.'], 400);
         }
+        fas_idempotency_begin($this->conn, 'mark-attendance-by-instructor', $data);
 
         try {
             $stmt = $this->conn->prepare("
@@ -2419,7 +2423,8 @@ class AttendanceApi
         }
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
-        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $authenticatedUser = fas_require_authenticated_user($this->conn, ['instructor']);
+        $teacherId = $this->resolveTeacherId(0, (int)($authenticatedUser['user_id'] ?? 0));
         $sessionId = (int)($data['session_id'] ?? 0);
 
         if ($teacherId < 1 || $sessionId < 1) {
@@ -2431,6 +2436,7 @@ class AttendanceApi
         if (!$this->ensureAttendanceTable()) {
             $this->sendJSON(['success' => false, 'error' => 'Attendance records are unavailable.'], 400);
         }
+        fas_idempotency_begin($this->conn, 'mark-present-by-instructor', $data);
 
         try {
             $stmt = $this->conn->prepare("

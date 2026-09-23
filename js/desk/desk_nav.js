@@ -277,12 +277,14 @@
                 });
                 return;
             }
-            Swal.fire({
+            await Swal.fire({
                 icon: 'success',
                 title: 'Password Updated',
-                text: 'Your password has been changed successfully.',
+                text: 'Sign in again with your new password.',
                 confirmButtonColor: '#b8860b'
             });
+            Auth.clearStoredUser();
+            Auth.redirectToLogin();
         } catch (error) {
             console.error('Desk password change failed:', error);
             Swal.fire({

@@ -18,31 +18,33 @@
         return document.querySelector('body > nav');
     }
 
-    function instructorProfileHtml(compact = false) {
+    function instructorProfileHtml() {
         return `
-            <a href="instructor_profile.html" class="instructor-sidebar-profile block rounded-2xl border border-white/10 bg-white/5 px-4 ${compact ? 'py-3' : 'py-4'} text-center transition hover:border-gold-500/30 hover:bg-white/10">
-                <div class="mx-auto ${compact ? 'h-14 w-14' : 'h-20 w-20'} rounded-full border-2 border-gold-500/40 bg-[#1a1d23] flex items-center justify-center shadow-lg shadow-black/20">
-                    <i class="fas fa-user-circle ${compact ? 'text-5xl' : 'text-7xl'} text-gold-400"></i>
+            <a href="instructor_profile.html" aria-label="View instructor profile" class="instructor-sidebar-profile flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-left transition hover:border-gold-500/30 hover:bg-white/10">
+                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-gold-500/40 bg-[#1a1d23] text-gold-400 shadow-lg shadow-black/20" aria-hidden="true">
+                    <i class="fas fa-user-circle text-4xl"></i>
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="instructor-shell-name whitespace-normal break-words text-sm font-bold leading-tight text-white">Instructor</p>
+                    <p class="instructor-shell-email mt-0.5 truncate text-xs text-slate-400">—</p>
+                    <p class="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-gold-400">Instructor</p>
                 </div>
-                <p class="instructor-shell-name mt-3 truncate text-sm font-bold text-white">Instructor</p>
-                <p class="instructor-shell-email mt-1 truncate text-xs text-slate-400">—</p>
-                <p class="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-gold-400">Instructor</p>
             </a>`;
     }
 
     function mountSidebarProfiles() {
         const sidebar = document.querySelector('body > aside');
-        const sidebarContent = sidebar?.firstElementChild;
+        const sidebarContent = sidebar?.querySelector(':scope > div:not(.fas-sidebar-brand)');
         if (sidebar && sidebarContent && !sidebar.querySelector('[data-instructor-shell-profile]')) {
             sidebar.classList.add('instructor-sidebar');
             const oldTitle = Array.from(sidebarContent.children).find(child =>
                 /Instructor Panel/i.test(child.textContent || '')
             );
-            if (oldTitle) oldTitle.classList.add('instructor-sidebar-title');
+            oldTitle?.remove();
             const mount = document.createElement('div');
             mount.setAttribute('data-instructor-shell-profile', 'desktop');
-            mount.innerHTML = instructorProfileHtml(true);
-            sidebarContent.appendChild(mount);
+            mount.innerHTML = instructorProfileHtml();
+            sidebarContent.prepend(mount);
         }
 
         const mobilePanel = document.querySelector('#instructorMobileMenu > div:last-child');
@@ -50,13 +52,60 @@
             const oldTitle = Array.from(mobilePanel.children).find(child =>
                 /Instructor Panel/i.test(child.textContent || '')
             );
-            if (oldTitle) oldTitle.hidden = true;
+            oldTitle?.remove();
             const mount = document.createElement('div');
-            mount.className = 'mb-4';
+            mount.className = 'instructor-mobile-profile';
             mount.setAttribute('data-instructor-shell-profile', 'mobile');
-            mount.innerHTML = instructorProfileHtml(true);
-            mobilePanel.insertBefore(mount, mobilePanel.firstChild);
+            mount.innerHTML = instructorProfileHtml();
+            mobilePanel.classList.add('instructor-mobile-panel');
+            mobilePanel.prepend(mount);
         }
+    }
+
+    function mountDesktopSidebarToggle() {
+        const sidebar = document.querySelector('body > aside.instructor-sidebar');
+        const content = sidebar?.querySelector(':scope > div:not(.fas-sidebar-brand)');
+        if (!content || content.querySelector('.instructor-sidebar-toggle')) return;
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'instructor-sidebar-toggle';
+        button.setAttribute('aria-controls', 'instructorSidebarLinks');
+        button.innerHTML = '<i class="fas fa-bars" aria-hidden="true"></i>';
+        const header = document.createElement('div');
+        header.className = 'instructor-sidebar-header';
+        header.appendChild(button);
+        const heading = document.createElement('div');
+        heading.className = 'instructor-sidebar-heading';
+        heading.innerHTML = '<span>Teaching Portal</span><span class="instructor-sidebar-gold-line" aria-hidden="true"></span>';
+        header.appendChild(heading);
+        content.prepend(header);
+        const profile = content.querySelector('[data-instructor-shell-profile="desktop"]');
+        if (profile) header.insertAdjacentElement('afterend', profile);
+
+        const nav = content.querySelector('nav');
+        if (nav) {
+            nav.id = 'instructorSidebarLinks';
+            nav.querySelector('a[href="instructor_profile.html"]')?.remove();
+            nav.querySelectorAll('a').forEach(link => {
+                link.title = link.textContent.trim();
+            });
+        }
+        const mobilePanelProfileLink = document.querySelector('#instructorMobileMenu nav a[href="instructor_profile.html"]');
+        mobilePanelProfileLink?.remove();
+
+        let collapsed = false;
+        try { collapsed = localStorage.getItem('fasInstructorSidebarCollapsed') === 'true'; } catch (_) {}
+        const setCollapsed = value => {
+            collapsed = value;
+            document.body.classList.toggle('instructor-sidebar-collapsed', collapsed);
+            button.setAttribute('aria-expanded', String(!collapsed));
+            button.setAttribute('aria-label', collapsed ? 'Expand instructor sidebar' : 'Collapse instructor sidebar');
+            button.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+            try { localStorage.setItem('fasInstructorSidebarCollapsed', String(collapsed)); } catch (_) {}
+        };
+        button.addEventListener('click', () => setCollapsed(!collapsed));
+        setCollapsed(collapsed);
     }
 
     function getMobileMenu() {
@@ -182,7 +231,13 @@
         if (menuName)  menuName.textContent  = name;
         if (menuEmail) menuEmail.textContent = user?.email || user?.username || '—';
 
-        document.querySelectorAll('.instructor-shell-name').forEach(node => { node.textContent = name; });
+        const nameLength = Array.from(String(name).trim()).length;
+        const nameFontSize = nameLength > 38 ? '11px' : nameLength > 27 ? '12px' : nameLength > 18 ? '13px' : '14px';
+        document.querySelectorAll('.instructor-shell-name').forEach(node => {
+            node.textContent = name;
+            node.style.fontSize = nameFontSize;
+            node.title = name;
+        });
         document.querySelectorAll('.instructor-shell-email').forEach(node => { node.textContent = user?.email || user?.username || '—'; });
     }
 
@@ -247,7 +302,9 @@
                 Swal.fire({ icon: 'error', title: 'Failed', text: data.error || 'Unable to change password.', confirmButtonColor: '#b8860b' });
                 return;
             }
-            Swal.fire({ icon: 'success', title: 'Password Updated', text: 'Your password has been changed.', confirmButtonColor: '#b8860b' });
+            await Swal.fire({ icon: 'success', title: 'Password Updated', text: 'Sign in again with your new password.', confirmButtonColor: '#b8860b' });
+            Auth.clearStoredUser();
+            Auth.redirectToLogin();
         } catch (err) {
             console.error('Instructor password change error:', err);
             Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.', confirmButtonColor: '#b8860b' });
@@ -258,6 +315,7 @@
         syncTopNavLayout();
         window.toggleInstructorMenu = toggleMobileMenu;
         mountSidebarProfiles();
+        mountDesktopSidebarToggle();
         mountDropdown();
         syncNav();
 

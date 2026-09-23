@@ -3670,11 +3670,100 @@
                             <button type="button" class="rounded-md bg-blue-100 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200" onclick="openEnrollmentDetailsModal(${Number(student.enrollment_id)})">
                                 Details
                             </button>
+                            ${balance > 0 ? `<button type="button" class="ml-1 rounded-md bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-200" onclick="openDeskBalancePayment(${Number(student.enrollment_id)})">Collect Balance</button>` : ''}
                         </td>
                     </tr>
                 `;
             }).join('');
         }
+
+        async function openDeskBalancePayment(enrollmentId) {
+            try {
+                const response = await axios.get(`${baseApiUrl}/students.php?action=get-enrollment-balance&enrollment_id=${encodeURIComponent(enrollmentId)}`);
+                const row = response.data?.enrollment;
+                if (!row || Number(row.balance_amount) <= 0) {
+                    showMessage('This enrollment has no remaining balance.', 'info');
+                    await loadActiveStudents();
+                    return;
+                }
+                document.getElementById('deskBalanceModal')?.remove();
+                const modal = document.createElement('div');
+                modal.id = 'deskBalanceModal';
+                modal.className = 'fixed inset-0 z-[1200] flex items-center justify-center bg-black/70 p-4';
+                modal.innerHTML = `<form class="w-full max-w-lg rounded-2xl bg-white p-5 text-slate-900 shadow-xl">
+                    <div class="flex justify-between gap-3"><h2 class="text-xl font-bold">Collect Remaining Balance</h2><button type="button" id="deskBalanceClose" aria-label="Close">×</button></div>
+                    <p class="mt-2 text-sm">${escapeHtml(row.first_name)} ${escapeHtml(row.last_name)} · ${escapeHtml(row.package_sessions)} sessions</p>
+                    <div class="mt-3 grid grid-cols-2 gap-2 text-sm"><div>Total: <strong>${formatCurrencyPHP(row.total_amount)}</strong></div><div>Paid: <strong>${formatCurrencyPHP(row.paid_amount)}</strong></div><div>Balance: <strong>${formatCurrencyPHP(row.balance_amount)}</strong></div><div>Status: <strong>${escapeHtml(row.payment_status)}</strong></div><div>Deadline: <strong>Before Session ${Number(row.deadline_session)}</strong></div><div>Sessions used: <strong>${Number(row.sessions_used)} / ${Number(row.package_sessions)}</strong></div></div>
+                    <label class="mt-4 block text-sm font-semibold">Amount received<input name="amount" type="number" min="0.01" max="${Number(row.balance_amount)}" step="0.01" value="${Number(row.balance_amount).toFixed(2)}" required class="mt-1 w-full rounded-lg border p-2"></label>
+                    <label class="mt-3 block text-sm font-semibold">Method<select name="payment_method" class="mt-1 w-full rounded-lg border p-2"><option>Cash</option><option>GCash</option><option>Bank Transfer</option></select></label>
+                    <label class="mt-3 block text-sm font-semibold">Receipt number (optional)<input name="receipt_number" maxlength="100" class="mt-1 w-full rounded-lg border p-2"></label>
+                    <p id="deskBalanceError" class="mt-3 text-sm text-red-700" role="alert"></p>
+                    <button type="submit" class="mt-4 rounded-lg bg-amber-500 px-4 py-2 font-bold">Record Payment</button>
+                </form>`;
+                document.body.appendChild(modal);
+                modal.querySelector('#deskBalanceClose').onclick = () => modal.remove();
+                modal.addEventListener('click', event => { if (event.target === modal) modal.remove(); });
+                modal.querySelector('form').addEventListener('submit', async event => {
+                    event.preventDefault();
+                    const form = event.currentTarget;
+                    const button = form.querySelector('[type="submit"]');
+                    button.disabled = true;
+                    const data = Object.fromEntries(new FormData(form).entries());
+                    if (!form.dataset.requestReceipt) form.dataset.requestReceipt = `BAL-${enrollmentId}-${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
+                    try {
+                        await axios.post(`${baseApiUrl}/students.php?action=record-enrollment-payment`, {
+                            enrollment_id: enrollmentId, amount: Number(data.amount), payment_method: data.payment_method,
+                            receipt_number: data.receipt_number || form.dataset.requestReceipt
+                        });
+                        modal.remove();
+                        showMessage('Balance payment recorded.', 'success');
+                        await loadActiveStudents();
+                    } catch (error) {
+                        form.querySelector('#deskBalanceError').textContent = error?.response?.data?.error || 'Could not record payment.';
+                        button.disabled = false;
+                    }
+                });
+            } catch (error) {
+                showMessage(error?.response?.data?.error || 'Could not load current balance.', 'error');
+            }
+        }
+
+        async function loadPendingBalancePayments() {
+            const root = document.getElementById('pendingBalancePayments');
+            if (!root) return;
+            try {
+                const response = await axios.get(`${baseApiUrl}/students.php?action=get-pending-enrollment-balance-payments`);
+                const rows = response.data?.payments || [];
+                root.innerHTML = rows.length ? rows.map(row => {
+                    const path = String(row.proof_path || '');
+                    const proof = /^uploads\/payment_proofs\/[a-z_]+\/[a-zA-Z0-9_.-]+$/.test(path)
+                        ? `<a href="../../${escapeHtml(encodeURI(path))}" target="_blank" rel="noopener" class="text-blue-700 underline">View proof</a>`
+                        : 'No proof';
+                    return `<div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 py-3">
+                        <div><strong>${escapeHtml(row.first_name)} ${escapeHtml(row.last_name)}</strong><div>${formatCurrencyPHP(row.amount)} · ${escapeHtml(row.payment_method)} · Ref: ${escapeHtml(row.reference_number)}</div></div>
+                        <div class="flex items-center gap-2">${proof}<button type="button" data-payment-id="${Number(row.payment_id)}" data-decision="approve" class="rounded bg-emerald-600 px-3 py-1.5 font-semibold text-white">Approve</button><button type="button" data-payment-id="${Number(row.payment_id)}" data-decision="reject" class="rounded bg-red-100 px-3 py-1.5 font-semibold text-red-700">Reject</button></div>
+                    </div>`;
+                }).join('') : 'No online balance payments awaiting review.';
+            } catch (error) {
+                root.textContent = error?.response?.data?.error || 'Unable to load online payments.';
+            }
+        }
+
+        document.getElementById('pendingBalancePayments')?.addEventListener('click', async event => {
+            const button = event.target.closest('button[data-payment-id]');
+            if (!button) return;
+            button.disabled = true;
+            try {
+                await axios.post(`${baseApiUrl}/students.php?action=review-enrollment-balance-payment`, {
+                    payment_id: Number(button.dataset.paymentId), decision: button.dataset.decision
+                });
+                showMessage(`Payment ${button.dataset.decision === 'approve' ? 'approved' : 'rejected'}.`, 'success');
+                await Promise.all([loadPendingBalancePayments(), loadActiveStudents()]);
+            } catch (error) {
+                showMessage(error?.response?.data?.error || 'Payment review failed.', 'error');
+                button.disabled = false;
+            }
+        });
 
         function renderEnrollmentDetailCard(label, value, iconClass, valueClass = 'text-slate-900') {
             return `
@@ -3981,6 +4070,7 @@
             await loadPendingRequests();
             await loadPendingSessionExtensionRequests();
             await loadActiveStudents();
+            await loadPendingBalancePayments();
 
             applySessionView();
             await maybeAutoOpenAssignPackageModalFromUrl();

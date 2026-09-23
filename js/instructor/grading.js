@@ -515,7 +515,7 @@ function computeAverageFromInputs() {
     const ids = buildScoreFields().map(field => field.inputId);
     const values = ids.map(id => Number(document.getElementById(id)?.value || 0)).filter(v => v >= 1 && v <= 5);
     if (!values.length || values.length !== ids.length) return null;
-    return Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(2));
+    return Math.round(values.reduce((s, v) => s + v, 0) / values.length);
 }
 function updateScorePreview() {
     const previewEl  = document.getElementById('scorePreview');
@@ -533,13 +533,13 @@ function updateScorePreview() {
         if (badgeEl) badgeEl.classList.add('hidden');
         return;
     }
-    previewEl.textContent = `${avg.toFixed(2)} / 5`;
+    previewEl.textContent = `${avg} / 5`;
     if (previewBox) previewBox.classList.remove('hidden');
     if (badgeEl) {
         badgeEl.classList.remove('hidden');
         badgeEl.classList.add('flex');
         const span = badgeEl.querySelector('span');
-        if (span) span.textContent = `Avg ${avg.toFixed(2)}`;
+        if (span) span.textContent = `Avg ${avg}`;
     }
     const sel = instructorGradeSessions.find(s => Number(s.session_id || 0) === Number(selectedGradeSessionId || 0)) || null;
     if (sel) renderAnalytics(sel);
@@ -730,7 +730,7 @@ function populateGradeForm(session) {
 function renderGradeStats(rows) {
     const graded  = rows.filter(r => Number(r.progress_id || 0) > 0);
     const avgs    = graded.map(r => Number(r.average_score || 0)).filter(v => v > 0);
-    const overall = avgs.length ? (avgs.reduce((s, v) => s + v, 0) / avgs.length).toFixed(2) : '—';
+    const overall = avgs.length ? String(Math.round(avgs.reduce((s, v) => s + v, 0) / avgs.length)) : '—';
     setGradeText('statSessionsInView', String(rows.length));
     setGradeText('statGradedSessions', String(graded.length));
     setGradeText('statAverageScore',   overall === '—' ? '—' : `${overall}/5`);
@@ -778,7 +778,7 @@ function renderGradeSessions() {
         const room       = session.room_name || 'Studio';
         const time       = formatTime12Hour(session.start_time);
         const graded     = Number(session.progress_id || 0) > 0;
-        const score      = graded && session.average_score ? Number(session.average_score).toFixed(1) : null;
+        const score      = graded && session.average_score ? String(Math.round(Number(session.average_score))) : null;
         const attendance = String(session.attendance_status || 'Pending').toLowerCase();
         const sessionEnded = Boolean(session.instructor_completed_at);
         const canEndSession = graded && ['present','late'].includes(attendance) && !sessionEnded;
@@ -878,7 +878,7 @@ function renderStudentHistory(session) {
         const isSelected = sid === Number(selectedGradeSessionId || 0);
         const graded = Number(row.progress_id || 0) > 0;
         const scoreText = graded && row.average_score !== null && row.average_score !== undefined
-            ? `${Number(row.average_score).toFixed(2)}/5`
+            ? `${Math.round(Number(row.average_score))}/5`
             : 'Not graded';
         const state = getGradeState(row);
         const stateCls = getGradeStateCls(row);
@@ -1088,7 +1088,7 @@ function renderAnalytics(session) {
                     pointRadius: tData.map((_, i) => i === tData.length - 1 ? 6 : 4),
                     tension:0.35, fill:true, borderWidth:2 }]},
                 options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false },
-                    tooltip:{ callbacks:{ label: ctx => `Avg: ${Number(ctx.parsed.y).toFixed(2)}/5` }}},
+                    tooltip:{ callbacks:{ label: ctx => `Avg: ${Math.round(Number(ctx.parsed.y))}/5` }}},
                     scales:{ y:{ min:0, max:5, ticks:{ stepSize:1, font:{ size:10 }, color:'#9ca3af' }, grid:{ color:'#f9fafb' }},
                         x:{ ticks:{ font:{ size:10 }, color:'#9ca3af' }, grid:{ display:false }}}}
             });
@@ -1106,7 +1106,7 @@ function renderAnalytics(session) {
                 const mean  = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
                 const pct   = (mean / 5) * 100;
                 const color = mean <= 2 ? 'bg-rose-400' : mean <= 3 ? 'bg-amber-400' : 'bg-teal-500';
-                const word  = mean > 0 ? (SCORE_WORDS[Math.round(mean)] || mean.toFixed(1)) : '—';
+                const word  = mean > 0 ? (SCORE_WORDS[Math.round(mean)] || String(Math.round(mean))) : '—';
                 const tc    = mean <= 2 ? 'text-rose-600' : mean <= 3 ? 'text-amber-600' : 'text-teal-600';
                 return `<div>
                     <div class="flex items-center justify-between mb-1.5">
@@ -1114,7 +1114,7 @@ function renderAnalytics(session) {
                         <span class="text-sm font-bold ${tc}">${word}</span>
                     </div>
                     <div class="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-                        <div class="h-full rounded-full ${color} transition-all duration-700" style="width:${pct.toFixed(1)}%"></div>
+                        <div class="h-full rounded-full ${color} transition-all duration-700" style="width:${Math.round(pct)}%"></div>
                     </div>
                 </div>`;
             }).join('');

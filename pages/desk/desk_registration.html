@@ -4,29 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Desk - Registrations</title>
+    <link rel="manifest" href="../../manifest.webmanifest">
+    <link rel="stylesheet" href="../../assets/fonts/google-fonts.css">
     <!-- Tailwind CSS - Using CDN for development (warning is expected) -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../../css/tailwind.min.css?v=20260919001">
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/css/intlTelInput.css">
+    <link rel="stylesheet" href="../../assets/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="../../assets/vendor/intl-tel-input/css/intlTelInput.css">
     <link rel="stylesheet" href="../../css/intl-phone-input.css">
     <link rel="stylesheet" href="../../css/desk-premium.css?v=20260910001">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
-                        obsidian: '#0f1115',
-                        darkSlate: '#1a1d23'
-                    },
-                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
-                }
-            }
-        }
-    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
         :root { --nav-bg: #0b0f18; --gold: #d4af37; }
         body { font-family: 'Space Grotesk', sans-serif; }
         .sidebar-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -64,7 +51,7 @@
             color: #b8860b;
         }
     </style>
-    <link rel="stylesheet" href="../../css/table-responsive.css">
+    <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001">
     <script src="../../js/table_responsive.js" defer></script>
 </head>
 <body class="desk-app bg-[#f1f5f9] text-slate-900 antialiased" data-custom-registration-mode="1">
@@ -377,8 +364,8 @@
                     <p class="walkin-kicker mb-2">Quick Registration</p>
                     <h3 class="text-2xl font-bold text-slate-900 mb-2">Register Student</h3>
                     <p class="text-sm text-slate-600 leading-6">
-                        Fill in the student details, use a simple login name if needed, and the system will turn it into a
-                        <span class="font-semibold text-slate-900">@fas.com</span> account automatically.
+                        Fill in the student details. The system automatically creates the Student ID login and uses
+                        <span class="font-semibold text-slate-900">fas@123</span> as the temporary password.
                         The registration stays tied to your branch.
                     </p>
                 </div>
@@ -412,26 +399,30 @@
                                 </div>
                                 <p class="mt-1.5 text-xs text-amber-600">Minimum age to register or enroll is 3 years old.</p>
                             </div>
-                            <div class="md:col-span-2">
-                                <label id="walkin_student_email_label" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Login Name (Becomes @fas.com)</label>
-                                <input type="text" id="walkin_student_email" name="student_email" placeholder="Login name" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
-                                <p id="walkin_student_email_hint" class="mt-1.5 text-xs text-slate-500">Enter a simple name or username. The system will turn it into a <code>@fas.com</code> login automatically.</p>
+                            <div id="walkin_student_email_group" class="md:col-span-2 hidden">
+                                <label id="walkin_student_email_label" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Student Email *</label>
+                                <input type="text" id="walkin_student_email" name="student_email" placeholder="Real email or @fas.com login name" autocomplete="off" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                <p id="walkin_student_email_hint" class="mt-1.5 text-xs text-slate-500">Required for students over 18. Use a real email, an <code>@fas.com</code> email, or a simple name. The Student ID remains their login.</p>
+                            </div>
+                            <div class="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-amber-800">Student Portal Account</p>
+                                <p class="mt-1 text-sm text-slate-600">A Student ID login is generated automatically. Students over 18 must also provide a real or <code>@fas.com</code> email above.</p>
                             </div>
                             <div class="w-full">
                                 <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">
-                                    Phone *
+                                    Contact Number *
                                 </label>
 
                                 <input id="phone" type="tel" name="student_phone" required autocomplete="off"
                                 class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500"
                                 placeholder="Phone number">
+                                <p class="mt-1.5 text-xs text-slate-500">For a minor student, enter the guardian's contact number here.</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Branch *</label>
-                                <select name="branch_id" id="walkin_branch_id" required class="branch-locked-select w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
-                                    <option value="">Loading branches...</option>
-                                </select>
-                                <p class="mt-1.5 text-xs text-slate-500">The registration stays tied to the branch selected here.</p>
+                                <input type="hidden" name="branch_id" id="walkin_branch_id" data-assigned-branch="true">
+                                <div id="walkin_branch_display" class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-700 font-medium">Loading assigned branch...</div>
+                                <p class="mt-1.5 text-xs text-slate-500">Automatically assigned to your desk branch.</p>
                             </div>
                         </div>
                         <div class="mt-3">
@@ -485,44 +476,10 @@
                                     <option value="Other">Other</option>
                                 </select>
                             </div>
-                            <div class="w-full">
-                                <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider guardian-label">Phone</label>
-                                <input type="tel" name="guardian_phone" autocomplete="off" class="intl-phone-input w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-yellow-500 guardian-field" placeholder="Phone number">
-                            </div>
                             <div>
-                                <label id="walkin_guardian_email_label" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Login Email (Becomes @fas.com)</label>
-                                <input type="text" name="guardian_email" id="walkin_guardian_email" placeholder="Login name or real email" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
-                                <p id="walkin_guardian_email_hint" class="mt-1.5 text-xs text-slate-500">Use a real email address, or enter a simple login name and the system will turn it into a <code>@fas.com</code> account automatically.</p>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Occupation</label>
-                                <input type="text" name="guardian_occupation" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
-                            </div>
-                        </div>
-                        <div class="mt-3">
-                            <input type="hidden" name="guardian_address" id="walkin_guardian_address">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em]">Address</label>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-500 mb-1">Street</label>
-                                    <input type="text" name="guardian_street" id="walkin_guardian_street" placeholder="House no., street, subdivision" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-500 mb-1">Barangay</label>
-                                    <input type="text" name="guardian_barangay" id="walkin_guardian_barangay" placeholder="Barangay" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-500 mb-1">Province</label>
-                                    <select name="guardian_province" id="walkin_guardian_province" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
-                                        <option value="">Loading provinces...</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-500 mb-1">City / Municipality</label>
-                                    <select name="guardian_city" id="walkin_guardian_city" class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20" disabled>
-                                        <option value="">Select province first</option>
-                                    </select>
-                                </div>
+                                <label id="walkin_guardian_email_label" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-[0.14em] guardian-label">Guardian Login Email</label>
+                                <input type="text" name="guardian_email" id="walkin_guardian_email" placeholder="Real or placeholder email" class="guardian-field w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20">
+                                <p id="walkin_guardian_email_hint" class="mt-1.5 text-xs text-slate-500">A real email is optional. You may enter a placeholder email or a simple login name; simple names become <code>@fas.com</code> logins.</p>
                             </div>
                         </div>
                     </div>
@@ -604,18 +561,19 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="../../js/index.js?v=20260906010"></script>
-    <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/intlTelInput.min.js"></script>
+    <script src="../../assets/vendor/js/axios.min.js"></script>
+<script src="../../js/offline.js?v=20260919001"></script>
+    <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
+    <script src="../../js/index.js?v=20260922001"></script>
+    <script src="../../assets/vendor/intl-tel-input/js/intlTelInput.min.js"></script>
     <script src="../../js/intl-phone-input.js"></script>
     <script src="../../js/session_timeout.js"></script>
-    <script src="../../js/desk/desk_nav.js?v=20260910001"></script>
+    <script src="../../js/desk/desk_nav.js?v=20260917003"></script>
       <script src="../../js/desk/desk_registration.js?v=20260906001"></script>
         <script src="../../js/birthdate_validation.js"></script>
     <script>
-        const PH_PROVINCES_URL = 'https://raw.githubusercontent.com/darklight721/philippines/master/provinces.json';
-        const PH_CITIES_URL = 'https://raw.githubusercontent.com/darklight721/philippines/master/cities.json';
+        const PH_PROVINCES_URL = '../../assets/data/philippines-provinces.json';
+        const PH_CITIES_URL = '../../assets/data/philippines-cities.json';
         let phProvinceRows = [];
         let phCityRows = [];
 
@@ -692,14 +650,10 @@
 
             const syncAll = () => {
                 syncCityOptions('walkin_student');
-                syncCityOptions('walkin_guardian');
                 syncHiddenAddress('walkin_student');
-                syncHiddenAddress('walkin_guardian');
             };
 
-            ['walkin_student_street', 'walkin_student_barangay', 'walkin_student_city', 'walkin_student_province',
-             'walkin_guardian_street', 'walkin_guardian_barangay', 'walkin_guardian_city', 'walkin_guardian_province'
-            ].forEach((id) => {
+            ['walkin_student_street', 'walkin_student_barangay', 'walkin_student_city', 'walkin_student_province'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) {
                     el.addEventListener('input', syncAll);
@@ -713,29 +667,17 @@
                     phProvinceRows.map((row) => ({ value: row.key, label: row.name })),
                     'Select province'
                 );
-                populateSelect(
-                    document.getElementById('walkin_guardian_province'),
-                    phProvinceRows.map((row) => ({ value: row.key, label: row.name })),
-                    'Select province'
-                );
                 syncAll();
             }).catch(() => {
                 const studentProvince = document.getElementById('walkin_student_province');
-                const guardianProvince = document.getElementById('walkin_guardian_province');
                 if (studentProvince) studentProvince.innerHTML = '<option value="">Failed to load provinces</option>';
-                if (guardianProvince) guardianProvince.innerHTML = '<option value="">Failed to load provinces</option>';
             });
 
             document.getElementById('walkin_student_province')?.addEventListener('change', () => {
                 syncCityOptions('walkin_student');
                 syncHiddenAddress('walkin_student');
             });
-            document.getElementById('walkin_guardian_province')?.addEventListener('change', () => {
-                syncCityOptions('walkin_guardian');
-                syncHiddenAddress('walkin_guardian');
-            });
             document.getElementById('walkin_student_city')?.addEventListener('change', () => syncHiddenAddress('walkin_student'));
-            document.getElementById('walkin_guardian_city')?.addEventListener('change', () => syncHiddenAddress('walkin_guardian'));
 
             form.addEventListener('submit', syncAll);
             syncAll();

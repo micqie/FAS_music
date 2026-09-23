@@ -1472,6 +1472,60 @@ class Admin
             }
             $payments = $stmtPayments->fetchAll(PDO::FETCH_ASSOC);
 
+            $enrollments = [];
+            $enrollmentPayments = [];
+            if ($this->tableExists('tbl_enrollments') && $this->tableExists('tbl_session_packages')) {
+                $stmtEnrollments = $this->conn->prepare("
+                    SELECT e.enrollment_id, e.created_at, e.enrollment_date, e.status, e.request_notes,
+                           e.assigned_teacher_id,
+                           NULLIF(TRIM(CONCAT_WS(' ', t.first_name, t.last_name)), '') AS instructor_name,
+                           COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
+                           COALESCE(sp.price, 0) AS package_fee
+                    FROM tbl_enrollments e
+                    LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
+                    LEFT JOIN tbl_teachers t ON t.teacher_id = e.assigned_teacher_id
+                    WHERE e.student_id = ? AND e.status <> 'Cancelled'
+                    ORDER BY e.created_at ASC, e.enrollment_id ASC
+                ");
+                $stmtEnrollments->execute([$resolvedStudentId]);
+                $enrollments = $stmtEnrollments->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($enrollments as &$enrollment) {
+                    $requestMeta = json_decode((string)($enrollment['request_notes'] ?? ''), true);
+                    if (is_array($requestMeta) && is_numeric($requestMeta['package_total_amount'] ?? null)) {
+                        $enrollment['package_fee'] = (float)$requestMeta['package_total_amount'];
+                    }
+                    unset($enrollment['request_notes']);
+                }
+                unset($enrollment);
+
+                if ($this->tableExists('tbl_payments')) {
+                    $stmtEnrollmentPayments = $this->conn->prepare("
+                        SELECT p.payment_id, p.enrollment_id, p.payment_date, p.created_at,
+                               p.amount, p.payment_method, p.receipt_number, p.reference_number, p.notes,
+                               e.package_id
+                        FROM tbl_payments p
+                        INNER JOIN tbl_enrollments e ON e.enrollment_id = p.enrollment_id
+                        WHERE e.student_id = ? AND p.status = 'Paid' AND e.status <> 'Cancelled'
+                        ORDER BY COALESCE(p.payment_date, DATE(p.created_at)) ASC, p.payment_id ASC
+                    ");
+                    $stmtEnrollmentPayments->execute([$resolvedStudentId]);
+                    $enrollmentPayments = $stmtEnrollmentPayments->fetchAll(PDO::FETCH_ASSOC);
+                }
+            }
+
+            $freezePayments = [];
+            if ($this->tableExists('tbl_freeze_payments')) {
+                $stmtFreezePayments = $this->conn->prepare("
+                    SELECT freeze_payment_id, enrollment_id, amount, payment_method, source,
+                           receipt_number, reference_number, payment_date, created_at
+                    FROM tbl_freeze_payments
+                    WHERE student_id = ? AND status = 'Paid'
+                    ORDER BY COALESCE(payment_date, DATE(created_at)) ASC, freeze_payment_id ASC
+                ");
+                $stmtFreezePayments->execute([$resolvedStudentId]);
+                $freezePayments = $stmtFreezePayments->fetchAll(PDO::FETCH_ASSOC);
+            }
+
             // Get user account
             $stmtUser = $this->conn->prepare("
                 SELECT username, email, status
@@ -1488,6 +1542,9 @@ class Admin
                 'student' => $student,
                 'guardians' => $guardians,
                 'payments' => $payments,
+                'enrollments' => $enrollments,
+                'enrollment_payments' => $enrollmentPayments,
+                'freeze_payments' => $freezePayments,
                 'user_account' => $userAccount
             ]);
         } catch (Exception $e) {

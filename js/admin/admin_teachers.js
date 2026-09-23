@@ -176,11 +176,33 @@
             const confirmation = document.getElementById('teacherConfirmPassword');
             if (password) {
                 password.value = '';
+                password.type = 'password';
                 password.dispatchEvent(new Event('input', { bubbles: true }));
             }
-            if (confirmation) confirmation.value = '';
+            if (confirmation) {
+                confirmation.value = '';
+                confirmation.type = 'password';
+            }
+            document.querySelectorAll('#teacherCredentialsSection button[onclick*="toggleTeacherPasswordVisibility"]').forEach(button => {
+                button.setAttribute('aria-label', 'Show password');
+                button.setAttribute('aria-pressed', 'false');
+                button.querySelector('i')?.classList.replace('fa-eye-slash', 'fa-eye');
+            });
             updateTeacherPasswordMatch();
         }
+
+        function toggleTeacherPasswordVisibility(inputId, button) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const visible = input.type === 'password';
+            input.type = visible ? 'text' : 'password';
+            button?.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+            button?.setAttribute('aria-pressed', visible ? 'true' : 'false');
+            const icon = button?.querySelector('i');
+            icon?.classList.toggle('fa-eye', !visible);
+            icon?.classList.toggle('fa-eye-slash', visible);
+        }
+        window.toggleTeacherPasswordVisibility = toggleTeacherPasswordVisibility;
 
         function setTeacherEmailLocked(locked) {
             const emailInput = document.getElementById('email');

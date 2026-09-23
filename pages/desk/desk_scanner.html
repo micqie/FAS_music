@@ -4,28 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Desk Scanner | Father & Sons Music</title>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
-                        obsidian: '#0f1115',
-                        darkSlate: '#1a1d23'
-                    }
-                }
-            }
-        };
-    </script>
- <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="manifest" href="../../manifest.webmanifest">
+    <link rel="stylesheet" href="../../assets/fonts/google-fonts.css">
+    <script src="../../assets/vendor/js/axios.min.js"></script>
+<script src="../../js/offline.js?v=20260919001"></script>
+    <script src="../../assets/vendor/jsqr/jsQR.js"></script>
+    <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
+    <link rel="stylesheet" href="../../css/tailwind.min.css?v=20260919001">
+    <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
+    <link rel="stylesheet" href="../../assets/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="../../css/desk-premium.css?v=20260910001">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
         :root { --nav-bg: #0b0f18; --gold: #d4af37; }
         body { font-family: 'Space Grotesk', sans-serif; }
         .scanner-panel { background: rgba(255, 255, 255, 0.96); }
@@ -48,7 +37,7 @@
         .user-card { animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
-    <link rel="stylesheet" href="../../css/table-responsive.css"></head>
+    <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001"></head>
 <body class="desk-app bg-slate-100 text-slate-900">
     <div class="min-h-screen flex">
         <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden flex-col">
@@ -156,9 +145,9 @@
         </div>
     </div>
 
-    <script src="../../js/index.js"></script>
+    <script src="../../js/index.js?v=20260917004"></script>
     <script src="../../js/session_timeout.js"></script>
-    <script src="../../js/desk/desk_nav.js?v=20260910001"></script>
+    <script src="../../js/desk/desk_nav.js?v=20260917003"></script>
     <script src="../../js/desk/desk_scan.js?v=20260910006"></script>
 </body>
 </html>

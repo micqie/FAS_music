@@ -44,7 +44,7 @@
             rows: [],
             filtered: [],
             page: 1,
-            pageSize: 5,
+            pageSize: 10,
             roles: []
         };
 
@@ -239,6 +239,7 @@
                 icon.classList.toggle('fa-eye-slash', !showing);
             }
             if (button) button.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+            if (button) button.setAttribute('aria-pressed', showing ? 'false' : 'true');
         }
         window.toggleAdminPasswordVisibility = toggleAdminPasswordVisibility;
 
@@ -267,9 +268,10 @@
                 pwdConfirm.value = '';
                 pwdConfirm.dispatchEvent(new Event('input', { bubbles: true }));
             }
-            modal.querySelectorAll('button[onclick*="toggleAdminPasswordVisibility"] i').forEach(icon => {
-                icon.classList.add('fa-eye');
-                icon.classList.remove('fa-eye-slash');
+            modal.querySelectorAll('button[onclick*="toggleAdminPasswordVisibility"]').forEach(button => {
+                button.setAttribute('aria-label', 'Show password');
+                button.setAttribute('aria-pressed', 'false');
+                button.querySelector('i')?.classList.replace('fa-eye-slash', 'fa-eye');
             });
             if (msgEl) {
                 msgEl.textContent = '';
@@ -412,6 +414,13 @@
                 input.value = '';
                 input.dispatchEvent(new Event('input', { bubbles: true }));
             });
+            form.querySelectorAll('button[onclick*="toggleAdminPasswordVisibility"]').forEach(button => {
+                const input = button.parentElement?.querySelector('input');
+                if (input) input.type = 'password';
+                button.setAttribute('aria-label', 'Show password');
+                button.setAttribute('aria-pressed', 'false');
+                button.querySelector('i')?.classList.replace('fa-eye-slash', 'fa-eye');
+            });
             setAdminCreationFormMode(formId, 'system_account');
 
             let messageId = 'adminAddStaffMessage';
@@ -539,18 +548,9 @@
                         const pwdActor = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
                         const payload = {
                             user_id: userId,
-                            old_password: '__ADMIN_OVERRIDE__',
                             new_password: pwdNew.value,
                             is_admin_override: true
                         };
-                        if (pwdActor) {
-                            const fn = String(pwdActor.first_name || '').trim();
-                            const ln = String(pwdActor.last_name  || '').trim();
-                            payload.performed_by_id    = pwdActor.user_id  || null;
-                            payload.performed_by_name  = [fn, ln].filter(Boolean).join(' ') || pwdActor.username || null;
-                            payload.performed_by_role  = pwdActor.role_name || null;
-                            payload.performed_by_email = pwdActor.email || pwdActor.username || null;
-                        }
                         const res = await axios.post(`${baseApiUrl}/users.php?action=change-password`, payload);
                         const data = res.data;
                         if (!data || !data.success) {
@@ -558,6 +558,13 @@
                             return;
                         }
                         showInlineMessage(msgEl, 'success', data.message || 'Password updated.');
+                        if (Number(userId) === Number(pwdActor?.user_id)) {
+                            window.setTimeout(() => {
+                                Auth.clearStoredUser();
+                                Auth.redirectToLogin();
+                            }, 900);
+                            return;
+                        }
                         setTimeout(() => {
                             closeAdminUserPasswordModal();
                         }, 900);

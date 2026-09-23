@@ -11,11 +11,12 @@ require_once 'db_connect.php';
 require_once 'instrument_specialization_sync.php';
 require_once 'auth_session.php';
 require_once 'xss_protection.php';  // XSS Protection utilities
+require_once 'offline_idempotency.php';
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Idempotency-Key');
 
 // Send security headers
 XSSProtection::sendSecurityHeaders();
@@ -51,6 +52,7 @@ class TeachersApi
 
     public function sendJSON($data, $status = 200)
     {
+        fas_idempotency_finalize($data, (int)$status);
         http_response_code($status);
         echo json_encode($data);
         exit;
@@ -545,7 +547,14 @@ class TeachersApi
         if ($value === '' || $value === null) {
             return null;
         }
-        $score = (int)$value;
+        if (!is_numeric($value)) {
+            return null;
+        }
+        $numericScore = (float)$value;
+        if (floor($numericScore) !== $numericScore) {
+            return null;
+        }
+        $score = (int)$numericScore;
         if ($score < 1 || $score > 5) {
             return null;
         }
@@ -1625,6 +1634,9 @@ class TeachersApi
         if ($resolvedAccountMode === 'real_email' && $email === '') {
             $this->sendJSON(['error' => 'Email is required for a real email account'], 400);
         }
+        if ($userId === null && !fas_ensure_password_change_column($this->conn)) {
+            $this->sendJSON(['error' => 'Unable to prepare secure account creation.'], 500);
+        }
 
         try {
             $this->conn->beginTransaction();
@@ -1651,15 +1663,15 @@ class TeachersApi
                 }
 
                 $roleId = $this->getTeacherRoleId();
-                $tempPassword = 'fasmusic@2020';
+                $tempPassword = fas_generate_temporary_password();
                 $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT);
                 $userStatus = $status === 'Active' ? 'Active' : 'Inactive';
 
                 $stmtUser = $this->conn->prepare("
                     INSERT INTO tbl_users (
                         username, password, role_id, first_name, last_name,
-                        email, phone, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        email, phone, status, must_change_password
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
                 ");
                 $stmtUser->execute([
                     $username,
@@ -2017,7 +2029,7 @@ class TeachersApi
                     return $value !== null;
                 }));
                 $row['average_score'] = !empty($validScores)
-                    ? round(array_sum($validScores) / count($validScores), 2)
+                    ? (int)round(array_sum($validScores) / count($validScores))
                     : null;
                 $row['criteria_scores'] = $criteriaScores;
             }
@@ -2036,7 +2048,7 @@ class TeachersApi
         }
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
-        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $teacherId = $this->resolveLearningWorkflowTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
         $sessionId = (int)($data['session_id'] ?? 0);
         $skillLevel = $this->normalizeProgressSkillLevel($data['skill_level'] ?? '');
         $performanceScore = $this->normalizeProgressScore($data['performance_score'] ?? null);
@@ -2067,6 +2079,7 @@ class TeachersApi
         if ($assessmentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $assessmentDate)) {
             $this->sendJSON(['error' => 'assessment_date must be in YYYY-MM-DD format'], 400);
         }
+        fas_idempotency_begin($this->conn, 'save-session-grade', $data);
 
         try {
             $stmtSession = $this->conn->prepare("
@@ -2184,7 +2197,7 @@ class TeachersApi
             }
 
             $scores = array_column($criteriaScores, 'score');
-            $averageScore = round(array_sum($scores) / count($scores), 2);
+            $averageScore = (int)round(array_sum($scores) / count($scores));
 
             $this->conn->prepare("
                 UPDATE tbl_sessions
@@ -2239,7 +2252,7 @@ class TeachersApi
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->sendJSON(['error' => 'Method not allowed'], 405);
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
-        $teacherId = $this->resolveTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
+        $teacherId = $this->resolveLearningWorkflowTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
         $sessionId = (int)($data['session_id'] ?? 0);
         if ($teacherId < 1 || $sessionId < 1) $this->sendJSON(['error' => 'Instructor and session are required.'], 400);
 
@@ -2366,18 +2379,18 @@ class TeachersApi
                     $scores = [];
                     foreach ($criteria as $criterion) {
                         if (isset($criterion['score']) && is_numeric($criterion['score'])) {
-                            $scores[] = (float)$criterion['score'];
+                            $scores[] = (int)round((float)$criterion['score']);
                         }
                     }
                     if (!$scores) {
                         foreach (['performance_score','technique_score','rhythm_score','focus_score','assignment_score'] as $scoreColumn) {
                             if ($evaluation[$scoreColumn] !== null && is_numeric($evaluation[$scoreColumn])) {
-                                $scores[] = (float)$evaluation[$scoreColumn];
+                                $scores[] = (int)round((float)$evaluation[$scoreColumn]);
                             }
                         }
                     }
                     $evaluation['criteria_scores'] = $criteria;
-                    $evaluation['average_score'] = $scores ? round(array_sum($scores) / count($scores), 2) : null;
+                    $evaluation['average_score'] = $scores ? (int)round(array_sum($scores) / count($scores)) : null;
                 }
                 unset($evaluation);
                 $row['completed_sessions'] = count($evaluations);
@@ -2419,6 +2432,7 @@ class TeachersApi
         if (!$this->teacherCanManageStudentInstrument($teacherId, $studentId, $instrumentId)) {
             $this->sendJSON(['error' => 'This student/instrument is not assigned to this instructor'], 403);
         }
+        fas_idempotency_begin($this->conn, 'save-learning-progress', $data);
 
         try {
             $this->conn->beginTransaction();

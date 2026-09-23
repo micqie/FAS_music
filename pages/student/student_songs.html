@@ -4,30 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Songs | Father & Sons Music</title>
+    <link rel="manifest" href="../../manifest.webmanifest">
+    <link rel="stylesheet" href="../../assets/fonts/google-fonts.css">
     <script>
         (function(){ var t=localStorage.getItem('theme')||'light'; document.documentElement.classList.toggle('dark',t==='dark'); })();
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../../css/tailwind.min.css?v=20260919001">
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../css/portal.css?v=20260910002">
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
-                        obsidian: '#0f1115',
-                        darkSlate: '#1a1d23'
-                    },
-                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
-                }
-            }
-        }
-    </script>
+    <link rel="stylesheet" href="../../assets/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="../../css/portal.css?v=20260917001">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .portal-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); }
         html.dark .portal-nav { background: rgba(15,17,21,0.92); }
@@ -271,12 +257,13 @@
         </div>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
+    <script src="../../assets/vendor/js/axios.min.js"></script>
+<script src="../../js/offline.js?v=20260919001"></script>
     <script src="../../js/portal_sidebar.js"></script>
-    <script src="../../js/index.js?v=20260910002"></script>
-    <script src="../../js/mode.js"></script>
-    <script src="../../js/student/student_shell.js"></script>
+    <script src="../../js/index.js?v=20260918001"></script>
+    <script src="../../js/mode.js?v=20260918001"></script>
+    <script src="../../js/student/student_shell.js?v=20260917001"></script>
     <script src="../../js/student/student_songs.js"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>

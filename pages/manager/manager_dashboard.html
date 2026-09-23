@@ -4,27 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manager Dashboard | Father & Sons</title>
+    <link rel="manifest" href="../../manifest.webmanifest">
+    <link rel="stylesheet" href="../../assets/fonts/google-fonts.css">
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
-                        obsidian: '#0f1115',
-                        darkSlate: '#1a1d23',
-                        branchBlue: '#0f4c81',
-                        branchMist: '#eef4fb'
-                    },
-                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
-                }
-            }
-        }
-    </script>
+    <link rel="stylesheet" href="../../css/tailwind.min.css?v=20260919001">
+    <link rel="stylesheet" href="../../assets/vendor/fontawesome/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .dark-glass { background: rgba(15, 17, 21, 0.9); backdrop-filter: blur(10px); }
         .sidebar-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -90,8 +75,10 @@
             color: #d4af37;
         }
     </style>
-    <script src="manager_shared.js?v=20260908001" defer></script>
-    <link rel="stylesheet" href="../../css/table-responsive.css"></head>
+    <script src="manager_shared.js?v=20260919002" defer></script>
+    <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001">
+    <link rel="stylesheet" href="../../css/manager-shell.css?v=20260919001">
+</head>
 <body class="dashboard-shell text-slate-900 antialiased">
     <nav class="fixed w-full z-50 dark-glass border-b border-white/10 px-8 py-3 flex justify-between items-center shadow-2xl">
         <div class="flex items-center gap-8">
@@ -261,9 +248,10 @@
         </div>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="../../js/index.js?v=20260908003"></script>
+    <script src="../../assets/vendor/js/axios.min.js"></script>
+<script src="../../js/offline.js?v=20260919001"></script>
+    <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
+    <script src="../../js/index.js?v=20260919002"></script>
     <script src="../../js/manager/dashboard.js"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>

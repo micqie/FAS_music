@@ -4,15 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Learning Progress | Father & Sons</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="../../manifest.webmanifest">
+    <link rel="stylesheet" href="../../assets/fonts/google-fonts.css">
+    <link rel="stylesheet" href="../../css/tailwind.min.css?v=20260919001">
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../css/instructor.css?v=20260910001">
-    <script>
-        tailwind.config={theme:{extend:{colors:{gold:{50:'#fdfaf1',100:'#f9f1d5',400:'#d4af37',500:'#b8860b',600:'#996515'},obsidian:'#0f1115'},fontFamily:{sans:['Inter','ui-sans-serif','system-ui']}}}}
-    </script>
+    <link rel="stylesheet" href="../../assets/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="../../css/instructor.css?v=20260919006">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         body{font-family:'Inter',sans-serif}.dark-glass{background:rgba(15,17,21,.94);backdrop-filter:blur(10px)}
         .soft-shadow{box-shadow:0 14px 40px rgba(15,23,42,.08)}
         .learning-record-title{font-size:1.35rem!important;line-height:1.75rem!important;padding-top:.25rem!important}
@@ -95,11 +93,12 @@
 
     <nav class="instructor-bottom-nav"><a href="instructor_dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a><a href="instructor_students.html"><i class="fas fa-user-graduate"></i><span>Students</span></a><a href="instructor_sessions.html"><i class="fas fa-calendar-alt"></i><span>Sessions</span></a><a href="instructor_grading.html"><i class="fas fa-star"></i><span>Grading</span></a><a href="instructor_profile.html"><i class="fas fa-id-badge"></i><span>Profile</span></a></nav>
 
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="../../js/index.js?v=20260908003"></script>
-    <script src="../../js/instructor/instructor_nav.js?v=20260910001"></script>
-    <script src="../../js/instructor/learning_progress.js?v=20260830003"></script>
+    <script src="../../assets/vendor/js/axios.min.js"></script>
+<script src="../../js/offline.js?v=20260919001"></script>
+    <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
+    <script src="../../js/index.js?v=20260919001"></script>
+    <script src="../../js/instructor/instructor_nav.js?v=20260919007"></script>
+    <script src="../../js/instructor/learning_progress.js?v=20260911001"></script>
     <script>
         function toggleInstructorMenu(){const menu=document.getElementById('instructorMobileMenu');const icon=document.getElementById('instructorMenuIcon');const opening=menu.classList.contains('hidden');menu.classList.toggle('hidden');icon.classList.toggle('fa-bars',!opening);icon.classList.toggle('fa-times',opening)}
         document.addEventListener('DOMContentLoaded',()=>{const user=typeof Auth!=='undefined'?Auth.getUser():null;const name=[user?.first_name,user?.last_name].filter(Boolean).join(' ')||user?.username||'Instructor';const label=document.getElementById('instructorNameNav');if(label)label.textContent=name;document.getElementById('progressSearch')?.addEventListener('input',event=>{window.filterInstructorLearningProgress?.(event.target.value||'')});document.getElementById('requestBookBtn')?.addEventListener('click',()=>window.openLearningMaterialRequest?.())});

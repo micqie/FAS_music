@@ -1,0 +1,180 @@
+/* Shared manager navigation. The same sidebar is used on desktop and mobile. */
+html, body { overflow-x: hidden; }
+
+body > aside.manager-sidebar {
+    display: flex !important;
+    z-index: 60 !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin !important;
+    scrollbar-color: #64748b #0f1115;
+}
+
+body > aside.manager-sidebar::-webkit-scrollbar {
+    display: block !important;
+    width: 8px !important;
+}
+
+body > aside.manager-sidebar::-webkit-scrollbar-thumb {
+    background: #64748b;
+    border-radius: 999px;
+}
+
+.manager-sidebar > div:not(.fas-sidebar-brand) {
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    flex: 1 0 auto;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 0 !important;
+    padding: 1rem 1.5rem 1.25rem !important;
+}
+
+.manager-sidebar > div:not(.fas-sidebar-brand) > * { margin-top: 0 !important; }
+.manager-sidebar h3 { display: none; }
+
+.manager-sidebar-header {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.manager-sidebar-heading {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.4rem;
+    color: #f8fafc;
+    font-size: 0.95rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.manager-sidebar-gold-line {
+    display: block;
+    width: 7rem;
+    max-width: 100%;
+    height: 0.22rem;
+    border-radius: 999px;
+    background: #d4af37;
+}
+
+.manager-sidebar-profile { overflow: hidden; }
+.manager-sidebar-profile .fa-user-circle { line-height: 1; }
+
+.manager-sidebar-toggle,
+.manager-mobile-menu-toggle {
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: 0 0 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+}
+
+.manager-sidebar-toggle:hover,
+.manager-mobile-menu-toggle:hover,
+.manager-sidebar-toggle:focus-visible,
+.manager-mobile-menu-toggle:focus-visible { background: rgba(255, 255, 255, 0.14); }
+
+.manager-sidebar-toggle { display: none; }
+.manager-mobile-menu-toggle { display: inline-flex; }
+
+.manager-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+@media (min-width: 1024px) {
+    body.manager-sidebar-collapsed { --manager-sidebar-width: 4.75rem; }
+    body.fas-manager-shell.manager-sidebar-collapsed { --fas-sidebar-width: 4.75rem; }
+
+    body > aside.manager-sidebar {
+        width: var(--manager-sidebar-width, 18rem) !important;
+        height: 100dvh !important;
+        padding-top: 0 !important;
+        overflow-y: auto !important;
+    }
+
+    body > main {
+        margin-left: var(--manager-sidebar-width, 18rem) !important;
+    }
+
+    .manager-sidebar-toggle { display: inline-flex; }
+    .manager-mobile-menu-toggle { display: none; }
+
+    body.manager-sidebar-collapsed .manager-sidebar > div:not(.fas-sidebar-brand) {
+        padding-right: 0.65rem !important;
+        padding-left: 0.65rem !important;
+    }
+
+    body.manager-sidebar-collapsed .manager-sidebar-toggle { margin: 0 auto; }
+    body.manager-sidebar-collapsed .manager-sidebar-heading,
+    body.manager-sidebar-collapsed .manager-sidebar-profile > div { display: none; }
+
+    body.manager-sidebar-collapsed .manager-sidebar-profile {
+        justify-content: center;
+        padding: 0.4rem;
+    }
+
+    body.manager-sidebar-collapsed .manager-sidebar-profile > span {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    body.manager-sidebar-collapsed .manager-sidebar-profile .fa-user-circle { font-size: 2rem; }
+
+    body.manager-sidebar-collapsed .manager-sidebar nav a {
+        justify-content: center;
+        padding-right: 0.5rem !important;
+        padding-left: 0.5rem !important;
+        font-size: 0;
+    }
+
+    body.manager-sidebar-collapsed .manager-sidebar nav a > i:first-child {
+        width: 1.25rem;
+        margin-right: 0 !important;
+        font-size: 1rem;
+        text-align: center;
+    }
+}
+
+@media (max-width: 1023px) {
+    .manager-sidebar-toggle { display: inline-flex; }
+
+    body > nav {
+        left: 0 !important;
+        width: 100% !important;
+        min-height: 4.5rem;
+        padding: 0.65rem 1rem !important;
+    }
+
+    body > nav > div:first-child { gap: 0.75rem !important; }
+    body > main { margin-left: 0 !important; padding-top: 5.5rem !important; }
+
+    body > aside.manager-sidebar {
+        top: 0 !important;
+        bottom: 0 !important;
+        width: min(18rem, calc(100vw - 2rem)) !important;
+        height: 100dvh !important;
+        padding-top: 0 !important;
+        overflow-y: auto !important;
+        transform: translateX(calc(-100% - 1rem));
+        transition: transform 220ms ease;
+    }
+
+    body.manager-menu-open { overflow: hidden; }
+    body.manager-menu-open > aside.manager-sidebar { transform: translateX(0); }
+    body.manager-menu-open .manager-sidebar-backdrop { display: block; }
+}

@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build:css": "tailwindcss -i css/tailwind-admin.input.css -o css/tailwind.min.css --minify && node scripts/fix-tailwind-asset-paths.js",
+    "build:offline": "python scripts/build_service_worker.py",
+    "build": "npm run build:css && npm run build:offline",
+    "test": "node tests/offline-static-test.js"
   },
   "repository": {
     "type": "git",

@@ -1,5 +1,8 @@
 (function (global) {
-    const UTILS_SCRIPT = 'https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/js/utils.js';
+    const ownScript = document.currentScript && document.currentScript.src;
+    const UTILS_SCRIPT = ownScript
+        ? new URL('../assets/vendor/intl-tel-input/js/utils.js', ownScript).href
+        : 'assets/vendor/intl-tel-input/js/utils.js';
     const PREFERRED_COUNTRIES = ['ph', 'us', 'gb', 'jp'];
 
     function getMaxLength(countryCode) {

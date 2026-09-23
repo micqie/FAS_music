@@ -12,6 +12,7 @@ if (!ini_get('date.timezone') || ini_get('date.timezone') === 'UTC') {
 require_once 'db_connect.php';
 require_once 'instrument_specialization_sync.php';
 require_once 'auth_session.php';
+require_once 'enrollment_payment_rules.php';
 require_once 'xss_protection.php';  // XSS Protection utilities
 
 header("Content-Type: application/json");
@@ -323,14 +324,14 @@ class StudentsApi
         }
 
         return [
-            'host' => $fileConfig['host'] ?? $env('MAIL_HOST', ''),
-            'username' => $fileConfig['username'] ?? $env('MAIL_USERNAME', ''),
-            'password' => $fileConfig['password'] ?? $env('MAIL_PASSWORD', ''),
-            'port' => (int)($fileConfig['port'] ?? $env('MAIL_PORT', 465)),
-            'from_address' => $fileConfig['from_address'] ?? $env('MAIL_FROM_ADDRESS', $env('MAIL_USERNAME', '')),
-            'from_name' => $fileConfig['from_name'] ?? $env('MAIL_FROM_NAME', 'Father & Sons Music School'),
-            'encryption' => strtolower((string)($fileConfig['encryption'] ?? $env('MAIL_ENCRYPTION', 'ssl'))),
-            'verify_peer' => filter_var($fileConfig['verify_peer'] ?? $env('MAIL_VERIFY_PEER', 'true'), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE),
+            'host' => $fileConfig['MAIL_HOST'] ?? $env('MAIL_HOST', ''),
+            'username' => $fileConfig['MAIL_USERNAME'] ?? $env('MAIL_USERNAME', ''),
+            'password' => $fileConfig['MAIL_PASSWORD'] ?? $env('MAIL_PASSWORD', ''),
+            'port' => (int)($fileConfig['MAIL_PORT'] ?? $env('MAIL_PORT', 465)),
+            'from_address' => $fileConfig['MAIL_FROM_ADDRESS'] ?? $env('MAIL_FROM_ADDRESS', $env('MAIL_USERNAME', '')),
+            'from_name' => $fileConfig['MAIL_FROM_NAME'] ?? $env('MAIL_FROM_NAME', 'Father & Sons Music School'),
+            'encryption' => strtolower((string)($fileConfig['MAIL_ENCRYPTION'] ?? $env('MAIL_ENCRYPTION', 'ssl'))),
+            'verify_peer' => filter_var($fileConfig['MAIL_VERIFY_PEER'] ?? $env('MAIL_VERIFY_PEER', 'true'), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE),
         ];
     }
 
@@ -1500,7 +1501,7 @@ class StudentsApi
                     return $value !== null;
                 }));
                 $row['average_score'] = !empty($validScores)
-                    ? round(array_sum($validScores) / count($validScores), 2)
+                    ? (int)round(array_sum($validScores) / count($validScores))
                     : null;
                 $row['criteria_scores'] = $criteriaScores;
             }
@@ -4208,6 +4209,17 @@ class StudentsApi
             $stmtEnrollments->execute([(int)$student['student_id']]);
             $allEnrollments = $stmtEnrollments->fetchAll(PDO::FETCH_ASSOC);
 
+            foreach ($allEnrollments as &$enrollmentRow) {
+                $balanceData = $this->balanceEnrollment((int)$enrollmentRow['enrollment_id']);
+                if ($balanceData) {
+                    foreach (['total_amount', 'paid_amount', 'balance_amount', 'deadline_session',
+                        'sessions_used', 'sessions_remaining', 'payment_status', 'payment_history'] as $field) {
+                        $enrollmentRow[$field] = $balanceData[$field];
+                    }
+                }
+            }
+            unset($enrollmentRow);
+
             if (!empty($allEnrollments)) {
                 $currentIndex = null;
                 foreach ($allEnrollments as $idx => $row) {
@@ -4272,18 +4284,18 @@ class StudentsApi
                             $criteria = json_decode((string)($grade['criteria_scores']??''),true);
                             if (is_array($criteria) && $criteria) {
                                 foreach ($criteria as $criterion) {
-                                    $label=trim((string)($criterion['name']??'')); $score=(float)($criterion['score']??0);
+                                    $label=trim((string)($criterion['name']??'')); $score=(int)round((float)($criterion['score']??0));
                                     if ($label!=='' && $score>=1 && $score<=5) $scoreGroups[$label][]=$score;
                                 }
                             } else {
                                 foreach (['Performance'=>'performance_score','Technique'=>'technique_score','Rhythm'=>'rhythm_score','Focus'=>'focus_score','Practice'=>'assignment_score'] as $label=>$column) {
-                                    $score=(float)($grade[$column]??0); if ($score>=1 && $score<=5) $scoreGroups[$label][]=$score;
+                                    $score=(int)round((float)($grade[$column]??0)); if ($score>=1 && $score<=5) $scoreGroups[$label][]=$score;
                                 }
                             }
                         }
-                        foreach ($scoreGroups as $label=>$scores) $certificateStrengths[]=['name'=>$label,'average'=>round(array_sum($scores)/count($scores),2)];
+                        foreach ($scoreGroups as $label=>$scores) $certificateStrengths[]=['name'=>$label,'average'=>(int)round(array_sum($scores)/count($scores))];
                         usort($certificateStrengths,function($a,$b){return $b['average']<=>$a['average'];});
-                        $certificateStrengths=array_slice(array_values(array_filter($certificateStrengths,function($row){return $row['average']>=3.5;})),0,3);
+                        $certificateStrengths=array_slice(array_values(array_filter($certificateStrengths,function($row){return $row['average']>=4;})),0,3);
                     }
                 } catch (PDOException $e) {
                     $issuedCertificate = null;
@@ -4434,10 +4446,28 @@ class StudentsApi
             $this->sendJSON(['error' => 'Email is required'], 400);
         }
 
+        $actor = fas_require_authenticated_user($this->conn);
+        if (fas_normalize_role_category($actor['role_name'] ?? '') === 'student'
+            && strcasecmp((string)($actor['email'] ?? ''), $email) !== 0) {
+            $this->sendJSON(['error' => 'You can only view your own student portal'], 403);
+        }
+
         try {
             $stmt = $this->conn->prepare("SELECT student_id FROM tbl_students WHERE email = ? LIMIT 1");
             $stmt->execute([$email]);
             $studentId = (int) $stmt->fetchColumn();
+            $role = fas_normalize_role_category($actor['role_name'] ?? '');
+            if ($studentId > 0 && $role === 'guardian') {
+                $access = $this->conn->prepare('SELECT 1 FROM tbl_student_guardians sg JOIN tbl_guardians g ON g.guardian_id = sg.guardian_id WHERE sg.student_id = ? AND g.email = ? LIMIT 1');
+                $access->execute([$studentId, (string)($actor['email'] ?? '')]);
+                if (!$access->fetchColumn()) $this->sendJSON(['error' => 'Student is not linked to this guardian'], 403);
+            } elseif ($studentId > 0 && in_array($role, ['staff', 'manager'], true)) {
+                $access = $this->conn->prepare('SELECT 1 FROM tbl_students WHERE student_id = ? AND branch_id = ? LIMIT 1');
+                $access->execute([$studentId, (int)($actor['branch_id'] ?? 0)]);
+                if (!$access->fetchColumn()) $this->sendJSON(['error' => 'Student is outside your branch'], 403);
+            } elseif ($studentId > 0 && !in_array($role, ['student', 'guardian', 'staff', 'manager', 'admin', 'owner'], true)) {
+                $this->sendJSON(['error' => 'Student portal access denied'], 403);
+            }
             if ($studentId < 1) {
                 $this->sendJSON([
                     'success' => true,
@@ -6701,6 +6731,8 @@ class StudentsApi
                     COALESCE(sp.price, 0) AS total_amount,
                     COALESCE(pay.paid_amount, 0) AS paid_amount,
                     COALESCE(pay.payment_type, '—') AS payment_type,
+                    pay.latest_payment_date,
+                    pay.latest_payment_id,
                     {$freezePaymentStatusSelect}
                     e.status,
                     e.assigned_teacher_id,
@@ -6715,6 +6747,7 @@ class StudentsApi
                     e.start_date,
                     e.end_date,
                     e.created_at,
+                    e.request_notes,
                     fs.session_date AS first_session_date,
                     fs.start_time AS first_start_time,
                     fs.end_time AS first_end_time,
@@ -6748,6 +6781,8 @@ class StudentsApi
                     SELECT
                         p.enrollment_id,
                         SUM(CASE WHEN p.status = 'Paid' THEN p.amount ELSE 0 END) AS paid_amount,
+                        MAX(CASE WHEN p.status = 'Paid' THEN COALESCE(p.payment_date, DATE(p.created_at)) END) AS latest_payment_date,
+                        MAX(CASE WHEN p.status = 'Paid' THEN p.payment_id END) AS latest_payment_id,
                         {$paySummaryPaymentTypeSelect}
                     FROM tbl_payments p
                     GROUP BY p.enrollment_id
@@ -6842,6 +6877,18 @@ class StudentsApi
 
             if (!empty($rows)) {
                 foreach ($rows as &$row) {
+                    $requestMeta = json_decode((string)($row['request_notes'] ?? ''), true);
+                    if (is_array($requestMeta) && is_numeric($requestMeta['package_total_amount'] ?? null)) {
+                        $row['total_amount'] = (float)$requestMeta['package_total_amount'];
+                    }
+                    $row['paid_amount'] = (float)($row['paid_amount'] ?? 0);
+                    $balanceData = $this->balanceEnrollment((int)$row['enrollment_id']);
+                    $row['balance_amount'] = $balanceData['balance_amount'] ?? max(0, (float)$row['total_amount'] - $row['paid_amount']);
+                    if ($balanceData) {
+                        foreach (['total_amount', 'paid_amount', 'deadline_session', 'sessions_used',
+                            'sessions_remaining', 'payment_status'] as $field) $row[$field] = $balanceData[$field];
+                    }
+                    unset($row['request_notes']);
                     $instrumentIds = [];
                     if (!empty($row['instrument_id'])) {
                         $instrumentIds[] = (int)$row['instrument_id'];
@@ -8145,7 +8192,7 @@ class StudentsApi
                         paid_amount = VALUES(paid_amount),
                         payment_deadline_session = VALUES(payment_deadline_session)
                 ");
-                $deadlineSession = $paymentType === 'Installment' ? 1 : max(1, (int)$packageSessions);
+                $deadlineSession = fas_balance_deadline_session((int)$basePackageSessions);
                 $stmtFinancials->execute([
                     $newEnrollmentId,
                     (float)$packagePrice,
@@ -8671,14 +8718,6 @@ class StudentsApi
             }
         }
 
-        // Cancel any previous Pending entries so there is only one active request
-        try {
-            $this->conn->prepare("
-                UPDATE tbl_freeze_payments SET status = 'Rejected', notes = 'Superseded by new submission'
-                WHERE enrollment_id = ? AND status = 'Pending'
-            ")->execute([$enrollmentId]);
-        } catch (PDOException $e) {}
-
         // Handle proof upload
         $proofPath = null;
         if ($isMultipart && !empty($_FILES['proof_file']['name']) && ($_FILES['proof_file']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
@@ -8693,6 +8732,23 @@ class StudentsApi
 
         try {
             $this->conn->beginTransaction();
+
+            // Serialize submissions for this enrollment. A successful payment
+            // restores the account, so another request must not charge it again.
+            $stmtState = $this->conn->prepare("
+                SELECT schedule_status FROM tbl_enrollments
+                WHERE enrollment_id = ? AND student_id = ? FOR UPDATE
+            ");
+            $stmtState->execute([$enrollmentId, $studentId]);
+            if (strcasecmp((string)$stmtState->fetchColumn(), 'Frozen') !== 0) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'This account is no longer frozen. Refresh the page before paying again.'], 409);
+            }
+
+            $this->conn->prepare("
+                UPDATE tbl_freeze_payments SET status = 'Rejected', notes = 'Superseded by new submission'
+                WHERE enrollment_id = ? AND status = 'Pending'
+            ")->execute([$enrollmentId]);
 
             $stmt = $this->conn->prepare("
                 INSERT INTO tbl_freeze_payments
@@ -8890,7 +8946,7 @@ class StudentsApi
 
         try {
             $this->conn->beginTransaction();
-            $stmt = $this->conn->prepare("SELECT * FROM tbl_freeze_payments WHERE freeze_payment_id = ? LIMIT 1");
+            $stmt = $this->conn->prepare("SELECT * FROM tbl_freeze_payments WHERE freeze_payment_id = ? LIMIT 1 FOR UPDATE");
             $stmt->execute([$fpId]);
             $fp = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$fp) { $this->conn->rollBack(); $this->sendJSON(['error' => 'Payment not found'], 404); }
@@ -8980,12 +9036,186 @@ class StudentsApi
         }
     }
 
+    private function balanceEnrollment(int $enrollmentId, bool $lock = false): ?array
+    {
+        $stmt = $this->conn->prepare("SELECT e.enrollment_id, e.student_id, e.status, e.request_notes,
+                e.total_sessions, e.completed_sessions, s.first_name, s.last_name, s.email,
+                s.branch_id, COALESCE(sp.price, 0) AS package_price,
+                COALESCE(sp.sessions, e.total_sessions, 0) AS package_sessions
+            FROM tbl_enrollments e
+            JOIN tbl_students s ON s.student_id = e.student_id
+            LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
+            WHERE e.enrollment_id = ?" . ($lock ? ' FOR UPDATE' : ''));
+        $stmt->execute([$enrollmentId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $meta = $this->decodeRequestMeta($row['request_notes']);
+        $total = is_numeric($meta['package_total_amount'] ?? null)
+            ? (float)$meta['package_total_amount'] : (float)$row['package_price'];
+        $payments = $this->conn->prepare("SELECT payment_id, amount, payment_method, payment_type,
+                payment_date, status, reference_number, receipt_number, notes, created_at
+            FROM tbl_payments WHERE enrollment_id = ? ORDER BY payment_id ASC");
+        $payments->execute([$enrollmentId]);
+        $history = $payments->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $paid = 0.0;
+        $pending = false;
+        foreach ($history as &$payment) {
+            if ($payment['status'] === 'Paid') $paid += (float)$payment['amount'];
+            $paymentMeta = $this->decodeRequestMeta($payment['notes'] ?? '');
+            if ($payment['status'] === 'Pending' && ($paymentMeta['kind'] ?? '') === 'balance_online') $pending = true;
+            $payment['purpose'] = ($paymentMeta['kind'] ?? '') === 'balance_online' || ($paymentMeta['kind'] ?? '') === 'balance_desk'
+                ? 'Balance Payment' : 'Initial Payment';
+            unset($payment['notes']);
+        }
+        unset($payment);
+        $sessions = (int)$row['package_sessions'];
+        $deadline = fas_balance_deadline_session($sessions);
+        $used = (int)$row['completed_sessions'];
+        $usedStmt = $this->conn->prepare("SELECT COUNT(*) FROM tbl_sessions WHERE enrollment_id = ?
+            AND (COALESCE(counted_in, 0) = 1 OR status IN ('Completed', 'Late'))");
+        $usedStmt->execute([$enrollmentId]);
+        $used = max($used, (int)$usedStmt->fetchColumn());
+        $row['total_amount'] = round($total, 2);
+        $row['paid_amount'] = round($paid, 2);
+        $row['balance_amount'] = round(max(0, $total - $paid), 2);
+        $row['deadline_session'] = $deadline;
+        $row['sessions_used'] = $used;
+        $row['sessions_remaining'] = max(0, (int)$row['total_sessions'] - $used);
+        $row['payment_status'] = fas_enrollment_payment_status($total, $paid, $pending, $used, $deadline);
+        $row['payment_history'] = $history;
+        unset($row['request_notes']);
+        return $row;
+    }
+
+    private function authorizeBalanceEnrollment(array $row, array $actor): void
+    {
+        $role = fas_normalize_role_category($actor['role_name'] ?? '');
+        $email = trim((string)($actor['email'] ?? ''));
+        if ($role === 'student' && strcasecmp($email, (string)$row['email']) === 0) return;
+        if ($role === 'guardian') {
+            $stmt = $this->conn->prepare("SELECT 1 FROM tbl_student_guardians sg
+                JOIN tbl_guardians g ON g.guardian_id = sg.guardian_id
+                WHERE sg.student_id = ? AND g.email = ? LIMIT 1");
+            $stmt->execute([(int)$row['student_id'], $email]);
+            if ($stmt->fetchColumn()) return;
+        }
+        if (in_array($role, ['admin', 'owner', 'manager', 'staff'], true)) {
+            if (in_array($role, ['admin', 'owner'], true) || (int)($actor['branch_id'] ?? 0) === (int)$row['branch_id']) return;
+        }
+        $this->sendJSON(['error' => 'You cannot access this enrollment payment'], 403);
+    }
+
+    public function getEnrollmentBalance(): void
+    {
+        $id = (int)($_GET['enrollment_id'] ?? 0);
+        $row = $id > 0 ? $this->balanceEnrollment($id) : null;
+        if (!$row) $this->sendJSON(['error' => 'Enrollment not found'], 404);
+        $this->authorizeBalanceEnrollment($row, fas_require_authenticated_user($this->conn));
+        $this->sendJSON(['success' => true, 'enrollment' => $row]);
+    }
+
+    public function submitEnrollmentBalancePayment(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->sendJSON(['error' => 'Method not allowed'], 405);
+        $actor = fas_require_authenticated_user($this->conn);
+        $role = fas_normalize_role_category($actor['role_name'] ?? '');
+        if (!in_array($role, ['student', 'guardian'], true)) $this->sendJSON(['error' => 'Student or guardian access required'], 403);
+        $id = (int)($_POST['enrollment_id'] ?? 0);
+        $method = trim((string)($_POST['payment_method'] ?? ''));
+        $reference = trim((string)($_POST['reference_number'] ?? ''));
+        if ($id < 1 || !in_array($method, ['GCash', 'Bank Transfer'], true) || $reference === '') {
+            $this->sendJSON(['error' => 'Enrollment, payment method and reference are required'], 400);
+        }
+        if (empty($_FILES['proof_file']['name'])) $this->sendJSON(['error' => 'Payment proof is required'], 400);
+        $proofPath = null;
+        try {
+            $this->conn->beginTransaction();
+            $row = $this->balanceEnrollment($id, true);
+            if (!$row || $row['status'] !== 'Active') $this->sendJSON(['error' => 'Active enrollment not found'], 404);
+            $this->authorizeBalanceEnrollment($row, $actor);
+            if ($row['balance_amount'] <= 0) $this->sendJSON(['error' => 'This enrollment is fully paid'], 409);
+            if ($row['payment_status'] === 'Pending Online Payment') $this->sendJSON(['error' => 'A balance payment is already awaiting review'], 409);
+            $proofPath = $this->storePaymentProofUpload($_FILES['proof_file'], 'enrollment_balances');
+            $notes = json_encode(['kind' => 'balance_online', 'proof_path' => $proofPath]);
+            $stmt = $this->conn->prepare("INSERT INTO tbl_payments
+                (enrollment_id, amount, payment_method, payment_type, payment_date, status, reference_number, notes)
+                VALUES (?, ?, ?, 'Installment', CURDATE(), 'Pending', ?, ?)");
+            $stmt->execute([$id, $row['balance_amount'], $method, $reference, $notes]);
+            $paymentId = (int)$this->conn->lastInsertId();
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'payment_id' => $paymentId, 'status' => 'Pending Online Payment',
+                'amount' => $row['balance_amount'], 'message' => 'Payment submitted for staff review.']);
+        } catch (Throwable $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            if ($proofPath) @unlink(dirname(__DIR__) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $proofPath));
+            error_log('submitEnrollmentBalancePayment: ' . $e->getMessage());
+            $this->sendJSON(['error' => 'Unable to submit balance payment'], 500);
+        }
+    }
+
+    public function getPendingEnrollmentBalancePayments(): void
+    {
+        $actor = fas_require_authenticated_user($this->conn, ['owner', 'manager', 'staff']);
+        $stmt = $this->conn->query("SELECT p.payment_id, p.enrollment_id, p.amount, p.payment_method,
+                p.reference_number, p.notes, p.created_at, s.first_name, s.last_name, s.branch_id
+            FROM tbl_payments p JOIN tbl_enrollments e ON e.enrollment_id = p.enrollment_id
+            JOIN tbl_students s ON s.student_id = e.student_id WHERE p.status = 'Pending'
+            ORDER BY p.payment_id DESC");
+        $rows = [];
+        $role = fas_normalize_role_category($actor['role_name'] ?? '');
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $meta = $this->decodeRequestMeta($row['notes']);
+            if (($meta['kind'] ?? '') !== 'balance_online') continue;
+            if (!in_array($role, ['admin', 'owner'], true) && (int)$row['branch_id'] !== (int)($actor['branch_id'] ?? 0)) continue;
+            $row['proof_path'] = $meta['proof_path'] ?? null;
+            unset($row['notes']);
+            $rows[] = $row;
+        }
+        $this->sendJSON(['success' => true, 'payments' => $rows]);
+    }
+
+    public function reviewEnrollmentBalancePayment(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->sendJSON(['error' => 'Method not allowed'], 405);
+        $actor = fas_require_authenticated_user($this->conn, ['owner', 'manager', 'staff']);
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $paymentId = (int)($data['payment_id'] ?? 0);
+        $decision = (string)($data['decision'] ?? '');
+        if ($paymentId < 1 || !in_array($decision, ['approve', 'reject'], true)) $this->sendJSON(['error' => 'Invalid payment or decision'], 400);
+        try {
+            $this->conn->beginTransaction();
+            $stmt = $this->conn->prepare('SELECT enrollment_id, amount, status, notes FROM tbl_payments WHERE payment_id = ? FOR UPDATE');
+            $stmt->execute([$paymentId]);
+            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+            $meta = $this->decodeRequestMeta($payment['notes'] ?? '');
+            if (!$payment || $payment['status'] !== 'Pending' || ($meta['kind'] ?? '') !== 'balance_online') $this->sendJSON(['error' => 'Pending payment not found'], 404);
+            $row = $this->balanceEnrollment((int)$payment['enrollment_id'], true);
+            $this->authorizeBalanceEnrollment($row, $actor);
+            if ($decision === 'approve' && !fas_balance_payment_allowed((float)$payment['amount'], (float)$row['balance_amount'])) {
+                $this->sendJSON(['error' => 'Payment exceeds the current balance. Reject and request a new submission.'], 409);
+            }
+            $newStatus = $decision === 'approve' ? 'Paid' : 'Failed';
+            $this->conn->prepare('UPDATE tbl_payments SET status = ? WHERE payment_id = ? AND status = \'Pending\'')->execute([$newStatus, $paymentId]);
+            if ($newStatus === 'Paid' && $this->tableExists('tbl_enrollment_financials')) {
+                $this->conn->prepare('UPDATE tbl_enrollment_financials SET paid_amount = ? WHERE enrollment_id = ?')
+                    ->execute([(float)$row['paid_amount'] + (float)$payment['amount'], (int)$payment['enrollment_id']]);
+            }
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'status' => $newStatus]);
+        } catch (Throwable $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            error_log('reviewEnrollmentBalancePayment: ' . $e->getMessage());
+            $this->sendJSON(['error' => 'Unable to review payment'], 500);
+        }
+    }
+
     // ── Admin: Record a payment against an active enrollment ─────────
     public function recordEnrollmentPayment()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
+        $actor = fas_require_authenticated_user($this->conn, ['owner', 'manager', 'staff']);
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
 
         $enrollmentId  = isset($data['enrollment_id'])  ? (int)$data['enrollment_id']         : 0;
@@ -8998,43 +9228,37 @@ class StudentsApi
         if ($enrollmentId <= 0) {
             $this->sendJSON(['error' => 'enrollment_id is required'], 400);
         }
-        if ($amount <= 0) {
+        if (!is_finite($amount) || $amount <= 0 || round($amount, 2) != $amount) {
             $this->sendJSON(['error' => 'Amount must be greater than 0'], 400);
         }
+        if (!in_array($paymentMethod, ['Cash', 'GCash', 'Bank Transfer'], true)) {
+            $this->sendJSON(['error' => 'Invalid payment method'], 400);
+        }
+        if (strlen($receiptNumber) > 50) $this->sendJSON(['error' => 'Receipt number is too long'], 400);
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $paymentDate)) {
             $paymentDate = date('Y-m-d');
         }
 
         try {
-            // Verify enrollment exists and is active
-            $stmtCheck = $this->conn->prepare("
-                SELECT e.enrollment_id, e.student_id, s.first_name, s.last_name,
-                       COALESCE(sp.price, 0) AS total_amount,
-                       COALESCE((
-                           SELECT SUM(p2.amount) FROM tbl_payments p2
-                           WHERE p2.enrollment_id = e.enrollment_id AND p2.status = 'Paid'
-                       ), 0) AS paid_amount
-                FROM tbl_enrollments e
-                INNER JOIN tbl_students s ON s.student_id = e.student_id
-                LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
-                WHERE e.enrollment_id = ? AND e.status = 'Active'
-                LIMIT 1
-            ");
-            $stmtCheck->execute([$enrollmentId]);
-            $enrollment = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
-            if (!$enrollment) {
+            $this->conn->beginTransaction();
+            $enrollment = $this->balanceEnrollment($enrollmentId, true);
+            if (!$enrollment || $enrollment['status'] !== 'Active') {
                 $this->sendJSON(['error' => 'Active enrollment not found'], 404);
             }
+            $this->authorizeBalanceEnrollment($enrollment, $actor);
 
-            $balance = max(0, (float)$enrollment['total_amount'] - (float)$enrollment['paid_amount']);
-            if ($amount > $balance + 0.01) {
+            $balance = (float)$enrollment['balance_amount'];
+            if (!fas_balance_payment_allowed($amount, $balance)) {
                 $this->sendJSON(['error' => sprintf('Amount exceeds outstanding balance of ₱%.2f', $balance)], 400);
             }
 
             // Auto-generate receipt if not provided
             if ($receiptNumber === '') {
-                $receiptNumber = 'OR-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+                $receiptNumber = 'BAL-' . $enrollmentId . '-' . bin2hex(random_bytes(5));
             }
+            $duplicate = $this->conn->prepare('SELECT 1 FROM tbl_payments WHERE receipt_number = ? LIMIT 1');
+            $duplicate->execute([$receiptNumber]);
+            if ($duplicate->fetchColumn()) $this->sendJSON(['error' => 'Receipt number already recorded'], 409);
 
             // Build insert dynamically to handle any schema
             $cols = ['enrollment_id', 'amount', 'payment_method', 'payment_date', 'status'];
@@ -9046,7 +9270,10 @@ class StudentsApi
             }
             if ($this->tableHasColumn('tbl_payments', 'notes') && $notes !== '') {
                 $cols[] = 'notes';
-                $vals[] = $notes;
+                $vals[] = json_encode(['kind' => 'balance_desk', 'note' => $notes]);
+            } elseif ($this->tableHasColumn('tbl_payments', 'notes')) {
+                $cols[] = 'notes';
+                $vals[] = json_encode(['kind' => 'balance_desk']);
             }
             if ($this->tableHasColumn('tbl_payments', 'payment_type')) {
                 $cols[] = 'payment_type';
@@ -9064,15 +9291,16 @@ class StudentsApi
             if ($this->tableExists('tbl_enrollment_financials')) {
                 $this->conn->prepare("
                     UPDATE tbl_enrollment_financials
-                    SET paid_amount = paid_amount + ?
+                    SET paid_amount = ?
                     WHERE enrollment_id = ?
-                ")->execute([$amount, $enrollmentId]);
+                ")->execute([(float)$enrollment['paid_amount'] + $amount, $enrollmentId]);
             }
 
             $newPaid    = (float)$enrollment['paid_amount'] + $amount;
             $newBalance = max(0, (float)$enrollment['total_amount'] - $newPaid);
             $studentName = trim($enrollment['first_name'] . ' ' . $enrollment['last_name']);
 
+            $this->conn->commit();
             $this->sendJSON([
                 'success'        => true,
                 'message'        => "Payment of ₱" . number_format($amount, 2) . " recorded for {$studentName}.",
@@ -9082,6 +9310,7 @@ class StudentsApi
                 'new_balance'    => $newBalance,
             ]);
         } catch (\PDOException $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
     }
@@ -9214,6 +9443,18 @@ switch ($action) {
         break;
     case 'record-enrollment-payment':
         $studentsApi->recordEnrollmentPayment();
+        break;
+    case 'get-enrollment-balance':
+        $studentsApi->getEnrollmentBalance();
+        break;
+    case 'submit-enrollment-balance-payment':
+        $studentsApi->submitEnrollmentBalancePayment();
+        break;
+    case 'get-pending-enrollment-balance-payments':
+        $studentsApi->getPendingEnrollmentBalancePayments();
+        break;
+    case 'review-enrollment-balance-payment':
+        $studentsApi->reviewEnrollmentBalancePayment();
         break;
     default:
         $studentsApi->sendJSON(['error' => 'Invalid action'], 400);

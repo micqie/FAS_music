@@ -1,7 +1,7 @@
 <?php
 /**
  * Walk-in / branch registration API only.
- * No PHPMailer — uses @fas.com login names and default password fas@123.
+ * No PHPMailer — generates Student ID logins and admin-issued default passwords.
  *
  * Online registration uses users.php?action=register or register-basic instead.
  */
@@ -15,7 +15,6 @@ require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/xss_protection.php';  // XSS Protection utilities
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 

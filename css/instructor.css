@@ -1,8 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
    Instructor Portal – Shared Mobile-First Styles
-   ═══════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 body { font-family: 'Inter', sans-serif; }
 html, body { overflow-x: hidden; }
@@ -27,43 +25,59 @@ main.instructor-main > div[class*="max-w-"] {
     max-width: 88rem !important;
 }
 
-.instructor-sidebar > div {
+.instructor-sidebar > div:not(.fas-sidebar-brand) {
     display: flex !important;
     width: 100%;
-    min-height: 100%;
+    min-height: 0;
+    flex: 1 0 auto;
     flex-direction: column;
     gap: 1rem !important;
     margin-top: 0 !important;
     padding: 1rem 1.5rem 1.25rem !important;
 }
 
-.instructor-sidebar > div > * {
+.instructor-sidebar > div:not(.fas-sidebar-brand) > * {
     margin-top: 0 !important;
 }
 
-.instructor-sidebar-title {
+.instructor-sidebar > div:not(.fas-sidebar-brand) > [data-instructor-shell-profile="desktop"] {
     flex: none;
-    margin: 0 !important;
-    padding: 0.25rem 0.5rem 0.75rem !important;
 }
 
-.instructor-sidebar-title h2 {
-    font-size: 1.35rem !important;
-    line-height: 1.2 !important;
+.instructor-sidebar-header {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.instructor-sidebar-heading {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.4rem;
+    color: #f8fafc;
+    font-size: 0.95rem;
+    font-weight: 800;
     white-space: nowrap;
 }
 
-.instructor-sidebar-title > div {
-    width: 100% !important;
-    height: 0.3rem !important;
-    margin-top: 0.65rem !important;
+.instructor-sidebar-gold-line {
+    display: block;
+    width: 7rem;
+    max-width: 100%;
+    height: 0.22rem;
+    border-radius: 999px;
+    background: #d4af37;
 }
 
-.instructor-sidebar [data-instructor-shell-profile="desktop"] {
-    flex: none;
-    margin-top: auto !important;
-    padding-top: 0.75rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+.instructor-mobile-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.instructor-mobile-profile {
+    margin-bottom: 1rem;
 }
 
 .instructor-sidebar-profile {
@@ -75,24 +89,81 @@ main.instructor-main > div[class*="max-w-"] {
     line-height: 1;
 }
 
+.instructor-sidebar-toggle {
+    display: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: 0 0 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    transition: background 150ms ease;
+}
+
+.instructor-sidebar-toggle:hover,
+.instructor-sidebar-toggle:focus-visible {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+@media (max-width: 1023px) {
+    body > nav button[onclick="toggleInstructorMenu()"] {
+        display: inline-flex;
+        width: 2.5rem;
+        height: 2.5rem;
+        flex: 0 0 2.5rem;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 0.75rem;
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff !important;
+    }
+
+    body > nav button[onclick="toggleInstructorMenu()"]:hover,
+    body > nav button[onclick="toggleInstructorMenu()"]:focus-visible {
+        background: rgba(255, 255, 255, 0.14);
+    }
+
+    body > nav #instructorMenuIcon {
+        color: #fff !important;
+    }
+}
+
 @media (min-width: 1024px) {
+    body.instructor-sidebar-collapsed {
+        --instructor-sidebar-width: 4.75rem;
+    }
+
+    body.fas-instructor-shell.instructor-sidebar-collapsed {
+        --fas-sidebar-width: 4.75rem;
+    }
+
+    .instructor-sidebar-toggle {
+        display: inline-flex;
+    }
+
     body > aside.instructor-sidebar {
         top: 0 !important;
         bottom: 0 !important;
-        width: 18rem !important;
+        width: var(--instructor-sidebar-width, 18rem) !important;
         height: 100dvh !important;
         padding-top: 4.75rem !important;
         overflow-y: auto !important;
     }
 
     body > nav.fixed {
-        left: 18rem !important;
+        left: var(--instructor-sidebar-width, 18rem) !important;
         right: 0 !important;
         width: auto !important;
         min-height: 4.75rem;
     }
 
     main.instructor-main {
+        margin-left: var(--instructor-sidebar-width, 18rem) !important;
         padding-top: 4.75rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
@@ -100,6 +171,49 @@ main.instructor-main > div[class*="max-w-"] {
 
     main.instructor-main > div {
         margin-top: 0.75rem !important;
+    }
+
+    body.instructor-sidebar-collapsed .instructor-sidebar > div:not(.fas-sidebar-brand) {
+        padding-right: 0.65rem !important;
+        padding-left: 0.65rem !important;
+    }
+
+    body.instructor-sidebar-collapsed .instructor-sidebar-toggle {
+        margin: 0 auto;
+    }
+
+    body.instructor-sidebar-collapsed .instructor-sidebar-heading,
+    body.instructor-sidebar-collapsed .instructor-sidebar-profile > div,
+    body.instructor-sidebar-collapsed .instructor-sidebar h3 {
+        display: none;
+    }
+
+    body.instructor-sidebar-collapsed .instructor-sidebar-profile {
+        justify-content: center;
+        padding: 0.4rem;
+    }
+
+    body.instructor-sidebar-collapsed .instructor-sidebar-profile > span {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    body.instructor-sidebar-collapsed .instructor-sidebar-profile .fa-user-circle {
+        font-size: 2rem;
+    }
+
+    body.instructor-sidebar-collapsed .instructor-sidebar nav a {
+        justify-content: center;
+        padding-right: 0.5rem !important;
+        padding-left: 0.5rem !important;
+        font-size: 0;
+    }
+
+    body.instructor-sidebar-collapsed .instructor-sidebar nav a > i:first-child {
+        width: 1.25rem;
+        margin-right: 0 !important;
+        font-size: 1rem;
+        text-align: center;
     }
 }
 

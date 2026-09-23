@@ -4,11 +4,12 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 date_default_timezone_set('Asia/Manila');
+require_once __DIR__ . '/private_config.php';
 
-$servername = "localhost";
-$dbusername = "micah";
-$dbpassword = "YourActualPassword";
-$dbname = "music_db";
+$servername = (string)fas_private_setting('DB_HOST', 'localhost');
+$dbusername = (string)fas_private_setting('DB_USER');
+$dbpassword = (string)fas_private_setting('DB_PASSWORD');
+$dbname = (string)fas_private_setting('DB_NAME', 'music_db');
 
 try {
     $conn = new PDO("mysql:host=$servername;dbname=$dbname;charset=utf8mb4", $dbusername, $dbpassword);

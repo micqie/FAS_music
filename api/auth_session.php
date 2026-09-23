@@ -1,35 +1,5 @@
 <?php
 
-if (!function_exists('fas_session_start')) {
-    function fas_session_start(): void
-    {
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            return;
-        }
-
-        $isSecure = (
-            (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-            || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443
-        );
-
-        if (PHP_VERSION_ID >= 70300) {
-            session_set_cookie_params([
-                'lifetime' => 0,
-                'path' => '/',
-                'domain' => '',
-                'secure' => $isSecure,
-                'httponly' => true,
-                'samesite' => 'Lax',
-            ]);
-        } else {
-            session_set_cookie_params(0, '/; samesite=Lax', '', $isSecure, true);
-        }
-
-        session_name('FASSESSID');
-        session_start();
-    }
-}
-
 if (!function_exists('fas_browser_binding_cookie_name')) {
     function fas_browser_binding_cookie_name(): string
     {
@@ -37,10 +7,120 @@ if (!function_exists('fas_browser_binding_cookie_name')) {
     }
 }
 
+if (!function_exists('fas_jwt_cookie_name')) {
+    function fas_jwt_cookie_name(): string { return 'FASAUTH'; }
+}
+
+if (!function_exists('fas_jwt_base64url_encode')) {
+    function fas_jwt_base64url_encode(string $value): string
+    {
+        return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+    }
+}
+
+if (!function_exists('fas_jwt_base64url_decode')) {
+    function fas_jwt_base64url_decode(string $value): ?string
+    {
+        if ($value === '' || !preg_match('/^[A-Za-z0-9_-]+$/D', $value)) return null;
+        $decoded = base64_decode(strtr($value, '-_', '+/'), true);
+        return $decoded === false ? null : $decoded;
+    }
+}
+
+if (!function_exists('fas_jwt_issue')) {
+    function fas_jwt_issue(int $userId, string $signingKey, ?int $now = null): string
+    {
+        $now = $now ?? time();
+        $header = fas_jwt_base64url_encode(json_encode(['typ' => 'JWT', 'alg' => 'HS256'], JSON_THROW_ON_ERROR));
+        $claims = fas_jwt_base64url_encode(json_encode([
+            'iss' => 'fas-music', 'aud' => 'fas-music-portal', 'sub' => (string)$userId,
+            'iat' => $now, 'nbf' => $now, 'exp' => $now + 43200,
+        ], JSON_THROW_ON_ERROR));
+        $message = $header . '.' . $claims;
+        return $message . '.' . fas_jwt_base64url_encode(hash_hmac('sha256', $message, $signingKey, true));
+    }
+}
+
+if (!function_exists('fas_jwt_verify')) {
+    function fas_jwt_verify(string $jwt, string $signingKey, ?int $now = null): ?array
+    {
+        if (strlen($jwt) > 4096 || substr_count($jwt, '.') !== 2 || strlen($signingKey) < 32) return null;
+        [$headerPart, $claimsPart, $signaturePart] = explode('.', $jwt);
+        $headerJson = fas_jwt_base64url_decode($headerPart);
+        $claimsJson = fas_jwt_base64url_decode($claimsPart);
+        $signature = fas_jwt_base64url_decode($signaturePart);
+        if ($headerJson === null || $claimsJson === null || $signature === null) return null;
+        $header = json_decode($headerJson, true);
+        $claims = json_decode($claimsJson, true);
+        if (!is_array($header) || $header !== ['typ' => 'JWT', 'alg' => 'HS256'] || !is_array($claims)) return null;
+        $expected = hash_hmac('sha256', $headerPart . '.' . $claimsPart, $signingKey, true);
+        if (!hash_equals($expected, $signature)) return null;
+        $now = $now ?? time();
+        if (($claims['iss'] ?? null) !== 'fas-music' || ($claims['aud'] ?? null) !== 'fas-music-portal'
+            || !is_string($claims['sub'] ?? null) || !preg_match('/^[1-9][0-9]*$/D', $claims['sub'])
+            || !is_int($claims['iat'] ?? null) || !is_int($claims['nbf'] ?? null) || !is_int($claims['exp'] ?? null)
+            || $claims['iat'] > $now + 60 || $claims['nbf'] > $now + 60 || $claims['exp'] <= $now
+            || $claims['exp'] > $claims['iat'] + 43200) return null;
+        return $claims;
+    }
+}
+
+if (!function_exists('fas_set_jwt_cookie')) {
+    function fas_set_jwt_cookie(string $jwt): void
+    {
+        setcookie(fas_jwt_cookie_name(), $jwt, [
+            'expires' => time() + 43200, 'path' => '/', 'secure' => fas_is_https_request(),
+            'httponly' => true, 'samesite' => 'Lax',
+        ]);
+        $_COOKIE[fas_jwt_cookie_name()] = $jwt;
+    }
+}
+
+if (!function_exists('fas_clear_jwt_cookie')) {
+    function fas_clear_jwt_cookie(): void
+    {
+        setcookie(fas_jwt_cookie_name(), '', [
+            'expires' => time() - 3600, 'path' => '/', 'secure' => fas_is_https_request(),
+            'httponly' => true, 'samesite' => 'Lax',
+        ]);
+        unset($_COOKIE[fas_jwt_cookie_name()]);
+    }
+}
+
+if (!function_exists('fas_clear_legacy_session_cookie')) {
+    function fas_clear_legacy_session_cookie(): void
+    {
+        setcookie('FASSESSID', '', [
+            'expires' => time() - 3600, 'path' => '/', 'secure' => fas_is_https_request(),
+            'httponly' => true, 'samesite' => 'Lax',
+        ]);
+    }
+}
+
 if (!function_exists('fas_generate_browser_binding_token')) {
     function fas_generate_browser_binding_token(): string
     {
         return bin2hex(random_bytes(32));
+    }
+}
+
+if (!function_exists('fas_generate_temporary_password')) {
+    function fas_generate_temporary_password(): string
+    {
+        return 'A1a!' . bin2hex(random_bytes(16));
+    }
+}
+
+if (!function_exists('fas_ensure_password_change_column')) {
+    function fas_ensure_password_change_column(PDO $conn): bool
+    {
+        if (fas_has_user_column($conn, 'must_change_password')) return true;
+        try {
+            $conn->exec('ALTER TABLE tbl_users ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER password');
+        } catch (PDOException $e) {
+            error_log('Unable to add password change flag: ' . $e->getMessage());
+        }
+        return fas_has_user_column($conn, 'must_change_password');
     }
 }
 
@@ -395,19 +475,6 @@ if (!function_exists('fas_is_session_timestamp_stale')) {
     }
 }
 
-if (!function_exists('fas_store_authenticated_user_session')) {
-    function fas_store_authenticated_user_session(array $user, string $sessionToken): void
-    {
-        $_SESSION['fas_auth'] = [
-            'user_id' => (int)($user['user_id'] ?? 0),
-            'role_name' => (string)($user['role_name'] ?? ''),
-            'role_category' => fas_normalize_role_category($user['role_name'] ?? ''),
-            'session_token' => $sessionToken,
-            'logged_in_at' => date('c'),
-        ];
-    }
-}
-
 if (!function_exists('fas_release_user_session_if_matches')) {
     function fas_release_user_session_if_matches(PDO $conn, int $userId, string $sessionToken): void
     {
@@ -435,18 +502,43 @@ if (!function_exists('fas_release_user_session_if_matches')) {
 }
 
 if (!function_exists('fas_get_session_context')) {
-    function fas_get_session_context(): ?array
+    function fas_get_session_context(PDO $conn): ?array
     {
-        fas_session_start();
-        $context = $_SESSION['fas_auth'] ?? null;
-        return is_array($context) ? $context : null;
+        $jwt = (string)($_COOKIE[fas_jwt_cookie_name()] ?? '');
+        if ($jwt === '' || strlen($jwt) > 4096 || substr_count($jwt, '.') !== 2) return null;
+        $parts = explode('.', $jwt);
+        $claimsJson = fas_jwt_base64url_decode($parts[1]);
+        $claims = $claimsJson === null ? null : json_decode($claimsJson, true);
+        $subject = is_array($claims) ? ($claims['sub'] ?? null) : null;
+        if (!is_string($subject) || !preg_match('/^[1-9][0-9]*$/D', $subject)) return null;
+        $userId = (int)$subject;
+        if ($userId < 1) return null;
+        $user = fas_fetch_user_auth_record($conn, $userId);
+        $sessionToken = trim((string)($user['active_session_token'] ?? ''));
+        if ($sessionToken === '' || !fas_jwt_verify($jwt, $sessionToken)) return null;
+        return [
+            'user_id' => $userId,
+            'role_name' => (string)($user['role_name'] ?? ''),
+            'role_category' => fas_normalize_role_category($user['role_name'] ?? ''),
+            'session_token' => $sessionToken,
+            'jwt_expires_at' => $claims['exp'],
+        ];
+    }
+}
+
+if (!function_exists('fas_can_change_user_password')) {
+    function fas_can_change_user_password(array $actor, int $targetUserId, bool $adminOverride): bool
+    {
+        $actorId = (int)($actor['user_id'] ?? 0);
+        if ($actorId < 1 || $targetUserId < 1) return false;
+        if ($adminOverride) return fas_normalize_role_category($actor['role_name'] ?? '') === 'admin';
+        return $actorId === $targetUserId;
     }
 }
 
 if (!function_exists('fas_login_user')) {
     function fas_login_user(PDO $conn, array $user): array
     {
-        fas_session_start();
         fas_ensure_session_columns($conn);
 
         $userId = (int)($user['user_id'] ?? 0);
@@ -465,7 +557,7 @@ if (!function_exists('fas_login_user')) {
             fas_set_browser_binding_cookie($browserToken);
         }
 
-        $currentContext = fas_get_session_context();
+        $currentContext = fas_get_session_context($conn);
         if ($currentContext && (int)($currentContext['user_id'] ?? 0) !== $userId) {
             fas_release_user_session_if_matches(
                 $conn,
@@ -521,8 +613,6 @@ if (!function_exists('fas_login_user')) {
             ];
         }
 
-        session_regenerate_id(true);
-
         $newToken = bin2hex(random_bytes(32));
         $update = $conn->prepare("
             UPDATE tbl_users
@@ -534,7 +624,8 @@ if (!function_exists('fas_login_user')) {
         ");
         $update->execute([$newToken, $browserHash, $userId]);
 
-        fas_store_authenticated_user_session($dbUser, $newToken);
+        fas_set_jwt_cookie(fas_jwt_issue($userId, $newToken));
+        fas_clear_legacy_session_cookie();
 
         return [
             'success' => true,
@@ -548,7 +639,7 @@ if (!function_exists('fas_resolve_authenticated_user')) {
     function fas_resolve_authenticated_user(PDO $conn): array
     {
         fas_ensure_session_columns($conn);
-        $context = fas_get_session_context();
+        $context = fas_get_session_context($conn);
         if (!$context) {
             return [
                 'ok' => false,
@@ -594,6 +685,7 @@ if (!function_exists('fas_resolve_authenticated_user')) {
         if (
             $activeToken === ''
             || !hash_equals($activeToken, $sessionToken)
+            || fas_is_session_timestamp_stale($dbUser['active_session_updated_at'] ?? null)
             || ($activeBrowserHash !== '' && ($browserHash === '' || !hash_equals($activeBrowserHash, $browserHash)))
         ) {
             return [
@@ -672,7 +764,7 @@ if (!function_exists('fas_require_authenticated_user')) {
 if (!function_exists('fas_logout_current_user')) {
     function fas_logout_current_user(PDO $conn): void
     {
-        $context = fas_get_session_context();
+        $context = fas_get_session_context($conn);
         if ($context) {
             fas_release_user_session_if_matches(
                 $conn,
@@ -681,25 +773,13 @@ if (!function_exists('fas_logout_current_user')) {
             );
         }
 
+        if ((int)($context['jwt_expires_at'] ?? 0) - time() < 1800) {
+            fas_set_jwt_cookie(fas_jwt_issue($userId, $sessionToken));
+        }
+
         fas_clear_browser_binding_cookie();
-        $_SESSION = [];
-
-        if (ini_get('session.use_cookies')) {
-            $params = session_get_cookie_params();
-            setcookie(
-                session_name(),
-                '',
-                time() - 42000,
-                $params['path'] ?? '/',
-                $params['domain'] ?? '',
-                !empty($params['secure']),
-                !empty($params['httponly'])
-            );
-        }
-
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            session_destroy();
-        }
+        fas_clear_jwt_cookie();
+        fas_clear_legacy_session_cookie();
     }
 }
 ?>

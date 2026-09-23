@@ -2,9 +2,9 @@
 
 module.exports = {
   content: [
-    './pages/admin/**/*.html',
-    './js/admin/**/*.js',
-    './js/index.js',
+    './*.html',
+    './pages/**/*.html',
+    './js/**/*.js',
   ],
   darkMode: 'class',
   theme: {
@@ -21,9 +21,14 @@ module.exports = {
         darkSlate: '#1a1d23',
         ink: '#111827',
         tide: '#0f766e',
+        cream: '#fafafa',
+        branchBlue: '#0f4c81',
+        branchMist: '#eef4fb',
+        deskBlue: '#0f4c81',
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+        serif: ['Georgia', 'Cambria', 'Times New Roman', 'serif'],
       },
     },
   },

@@ -285,7 +285,6 @@ main table.admin-data-table tr[hidden] {
 .table-money-cell {
     min-width: 140px;
     max-width: 200px;
-    text-align: left;
     white-space: normal;
     font-variant-numeric: tabular-nums;
 }
@@ -369,7 +368,6 @@ main table.admin-data-table tr[hidden] {
 
 #studentsTable td:nth-child(4) { /* Fee */
     min-width: 100px;
-    text-align: right;
 }
 
 #studentsTable td:nth-child(5) { /* Status */

@@ -154,9 +154,9 @@ function learningTrend(evaluations) {
     const newest = Number(rated[0].average_score);
     const oldest = Number(rated[rated.length - 1].average_score);
     const change = newest - oldest;
-    if (change >= 0.35) return { label: 'Improving', detail: `Recent average increased from ${oldest.toFixed(2)} to ${newest.toFixed(2)}.`, className: 'bg-emerald-100 text-emerald-700' };
-    if (change <= -0.35) return { label: 'Needs review', detail: `Recent average changed from ${oldest.toFixed(2)} to ${newest.toFixed(2)}.`, className: 'bg-amber-100 text-amber-700' };
-    return { label: 'Steady', detail: `Recent ratings are consistent around ${newest.toFixed(2)}/5.`, className: 'bg-blue-100 text-blue-700' };
+    if (change >= 1) return { label: 'Improving', detail: `Recent average increased from ${Math.round(oldest)} to ${Math.round(newest)}.`, className: 'bg-emerald-100 text-emerald-700' };
+    if (change <= -1) return { label: 'Needs review', detail: `Recent average changed from ${Math.round(oldest)} to ${Math.round(newest)}.`, className: 'bg-amber-100 text-amber-700' };
+    return { label: 'Steady', detail: `Recent ratings are consistent around ${Math.round(newest)}/5.`, className: 'bg-blue-100 text-blue-700' };
 }
 
 function evaluationDetails(evaluation) {
@@ -176,7 +176,7 @@ function buildPromotionalExamProgressPreview(row) {
         </div>`;
     }
 
-    const overall = evaluations.reduce((sum, item) => sum + Number(item.average_score || 0), 0) / evaluations.length;
+    const overall = Math.round(evaluations.reduce((sum, item) => sum + Number(item.average_score || 0), 0) / evaluations.length);
     const criteriaGroups = new Map();
     evaluations.forEach(evaluation => {
         let sessionCriteria = Array.isArray(evaluation.criteria_scores) ? evaluation.criteria_scores : [];
@@ -201,7 +201,7 @@ function buildPromotionalExamProgressPreview(row) {
     });
     const criteria = Array.from(criteriaGroups.values()).map(group => ({
         name: group.name,
-        average: group.scores.reduce((sum, score) => sum + score, 0) / group.scores.length
+        average: Math.round(group.scores.reduce((sum, score) => sum + score, 0) / group.scores.length)
     })).sort((a, b) => b.average - a.average);
     const strongest = criteria[0] || null;
     const needsSupport = criteria.length > 1 ? criteria[criteria.length - 1] : null;
@@ -210,16 +210,16 @@ function buildPromotionalExamProgressPreview(row) {
     return `<section class="rounded-xl border border-slate-200 bg-slate-50 p-3">
         <div class="flex items-center justify-between gap-3">
             <div><div class="text-[10px] font-black uppercase tracking-[.14em] text-slate-500">Session rating preview</div><div class="mt-0.5 text-xs text-slate-500">Guide only · ${evaluations.length} graded session${evaluations.length === 1 ? '' : 's'} · selected instrument</div></div>
-            <div class="rounded-lg bg-slate-900 px-3 py-2 text-center text-white"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-300">Overall</div><div class="text-lg font-black">${overall.toFixed(2)}<span class="text-xs text-slate-300">/5</span></div></div>
+            <div class="rounded-lg bg-slate-900 px-3 py-2 text-center text-white"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-300">Overall</div><div class="text-lg font-black">${overall}<span class="text-xs text-slate-300">/5</span></div></div>
         </div>
         <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <div class="rounded-lg bg-white px-3 py-2"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Recent trend</div><div class="mt-0.5 text-xs font-black text-slate-800">${learningHtml(trend.label)}</div></div>
-            <div class="rounded-lg bg-white px-3 py-2"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Strongest area</div><div class="mt-0.5 text-xs font-black text-emerald-700">${strongest ? `${learningHtml(strongest.name)} · ${strongest.average.toFixed(2)}/5` : 'Not enough data'}</div></div>
-            <div class="rounded-lg bg-white px-3 py-2"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Review during exam</div><div class="mt-0.5 text-xs font-black text-amber-700">${needsSupport ? `${learningHtml(needsSupport.name)} · ${needsSupport.average.toFixed(2)}/5` : 'Not enough data'}</div></div>
+            <div class="rounded-lg bg-white px-3 py-2"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Strongest area</div><div class="mt-0.5 text-xs font-black text-emerald-700">${strongest ? `${learningHtml(strongest.name)} · ${strongest.average}/5` : 'Not enough data'}</div></div>
+            <div class="rounded-lg bg-white px-3 py-2"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Review during exam</div><div class="mt-0.5 text-xs font-black text-amber-700">${needsSupport ? `${learningHtml(needsSupport.name)} · ${needsSupport.average}/5` : 'Not enough data'}</div></div>
         </div>
         <details class="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
             <summary class="cursor-pointer text-xs font-bold text-slate-700">View recent session ratings</summary>
-            <div class="mt-2 divide-y divide-slate-100">${recent.map(evaluation => `<div class="flex items-center justify-between gap-3 py-2 text-xs"><div><span class="font-bold text-slate-800">Session ${Number(evaluation.session_number || 0) || '—'}</span><span class="ml-2 text-slate-400">${learningDate(evaluation.session_date)}</span></div><span class="font-black text-slate-900">${Number(evaluation.average_score).toFixed(2)}/5</span></div>`).join('')}</div>
+            <div class="mt-2 divide-y divide-slate-100">${recent.map(evaluation => `<div class="flex items-center justify-between gap-3 py-2 text-xs"><div><span class="font-bold text-slate-800">Session ${Number(evaluation.session_number || 0) || '—'}</span><span class="ml-2 text-slate-400">${learningDate(evaluation.session_date)}</span></div><span class="font-black text-slate-900">${Math.round(Number(evaluation.average_score))}/5</span></div>`).join('')}</div>
         </details>
         <p class="mt-2 text-[10px] leading-4 text-slate-500">Previous lesson ratings support professional judgment. The instructor still records the formal exam rating and Passed or Retake result.</p>
     </section>`;
@@ -237,7 +237,7 @@ async function openLevelReadinessReview(index) {
         return `<article class="rounded-lg border ${rated ? 'border-slate-200 bg-slate-50' : 'border-dashed border-slate-200 bg-white'} px-3 py-2.5">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div><div class="text-sm font-black text-slate-900">Session ${Number(evaluation.session_number || 0) || '—'} · ${learningHtml(rating)}</div><div class="text-[11px] text-slate-400">${learningDate(evaluation.session_date)}</div></div>
-                ${evaluation.average_score !== null && evaluation.average_score !== '' ? `<span class="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-black text-white">${Number(evaluation.average_score).toFixed(2)}/5</span>` : '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">No saved grade</span>'}
+                ${evaluation.average_score !== null && evaluation.average_score !== '' ? `<span class="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-black text-white">${Math.round(Number(evaluation.average_score))}/5</span>` : '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">No saved grade</span>'}
             </div>
             <details class="mt-2 border-t border-slate-200 pt-2">
                 <summary class="cursor-pointer text-xs font-bold text-slate-600">Details</summary>

@@ -266,6 +266,16 @@ function filterRegistrationRows(rows, filters) {
 function sortEnrollmentRows(rows, sortMode) {
     const items = [...rows];
     items.sort((a, b) => {
+        if (sortMode === 'recent_payment') {
+            const activityTime = row => {
+                const value = row.latest_payment_date || row.created_at || row.enrollment_date || '';
+                return Date.parse(String(value).replace(' ', 'T')) || 0;
+            };
+            return Number(Boolean(b.latest_payment_date)) - Number(Boolean(a.latest_payment_date))
+                || activityTime(b) - activityTime(a)
+                || Number(b.latest_payment_id || 0) - Number(a.latest_payment_id || 0)
+                || Number(b.enrollment_id || 0) - Number(a.enrollment_id || 0);
+        }
         if (sortMode === 'highest_paid') return Number(b.paid_amount || 0) - Number(a.paid_amount || 0);
         if (sortMode === 'student_name') {
             const left = `${a.last_name || ''} ${a.first_name || ''}`.trim();
@@ -437,12 +447,13 @@ function renderEnrollmentTable(enrollments) {
     body.innerHTML = visibleRows.map(row => {
         const studentName  = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Student';
         const stuId        = row.student_id ? `STU-${String(row.student_id).padStart(4,'0')}` : '';
-        const enrollDate   = row.enrollment_date || row.created_at || '';
+        const activityDate = row.latest_payment_date || row.enrollment_date || row.created_at || '';
+        const activityLabel = row.latest_payment_date ? 'Paid ' : 'Enrolled ';
         let   subLine      = stuId;
-        if (enrollDate) {
-            const d = new Date(enrollDate);
+        if (activityDate) {
+            const d = new Date(String(activityDate).replace(' ', 'T'));
             if (!Number.isNaN(d.getTime())) {
-                subLine += (subLine ? ' \u00B7 ' : '') + 'Enrolled ' + d.toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'numeric' });
+                subLine += (subLine ? ' \u00B7 ' : '') + activityLabel + d.toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'numeric' });
             }
         }
 
@@ -559,7 +570,7 @@ function getFilters() {
         balanceMode: document.getElementById('paymentBalanceFilter')?.value || 'all',
         dateFrom: document.getElementById('paymentDateFrom')?.value || '',
         dateTo: document.getElementById('paymentDateTo')?.value || '',
-        sortMode: 'highest_balance'
+        sortMode: 'recent_payment'
     };
 }
 
@@ -731,11 +742,11 @@ function rpPopulateStudents(enrollments) {
     const sel = document.getElementById('rpStudentSelect');
     if (!sel) return;
     sel.innerHTML = '<option value="">Select a student…</option>' +
-        enrollments.map(e => {
+        enrollments.filter(e => Number(e.balance_amount ?? (Number(e.total_amount || 0) - Number(e.paid_amount || 0))) > 0).map(e => {
             const name = `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Student';
             const branch = e.branch_name || '';
             const balance = Math.max(0, Number(e.total_amount || 0) - Number(e.paid_amount || 0));
-            return `<option value="${e.enrollment_id}" data-balance="${balance}" data-branch="${escapeHtml(branch)}">
+            return `<option value="${e.enrollment_id}" data-balance="${balance}" data-deadline="${Number(e.deadline_session || 0)}" data-branch="${escapeHtml(branch)}">
                 ${escapeHtml(name)} — ${escapeHtml(branch)}
             </option>`;
         }).join('');
@@ -836,6 +847,8 @@ function initRecordPaymentModal() {
         const amt    = document.getElementById('rpBalanceAmount');
         if (this.value && hint && amt) {
             amt.textContent = `₱${balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+            const deadline = document.getElementById('rpDeadline');
+            if (deadline) deadline.textContent = opt?.dataset?.deadline ? ` · Due before Session ${opt.dataset.deadline}` : '';
             hint.classList.remove('hidden');
             // Pre-fill amount with full balance
             const amtInput = document.getElementById('rpAmount');
@@ -855,7 +868,9 @@ function initRecordPaymentModal() {
         const amount       = parseFloat(document.getElementById('rpAmount')?.value   || '0');
         const date         = document.getElementById('rpDate')?.value    || '';
         const method       = document.getElementById('rpMethod')?.value  || 'Cash';
-        const receipt      = document.getElementById('rpReceipt')?.value || '';
+        const receiptInput = document.getElementById('rpReceipt');
+        if (receiptInput && !receiptInput.value.trim()) receiptInput.value = `BAL-${enrollmentId}-${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
+        const receipt      = receiptInput?.value || '';
         const notes        = document.getElementById('rpNote')?.value    || '';
 
         if (!enrollmentId) { rpShowMessage('Please select a student.'); return; }

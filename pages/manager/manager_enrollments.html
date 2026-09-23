@@ -4,27 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manager - Enrollments</title>
+    <link rel="manifest" href="../../manifest.webmanifest">
+    <link rel="stylesheet" href="../../assets/fonts/google-fonts.css">
     <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/tailwind.min.css?v=20260919001">
+    <link rel="stylesheet" href="../../assets/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="../../css/desk-modals.css">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        gold: { 50: '#fdfaf1', 100: '#f9f1d5', 400: '#d4af37', 500: '#b8860b', 600: '#996515' },
-                        obsidian: '#0f1115',
-                        darkSlate: '#1a1d23'
-                    },
-                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
-                }
-            }
-        }
-    </script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.1.1/build/css/intlTelInput.css">
+    <link rel="stylesheet" href="../../assets/vendor/intl-tel-input/css/intlTelInput.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .dark-glass { background: rgba(15, 17, 21, 0.9); backdrop-filter: blur(10px); }
         .sidebar-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -47,9 +34,10 @@
         .enrollment-table th { font-size: .65rem !important; letter-spacing: .08em !important; white-space: nowrap; }
         .enrollment-table tbody button { border-radius: .375rem !important; font-size: .75rem !important; line-height: 1rem !important; padding: .4rem .65rem !important; white-space: nowrap; }
     </style>
-    <script src="manager_shared.js?v=20260908001" defer></script>
-    <link rel="stylesheet" href="../../css/table-responsive.css">
+    <script src="manager_shared.js?v=20260919002" defer></script>
+    <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001">
     <script src="../../js/table_responsive.js" defer></script>
+    <link rel="stylesheet" href="../../css/manager-shell.css?v=20260919001">
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
 
@@ -703,9 +691,10 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="../../js/index.js?v=20260908003"></script>
+    <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
+    <script src="../../assets/vendor/js/axios.min.js"></script>
+<script src="../../js/offline.js?v=20260919001"></script>
+    <script src="../../js/index.js?v=20260919002"></script>
     <script src="../../js/manager/dashboard.js?v=20260828001"></script>
     <script src="../../js/desk/desk_enrollment.js?v=20260907002"></script>
     <script src="../../js/session_timeout.js?v=20260828001"></script>

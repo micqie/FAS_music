@@ -72,10 +72,6 @@ let fasServerClockSynced = false;
                     filter: brightness(2);
                 }
 
-                body.fas-portal-shell > nav.fas-portal-topbar .fas-topbar-brand {
-                    display: none !important;
-                }
-
                 html:not(.dark) body.fas-student-shell .fas-sidebar-brand {
                     border-bottom-color: rgb(228 228 231);
                     background: #fff;
@@ -106,6 +102,15 @@ let fasServerClockSynced = false;
         }
         topbar.classList.add('fas-portal-topbar');
         sidebar.classList.add('fas-portal-sidebar');
+
+        if (portalRole === 'instructor' || portalRole === 'manager') {
+            const topbarBrand = logoImage.closest('a');
+            if (topbarBrand) {
+                topbarBrand.href = portalRole === 'instructor' ? 'instructor_dashboard.html' : 'manager_dashboard.html';
+                topbarBrand.setAttribute('aria-label', portalRole === 'instructor' ? 'Instructor dashboard' : 'Manager dashboard');
+            }
+            return;
+        }
 
         const topbarBrand = logoImage.closest('a') || logoImage;
         topbarBrand.classList.add('fas-topbar-brand');
@@ -567,42 +572,14 @@ let studentDashboardMetaState = null;
 let studentRegistrationRestartNotice = false;
 let _studentPerformanceRadarChartInstance = null;
 
-function setStudentRegistrationPassword(password) {
-    const value = String(password || '').trim();
-    try {
-        if (value) {
-            sessionStorage.setItem('student_registration_password', value);
-        } else {
-            sessionStorage.removeItem('student_registration_password');
-        }
-    } catch (e) {
-        // Ignore storage failures.
-    }
-    try {
-        if (value) {
-            localStorage.setItem('student_registration_password', value);
-        } else {
-            localStorage.removeItem('student_registration_password');
-        }
-    } catch (e) {
-        // Ignore storage failures.
-    }
-}
-
-function getStudentRegistrationPassword() {
-    try {
-        const sessionValue = sessionStorage.getItem('student_registration_password') || '';
-        if (sessionValue) return sessionValue;
-    } catch (e) {
-        // Ignore storage failures.
-    }
-    try {
-        const localValue = localStorage.getItem('student_registration_password') || '';
-        if (localValue) return localValue;
-    } catch (e) {
-        // Ignore storage failures.
-    }
-    return '';
+// Remove credentials saved by older versions of the student registration flow.
+try {
+    localStorage.removeItem('student_registration_password');
+    sessionStorage.removeItem('student_registration_password');
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
+} catch (e) {
+    // Storage can be disabled in some browsers.
 }
 
 function normalizeRoleName(role) {
@@ -676,12 +653,23 @@ const Auth = {
     },
 
     // ── Low-level localStorage read/write (shared across all same-browser tabs) ──
+    _publicUser(user) {
+        if (!user || typeof user !== 'object' || !Number(user.user_id)) return null;
+        const allowed = ['user_id', 'username', 'first_name', 'last_name', 'email', 'phone',
+            'status', 'role_name', 'role_id', 'branch_id', 'branch_name',
+            'student_id', 'guardian_id', 'teacher_id'];
+        return Object.fromEntries(allowed.filter(key => Object.prototype.hasOwnProperty.call(user, key))
+            .map(key => [key, user[key]]));
+    },
+
     _readLocalUser() {
         try {
             const str = localStorage.getItem('fas_user');
             if (!str) return null;
             const parsed = JSON.parse(str);
-            return parsed && typeof parsed === 'object' ? parsed : null;
+            const safeUser = this._publicUser(parsed);
+            if (safeUser && JSON.stringify(safeUser) !== str) this._writeLocalUser(safeUser);
+            return safeUser;
         } catch (e) {
             return null;
         }
@@ -689,7 +677,8 @@ const Auth = {
 
     _writeLocalUser(user) {
         try {
-            localStorage.setItem('fas_user', JSON.stringify(user));
+            const safeUser = this._publicUser(user);
+            if (safeUser) localStorage.setItem('fas_user', JSON.stringify(safeUser));
         } catch (e) {
             console.warn('Unable to save user to localStorage. Storage access may be blocked.');
         }
@@ -701,6 +690,13 @@ const Auth = {
         try { localStorage.removeItem('student_registration_password'); }    catch (e) { /* ignore */ }
         try { sessionStorage.removeItem('user'); }                           catch (e) { /* ignore */ }
         try { sessionStorage.removeItem('student_registration_password'); }  catch (e) { /* ignore */ }
+        try {
+            const privateStatePrefixes = ['fas_freeze_restored_', 'fas_guardian_session_', 'fas_student_session_completed_'];
+            for (let index = localStorage.length - 1; index >= 0; index--) {
+                const key = localStorage.key(index);
+                if (key && privateStatePrefixes.some(prefix => key.startsWith(prefix))) localStorage.removeItem(key);
+            }
+        } catch (e) { /* ignore */ }
     },
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -708,44 +704,15 @@ const Auth = {
     // Returns the currently logged-in user from shared localStorage (synchronous,
     // works across all tabs in the same browser).
     getUser() {
-        // Primary key written by this system.
-        const user = this._readLocalUser();
-        if (user) return user;
-
-        // Legacy fallback: previous implementation stored under 'user'.
-        try {
-            const legacy = localStorage.getItem('user');
-            if (legacy) {
-                const parsed = JSON.parse(legacy);
-                if (parsed && typeof parsed === 'object') {
-                    // Migrate to the new key so future reads are fast.
-                    this._writeLocalUser(parsed);
-                    localStorage.removeItem('user');
-                    return parsed;
-                }
-            }
-        } catch (e) { /* ignore */ }
-
-        // sessionStorage fallback (e.g. storage partitioning edge-cases).
-        try {
-            const ss = sessionStorage.getItem('user');
-            if (ss) {
-                const parsed = JSON.parse(ss);
-                if (parsed && typeof parsed === 'object') {
-                    this._writeLocalUser(parsed);
-                    return parsed;
-                }
-            }
-        } catch (e) { /* ignore */ }
-
-        return null;
+        return this._readLocalUser();
     },
 
     // Persists the logged-in user and notifies all other tabs.
     setUser(user) {
         this._sessionInvalidationHandled = false;
-        this._writeLocalUser(user);
-        this._broadcastLogin(user);
+        const safeUser = this._publicUser(user);
+        this._writeLocalUser(safeUser);
+        this._broadcastLogin(safeUser);
     },
 
     // Wipes stored user data from all storage mechanisms.
@@ -784,7 +751,7 @@ const Auth = {
         }
     },
 
-    // Contacts the server to verify the PHP session is still valid.
+    // Contacts the server to verify the signed authentication cookie is still valid.
     // If the server returns a user record, that becomes the authoritative copy
     // and is pushed to localStorage (and broadcast to other tabs via setUser).
     async validateServerSession(options = {}) {
@@ -864,6 +831,7 @@ const Auth = {
 
 // Initialise the cross-tab broadcast channel listener immediately.
 Auth._initChannel();
+Auth._readLocalUser(); // Rewrite any older stored profile without sensitive fields.
 
 // ── localStorage storage-event fallback for browsers without BroadcastChannel ──
 // (BroadcastChannel does NOT fire for the tab that wrote the key, so this is safe.)
@@ -923,7 +891,7 @@ function isRoleAllowedForPolicy(roleCategory, policyRole) {
 // On protected pages:
 //  1. If localStorage already has the user (e.g. existing tab or after login) → validate with server.
 //  2. If localStorage is empty (e.g. freshly opened Tab 2) → ask the server; it will return the
-//     active session because the browser's PHP session cookie is shared across all tabs.
+//     active session because the browser's HttpOnly JWT cookie is shared across all tabs.
 async function ensureProtectedPageSession() {
     if (!isProtectedPortalPage()) {
         return;
@@ -939,11 +907,11 @@ async function ensureProtectedPageSession() {
     let result = null;
 
     if (localUser) {
-        // User found in localStorage — verify that the PHP session is still valid.
+        // User found in localStorage — verify the server-side authentication state.
         result = await Auth.validateServerSession({ silent: true });
     } else {
         // No local user (new tab, incognito carry-over, etc.) — try to hydrate from
-        // the PHP session.  The cookie is automatically sent by the browser.
+        // the signed JWT cookie. The cookie is automatically sent by the browser.
         result = await Auth.validateServerSession({ silent: true });
     }
 
@@ -958,7 +926,7 @@ async function ensureProtectedPageSession() {
         if (policy && !allowed && result?.valid) {
             Auth.handleSessionInvalidation(`You must be logged in as ${policy.label} to access this page.`);
         } else {
-            // PHP session is also gone or invalid — redirect to login.
+            // Authentication is gone or invalid — redirect to login.
             Auth.redirectToLogin();
         }
         return;
@@ -1668,11 +1636,8 @@ function initLoginForm() {
                     return;
                 }
 
-                // Store user in sessionStorage
+                // Store the public user profile for navigation and display.
                 Auth.setUser(data.user);
-                if (getRoleCategory(data.user.role_name) === 'student') {
-                    setStudentRegistrationPassword(password);
-                }
 
                 showLoginMessage('Welcome back. Redirecting to your dashboard...', 'success', 'Login Successful');
 
@@ -1863,12 +1828,18 @@ function initRegisterForm() {
             }
 
             try {
-                const response = await axios.post(`${baseApiUrl}/online_register.php?action=register`, payload);
+                // Registration sends a verification email before the API responds.
+                // The offline layer's global 8-second timeout is too short for SMTP,
+                // whose server-side timeout is 20 seconds.
+                const response = await axios.post(
+                    `${baseApiUrl}/online_register.php?action=register`,
+                    payload,
+                    { timeout: 30000 }
+                );
                 const data = response.data || {};
 
                 if (response.status === 200 && data.success) {
                     const verificationEmail = data.verification_email || payload.student_email;
-                    setStudentRegistrationPassword(payload.password || '');
                     registerForm.reset();
                     toggleRegisterModal(false);
                     await Swal.fire({
@@ -1890,14 +1861,26 @@ function initRegisterForm() {
                         'success',
                         'Account Created'
                     );
-                    await promptEmailVerification(verificationEmail);
+                    const verificationCompleted = await promptEmailVerification(verificationEmail);
+                    if (verificationCompleted) {
+                        toggleLoginModal(true);
+
+                        const loginUsername = document.getElementById('loginUsername');
+                        const loginPassword = document.getElementById('loginPassword');
+                        if (loginUsername) {
+                            loginUsername.value = data.student_login_identifier || verificationEmail;
+                        }
+                        window.setTimeout(() => (loginPassword || loginUsername)?.focus(), 0);
+                    }
                 } else {
                     showRegisterMessage(data.error || 'Registration failed. Please try again.', 'error');
                 }
             } catch (error) {
                 console.error('Basic registration error:', error);
                 const serverError = error?.response?.data?.error;
-                const message = serverError || error?.message || 'Network error. Please try again.';
+                const message = error?.code === 'ECONNABORTED'
+                    ? 'The mail server took too long to respond. The account was not created; please try again.'
+                    : (serverError || error?.message || 'Network error. Please try again.');
                 showRegisterMessage(message, 'error');
                 await Swal.fire({
                     icon: 'error',
@@ -3189,21 +3172,7 @@ function renderStudentPerformanceProfile(metrics, rows) {
         : [];
     const hasData = validMetrics.some(metric => Number(metric?.percent || 0) > 0);
 
-    if (!validMetrics.length || !hasData) {
-        return `
-            <div class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-xl dark:shadow-black/40 mb-8">
-                <div class="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.28em] text-gold-500">Performance Profile</p>
-                        <h2 class="portal-section-title text-zinc-900 dark:text-white">Your Progress</h2>
-                    </div>
-                </div>
-                <div class="mt-6 rounded-3xl border border-dashed border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                    Grade a few sessions and your progress profile will appear here.
-                </div>
-            </div>
-        `;
-    }
+    if (!validMetrics.length || !hasData) return '';
 
     const availableMetrics = validMetrics.filter(metric => Number.isFinite(Number(metric.percent)) && Number(metric.percent) > 0);
     const averagePercent = availableMetrics.length
@@ -3548,7 +3517,7 @@ function buildStudentCertificateMarkup(portal) {
     const state = getStudentCertificateState(portal);
     const issuedLabel = formatDateLong(state.issueDate) || state.issueDate;
     const strengthsMarkup = state.strengths.length
-        ? state.strengths.map(item => `<span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-3 py-1.5 text-xs font-bold text-gold-700"><i class="fas fa-star mr-1.5 text-[9px]"></i>${escapeHtml(item.name)} · ${Number(item.average).toFixed(1)}/5</span>`).join('')
+        ? state.strengths.map(item => `<span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-3 py-1.5 text-xs font-bold text-gold-700"><i class="fas fa-star mr-1.5 text-[9px]"></i>${escapeHtml(item.name)} · ${Math.round(Number(item.average))}/5</span>`).join('')
         : '';
     return `
         <div class="certificate-sheet relative overflow-hidden rounded-2xl border-2 border-gold-200 bg-white p-5 sm:p-7 shadow-xl shadow-black/10">
@@ -3695,7 +3664,6 @@ function printStudentCertificate() {
     <title>Achievement Certificate</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         html, body { margin: 0; padding: 0; background: #f4f1e8; font-family: Inter, Arial, sans-serif; }
         .print-wrap { max-width: 1100px; margin: 0 auto; padding: 32px; }
         @media print {
@@ -4281,51 +4249,100 @@ function enrollmentStatusBadgeClass(status) {
     return 'bg-zinc-500/15 text-zinc-300 border border-zinc-500/30';
 }
 
-function renderCurrentEnrollmentSummary(enrollment, student, instruments) {
+function renderCurrentEnrollmentSummary(enrollment) {
     if (!enrollment) {
-        return '<div class="text-sm text-zinc-500">No enrollment record yet.</div>';
+        return '';
     }
-    const teacherName = `${enrollment.teacher_first_name || ''} ${enrollment.teacher_last_name || ''}`.trim();
-    const startDate = formatDateLong(enrollment.first_session_date || enrollment.start_date || '');
-    const startTime = enrollment.first_start_time ? formatTime12Hour(enrollment.first_start_time) : '';
-    const endTime = enrollment.first_end_time ? formatTime12Hour(enrollment.first_end_time) : '';
-    const timeLabel = (startTime && endTime) ? `${startTime} - ${endTime}` : 'Not set';
-    const room = enrollment.first_room || 'Not set';
-    const branchName = student?.branch_name || 'Branch not set';
-    const instrumentNames = (Array.isArray(instruments) ? instruments : [])
-        .map(i => String(i.type_name || i.instrument_name || '').trim())
-        .filter(Boolean);
-    const instrumentsLabel = instrumentNames.length ? instrumentNames.join(', ') : 'Not set';
-    const totalAmount = Number(enrollment.total_amount || 0);
-    const paidAmount = Number(enrollment.paid_amount || 0);
-    const balance = Math.max(0, totalAmount - paidAmount);
-    const paymentState = totalAmount > 0 && paidAmount >= totalAmount ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Unpaid');
-    const status = enrollment.status || '—';
-    const reserveNotice = getScheduleFreezeReservationNotice(enrollment);
-    return `
-        <div class="rounded-xl border border-white/10 bg-black/20 p-4">
-            <div class="flex items-center justify-between gap-2">
-                <div class="text-base font-bold text-white">ENROLLED: ${escapeHtml(enrollment.package_name || 'Package')}</div>
-                <span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold ${enrollmentStatusBadgeClass(status)}">${escapeHtml(status)}</span>
+    return renderPortalBalanceSection(enrollment, true);
+}
+
+function renderPortalBalanceSection(enrollment, showPackage = false) {
+    if (!enrollment || String(enrollment.status) !== 'Active') return '';
+    const balance = Number(enrollment.balance_amount ?? Math.max(0, Number(enrollment.total_amount || 0) - Number(enrollment.paid_amount || 0)));
+    const status = String(enrollment.payment_status || (balance > 0 ? 'Partial' : 'Fully Paid'));
+    const history = Array.isArray(enrollment.payment_history) ? enrollment.payment_history : [];
+    const deadline = Number(enrollment.deadline_session || 0);
+    const used = Number(enrollment.sessions_used || 0);
+    const due = balance > 0;
+    const pending = status === 'Pending Online Payment';
+    const overdue = status === 'Payment Overdue';
+    const soon = due && !overdue && deadline > 0 && used >= deadline - 1;
+    const tone = !due ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+        : overdue ? 'border-rose-300 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10'
+        : 'border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10';
+    const accent = !due ? 'text-emerald-700 dark:text-emerald-300'
+        : overdue ? 'text-rose-700 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300';
+    const label = !due ? 'Paid in full' : pending ? 'Payment under review' : overdue ? 'Payment overdue' : soon ? 'Balance due soon' : 'Balance to pay';
+    const packageLabel = showPackage ? `<div class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">${escapeHtml(enrollment.package_name || 'Session package')}</div>` : '';
+    const historyHtml = history.length ? `<details class="mt-3 border-t border-zinc-200/80 pt-3 text-sm dark:border-white/10"><summary class="w-fit cursor-pointer font-semibold text-zinc-700 dark:text-zinc-200">Payment history</summary><div class="mt-2 space-y-2">${history.map(p => `<div class="flex flex-wrap justify-between gap-2 text-zinc-600 dark:text-zinc-300"><span>${escapeHtml(p.purpose || 'Payment')} · ${escapeHtml(p.payment_method || '')} · ${escapeHtml(p.payment_date || '')}</span><span class="font-semibold">${formatCurrencyPHP(p.amount)} · ${escapeHtml(p.status || '')}</span></div>`).join('')}</div></details>` : '';
+    return `<div class="rounded-2xl border ${tone} p-4 sm:p-5">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+                <div class="flex items-center gap-2 text-sm font-bold ${accent}"><i class="fas ${due ? 'fa-circle-exclamation' : 'fa-circle-check'}" aria-hidden="true"></i>${label}</div>
+                <div class="mt-1 text-2xl font-black tracking-tight text-zinc-900 dark:text-white sm:text-3xl">${formatCurrencyPHP(balance)}</div>
+                ${packageLabel}
             </div>
-            ${reserveNotice ? `
-                <div class="mt-4 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                    <div class="font-extrabold">${escapeHtml(reserveNotice.title)}</div>
-                    <div class="mt-1 text-amber-50/90">${escapeHtml(reserveNotice.text)}</div>
-                </div>
-            ` : ''}
-            <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div><span class="text-zinc-400">Instrument type:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(instrumentsLabel)}</span></div>
-                <div><span class="text-zinc-400">Payment:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(paymentState)} (${escapeHtml(enrollment.payment_type || 'Partial Payment')})</span></div>
-                <div><span class="text-zinc-400">Current Balance:</span> <span class="text-zinc-100 font-semibold">${formatCurrencyPHP(balance)}</span></div>
-                <div><span class="text-zinc-400">Where:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(`${room} (${branchName})`)}</span></div>
-                <div><span class="text-zinc-400">Start Date:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(startDate || 'Not set')}</span></div>
-                <div><span class="text-zinc-400">Start Time:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(timeLabel)}</span></div>
-                <div><span class="text-zinc-400">Teacher:</span> <span class="text-zinc-100 font-semibold">${escapeHtml(teacherName || 'Not set')}</span></div>
-                <div><span class="text-zinc-400">Amount:</span> <span class="text-zinc-100 font-semibold">${formatCurrencyPHP(enrollment.total_amount || 0)}</span></div>
-            </div>
+            ${due && !pending ? `<button type="button" onclick="openPortalBalancePayment(${Number(enrollment.enrollment_id)})" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-extrabold text-zinc-950 transition hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600">Pay balance</button>` : ''}
         </div>
-    `;
+        ${due ? `<div class="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs font-medium text-zinc-700 dark:text-zinc-200"><span>Due before session <strong>${deadline}</strong></span><span><strong>${used}</strong> sessions used</span><span>Paid <strong>${formatCurrencyPHP(enrollment.paid_amount)}</strong></span></div>` : ''}
+        ${pending ? '<div class="mt-3 text-xs font-medium text-amber-800 dark:text-amber-200">Your payment is awaiting approval.</div>' : ''}
+        ${historyHtml}
+    </div>`;
+}
+
+async function openPortalBalancePayment(enrollmentId) {
+    try {
+        const response = await axios.get(`${baseApiUrl}/students.php?action=get-enrollment-balance&enrollment_id=${encodeURIComponent(enrollmentId)}`);
+        const enrollment = response.data?.enrollment;
+        if (!enrollment || Number(enrollment.balance_amount) <= 0 || enrollment.payment_status === 'Pending Online Payment') {
+            showMessage('This balance is no longer available for payment. Refresh the page.', 'info');
+            return;
+        }
+        document.getElementById('portalBalancePaymentModal')?.remove();
+        const modal = document.createElement('div');
+        modal.id = 'portalBalancePaymentModal';
+        modal.className = 'fixed inset-0 z-[1200] flex items-center justify-center bg-black/80 p-4';
+        modal.innerHTML = `<form id="portalBalancePaymentForm" class="w-full max-w-md rounded-2xl bg-white p-5 text-slate-900 shadow-xl">
+            <div class="flex items-center justify-between gap-3"><h2 class="text-lg font-bold">Pay balance</h2><button type="button" id="closePortalBalancePayment" class="grid h-9 w-9 place-items-center rounded-full text-xl text-slate-500 hover:bg-slate-100" aria-label="Close">×</button></div>
+            <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"><div class="text-xs font-bold text-amber-800">Amount to pay</div><div class="mt-0.5 text-2xl font-black text-slate-900">${formatCurrencyPHP(enrollment.balance_amount)}</div><div class="mt-1 text-xs text-slate-600">Due before session ${Number(enrollment.deadline_session)}</div></div>
+            <label class="mt-4 block text-sm font-semibold">Method<select name="payment_method" required class="mt-1 w-full rounded-lg border p-2"><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option></select></label>
+            <div id="portalBalanceDestination" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"></div>
+            <label class="mt-3 block text-sm font-semibold">Reference number<input name="reference_number" required maxlength="100" class="mt-1 w-full rounded-lg border p-2"></label>
+            <label class="mt-3 block text-sm font-semibold">Payment proof<input name="proof_file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required class="mt-1 w-full rounded-lg border p-2"></label>
+            <p id="portalBalancePaymentError" class="mt-3 text-sm text-red-700" role="alert"></p>
+            <button type="submit" class="mt-4 w-full rounded-lg bg-amber-500 px-4 py-2.5 font-bold text-black">Submit payment</button>
+            <p class="mt-2 text-center text-xs text-slate-500">Balance updates after approval.</p>
+        </form>`;
+        document.body.appendChild(modal);
+        const methodSelect = modal.querySelector('[name="payment_method"]');
+        const destination = modal.querySelector('#portalBalanceDestination');
+        fetchPaymentDestination().then(recipient => {
+            if (!modal.isConnected) return;
+            const updateDestination = () => renderPaymentDestination(destination, methodSelect.value, recipient);
+            methodSelect.addEventListener('change', updateDestination);
+            updateDestination();
+        });
+        modal.querySelector('#closePortalBalancePayment').onclick = () => modal.remove();
+        modal.addEventListener('click', event => { if (event.target === modal) modal.remove(); });
+        modal.querySelector('form').addEventListener('submit', async event => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const button = form.querySelector('[type="submit"]');
+            button.disabled = true;
+            const data = new FormData(form);
+            data.append('enrollment_id', String(enrollmentId));
+            try {
+                await axios.post(`${baseApiUrl}/students.php?action=submit-enrollment-balance-payment`, data);
+                modal.remove();
+                window.location.reload();
+            } catch (error) {
+                form.querySelector('#portalBalancePaymentError').textContent = error?.response?.data?.error || 'Payment could not be submitted.';
+                button.disabled = false;
+            }
+        });
+    } catch (error) {
+        showMessage(error?.response?.data?.error || 'Could not load current balance.', 'error');
+    }
 }
 
 function getScheduleFreezeReservationNotice(enrollment) {
@@ -5509,34 +5526,19 @@ function getGuardianPaymentMetrics(item) {
 function renderGuardianPaymentCard(item, index) {
     const student = item?.student || {};
     const enrollment = item?.current_enrollment || null;
-    const metrics = getGuardianPaymentMetrics(item);
     const studentName = getGuardianStudentName(item, index);
     const branchName = student.branch_name || '—';
     const packageName = enrollment?.package_name || student.package_name || 'No package yet';
-    const paymentStatus = enrollment?.payment_status || student.registration_status || 'Pending';
-    const statusMetrics = getGuardianSessionStatusMetrics(item);
 
     return `
-        <button type="button" onclick="openGuardianStudentModal(${index})" class="w-full rounded-3xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5 text-left transition hover:border-gold-300">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <div class="text-xl font-black text-zinc-900 dark:text-white">${escapeHtml(studentName)}</div>
-                    <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">${escapeHtml(branchName)} • ${escapeHtml(packageName)}</div>
-                </div>
-                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${badgeClassForRegistrationStatus(paymentStatus)}">${escapeHtml(paymentStatus)}</span>
+        <div class="w-full rounded-3xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-5 text-left">
+            <div class="text-base font-bold text-zinc-900 dark:text-white">${escapeHtml(studentName)}</div>
+            <div class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">${escapeHtml(branchName)} · ${escapeHtml(packageName)}</div>
+            <div class="mt-3">
+                ${enrollment?.status === 'Active' ? renderPortalBalanceSection(enrollment) : '<div class="text-sm text-zinc-500">No active enrollment</div>'}
             </div>
-
-            <div class="mt-4 grid grid-cols-2 gap-3">
-                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-4">
-                    <div class="portal-stat-label">Paid</div>
-                    <div class="mt-2 text-xl font-black text-emerald-600">${formatCurrencyPHP(metrics.totalPaid)}</div>
-                </div>
-                <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-4">
-                    <div class="portal-stat-label">Due</div>
-                    <div class="mt-2 text-xl font-black text-gold-500">${formatCurrencyPHP(metrics.totalBalance)}</div>
-                </div>
-            </div>
-        </button>
+            <button type="button" onclick="openGuardianStudentModal(${index})" class="mt-3 text-xs font-semibold text-zinc-600 underline underline-offset-2 dark:text-zinc-300">Student details</button>
+        </div>
     `;
 }
 
@@ -8345,9 +8347,12 @@ let studentRegAddressLoaded = false;
 async function loadStudentRegAddressData() {
     if (studentRegAddressLoaded) return;
     try {
+        const appAssetRoot = (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
+            ? baseApiUrl.slice(0, -4)
+            : new URL('../', document.baseURI).href.replace(/\/$/, '');
         const [provRes, cityRes] = await Promise.all([
-            fetch('https://raw.githubusercontent.com/darklight721/philippines/master/provinces.json'),
-            fetch('https://raw.githubusercontent.com/darklight721/philippines/master/cities.json')
+            fetch(`${appAssetRoot}/assets/data/philippines-provinces.json`),
+            fetch(`${appAssetRoot}/assets/data/philippines-cities.json`)
         ]);
         studentRegPhProvinces = provRes.ok ? await provRes.json() : [];
         studentRegPhCities = cityRes.ok ? await cityRes.json() : [];
@@ -9450,13 +9455,14 @@ async function initStudentDashboardPage() {
     const enrollmentApproved = portal.current_enrollment && String(portal.current_enrollment.status || '') === 'Active';
     const enrollmentCompleted = isStudentEnrollmentCompleted(portal);
     const isEnrolledStudent = Boolean(enrollmentApproved);
-    const overviewGrid = document.getElementById('studentOverviewGrid');
     const overviewCard = document.getElementById('studentEnrollmentOverviewCard');
     const performanceCard = document.getElementById('studentPerformanceCard');
     const requestShortcutCard = document.getElementById('studentRequestShortcutCard');
     const upcomingCard = document.getElementById('studentUpcomingScheduleCard');
+    const upcomingDetails = document.getElementById('studentUpcomingDetails');
     const qrCard = document.getElementById('studentQrCard');
     const completedState = document.getElementById('studentCompletedState');
+    const enrollmentPaymentCard = document.getElementById('studentEnrollmentPaymentCard');
     bindStudentModalFrame('studentRegistrationModal', closeStudentRegistrationModal);
     bindStudentModalFrame('studentRequestModal', closeStudentRequestModal);
     if (!window.__studentModalEscBound) {
@@ -9467,9 +9473,6 @@ async function initStudentDashboardPage() {
                 closeStudentRequestModal();
             }
         });
-    }
-    if (overviewGrid) {
-        overviewGrid.classList.toggle('hidden', isNewStudent);
     }
     const welcomeNote = document.getElementById('studentWelcomeNote');
     if (welcomeNote) {
@@ -9484,10 +9487,10 @@ async function initStudentDashboardPage() {
         }
     }
     if (overviewCard) overviewCard.classList.toggle('hidden', isEnrolledStudent || enrollmentCompleted);
-    if (performanceCard) performanceCard.classList.toggle('hidden', !isEnrolledStudent);
     if (requestShortcutCard) requestShortcutCard.classList.toggle('hidden', isEnrolledStudent || !regPaid);
     if (upcomingCard) upcomingCard.classList.toggle('hidden', !isEnrolledStudent || enrollmentCompleted);
     if (qrCard) qrCard.classList.toggle('hidden', true);
+    if (enrollmentPaymentCard) enrollmentPaymentCard.classList.toggle('hidden', !isEnrolledStudent);
     if (completedState) {
         if (enrollmentCompleted) {
             completedState.innerHTML = renderStudentCompletedSessionsPanel(portal);
@@ -9499,26 +9502,23 @@ async function initStudentDashboardPage() {
     }
 
     // Package
-    setText('packageName', s.package_name || 'Not assigned yet');
     setText('packageSessions', s.package_sessions ? `${s.package_sessions} sessions` : '—');
     setText('packageMaxInstruments', s.package_max_instruments ? `${s.package_max_instruments} instrument(s)` : '—');
 
-    const upcomingDate = formatDateLong(portal.current_enrollment?.first_session_date || portal.current_enrollment?.start_date || '');
+    const upcomingDate = formatDateLong(portal.current_enrollment?.first_session_date || '');
+    if (upcomingDetails) upcomingDetails.classList.toggle('hidden', !upcomingDate);
     const upcomingStart = portal.current_enrollment?.first_start_time ? formatTime12Hour(portal.current_enrollment.first_start_time) : '';
     const upcomingEnd = portal.current_enrollment?.first_end_time ? formatTime12Hour(portal.current_enrollment.first_end_time) : '';
     const upcomingTime = upcomingStart && upcomingEnd ? `${upcomingStart} - ${upcomingEnd}` : 'To be announced';
     const upcomingRoom = portal.current_enrollment?.first_room || 'To be announced';
     const upcomingTeacher = `${portal.current_enrollment?.teacher_first_name || ''} ${portal.current_enrollment?.teacher_last_name || ''}`.trim() || 'Not assigned yet';
-    setText('studentUpcomingDate', upcomingDate || (isEnrolledStudent ? 'Schedule confirmed soon' : 'Waiting for schedule'));
+    setText('studentUpcomingDate', upcomingDate || (isEnrolledStudent ? 'No upcoming class scheduled' : 'Waiting for schedule'));
     setText('studentUpcomingTime', upcomingTime);
     setText('studentUpcomingRoom', upcomingRoom);
     setText('studentUpcomingTeacher', upcomingTeacher);
-    setText('studentUpcomingNote', isEnrolledStudent
-        ? 'This is the next schedule attached to your active enrollment.'
-        : 'Your next approved class will appear here.');
 
     // Enrollment focus cards
-    setHtml('currentEnrollmentSummary', renderCurrentEnrollmentSummary(portal.current_enrollment || null, portal.student || {}, portal.instruments || []));
+    setHtml('currentEnrollmentSummary', renderCurrentEnrollmentSummary(portal.current_enrollment || null));
     setHtml('enrollmentHistoryList', renderEnrollmentHistoryList(portal.enrollment_history || []));
 
     // Attendance summary (optional)
@@ -9527,11 +9527,13 @@ async function initStudentDashboardPage() {
         const attended = Number(summaryRes.summary?.present_count ?? 0) + Number(summaryRes.summary?.late_count ?? 0);
         setText('sessionsAttended', String(attended));
         const total = Number(s.package_sessions || 0);
+        setText('studentUpcomingSessionProgress', total > 0 ? `${attended}/${total}` : '—');
         const remaining = total > 0 ? Math.max(0, total - attended) : 0;
         setText('sessionsRemaining', total > 0 ? String(remaining) : '—');
         setText('lastAttended', summaryRes.summary?.last_attended_at ? new Date(summaryRes.summary.last_attended_at).toLocaleString() : '—');
     } else {
         setText('sessionsAttended', '0');
+        setText('studentUpcomingSessionProgress', '—');
         setText('sessionsRemaining', '—');
         setText('lastAttended', '—');
     }
@@ -9539,10 +9541,16 @@ async function initStudentDashboardPage() {
     if (isEnrolledStudent) {
         const performanceRows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
         const performanceMetrics = buildStudentPerformanceMetrics(performanceRows);
-        setHtml('studentPerformanceCard', renderStudentPerformanceProfile(performanceMetrics, performanceRows));
-        renderStudentPerformanceRadar(performanceMetrics);
+        const hasGrades = performanceRows.some(row => Number(row?.progress_id || 0) > 0)
+            && performanceMetrics.some(metric => Number(metric?.percent || 0) > 0);
+        if (performanceCard) {
+            performanceCard.innerHTML = hasGrades ? renderStudentPerformanceProfile(performanceMetrics, performanceRows) : '';
+            performanceCard.classList.toggle('hidden', !hasGrades);
+        }
+        renderStudentPerformanceRadar(hasGrades ? performanceMetrics : []);
     } else {
         setHtml('studentPerformanceCard', '');
+        performanceCard?.classList.add('hidden');
         renderStudentPerformanceRadar([]);
     }
 
@@ -9733,7 +9741,7 @@ async function initStudentSessionsPage() {
         const rows = Array.isArray(portal.current_session_grades) ? portal.current_session_grades : [];
         const gradedRows = rows.filter(r => Number(r.progress_id || 0) > 0 && Number(r.average_score || 0) > 0);
         const averageGrade = gradedRows.length
-            ? (gradedRows.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / gradedRows.length).toFixed(2)
+            ? String(Math.round(gradedRows.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / gradedRows.length))
             : null;
 
         setText('gradedSessionCount', String(gradedRows.length));
@@ -9837,7 +9845,7 @@ function renderAttendanceStatusBadge(status) {
 
 function renderStudentGradeBadge(averageScore, progressId) {
     const hasGrade = Number(progressId || 0) > 0 && Number(averageScore || 0) > 0;
-    const label = hasGrade ? `${Number(averageScore).toFixed(2)}/5` : 'Pending';
+    const label = hasGrade ? `${Math.round(Number(averageScore))}/5` : 'Pending';
     const cls = hasGrade
         ? 'bg-gold-500/15 text-gold-300 border border-gold-500/30'
         : 'bg-zinc-500/15 text-zinc-300 border border-zinc-500/25';
@@ -9857,7 +9865,7 @@ function buildStudentGradeDetailsMarkup(row) {
         ? `${formatTime12Hour(row.start_time)} - ${formatTime12Hour(row.end_time)}`
         : (row.start_time ? formatTime12Hour(row.start_time) : 'Time pending');
     const hasGrade = Number(row.progress_id || 0) > 0;
-    const averageScore = hasGrade ? Number(row.average_score).toFixed(2) : null;
+    const averageScore = hasGrade ? String(Math.round(Number(row.average_score))) : null;
     const sessionEndValue = row.session_date
         ? `${row.session_date}T${row.end_time || row.start_time || '23:59:59'}`
         : '';
@@ -9916,7 +9924,7 @@ function buildStudentGradeDetailsMarkup(row) {
     `;
 
     return `
-        <div class="text-left overflow-hidden rounded-[1.5rem] bg-[#f8f4ea] max-w-[96vw] sm:max-w-none max-h-[calc(100vh-2rem)] flex flex-col shadow-2xl">
+        <div class="text-left overflow-hidden rounded-[1.5rem] bg-[#f8f4ea] max-w-[96vw] sm:max-w-none max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] flex flex-col shadow-2xl">
             <div class="flex items-start justify-between gap-3 bg-[#bd9525] px-5 py-4 text-white">
                 <div>
                     <div class="text-[10px] font-black uppercase tracking-[0.22em] text-white/90">Session ${escapeHtml(String(row.session_number || ''))}</div>
@@ -9927,7 +9935,7 @@ function buildStudentGradeDetailsMarkup(row) {
                 </button>
             </div>
             <div class="px-5 py-5 bg-white overflow-y-auto">
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                     <div class="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5">
                         <div class="h-9 w-9 rounded-xl bg-white border border-zinc-200 grid place-items-center text-gold-500 shrink-0">
                             <i class="far fa-calendar text-sm"></i>
@@ -10034,7 +10042,7 @@ async function initStudentGradesPage() {
             ? Math.max(0, Math.min(100, Math.round((completedSessions / packageSessions) * 100)))
             : 0;
         const averageValue = gradedRows.length
-            ? (gradedRows.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / gradedRows.length).toFixed(2)
+            ? String(Math.round(gradedRows.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / gradedRows.length))
             : null;
         const latestGraded = gradedRows.find(row => row.assessment_date || row.updated_at) || null;
 
@@ -10681,12 +10689,31 @@ function logout() {
 async function loadWalkinBranches() {
     const branchSelect = document.getElementById('walkin_branch_id');
     if (!branchSelect) return;
+    const usesAssignedBranch = branchSelect.dataset.assignedBranch === 'true';
+    const branchDisplay = document.getElementById('walkin_branch_display');
+    let assignedBranchId = 0;
+
+    if (usesAssignedBranch) {
+        const currentUser = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+        assignedBranchId = Number(currentUser?.branch_id || 0);
+        branchSelect.value = assignedBranchId > 0 ? String(assignedBranchId) : '';
+        if (branchDisplay) {
+            branchDisplay.textContent = currentUser?.branch_name
+                || (assignedBranchId > 0 ? `Assigned Branch #${assignedBranchId}` : 'No assigned branch');
+        }
+    }
 
     try {
         const response = await axios.get(`${baseApiUrl}/branch.php?action=get-branches`);
         const data = response.data;
 
         if (data.success && data.branches) {
+            if (usesAssignedBranch) {
+                const assignedBranch = data.branches.find(branch => Number(branch.branch_id) === assignedBranchId);
+                if (branchDisplay && assignedBranch) branchDisplay.textContent = assignedBranch.branch_name;
+                branchSelect.dispatchEvent(new Event('change'));
+                return;
+            }
             branchSelect.innerHTML = '<option value=\"\">Select Branch</option>';
             data.branches.forEach(branch => {
                 const option = document.createElement('option');
@@ -10695,11 +10722,11 @@ async function loadWalkinBranches() {
                 branchSelect.appendChild(option);
             });
         } else {
-            branchSelect.innerHTML = '<option value=\"\">No branches available</option>';
+            if (!usesAssignedBranch) branchSelect.innerHTML = '<option value=\"\">No branches available</option>';
         }
     } catch (error) {
         console.error('Error loading branches for walk-in:', error);
-        branchSelect.innerHTML = '<option value=\"\">Error loading branches</option>';
+        if (!usesAssignedBranch) branchSelect.innerHTML = '<option value=\"\">Error loading branches</option>';
     }
 }
 
@@ -11201,25 +11228,25 @@ function setupWalkinEnrollmentForm() {
 
 function syncWalkinLoginModeUI(allowRealEmail = false) {
     const emailInput = document.getElementById('walkin_student_email');
+    const emailGroup = document.getElementById('walkin_student_email_group');
     const emailLabel = document.getElementById('walkin_student_email_label');
     const emailHint = document.getElementById('walkin_student_email_hint');
     if (!emailInput) return;
 
+    if (emailGroup) emailGroup.classList.toggle('hidden', !allowRealEmail);
     emailInput.type = 'text';
     emailInput.autocomplete = 'off';
-    emailInput.placeholder = allowRealEmail ? 'Real email or login name' : 'Login name';
-    emailInput.required = true;
+    emailInput.placeholder = 'Real email or @fas.com login name';
+    emailInput.required = allowRealEmail;
+    emailInput.disabled = !allowRealEmail;
+    if (!allowRealEmail) emailInput.value = '';
 
     if (emailLabel) {
-        emailLabel.textContent = allowRealEmail
-            ? 'Student Email or Login Name'
-            : 'Login Name (Becomes @fas.com)';
+        emailLabel.textContent = 'Student Email *';
     }
 
     if (emailHint) {
-        emailHint.innerHTML = allowRealEmail
-            ? 'Adults can use a real email address for verification, or enter a simple login name and the system will turn it into a <code>@fas.com</code> login automatically.'
-            : 'Enter a simple name or username. The system will turn it into a <code>@fas.com</code> login automatically.';
+        emailHint.innerHTML = 'Required for students over 18. Enter a real email, an <code>@fas.com</code> email, or a simple name that will become <code>@fas.com</code>. The Student ID remains their login.';
     }
 }
 
@@ -11231,14 +11258,15 @@ function syncWalkinGuardianLoginModeUI() {
 
     emailInput.type = 'text';
     emailInput.autocomplete = 'off';
-    emailInput.placeholder = 'Login name or real email';
+    emailInput.placeholder = 'Real or placeholder email';
 
     if (emailLabel) {
-        emailLabel.textContent = 'Login Email (Becomes @fas.com)';
+        const required = emailInput.required ? ' *' : '';
+        emailLabel.textContent = `Guardian Login Email${required}`;
     }
 
     if (emailHint) {
-        emailHint.innerHTML = 'Use a real email address, or enter a simple login name and the system will turn it into a <code>@fas.com</code> account automatically.';
+        emailHint.innerHTML = 'A real email is optional. You may enter a placeholder email or a simple login name; simple names become <code>@fas.com</code> logins.';
     }
 }
 
@@ -11299,11 +11327,17 @@ function initWalkinPage() {
             if (['staff', 'desk', 'front desk'].includes(role)) {
                 data['registration_source'] = 'staff';
                 const deskBranchId = Number(user?.branch_id || 0);
-                if (deskBranchId > 0) data['desk_branch_id'] = deskBranchId;
+                if (deskBranchId > 0) {
+                    data['branch_id'] = deskBranchId;
+                    data['desk_branch_id'] = deskBranchId;
+                }
             } else if (['manager', 'branch manager'].includes(role)) {
                 data['registration_source'] = 'manager';
                 const managerBranchId = Number(user?.branch_id || 0);
-                if (managerBranchId > 0) data['manager_branch_id'] = managerBranchId;
+                if (managerBranchId > 0) {
+                    data['branch_id'] = managerBranchId;
+                    data['manager_branch_id'] = managerBranchId;
+                }
             } else {
                 data['registration_source'] = 'admin';
             }
@@ -11312,7 +11346,14 @@ function initWalkinPage() {
         }
 
         try {
-            const response = await axios.post(`${baseApiUrl}/walkin_register.php?action=register`, data);
+            // Walk-in registration may also deliver credentials through SMTP.
+            // Allow enough time for PHPMailer instead of inheriting the global
+            // 8-second offline/network timeout.
+            const response = await axios.post(
+                `${baseApiUrl}/walkin_register.php?action=register`,
+                data,
+                { timeout: 30000 }
+            );
 
             const responseText = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
             let result;
@@ -11326,10 +11367,31 @@ function initWalkinPage() {
 
             if (result.success) {
                 const guardianLabel = result.guardian_username
-                    ? `<strong>Guardian ID:</strong> ${escapeHtml(result.guardian_username)}<br><strong>Guardian Password:</strong> Saved from registration<br>`
+                    ? `<br><strong>Guardian Login Email:</strong> ${escapeHtml(result.guardian_username)}<br>
+                       <strong>Guardian Temporary Password:</strong> ${escapeHtml(result.guardian_temporary_password || 'fas@123')}<br>`
                     : '';
-                const loginLabel = 'Login Email';
-                const loginValue = result.login_email || result.username || data['student_email'] || '—';
+                const loginLabel = 'Student Login ID';
+                const loginValue = result.student_login_id || result.username || '—';
+                const accountCreatedMessage = result.guardian_username
+                    ? 'Student and guardian accounts were created successfully.'
+                    : 'Student account was created successfully.';
+                const passwordInstruction = result.guardian_username
+                    ? 'Give these credentials privately. The student and guardian must change their temporary password when they first sign in.'
+                    : 'Give these credentials privately. The student must change the temporary password when first signing in.';
+                const emailDeliveryMessages = [];
+                if (result.student_credentials_email_attempted) {
+                    emailDeliveryMessages.push(result.student_credentials_email_sent
+                        ? 'Student credentials were sent to the real student email through SMTP.'
+                        : `The student account was created, but SMTP delivery failed${result.student_credentials_email_error ? `: ${escapeHtml(result.student_credentials_email_error)}` : '.'}`);
+                }
+                if (result.guardian_credentials_email_attempted) {
+                    emailDeliveryMessages.push(result.guardian_credentials_email_sent
+                        ? 'Guardian credentials were sent to the real guardian email through SMTP.'
+                        : `The guardian account was created, but SMTP delivery failed${result.guardian_credentials_email_error ? `: ${escapeHtml(result.guardian_credentials_email_error)}` : '.'}`);
+                }
+                const emailDeliveryLabel = emailDeliveryMessages.length
+                    ? `<br><br><strong>Email Delivery:</strong><br>${emailDeliveryMessages.join('<br>')}`
+                    : '';
                 const isWalkInAccount = Boolean(result.walkin_login_generated);
                 const needsVerification = Boolean(result.verification_required);
 
@@ -11345,14 +11407,15 @@ function initWalkinPage() {
                 Swal.fire({
                     icon: 'success',
                     title: 'Student Registered',
-                    html: `Student account was created successfully.<br><br>
+                    html: `${accountCreatedMessage}<br><br>
                            <strong>${loginLabel}:</strong> ${escapeHtml(loginValue)}<br>
-                           <strong>Student Temporary Password:</strong> Generated automatically<br>
+                           <strong>Student Temporary Password:</strong> ${escapeHtml(result.temporary_password || 'Check the account email')}<br>
                            ${guardianLabel}
+                           ${emailDeliveryLabel}
                            ${needsVerification
                          ? '<br>Next step: verify the email inbox before logging in.'
                          : isWalkInAccount
-                         ? '<br>The student can log in immediately using the login email above.'
+                         ? `<br>${passwordInstruction}`
                          : '<br>Next step: confirm the walk-in registration payment method.'}`,
                     confirmButtonColor: '#b8860b'
                 }).then(() => {
@@ -13396,136 +13459,6 @@ function initAdminResponsiveTables() {
     });
 }
 
-function initAdminAutoPagination() {
-    const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
-    if (!pathname.includes('/pages/admin/')) return;
-
-    const builtInPaginatedBodies = new Set([
-        'registrationsTable',
-        'adminUsersTable',
-        'enrollmentPaymentsTable',
-        'registrationPaymentsTable'
-    ]);
-    const paginatedState = new WeakMap();
-
-    function getDataRows(tbody) {
-        return Array.from(tbody.querySelectorAll(':scope > tr')).filter((row) => {
-            const cells = row.children;
-            if (!cells.length) return false;
-            if (cells.length === 1 && cells[0].hasAttribute('colspan')) return false;
-            return true;
-        });
-    }
-
-    function ensureControls(wrapper) {
-        if (!wrapper.dataset.autoPaginationKey) {
-            wrapper.dataset.autoPaginationKey = `admin-pagination-${Math.random().toString(36).slice(2, 10)}`;
-        }
-
-        let controls = wrapper.parentElement?.querySelector(`:scope > [data-admin-auto-pagination-for="${wrapper.dataset.autoPaginationKey}"]`);
-        if (controls) return controls;
-
-        controls = document.createElement('div');
-        controls.dataset.adminAutoPagination = '1';
-        controls.dataset.adminAutoPaginationFor = wrapper.dataset.autoPaginationKey;
-        controls.className = 'flex items-center justify-between gap-3 flex-wrap px-4 py-3 border-t border-slate-200 bg-slate-50/60';
-        wrapper.insertAdjacentElement('afterend', controls);
-        return controls;
-    }
-
-    function renderAutoPage(tbody) {
-        if (!tbody || builtInPaginatedBodies.has(tbody.id || '')) return;
-
-        const table = tbody.closest('table');
-        const wrapper = table?.closest('.overflow-x-scroll, .overflow-x-auto');
-        if (!table || !wrapper) return;
-
-        const rows = getDataRows(tbody);
-        const pageSize = 5;
-        let state = paginatedState.get(tbody);
-        if (!state) {
-            state = { page: 1 };
-            paginatedState.set(tbody, state);
-        }
-
-        const controls = ensureControls(wrapper);
-        const totalRows = rows.length;
-        const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-        state.page = Math.min(Math.max(1, state.page), totalPages);
-
-        if (totalRows <= pageSize) {
-            rows.forEach((row) => { row.style.display = ''; });
-            controls.innerHTML = '';
-            controls.classList.add('hidden');
-            return;
-        }
-
-        controls.classList.remove('hidden');
-
-        const start = (state.page - 1) * pageSize;
-        const end = start + pageSize;
-
-        rows.forEach((row, index) => {
-            row.style.display = index >= start && index < end ? '' : 'none';
-        });
-
-        controls.innerHTML = `
-            <div class="text-xs font-semibold text-slate-500">
-                Showing ${start + 1}-${Math.min(end, totalRows)} of ${totalRows}
-            </div>
-            <div class="flex items-center gap-2">
-                <button type="button" data-admin-auto-page="prev" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed" ${state.page <= 1 ? 'disabled' : ''}>
-                    Prev
-                </button>
-                <div class="px-2 text-xs font-semibold text-slate-600">
-                    Page ${state.page} of ${totalPages}
-                </div>
-                <button type="button" data-admin-auto-page="next" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed" ${state.page >= totalPages ? 'disabled' : ''}>
-                    Next
-                </button>
-            </div>
-        `;
-
-        controls.querySelector('[data-admin-auto-page="prev"]')?.addEventListener('click', () => {
-            state.page = Math.max(1, state.page - 1);
-            renderAutoPage(tbody);
-        });
-        controls.querySelector('[data-admin-auto-page="next"]')?.addEventListener('click', () => {
-            state.page = Math.min(totalPages, state.page + 1);
-            renderAutoPage(tbody);
-        });
-    }
-
-    document.querySelectorAll('table tbody[id]').forEach((tbody) => {
-        if (builtInPaginatedBodies.has(tbody.id || '')) return;
-
-        const observer = new MutationObserver(() => {
-            const state = paginatedState.get(tbody);
-            if (state && state.page > 1 && getDataRows(tbody).length <= (state.page - 1) * 5) {
-                state.page = 1;
-            }
-            renderAutoPage(tbody);
-        });
-
-        observer.observe(tbody, { childList: true });
-        renderAutoPage(tbody);
-    });
-}
-
-function enforceAdminFixedPageSizes() {
-    const pathname = String(window.location.pathname || '').replace(/\\/g, '/').toLowerCase();
-    if (!pathname.includes('/pages/admin/')) return;
-
-    ['adminUsersPageSize'].forEach((id) => {
-        const select = document.getElementById(id);
-        if (!select) return;
-        select.innerHTML = '<option value="5" selected>5</option>';
-        select.value = '5';
-        select.disabled = true;
-        select.classList.add('cursor-not-allowed', 'bg-slate-100', 'text-slate-500');
-    });
-}
-
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     initPaymentDestinationReferences();
@@ -13552,15 +13485,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initAdminSidebarMenu();
     initAdminResponsiveTables();
-    initAdminAutoPagination();
-    enforceAdminFixedPageSizes();
 
     if (loginForm) {
         // ── Already-logged-in redirect ─────────────────────────────────────────
         // If localStorage already has a user (shared with all tabs in the same
         // browser), skip the login page and go straight to their dashboard.
-        // If localStorage is empty, try the PHP session cookie (shared across
-        // all tabs in the same browser).  Only redirect if we get a confirmed
+        // Ask the server about the HttpOnly JWT cookie. Only redirect if it confirms
         // user — never redirect back to index.html to avoid loops.
         (async () => {
             // Skip session check on public pages
@@ -13568,18 +13498,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            const localUser = Auth.getUser();
-            if (localUser && _getDashboardUrl(localUser.role_name)) {
-                window.location.href = _getDashboardUrl(localUser.role_name);
-                return;
-            }
-
             try {
-                const response = await axios.get(`${baseApiUrl}/users.php?action=session`, {
+                const response = await axios.get(`${baseApiUrl}/users.php?action=optional-session`, {
                     validateStatus: () => true
                 });
                 const data = response.data || {};
-                if (response.status === 200 && data.success && data.user) {
+                if (response.status === 200 && data.authenticated && data.user) {
                     const url = _getDashboardUrl(data.user.role_name);
                     if (url) {
                         Auth.setUser(data.user);
@@ -13587,6 +13511,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         return;
                     }
                 }
+                if (response.status === 200 && data.authenticated === false) Auth.clearStoredUser();
             } catch (_) { /* network error — show login normally */ }
 
             initIndexPage();

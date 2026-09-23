@@ -11,7 +11,6 @@ require_once 'xss_protection.php';  // XSS Protection utilities
 
 if (!defined('FAS_USERS_CLASS_ONLY')) {
     header("Content-Type: application/json");
-    header("Access-Control-Allow-Origin: *");
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Authorization');
     
@@ -148,6 +147,15 @@ class User
         } catch (PDOException $e) {
             // Keep API working even if alter fails
         }
+    }
+
+    private function publicAuthUser(array $user): array
+    {
+        return array_intersect_key($user, array_flip([
+            'user_id', 'username', 'first_name', 'last_name', 'email', 'phone',
+            'status', 'role_name', 'role_id', 'branch_id', 'branch_name',
+            'student_id', 'guardian_id', 'teacher_id'
+        ]));
     }
 
     private function ensureUserSecurityColumns()
@@ -379,6 +387,7 @@ class User
     private function getStudentAccountMetaForUser(array $user): ?array
     {
         $hasSourceCol = $this->hasStudentColumn('registration_source');
+        $hasStudentUserId = $this->hasStudentColumn('student_user_id');
         $lookupEmail = trim((string)($user['email'] ?? ''));
         $lookupUsername = trim((string)($user['username'] ?? ''));
         if ($lookupEmail === '' && $lookupUsername === '') {
@@ -401,10 +410,15 @@ class User
                     ON g.guardian_id = sg.guardian_id
                 WHERE s.email = ?
                    OR s.email = ?
+                   " . ($hasStudentUserId ? "OR s.student_user_id = ?" : "") . "
                 ORDER BY s.student_id DESC
                 LIMIT 1
             ");
-            $stmt->execute([$lookupEmail, $lookupUsername]);
+            $lookupValues = [$lookupEmail, $lookupUsername];
+            if ($hasStudentUserId) {
+                $lookupValues[] = (int)($user['user_id'] ?? 0);
+            }
+            $stmt->execute($lookupValues);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             return $row ?: null;
         } catch (PDOException $e) {
@@ -589,7 +603,7 @@ class User
         $lower = strtolower($message);
 
         if (strpos($lower, 'could not authenticate') !== false || strpos($lower, 'authenticate') !== false) {
-            return 'Gmail rejected the SMTP login. Generate a new Gmail App Password for the sender account and update api/mail_config.php.';
+            return 'Gmail rejected the SMTP login. Replace the sender account App Password in the private mail configuration.';
         }
         if (strpos($lower, 'could not connect') !== false || strpos($lower, 'failed to connect') !== false) {
             return 'Could not connect to Gmail SMTP. Check internet access, firewall/antivirus SMTP blocking, MAIL_HOST, MAIL_PORT, and MAIL_ENCRYPTION.';
@@ -796,7 +810,14 @@ class User
         }
     }
 
-    private function sendWalkInAccountEmail($toEmail, $toName, $loginEmail, $temporaryPassword)
+    private function sendWalkInAccountEmail(
+        $toEmail,
+        $toName,
+        $accountLogin,
+        $temporaryPassword,
+        $linkedStudentLogin = null,
+        $linkedStudentPassword = null
+    )
     {
         $this->ensurePhpMailerLoaded();
         $mail = $this->getMailSettings();
@@ -812,21 +833,38 @@ class User
         $mailer->addAddress($toEmail, $toName ?: $toEmail);
 
         $safeName = htmlspecialchars($toName ?: 'Student', ENT_QUOTES, 'UTF-8');
-        $safeLogin = htmlspecialchars($loginEmail, ENT_QUOTES, 'UTF-8');
+        $safeLogin = htmlspecialchars($accountLogin, ENT_QUOTES, 'UTF-8');
         $safePassword = htmlspecialchars($temporaryPassword, ENT_QUOTES, 'UTF-8');
+        $safeStudentLogin = htmlspecialchars((string)$linkedStudentLogin, ENT_QUOTES, 'UTF-8');
+        $safeStudentPassword = htmlspecialchars((string)$linkedStudentPassword, ENT_QUOTES, 'UTF-8');
+        $includesStudentCredentials = trim((string)$linkedStudentLogin) !== '';
 
-        $mailer->Subject = 'Your Father & Sons Walk-In Account';
+        $linkedStudentHtml = $includesStudentCredentials
+            ? '
+                <div style="margin: 20px 0 0; padding: 16px; background: #f8fafc; border-left: 4px solid #b8860b;">
+                    <p style="margin: 0 0 8px;"><strong>Your Student&rsquo;s Account</strong></p>
+                    <p style="margin: 0 0 6px;"><strong>Student ID:</strong> ' . $safeStudentLogin . '</p>
+                    <p style="margin: 0;"><strong>Student Temporary Password:</strong> ' . $safeStudentPassword . '</p>
+                </div>'
+            : '';
+
+        $mailer->Subject = $includesStudentCredentials
+            ? 'Your Guardian and Student Walk-In Accounts'
+            : 'Your Father & Sons Walk-In Account';
         $mailer->Body = '
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-                <h2 style="margin: 0 0 12px;">Your walk-in account is ready</h2>
+                <h2 style="margin: 0 0 12px;">' . ($includesStudentCredentials ? 'Your guardian and student accounts are ready' : 'Your walk-in account is ready') . '</h2>
                 <p>Hello ' . $safeName . ',</p>
                 <p>Your account was created by the branch staff. You can log in using:</p>
-                <p style="font-size: 18px; font-weight: 700; margin: 16px 0; color: #b8860b;">' . $safeLogin . '</p>
-                <p><strong>Temporary Password:</strong> ' . $safePassword . '</p>
-                <p>Please change your password after your first login.</p>
+                <p style="font-size: 18px; font-weight: 700; margin: 16px 0; color: #b8860b;">' . ($includesStudentCredentials ? '<span style="font-size: 14px; color: #475569;">Guardian Login Email:</span><br>' : '') . $safeLogin . '</p>
+                <p><strong>' . ($includesStudentCredentials ? 'Guardian Temporary Password' : 'Temporary Password') . ':</strong> ' . $safePassword . '</p>
+                ' . $linkedStudentHtml . '
+                <p>Please change each temporary password after the account&rsquo;s first login.</p>
             </div>
         ';
-        $mailer->AltBody = "Your walk-in account is ready. Login: {$loginEmail}. Temporary Password: {$temporaryPassword}.";
+        $mailer->AltBody = $includesStudentCredentials
+            ? "Your guardian and student accounts are ready.\n\nGuardian Login Email: {$accountLogin}\nGuardian Temporary Password: {$temporaryPassword}\n\nStudent ID: {$linkedStudentLogin}\nStudent Temporary Password: {$linkedStudentPassword}\n\nPlease change each temporary password after the account's first login."
+            : "Your walk-in account is ready. Login: {$accountLogin}. Temporary Password: {$temporaryPassword}.";
         $mailer->send();
         return true;
     }
@@ -1399,6 +1437,12 @@ class User
                 $this->sendJSON($payload, 401);
             }
 
+            // Replace legacy plaintext passwords as soon as the owner signs in.
+            if (!password_get_info($storedPassword)['algo']) {
+                $upgrade = $this->conn->prepare('UPDATE tbl_users SET password = ? WHERE user_id = ? AND password = ?');
+                $upgrade->execute([password_hash($password, PASSWORD_DEFAULT), (int)$user['user_id'], $storedPassword]);
+            }
+
             $studentAccountMeta = $this->getStudentAccountMetaForUser($user);
             $isGuardianPortalStudent = $studentAccountMeta
                 && strcasecmp((string)($studentAccountMeta['registration_source'] ?? ''), 'guardian-portal') === 0;
@@ -1478,23 +1522,32 @@ class User
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Login successful',
-                'user' => $user,
+                'user' => $this->publicAuthUser($user),
                 'must_change_password' => $mustChangePassword
             ]);
         } catch (PDOException $e) {
-            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+            error_log('Login database error: ' . $e->getMessage());
+            $this->sendJSON(['error' => 'Unable to sign in right now.'], 500);
         }
     }
 
     public function getCurrentSession()
     {
         $resolved = fas_require_authenticated_user($this->conn);
-        unset($resolved['password'], $resolved['active_session_token'], $resolved['active_session_updated_at']);
-
         $this->sendJSON([
             'success' => true,
             'authenticated' => true,
-            'user' => $resolved,
+            'user' => $this->publicAuthUser($resolved),
+        ]);
+    }
+
+    public function getOptionalSession()
+    {
+        $resolved = fas_resolve_authenticated_user($this->conn);
+        $this->sendJSON([
+            'success' => true,
+            'authenticated' => !empty($resolved['ok']),
+            'user' => !empty($resolved['ok']) ? $this->publicAuthUser($resolved['user']) : null,
         ]);
     }
 
@@ -1762,7 +1815,11 @@ class User
             $this->sendJSON(['error' => 'Invalid payload'], 400);
         }
 
-        $userId = (int)($data['user_id'] ?? 0);
+        $actor = fas_require_authenticated_user($this->conn);
+        $userId = (int)($actor['user_id'] ?? 0);
+        if (isset($data['user_id']) && (int)$data['user_id'] !== $userId) {
+            $this->sendJSON(['error' => 'You can only update your own profile.'], 403);
+        }
         $firstName = trim((string)($data['first_name'] ?? ''));
         $lastName = trim((string)($data['last_name'] ?? ''));
         $phone = trim((string)($data['phone'] ?? ''));
@@ -1810,10 +1867,11 @@ class User
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Profile updated successfully.',
-                'user' => $user
+                'user' => $this->publicAuthUser($user)
             ]);
         } catch (PDOException $e) {
-            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+            error_log('Profile update database error: ' . $e->getMessage());
+            $this->sendJSON(['error' => 'Unable to update profile right now.'], 500);
         }
     }
 
@@ -1824,10 +1882,19 @@ class User
         }
 
         $data = json_decode($json, true);
-        $userId = $data['user_id'] ?? null;
+        if (!is_array($data)) {
+            $this->sendJSON(['error' => 'Invalid payload'], 400);
+        }
+        $actor = fas_require_authenticated_user($this->conn);
+        $actorId = (int)($actor['user_id'] ?? 0);
+        $userId = (int)($data['user_id'] ?? 0);
         $oldPassword = $data['old_password'] ?? '';
         $newPassword = $data['new_password'] ?? '';
         $isAdminOverride = !empty($data['is_admin_override']);
+
+        if (!fas_can_change_user_password($actor, $userId, $isAdminOverride)) {
+            $this->sendJSON(['error' => 'You cannot change this account password.'], 403);
+        }
 
         if (empty($userId) || empty($newPassword) || (!$isAdminOverride && empty($oldPassword))) {
             $this->sendJSON(['error' => 'user_id and new_password are required'], 400);
@@ -1857,27 +1924,20 @@ class User
                 }
             }
 
-            if ($isAdminOverride) {
-                if (strlen($newPassword) < 6) {
-                    $this->sendJSON(['error' => 'New password must be at least 6 characters long'], 400);
-                }
-            } else {
-                // Validate new password with same strong policy as registration
-                if (strlen($newPassword) < 8) {
-                    $this->sendJSON(['error' => 'New password must be at least 8 characters long'], 400);
-                }
-                if (!preg_match('/[A-Z]/', $newPassword)) {
-                    $this->sendJSON(['error' => 'New password must contain at least one uppercase letter'], 400);
-                }
-                if (!preg_match('/[a-z]/', $newPassword)) {
-                    $this->sendJSON(['error' => 'New password must contain at least one lowercase letter'], 400);
-                }
-                if (!preg_match('/[0-9]/', $newPassword)) {
-                    $this->sendJSON(['error' => 'New password must contain at least one number'], 400);
-                }
-                if (!preg_match('/[!@#$%^&*]/', $newPassword)) {
-                    $this->sendJSON(['error' => 'New password must contain at least one special character (!@#$%^&*)'], 400);
-                }
+            if (strlen($newPassword) < 8) {
+                $this->sendJSON(['error' => 'New password must be at least 8 characters long'], 400);
+            }
+            if (!preg_match('/[A-Z]/', $newPassword)) {
+                $this->sendJSON(['error' => 'New password must contain at least one uppercase letter'], 400);
+            }
+            if (!preg_match('/[a-z]/', $newPassword)) {
+                $this->sendJSON(['error' => 'New password must contain at least one lowercase letter'], 400);
+            }
+            if (!preg_match('/[0-9]/', $newPassword)) {
+                $this->sendJSON(['error' => 'New password must contain at least one number'], 400);
+            }
+            if (!preg_match('/[!@#$%^&*]/', $newPassword)) {
+                $this->sendJSON(['error' => 'New password must contain at least one special character (!@#$%^&*)'], 400);
             }
 
             $stmtCurrent = $this->conn->prepare("SELECT user_id, username, email, role_id FROM tbl_users WHERE user_id = ? LIMIT 1");
@@ -1887,11 +1947,15 @@ class User
             $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
             if ($hasPasswordChangeFlag) {
                 $mustChangePassword = $isAdminOverride ? 1 : 0;
-                $update = $this->conn->prepare("UPDATE tbl_users SET password = ?, must_change_password = ? WHERE user_id = ?");
+                $update = $this->conn->prepare("UPDATE tbl_users SET password = ?, must_change_password = ?, active_session_token = NULL, active_session_updated_at = NULL, active_browser_token_hash = NULL, active_browser_token_updated_at = NULL WHERE user_id = ?");
                 $update->execute([$hashed, $mustChangePassword, $userId]);
             } else {
-                $update = $this->conn->prepare("UPDATE tbl_users SET password = ? WHERE user_id = ?");
+                $update = $this->conn->prepare("UPDATE tbl_users SET password = ?, active_session_token = NULL, active_session_updated_at = NULL, active_browser_token_hash = NULL, active_browser_token_updated_at = NULL WHERE user_id = ?");
                 $update->execute([$hashed, $userId]);
+            }
+            if ($userId === $actorId) {
+                fas_clear_jwt_cookie();
+                fas_clear_browser_binding_cookie();
             }
 
             AuditLogs::record(
@@ -1907,24 +1971,16 @@ class User
                 'info',
                 null,
                 ['password_changed' => true],
-                // performer: admin override uses performed_by_* from payload; self-change uses own account
-                $isAdminOverride
-                    ? (isset($data['performed_by_id']) ? (int)$data['performed_by_id'] : null)
-                    : $userId,
-                $isAdminOverride
-                    ? (trim((string)($data['performed_by_name'] ?? '')) ?: null)
-                    : null,
-                $isAdminOverride
-                    ? (trim((string)($data['performed_by_role'] ?? '')) ?: null)
-                    : null,
-                $isAdminOverride
-                    ? (trim((string)($data['performed_by_email'] ?? '')) ?: null)
-                    : ($currentUser['email'] ?? ($currentUser['username'] ?? null))
+                $actorId,
+                trim((string)(($actor['first_name'] ?? '') . ' ' . ($actor['last_name'] ?? ''))) ?: ($actor['username'] ?? null),
+                $actor['role_name'] ?? null,
+                $actor['email'] ?? ($actor['username'] ?? null)
             );
 
             $this->sendJSON(['success' => true, 'message' => 'Password changed successfully']);
         } catch (PDOException $e) {
-            $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+            error_log('Password change database error: ' . $e->getMessage());
+            $this->sendJSON(['error' => 'Unable to change password right now.'], 500);
         }
     }
 
@@ -2111,6 +2167,7 @@ class User
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
+        $actor = fas_require_authenticated_user($this->conn, ['staff', 'manager']);
 
         $isMultipart = $this->isMultipartRequest();
         $data = $isMultipart ? $_POST : json_decode($json, true);
@@ -2118,8 +2175,8 @@ class User
             $this->sendJSON(['error' => 'Invalid request data'], 400);
         }
 
-        foreach (['student_first_name', 'student_last_name', 'student_email', 'student_phone', 'branch_id',
-                  'guardian_first_name', 'guardian_last_name', 'guardian_relationship', 'guardian_phone'] as $k) {
+        foreach (['student_first_name', 'student_last_name', 'student_phone', 'branch_id',
+                  'guardian_first_name', 'guardian_last_name', 'guardian_relationship', 'guardian_email'] as $k) {
             if (isset($data[$k]) && is_string($data[$k])) {
                 $data[$k] = trim($data[$k]);
             }
@@ -2131,31 +2188,23 @@ class User
             $registrationSource = 'walkin';
         }
 
-        $deskBranchId = (int)($data['desk_branch_id'] ?? 0);
-        $managerBranchId = (int)($data['manager_branch_id'] ?? 0);
-        $scopedBranchId = $deskBranchId > 0 ? $deskBranchId : $managerBranchId;
+        $isAdmin = fas_normalize_role_category($actor['role_name'] ?? '') === 'admin';
+        $scopedBranchId = $isAdmin ? 0 : (int)($actor['branch_id'] ?? 0);
         $requestedBranchId = (int)($data['branch_id'] ?? 0);
-        if ($scopedBranchId > 0 && $requestedBranchId > 0 && $scopedBranchId !== $requestedBranchId) {
-            $this->sendJSON(['error' => 'Selected branch does not belong to your assigned branch'], 403);
+        if (!$isAdmin) {
+            if ($scopedBranchId < 1) {
+                $this->sendJSON(['error' => 'Your account does not have an assigned branch. Please contact the administrator.'], 403);
+            }
+            // Desk and manager registrations always use the authenticated user's
+            // branch, even if the browser omitted or modified the hidden value.
+            $data['branch_id'] = $scopedBranchId;
+            $requestedBranchId = $scopedBranchId;
         }
 
-        $submittedEmailRaw = trim((string)($data['student_email'] ?? ''));
-        if ($submittedEmailRaw === '') {
-            $this->sendJSON(['error' => 'Please enter a login name for this walk-in student.'], 400);
-        }
-        if (strpos($submittedEmailRaw, '@') !== false) {
-            $this->sendJSON(['error' => 'Walk-in registrations only accept a name or username, not a real email address.'], 400);
-        }
-
-        $loginEmail = $this->buildWalkInLoginEmail(
-            $submittedEmailRaw,
-            $data['student_first_name'] ?? '',
-            $data['student_last_name'] ?? ''
-        );
-        if ($loginEmail === null) {
-            $this->sendJSON(['error' => 'That walk-in name is already in use. Please choose another name.'], 400);
-        }
-        $data['student_email'] = $loginEmail;
+        // The generated Student ID is always the portal login. Adults also supply
+        // a real email as contact information; minors use the guardian account.
+        $submittedStudentEmail = strtolower(trim((string)($data['student_email'] ?? '')));
+        $data['student_email'] = null;
 
         foreach (['student_first_name', 'student_last_name', 'student_phone', 'branch_id', 'student_date_of_birth'] as $field) {
             if (($data[$field] ?? '') === '') {
@@ -2167,13 +2216,35 @@ class User
         $age = $this->assertMinimumStudentAge($dateOfBirth, 'register or enroll');
         $isMinor = ($age !== null) && ($age <= 18);
         if ($isMinor) {
-            foreach (['guardian_first_name', 'guardian_last_name', 'guardian_relationship', 'guardian_phone'] as $field) {
+            foreach (['guardian_first_name', 'guardian_last_name', 'guardian_relationship', 'guardian_email'] as $field) {
                 if (($data[$field] ?? '') === '') {
-                    $this->sendJSON(['error' => 'Guardian information is required for students aged 18 and below.'], 400);
+                    $this->sendJSON(['error' => 'Guardian information, including a login email, is required for students aged 18 and below.'], 400);
                 }
             }
+        } else {
+            if ($submittedStudentEmail === '') {
+                $this->sendJSON(['error' => 'A student email or @fas.com login name is required for students over 18.'], 400);
+            }
+            if (strpos($submittedStudentEmail, '@') === false) {
+                $submittedStudentEmail = $this->buildWalkInLoginEmail(
+                    $submittedStudentEmail,
+                    $data['student_first_name'] ?? '',
+                    $data['student_last_name'] ?? ''
+                );
+                if ($submittedStudentEmail === null) {
+                    $this->sendJSON(['error' => 'That student @fas.com email is already registered. Please use a different name.'], 400);
+                }
+            } elseif (!$this->isValidEmailAddress($submittedStudentEmail)) {
+                $this->sendJSON(['error' => 'Enter a valid real email or @fas.com email for the student.'], 400);
+            } elseif ($this->walkInEmailExists($submittedStudentEmail)) {
+                $this->sendJSON(['error' => 'That student email address is already registered.'], 400);
+            }
+            $data['student_email'] = $submittedStudentEmail;
         }
 
+        if (!$this->ensureUserPasswordChangeColumn()) {
+            $this->sendJSON(['error' => 'Unable to prepare secure account creation.'], 500);
+        }
         $password = 'fas@123';
         $data['registration_fee_amount'] = 1000;
 
@@ -2237,19 +2308,95 @@ class User
             $stmtStudent->execute($studentValues);
             $studentId = (int)$this->conn->lastInsertId();
 
+            $studentLoginIdentifier = $this->formatStudentLoginIdentifier($studentId);
+            $studentSystemEmail = strtolower($studentLoginIdentifier) . '@fas.com';
+            $studentProfileEmail = $data['student_email'] ?: $studentSystemEmail;
+            $studentIdentityAssignments = ['email = ?'];
+            $studentIdentityValues = [$studentProfileEmail];
+            if ($this->hasStudentColumn('student_code')) {
+                $studentIdentityAssignments[] = 'student_code = ?';
+                $studentIdentityValues[] = $studentLoginIdentifier;
+            }
+            $studentIdentityValues[] = $studentId;
+            $stmtStudentIdentity = $this->conn->prepare(
+                'UPDATE tbl_students SET ' . implode(', ', $studentIdentityAssignments) . ' WHERE student_id = ?'
+            );
+            $stmtStudentIdentity->execute($studentIdentityValues);
+            $data['student_email'] = $studentProfileEmail;
+
             $stmtRegPayment = $this->conn->prepare("
                 INSERT INTO tbl_registration_payments (
                     student_id, payment_date, amount, payment_method, status, receipt_number
                 ) VALUES (?, CURRENT_DATE, 1000.00, 'Walk-In', 'Paid', ?)
             ");
-            $stmtRegPayment->execute([$studentId, 'REG-WALKIN-' . time()]);
+            $stmtRegPayment->execute([$studentId, 'REG-WALKIN-' . $studentId . '-' . time()]);
+
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            $stmtUser = $this->conn->prepare("
+                INSERT INTO tbl_users (
+                    username, password, role_id, first_name, last_name,
+                    email, phone, status, must_change_password
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 1)
+            ");
+            $stmtUser->execute([
+                $studentLoginIdentifier,
+                $hashedPassword,
+                $roleId,
+                $data['student_first_name'],
+                $data['student_last_name'],
+                $studentSystemEmail,
+                $data['student_phone']
+            ]);
+            $userId = (int)$this->conn->lastInsertId();
+
+            if ($this->hasStudentColumn('student_user_id')) {
+                $stmtStudentUser = $this->conn->prepare('UPDATE tbl_students SET student_user_id = ? WHERE student_id = ?');
+                $stmtStudentUser->execute([$userId, $studentId]);
+            }
 
             $guardianId = null;
+            $guardianUserId = null;
             $guardianUsername = null;
             $hasGuardianData = !empty($data['guardian_first_name']) && !empty($data['guardian_last_name'])
-                && !empty($data['guardian_relationship']) && !empty($data['guardian_phone']);
+                && !empty($data['guardian_relationship']);
 
             if ($hasGuardianData) {
+                $guardianLoginInput = trim((string)($data['guardian_email'] ?? ''));
+                if ($guardianLoginInput === '') {
+                    throw new Exception('Guardian login email is required when guardian information is provided.');
+                }
+                if (preg_match('/\s/', $guardianLoginInput)) {
+                    throw new Exception('Guardian login email cannot contain spaces.');
+                }
+
+                if (strpos($guardianLoginInput, '@') === false) {
+                    $guardianUsername = $this->buildWalkInLoginEmail(
+                        $guardianLoginInput,
+                        $data['guardian_first_name'],
+                        $data['guardian_last_name']
+                    );
+                    if ($guardianUsername === null) {
+                        throw new Exception('That guardian login is already in use. Please enter a different email or login name.');
+                    }
+                } else {
+                    $guardianUsername = strtolower($guardianLoginInput);
+                    $guardianExistsStmt = $this->conn->prepare("
+                        SELECT 1 FROM tbl_users
+                        WHERE LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?)
+                        LIMIT 1
+                    ");
+                    $guardianExistsStmt->execute([$guardianUsername, $guardianUsername]);
+                    if ($guardianExistsStmt->fetchColumn()) {
+                        throw new Exception('That guardian login is already in use. Please enter a different email or login name.');
+                    }
+                }
+                if (strlen($guardianUsername) > 50) {
+                    throw new Exception('Guardian login email must be 50 characters or fewer.');
+                }
+                if (!$guardianRoleId) {
+                    throw new Exception('Guardian role not found.');
+                }
+
                 $stmtGuardian = $this->conn->prepare("
                     INSERT INTO tbl_guardians (
                         first_name, last_name, relationship_type, phone,
@@ -2260,39 +2407,62 @@ class User
                     $data['guardian_first_name'],
                     $data['guardian_last_name'],
                     $data['guardian_relationship'],
-                    $data['guardian_phone'],
-                    $data['guardian_occupation'] ?? null,
-                    $data['guardian_email'] ?? null,
-                    $data['guardian_address'] ?? null
+                    $data['student_phone'],
+                    null,
+                    $guardianUsername,
+                    $data['student_address'] ?? null
                 ]);
                 $guardianId = (int)$this->conn->lastInsertId();
 
-                $stmtLink = $this->conn->prepare("
-                    INSERT INTO tbl_student_guardians (
-                        student_id, guardian_id, is_primary_guardian,
-                        can_enroll, can_pay, emergency_contact
-                    ) VALUES (?, ?, 'Y', 'Y', 'Y', 'Y')
+                $stmtGuardianUser = $this->conn->prepare("
+                    INSERT INTO tbl_users (
+                        username, password, role_id, first_name, last_name,
+                        email, phone, status, must_change_password
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 1)
                 ");
-                $stmtLink->execute([$studentId, $guardianId]);
-            }
+                $stmtGuardianUser->execute([
+                    $guardianUsername,
+                    $hashedPassword,
+                    $guardianRoleId,
+                    $data['guardian_first_name'],
+                    $data['guardian_last_name'],
+                    $guardianUsername,
+                    $data['student_phone']
+                ]);
+                $guardianUserId = (int)$this->conn->lastInsertId();
 
-            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-            $stmtUser = $this->conn->prepare("
-                INSERT INTO tbl_users (
-                    username, password, role_id, first_name, last_name,
-                    email, phone, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
-            ");
-            $stmtUser->execute([
-                $data['student_email'],
-                $hashedPassword,
-                $roleId,
-                $data['student_first_name'],
-                $data['student_last_name'],
-                $data['student_email'],
-                $data['student_phone']
-            ]);
-            $userId = (int)$this->conn->lastInsertId();
+                if ($this->tableHasColumn('tbl_guardians', 'guardian_code') || $this->tableHasColumn('tbl_guardians', 'guardian_user_id')) {
+                    $guardianAssignments = [];
+                    $guardianValues = [];
+                    if ($this->tableHasColumn('tbl_guardians', 'guardian_code')) {
+                        $guardianAssignments[] = 'guardian_code = ?';
+                        $guardianValues[] = 'G-' . str_pad((string)$guardianId, 4, '0', STR_PAD_LEFT);
+                    }
+                    if ($this->tableHasColumn('tbl_guardians', 'guardian_user_id')) {
+                        $guardianAssignments[] = 'guardian_user_id = ?';
+                        $guardianValues[] = $guardianUserId;
+                    }
+                    $guardianValues[] = $guardianId;
+                    $stmtGuardianIdentity = $this->conn->prepare(
+                        'UPDATE tbl_guardians SET ' . implode(', ', $guardianAssignments) . ' WHERE guardian_id = ?'
+                    );
+                    $stmtGuardianIdentity->execute($guardianValues);
+                }
+
+                $linkColumns = ['student_id', 'guardian_id'];
+                $linkValues = [$studentId, $guardianId];
+                if ($this->tableHasColumn('tbl_student_guardians', 'guardian_user_id')) {
+                    $linkColumns[] = 'guardian_user_id';
+                    $linkValues[] = $guardianUserId;
+                }
+                $linkColumns = array_merge($linkColumns, ['is_primary_guardian', 'can_enroll', 'can_pay', 'emergency_contact']);
+                $linkValues = array_merge($linkValues, ['Y', 'Y', 'Y', 'Y']);
+                $stmtLink = $this->conn->prepare(
+                    'INSERT INTO tbl_student_guardians (' . implode(', ', $linkColumns) . ') VALUES ('
+                    . implode(', ', array_fill(0, count($linkColumns), '?')) . ')'
+                );
+                $stmtLink->execute($linkValues);
+            }
 
             if ($this->hasUserColumn('email_verified_at')) {
                 $stmtVerifyUser = $this->conn->prepare("
@@ -2301,13 +2471,10 @@ class User
                         email_verification_code_hash = NULL,
                         email_verification_code_expires_at = NULL,
                         email_verification_sent_at = NULL
-                    WHERE user_id = ?
+                    WHERE user_id IN (?, ?)
                 ");
-                $stmtVerifyUser->execute([$userId]);
+                $stmtVerifyUser->execute([$userId, $guardianUserId ?: $userId]);
             }
-
-            // Walk-in registrations create only the student's generated @fas.com portal login.
-            // Guardian email, when provided, remains contact information on tbl_guardians.
 
             if (!empty($data['instruments']) && is_array($data['instruments'])) {
                 $stmtInstrument = $this->conn->prepare("
@@ -2322,15 +2489,68 @@ class User
             $this->conn->commit();
             $this->ensureWalkInAccountsSynced();
 
+            $studentEmailAttempted = false;
+            $studentEmailSent = false;
+            $studentEmailError = null;
+            $guardianEmailAttempted = false;
+            $guardianEmailSent = false;
+            $guardianEmailError = null;
+
+            $studentRealEmail = $this->isValidEmailAddress($studentProfileEmail)
+                && !$this->isSchoolLoginEmail($studentProfileEmail);
+            if ($studentRealEmail) {
+                $studentEmailAttempted = true;
+                try {
+                    $studentEmailSent = $this->sendWalkInAccountEmail(
+                        $studentProfileEmail,
+                        trim($data['student_first_name'] . ' ' . $data['student_last_name']),
+                        $studentLoginIdentifier,
+                        $password
+                    );
+                } catch (Throwable $mailException) {
+                    $studentEmailError = $this->getFriendlyMailError($mailException->getMessage());
+                    error_log('Walk-in student credentials email failed: ' . $mailException->getMessage());
+                }
+            }
+
+            $guardianRealEmail = $guardianUsername
+                && $this->isValidEmailAddress($guardianUsername)
+                && !$this->isSchoolLoginEmail($guardianUsername);
+            if ($guardianRealEmail) {
+                $guardianEmailAttempted = true;
+                try {
+                    $guardianEmailSent = $this->sendWalkInAccountEmail(
+                        $guardianUsername,
+                        trim(($data['guardian_first_name'] ?? '') . ' ' . ($data['guardian_last_name'] ?? '')),
+                        $guardianUsername,
+                        $password,
+                        $studentLoginIdentifier,
+                        $password
+                    );
+                } catch (Throwable $mailException) {
+                    $guardianEmailError = $this->getFriendlyMailError($mailException->getMessage());
+                    error_log('Walk-in guardian credentials email failed: ' . $mailException->getMessage());
+                }
+            }
+
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Student registered successfully. Account is active and can log in immediately.',
                 'student_id' => $studentId,
+                'student_login_id' => $studentLoginIdentifier,
                 'guardian_id' => $guardianId,
                 'guardian_username' => $guardianUsername,
+                'guardian_temporary_password' => $guardianUserId ? $password : null,
                 'user_id' => $userId,
-                'username' => $data['student_email'],
-                'login_email' => $data['student_email'],
+                'username' => $studentLoginIdentifier,
+                'login_email' => null,
+                'temporary_password' => $password,
+                'student_credentials_email_attempted' => $studentEmailAttempted,
+                'student_credentials_email_sent' => $studentEmailSent,
+                'student_credentials_email_error' => $studentEmailError,
+                'guardian_credentials_email_attempted' => $guardianEmailAttempted,
+                'guardian_credentials_email_sent' => $guardianEmailSent,
+                'guardian_credentials_email_error' => $guardianEmailError,
                 'walkin_login_generated' => true,
                 'registration_status' => 'Approved',
                 'registration_fee_amount' => $data['registration_fee_amount'],
@@ -2341,7 +2561,7 @@ class User
                 $this->conn->rollBack();
             }
             if ($e->getCode() == 23000) {
-                $this->sendJSON(['error' => 'That walk-in login name is already in use. Please choose another name.'], 400);
+                $this->sendJSON(['error' => 'The generated student or guardian login is already in use. Please check the guardian email and try again.'], 400);
             }
             $this->sendJSON(['error' => 'Walk-in registration failed: ' . $e->getMessage()], 500);
         } catch (Exception $e) {
@@ -2935,6 +3155,7 @@ $action = $_GET['action'] ?? '';
 
 $publicActions = [
     'login',
+    'optional-session',
     'register',
     'register-basic',
     'verify-email',
@@ -2954,6 +3175,9 @@ switch ($action) {
         break;
     case 'session':
         $user->getCurrentSession();
+        break;
+    case 'optional-session':
+        $user->getOptionalSession();
         break;
     case 'logout':
         $user->logout();

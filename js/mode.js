@@ -54,9 +54,9 @@ window.ThemeMode = {
         // Create floating button dynamically if not in HTML
         const button = document.createElement('button');
         button.id = 'themeToggle';
+        button.type = 'button';
         button.className = 'fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300';
         button.setAttribute('aria-label', 'Toggle dark or light mode');
-        button.onclick = () => this.toggle();
 
         // Create icon container
         const iconContainer = document.createElement('div');
