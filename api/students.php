@@ -6199,6 +6199,7 @@ class StudentsApi
 
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
         $this->ensureStudentSessionExtensionRequestsTable();
+        $this->ensureStudentCodesAssigned();
 
         try {
             $sql = "
@@ -6221,6 +6222,7 @@ class StudentsApi
                     s.first_name,
                     s.last_name,
                     s.email,
+                    s.student_code,
                     b.branch_name,
                     e.assigned_teacher_id,
                     e.instrument_id,
@@ -6583,6 +6585,7 @@ class StudentsApi
                     s.first_name,
                     s.last_name,
                     s.email,
+                    s.student_code,
                     b.branch_name,
                     COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
                     COALESCE(e.total_sessions, sp.sessions, 0) AS sessions,
@@ -6692,6 +6695,7 @@ class StudentsApi
 
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
         $this->ensureSessionPackagesTable();
+        $this->ensureStudentCodesAssigned();
 
         try {
             $studentCodeSelect = $this->tableHasColumn('tbl_students', 'student_code')
@@ -8786,6 +8790,7 @@ class StudentsApi
     public function getFreezePayments() {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET') { $this->sendJSON(['error' => 'Method not allowed'], 405); }
         $this->ensureFreezePaymentsTable();
+        $this->ensureStudentCodesAssigned();
 
         $branchId  = (int)($_GET['branch_id'] ?? 0);
         $statusFilter = trim($_GET['status'] ?? '');
@@ -8798,7 +8803,7 @@ class StudentsApi
         try {
             $stmt = $this->conn->prepare("
                 SELECT fp.*,
-                       s.first_name, s.last_name, s.email, s.branch_id,
+                       s.first_name, s.last_name, s.email, s.student_code, s.branch_id,
                        b.branch_name,
                        COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
                        e.used_absences, e.schedule_status
@@ -8827,6 +8832,7 @@ class StudentsApi
     public function getFrozenStudents() {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET') { $this->sendJSON(['error' => 'Method not allowed'], 405); }
         $this->ensureFreezePaymentsTable();
+        $this->ensureStudentCodesAssigned();
 
         $branchId = (int)($_GET['branch_id'] ?? 0);
         $params = [];
@@ -8852,6 +8858,7 @@ class StudentsApi
                        s.first_name,
                        s.last_name,
                        s.email,
+                       s.student_code,
                        s.phone,
                        s.branch_id,
                        b.branch_name,
@@ -9111,6 +9118,16 @@ class StudentsApi
         $row = $id > 0 ? $this->balanceEnrollment($id) : null;
         if (!$row) $this->sendJSON(['error' => 'Enrollment not found'], 404);
         $this->authorizeBalanceEnrollment($row, fas_require_authenticated_user($this->conn));
+        if ($this->tableExists('tbl_freeze_payments')) {
+            $freezePayments = $this->conn->prepare("SELECT amount, status, payment_method, payment_date,
+                    created_at, receipt_number, reference_number
+                FROM tbl_freeze_payments
+                WHERE enrollment_id = ?
+                ORDER BY created_at DESC, freeze_payment_id DESC");
+            $freezePayments->execute([$id]);
+            $history = $freezePayments->fetchAll(PDO::FETCH_ASSOC);
+            if ($history) $row['freeze_payments'] = $history;
+        }
         $this->sendJSON(['success' => true, 'enrollment' => $row]);
     }
 

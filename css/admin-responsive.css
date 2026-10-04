@@ -188,6 +188,11 @@ body > aside {
     overscroll-behavior: contain;
 }
 
+/* Keep page dialogs above the drawer when the sidebar is opened. */
+body.admin-responsive-ready > .fixed.inset-0 {
+    z-index: 1300 !important;
+}
+
 .admin-sidebar-close {
     position: absolute;
     top: 1rem;

@@ -77,6 +77,20 @@
             return String(input?.value || '').trim().toLowerCase();
         }
 
+        function getEnrollmentView() {
+            return String(new URLSearchParams(window.location.search).get('view') || 'active').toLowerCase();
+        }
+
+        function getEnrollmentBalance(student) {
+            const balance = Number(student?.balance_amount ?? (Number(student?.total_amount || 0) - Number(student?.paid_amount || 0)));
+            return Number.isFinite(balance) ? Math.max(0, balance) : 0;
+        }
+
+        function needsBalanceCollection(student) {
+            return getEnrollmentBalance(student) > 0.005
+                && String(student?.payment_status || '') !== 'Pending Online Payment';
+        }
+
         function getEnrollmentBranchId() {
             const branchFilter = document.getElementById('branchFilter');
             const selectedBranchId = Number(branchFilter?.value || 0);
@@ -115,12 +129,13 @@
             const pendingCount = allPendingRequests.length;
             const activeCount = allStudents.length;
             const extensionCount = allSessionExtensionRequests.length;
+            const balanceCount = allStudents.filter(needsBalanceCollection).length;
 
             setEnrollmentSummaryText('pendingTabCount', String(pendingCount));
             setEnrollmentSummaryText('activeTabCount', String(activeCount));
-            setEnrollmentSummaryText('itemsNeedActionCount', String(pendingCount + extensionCount));
+            setEnrollmentSummaryText('balanceTabCount', String(balanceCount));
+            setEnrollmentSummaryText('itemsNeedActionCount', String(pendingCount + extensionCount + (uiIsDesk ? balanceCount : 0)));
             setEnrollmentSummaryText('pendingRequestCount', `${pendingCount} pending`);
-            setEnrollmentSummaryText('studentCount', `${activeCount} active`);
             setEnrollmentSummaryText('sessionExtensionRequestCount', `${extensionCount}`);
             setEnrollmentSummaryText('sessionExtensionRequestCountHeader', `${extensionCount} pending`);
         }
@@ -272,10 +287,15 @@
         function setSessionNavState(view) {
             const topPending = document.getElementById('viewNavPending');
             const topActive = document.getElementById('viewNavActive');
-            const topBase = 'rounded-md px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition';
-            const topActiveClass = 'rounded-md bg-gold-500 px-3 py-1.5 text-xs sm:text-sm font-semibold text-black shadow-sm';
+            const topBalance = document.getElementById('viewNavBalance');
+            const topBase = 'rounded-md px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition whitespace-nowrap';
+            const topActiveClass = 'rounded-md bg-gold-500 px-3 py-1.5 text-xs sm:text-sm font-semibold text-black shadow-sm whitespace-nowrap';
             if (topPending) topPending.className = (view === 'pending') ? topActiveClass : topBase;
             if (topActive) topActive.className = (view === 'active') ? topActiveClass : topBase;
+            if (topBalance) topBalance.className = (view === 'balance') ? topActiveClass : topBase;
+            for (const [button, name] of [[topPending, 'pending'], [topActive, 'active'], [topBalance, 'balance']]) {
+                button?.setAttribute('aria-pressed', String(view === name));
+            }
 
             if (managerPageMode !== 'enrollments') return;
 
@@ -335,10 +355,11 @@
         }
 
         function applySessionView() {
-            const params = new URLSearchParams(window.location.search);
-            const view = String(params.get('view') || 'active').toLowerCase();
+            const requestedView = getEnrollmentView();
+            const view = requestedView === 'balance' && !uiIsDesk ? 'active' : requestedView;
             const pendingSection = document.getElementById('pendingSessionsSection');
             const activeSection = document.getElementById('activeSessionsSection');
+            const activeSectionTitle = document.getElementById('activeSectionTitle');
             const title = document.getElementById('sessionsPageTitle');
             const subtitle = document.getElementById('sessionsPageSubtitle');
 
@@ -356,6 +377,12 @@
                 ? 'Manage pending and active enrollments'
                 : 'Manage pending and active sessions';
 
+            if (uiIsDesk && activeSectionTitle) {
+                activeSectionTitle.innerHTML = view === 'balance'
+                    ? '<i class="fas fa-wallet mr-1.5 text-gold-500"></i>Need to Collect Balance'
+                    : '<i class="fas fa-user-check mr-1.5 text-gold-500"></i>Active Enrollments';
+            }
+
             if (view === 'pending') {
                 if (pendingSection) pendingSection.classList.remove('hidden');
                 if (activeSection) activeSection.classList.add('hidden');
@@ -371,6 +398,15 @@
                 if (title) title.textContent = activeLabel;
                 if (subtitle) subtitle.textContent = activeSub;
                 setSessionNavState('active');
+                return;
+            }
+
+            if (view === 'balance') {
+                if (pendingSection) pendingSection.classList.add('hidden');
+                if (activeSection) activeSection.classList.remove('hidden');
+                if (title) title.textContent = 'Need to Collect Balance';
+                if (subtitle) subtitle.textContent = 'Active enrollments with an outstanding balance ready to collect. Overdue balances appear first.';
+                setSessionNavState('balance');
                 return;
             }
 
@@ -1481,6 +1517,13 @@
             return studentSkillLevel !== 'beginner';
         }
 
+        function formatEnrollmentSessionCount(value) {
+            const count = Number(value);
+            return value === null || value === undefined || value === '' || !Number.isFinite(count) || count < 0
+                ? '—'
+                : String(Math.trunc(count));
+        }
+
         function renderPendingRequests() {
             const tableBody = document.getElementById('pendingRequestsTable');
             const countEl = document.getElementById('pendingRequestCount');
@@ -1519,7 +1562,8 @@
 
             tableBody.innerHTML = rows.map(r => {
                 const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
-                const pkg = escapeHtml(r.package_name || '—');
+                const studentDisplayId = getEnrollmentStudentDisplayId(r);
+                const packageValue = uiIsDesk ? formatEnrollmentSessionCount(r.sessions) : (r.package_name || '—');
                 const instruments = Array.isArray(r.instruments) && r.instruments.length
                     ? r.instruments.map(i => escapeHtml(i.type_name || i.instrument_name || 'Instrument')).join(', ')
                     : '—';
@@ -1527,11 +1571,11 @@
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-3 py-2.5">
                             <div class="font-semibold text-sm text-slate-900">${studentName || 'Student'}</div>
-                            <div class="text-xs text-slate-600">${escapeHtml(r.email || '')}</div>
+                            <div class="text-xs text-slate-600">${escapeHtml(studentDisplayId)}</div>
                             <div class="text-xs text-slate-500">${escapeHtml(r.branch_name || '')}</div>
                             <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${r.schedule_request_status === 'Schedule Conflict' ? 'bg-red-100 text-red-700' : r.schedule_request_status === 'Suggested' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-800'}">${escapeHtml(r.schedule_request_status || 'Pending')}</span>
                         </td>
-                        <td class="px-3 py-2.5 text-sm text-slate-700">${pkg}</td>
+                        <td class="px-3 py-2.5 text-sm text-slate-700">${escapeHtml(packageValue)}</td>
                         <td class="px-3 py-2.5 text-sm text-slate-700">${instruments}</td>
                         <td class="px-3 py-2.5 text-sm text-slate-700">
                             <button type="button" onclick="openPendingRequestScheduleModal(${Number(r.request_id)})" class="group block w-full min-w-[220px] max-w-xs rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-left transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1" aria-label="Review schedule request for ${studentName || 'student'}">
@@ -1634,7 +1678,7 @@
                 if (countEl) countEl.textContent = 'Error';
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-4 py-6 text-center text-red-500">
+                        <td colspan="6" class="px-4 py-6 text-center text-red-500">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Failed to load session extension requests.</p>
                         </td>
@@ -1667,7 +1711,7 @@
             if (!rows.length) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-4 py-6 text-center text-slate-500">
+                        <td colspan="6" class="px-4 py-6 text-center text-slate-500">
                             <i class="fas fa-calendar-plus text-2xl mb-2 text-gold-500/60"></i>
                             <p>No pending session extension requests.</p>
                         </td>
@@ -1677,6 +1721,7 @@
 
             tableBody.innerHTML = rows.map(req => {
                 const studentName = `${escapeHtml(req.first_name || '')} ${escapeHtml(req.last_name || '')}`.trim() || 'Student';
+                const studentDisplayId = getEnrollmentStudentDisplayId(req);
                 const purchasedSessions = `${Number(req.requested_sessions || 1)} session${Number(req.requested_sessions || 1) === 1 ? '' : 's'}`;
                 const amount = formatCurrencyPHP(req.requested_amount || 650);
                 const paymentMethod = escapeHtml(req.payment_method || 'Cash');
@@ -1687,9 +1732,8 @@
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-4 py-3">
                             <div class="font-semibold text-sm sm:text-base text-slate-900">${studentName}</div>
-                            <div class="text-sm text-slate-500">${escapeHtml(req.email || '')}</div>
+                            <div class="text-sm text-slate-500">${escapeHtml(studentDisplayId)}</div>
                         </td>
-                        <td class="px-4 py-3 text-sm sm:text-base text-slate-700">${escapeHtml(req.branch_name || '')}</td>
                         <td class="px-4 py-3 text-sm sm:text-base text-slate-700"><div class="font-semibold">${purchasedSessions}</div><div class="text-xs text-slate-400">Schedule required for approval</div></td>
                         <td class="px-4 py-3 text-sm sm:text-base text-slate-700">
                             <div>${paymentMethod}</div>
@@ -3592,7 +3636,6 @@
                 if (data.success && Array.isArray(data.enrollments)) {
                     allStudents = data.enrollments;
                     renderStudents(tableBody);
-                    if (countEl) countEl.textContent = `${data.enrollments.length} active`;
                     updateEnrollmentSummary(); // Update tab counts
                 } else {
                     tableBody.innerHTML = `
@@ -3602,7 +3645,7 @@
                                 <p>${uiIsDesk ? 'No active enrollments found.' : 'No active sessions found.'}</p>
                             </td>
                         </tr>`;
-                    if (countEl) countEl.textContent = '0 active';
+                    if (countEl) countEl.textContent = uiIsDesk && getEnrollmentView() === 'balance' ? '0 to collect' : '0 active';
                     updateEnrollmentSummary(); // Update tab counts even when empty
                 }
             } catch (error) {
@@ -3618,8 +3661,10 @@
         }
 
         function renderStudents(tableBody) {
+            const collectingBalance = uiIsDesk && getEnrollmentView() === 'balance';
             const rows = (Array.isArray(allStudents) ? allStudents : []).filter(student => {
                 if (!matchesSelectedBranch(student.branch_id, student.branch_name)) return false;
+                if (collectingBalance && !needsBalanceCollection(student)) return false;
                 return matchesEnrollmentSearch([
                     `${student.first_name || ''} ${student.last_name || ''}`,
                     getEnrollmentStudentDisplayId(student),
@@ -3631,8 +3676,19 @@
                 ]);
             });
 
+            if (collectingBalance) {
+                rows.sort((a, b) => {
+                    const aOverdue = a.payment_status === 'Payment Overdue' ? 1 : 0;
+                    const bOverdue = b.payment_status === 'Payment Overdue' ? 1 : 0;
+                    if (aOverdue !== bOverdue) return bOverdue - aOverdue;
+                    const aRemaining = Number(a.deadline_session || 0) - Number(a.sessions_used || 0);
+                    const bRemaining = Number(b.deadline_session || 0) - Number(b.sessions_used || 0);
+                    return aRemaining - bRemaining;
+                });
+            }
+
             const countEl = document.getElementById('studentCount');
-            if (countEl) countEl.textContent = `${rows.length} active`;
+            if (countEl) countEl.textContent = collectingBalance ? `${rows.length} to collect` : `${rows.length} active`;
             
             // Update tab count
             const activeTabCountEl = document.getElementById('activeTabCount');
@@ -3643,18 +3699,22 @@
                     <tr>
                         <td colspan="6" class="px-4 py-6 text-center text-slate-500">
                             <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
-                            <p>No active enrollments found.</p>
+                            <p>${collectingBalance ? 'No balances need collection.' : 'No active enrollments found.'}</p>
                         </td>
                     </tr>`;
                 return;
             }
 
             tableBody.innerHTML = rows.map(student => {
-                const packageName = student.package_name || '—';
+                const progress = getEnrollmentSessionProgress(student);
+                const packageValue = uiIsDesk ? `${progress.used}/${progress.total}` : (student.package_name || '—');
                 const studentDisplayId = getEnrollmentStudentDisplayId(student);
                 const totalAmount = Number(student.total_amount || 0);
                 const paidAmount = Number(student.paid_amount || 0);
-                const balance = Math.max(0, totalAmount - paidAmount);
+                const balance = getEnrollmentBalance(student);
+                const awaitingOnlinePayment = student.payment_status === 'Pending Online Payment';
+                const overdue = student.payment_status === 'Payment Overdue';
+                const deadline = Number(student.deadline_session || 0);
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
@@ -3662,15 +3722,19 @@
                             <div class="font-semibold text-sm text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
                             <div class="text-xs font-medium text-slate-600">${escapeHtml(studentDisplayId)}</div>
                         </td>
-                        <td class="px-3 py-2.5 text-sm text-slate-700">${escapeHtml(packageName)}</td>
+                        <td class="px-3 py-2.5 text-sm text-slate-700">${escapeHtml(packageValue)}</td>
                         <td class="px-3 py-2.5 text-sm text-slate-700 font-semibold">${formatCurrencyPHP(totalAmount)}</td>
                         <td class="px-3 py-2.5 text-sm text-emerald-700 font-semibold">${formatCurrencyPHP(paidAmount)}</td>
-                        <td class="px-3 py-2.5 text-sm ${balance > 0 ? 'text-red-600' : 'text-slate-700'} font-semibold">${formatCurrencyPHP(balance)}</td>
+                        <td class="px-3 py-2.5 text-sm ${balance > 0 ? 'text-red-600' : 'text-slate-700'} font-semibold">
+                            ${formatCurrencyPHP(balance)}
+                            ${collectingBalance && deadline > 0 ? `<div class="mt-0.5 text-xs font-medium ${overdue ? 'text-red-600' : 'text-slate-500'}">${overdue ? 'Overdue' : `Due before session ${deadline}`}</div>` : ''}
+                            ${awaitingOnlinePayment ? '<div class="mt-0.5 text-xs font-medium text-amber-700">Online payment under review</div>' : ''}
+                        </td>
                         <td class="px-3 py-2.5">
                             <button type="button" class="rounded-md bg-blue-100 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200" onclick="openEnrollmentDetailsModal(${Number(student.enrollment_id)})">
                                 Details
                             </button>
-                            ${balance > 0 ? `<button type="button" class="ml-1 rounded-md bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-200" onclick="openDeskBalancePayment(${Number(student.enrollment_id)})">Collect Balance</button>` : ''}
+                            ${needsBalanceCollection(student) ? `<button type="button" class="ml-1 rounded-md bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-200" onclick="openDeskBalancePayment(${Number(student.enrollment_id)})">Collect Balance</button>` : ''}
                         </td>
                     </tr>
                 `;
@@ -3765,36 +3829,19 @@
             }
         });
 
-        function renderEnrollmentDetailCard(label, value, iconClass, valueClass = 'text-slate-900') {
+        function renderEnrollmentDetailRow(label, value, valueClass = '') {
             return `
-                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                    <div class="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">
-                        <i class="fas ${iconClass} text-gold-500/90"></i>
-                        ${escapeHtml(label)}
-                    </div>
-                    <div class="mt-2 text-sm font-semibold ${valueClass}">${value}</div>
+                <div class="enrollment-details-row">
+                    <span class="enrollment-details-label">${escapeHtml(label)}</span>
+                    <strong class="enrollment-details-value ${valueClass}">${value}</strong>
                 </div>
             `;
         }
 
-        async function getEnrollmentSessionProgress(student) {
-            const totalSessions = Math.max(0, Number(student?.sessions || 0));
-            const studentId = Number(student?.student_id || 0);
-
-            if (!studentId) {
-                return { used: 0, total: totalSessions };
-            }
-
-            try {
-                const summary = await fetchAttendanceSummary(studentId);
-                const presentCount = Number(summary?.summary?.present_count || 0);
-                const lateCount = Number(summary?.summary?.late_count || 0);
-                const used = Math.min(totalSessions, presentCount + lateCount);
-                return { used, total: totalSessions };
-            } catch (error) {
-                console.error('Failed to load attendance summary for enrollment modal:', error);
-                return { used: 0, total: totalSessions };
-            }
+        function getEnrollmentSessionProgress(student) {
+            const total = Math.max(0, Math.trunc(Number(student?.sessions) || 0));
+            const used = Math.max(0, Math.trunc(Number(student?.sessions_used ?? student?.completed_sessions) || 0));
+            return { used, total };
         }
 
         function formatDateOnly(dateString) {
@@ -3811,10 +3858,22 @@
                 return;
             }
 
-            const totalAmount    = Number(student.total_amount || 0);
-            const paidAmount     = Number(student.paid_amount  || 0);
-            const balance        = Math.max(0, totalAmount - paidAmount);
-            const sessionProgress = await getEnrollmentSessionProgress(student);
+            let paymentDetails = null;
+            let paymentDetailsUnavailable = false;
+            if (String(student.freeze_payment_status || 'None') !== 'None') {
+                try {
+                    const response = await axios.get(`${baseApiUrl}/students.php?action=get-enrollment-balance&enrollment_id=${encodeURIComponent(enrollmentId)}`);
+                    paymentDetails = response.data?.enrollment || null;
+                } catch (error) {
+                    console.error('Failed to load enrollment payment details:', error);
+                    paymentDetailsUnavailable = true;
+                }
+            }
+
+            const totalAmount    = Number(paymentDetails?.total_amount ?? student.total_amount ?? 0);
+            const paidAmount     = Number(paymentDetails?.paid_amount ?? student.paid_amount ?? 0);
+            const balance        = Number(paymentDetails?.balance_amount ?? getEnrollmentBalance(student));
+            const sessionProgress = getEnrollmentSessionProgress(student);
             const sessionPercent  = sessionProgress.total > 0
                 ? Math.min(100, Math.round((sessionProgress.used / sessionProgress.total) * 100))
                 : 0;
@@ -3852,7 +3911,7 @@
                     const tName = teacherNameMap[tid]
                         || `${String(slot.teacher_first_name || slot.first_name || '').trim()} ${String(slot.teacher_last_name || slot.last_name || '').trim()}`.trim()
                         || (tid > 0 ? `Teacher #${tid}` : '—');
-                    const day  = escapeHtml(slot.day_of_week || '');
+                    const day  = slot.day_of_week || '';
                     const time = slot.start_time
                         ? `${formatTime12Hour(slot.start_time)} – ${formatTime12Hour(slot.end_time)}`
                         : '';
@@ -3871,61 +3930,94 @@
             }
 
             // ── Render teacher rows ──
-            const teacherListHtml = teacherRows.map((t, idx) => `
-                <div class="desk-modal-list-item">
-                    <span class="font-semibold text-slate-900">${escapeHtml(t.name)}</span>
-                    ${t.day || t.time ? `<span class="text-slate-500"> · ${[t.day, t.time].filter(Boolean).map(v => escapeHtml(v)).join(' · ')}</span>` : ''}
+            const teacherListHtml = teacherRows.map(t => `
+                <div class="enrollment-details-teacher">
+                    <strong>${escapeHtml(t.name)}</strong>
+                    ${t.day || t.time ? `<span>${[t.day, t.time].filter(Boolean).map(v => escapeHtml(v)).join(' · ')}</span>` : ''}
                 </div>
             `).join('');
 
             const paymentBadge = balance <= 0
-                ? '<span class="text-emerald-700 font-semibold">Fully paid</span>'
-                : '<span class="text-red-600 font-semibold">Balance due</span>';
+                ? '<span class="enrollment-details-status is-paid">Fully paid</span>'
+                : '<span class="enrollment-details-status is-due">Balance due</span>';
+
+            const freezePayments = Array.isArray(paymentDetails?.freeze_payments) ? paymentDetails.freeze_payments : [];
+            const freezePaidAmount = freezePayments.reduce((sum, payment) =>
+                sum + (payment.status === 'Paid' ? Number(payment.amount || 0) : 0), 0);
+            const paymentOverviewHtml = freezePayments.length ? `
+                <section class="enrollment-details-section">
+                    <h3>Payment overview</h3>
+                    ${renderEnrollmentDetailRow('Enrollment paid', formatCurrencyPHP(paidAmount))}
+                    ${renderEnrollmentDetailRow('Freeze account paid', formatCurrencyPHP(freezePaidAmount))}
+                    ${renderEnrollmentDetailRow('Overall paid', formatCurrencyPHP(paidAmount + freezePaidAmount), 'enrollment-details-total')}
+                    <p class="enrollment-details-note">Overall paid includes approved freeze payments. Enrollment balance is separate.</p>
+                    <h4>Freeze account payments</h4>
+                    <div class="enrollment-details-payment-list">
+                        ${freezePayments.map(payment => {
+                            const status = String(payment.status || 'Pending');
+                            const statusClass = status === 'Paid' ? 'is-paid' : status === 'Rejected' ? 'is-due' : 'is-pending';
+                            const date = formatDateOnly(payment.payment_date || payment.created_at);
+                            const receipt = payment.receipt_number || payment.reference_number || '';
+                            return `<div class="enrollment-details-payment">
+                                <strong>${formatCurrencyPHP(Number(payment.amount || 0))}</strong>
+                                <span class="enrollment-details-status ${statusClass}">${escapeHtml(status)}</span>
+                                <span class="enrollment-details-payment-meta">${escapeHtml(payment.payment_method || '—')} · ${escapeHtml(date)}${receipt ? ` · ${escapeHtml(receipt)}` : ''}</span>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </section>` : '';
 
             Swal.fire({
                 title: 'Enrollment Details',
-                width: 760,
+                width: 896,
                 confirmButtonText: 'Close',
                 confirmButtonColor: '#b8860b',
                 customClass: {
                     popup: 'enrollment-details-popup enrollment-details-readable',
-                    title: 'text-xl font-bold text-slate-900',
-                    htmlContainer: 'px-0',
+                    title: 'enrollment-details-title',
+                    htmlContainer: 'enrollment-details-html',
                     confirmButton: 'desk-modal-btn desk-modal-btn-gold'
                 },
                 html: `
-                    <div class="text-left text-base text-slate-700">
-                        <div class="desk-modal-summary" style="border-radius:0;border-left:none;border-right:none;">
-                            <span><b>Student</b> ${studentName}</span>
-                            <span><b>Package</b> ${packageName}</span>
-                            <span><b>Branch</b> ${branchName}</span>
-                            <span><b>Payment</b> ${paymentType}</span>
+                    <div class="enrollment-details-content">
+                        <div class="enrollment-details-student">
+                            <span class="enrollment-details-label">Student</span>
+                            <strong>${studentName}</strong>
                         </div>
-
-                        <div class="px-5 py-4 border-b border-slate-100">
-                            <div class="flex items-center justify-between gap-2 mb-2">
-                                <span class="text-sm font-semibold uppercase tracking-wide text-slate-500">Sessions</span>
-                                <span class="text-sm text-slate-600">${sessionPercent}% · ${sessionProgress.used} / ${sessionProgress.total}</span>
+                        <div class="enrollment-details-grid">
+                            <div><span class="enrollment-details-label">Package</span><strong>${packageName}</strong></div>
+                            <div><span class="enrollment-details-label">Branch</span><strong>${branchName}</strong></div>
+                            <div><span class="enrollment-details-label">Payment type</span><strong>${paymentType}</strong></div>
+                            <div><span class="enrollment-details-label">Start date</span><strong>${escapeHtml(firstSession)}</strong></div>
+                        </div>
+                        <div class="enrollment-details-columns ${freezePayments.length ? 'has-payment-overview' : ''}">
+                            <div>
+                                <section class="enrollment-details-section">
+                                    <div class="enrollment-details-session-heading">
+                                        <h3>Sessions used</h3>
+                                        <strong>${sessionProgress.used} / ${sessionProgress.total}</strong>
+                                    </div>
+                                    <div class="enrollment-details-progress" role="progressbar" aria-label="Sessions used" aria-valuenow="${Math.min(sessionProgress.used, sessionProgress.total)}" aria-valuemin="0" aria-valuemax="${sessionProgress.total}">
+                                        <div style="width:${sessionPercent}%"></div>
+                                    </div>
+                                </section>
+                                <section class="enrollment-details-section">
+                                    <h3>Enrollment payment</h3>
+                                    <div class="enrollment-details-money-grid">
+                                        <div><span class="enrollment-details-label">Fee</span><strong>${formatCurrencyPHP(totalAmount)}</strong></div>
+                                        <div><span class="enrollment-details-label">Paid</span><strong class="enrollment-details-paid">${formatCurrencyPHP(paidAmount)}</strong></div>
+                                        <div><span class="enrollment-details-label">Balance</span><strong class="${balanceValueClass}">${formatCurrencyPHP(balance)}</strong>${paymentBadge}</div>
+                                    </div>
+                                </section>
+                                <section class="enrollment-details-section">
+                                    <h3>${teacherRows.length > 1 ? 'Teachers' : 'Teacher'}</h3>
+                                    ${teacherListHtml}
+                                </section>
                             </div>
-                            <div class="h-3 rounded-sm bg-slate-100 overflow-hidden">
-                                <div class="h-full rounded-sm bg-gold-500" style="width:${sessionPercent}%"></div>
-                            </div>
-                        </div>
-
-                        <div class="px-5 py-4 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                            <div><span class="block text-slate-400 font-semibold uppercase mb-1">Fee</span><span class="text-lg font-bold text-slate-900">${formatCurrencyPHP(totalAmount)}</span></div>
-                            <div><span class="block text-slate-400 font-semibold uppercase mb-1">Paid</span><span class="text-lg font-bold text-emerald-700">${formatCurrencyPHP(paidAmount)}</span></div>
-                            <div><span class="block text-slate-400 font-semibold uppercase mb-1">Balance</span><span class="text-lg font-bold ${balanceValueClass}">${formatCurrencyPHP(balance)}</span> · ${paymentBadge}</div>
-                        </div>
-
-                        <div class="px-5 py-4 border-b border-slate-100">
-                            <div class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2">${teacherRows.length > 1 ? 'Teachers' : 'Teacher'}</div>
-                            <div class="space-y-2">${teacherListHtml}</div>
-                        </div>
-
-                        <div class="px-5 py-4 text-sm">
-                            <span class="text-slate-400 font-semibold uppercase">Start date</span>
-                            <span class="ml-2 text-base font-semibold ${hasFirstSession ? 'text-slate-900' : 'text-slate-400'}">${escapeHtml(firstSession)}</span>
+                            ${paymentOverviewHtml || paymentDetailsUnavailable ? `<div>
+                                ${paymentOverviewHtml}
+                                ${paymentDetailsUnavailable ? '<p class="enrollment-details-error">Additional payment details could not be loaded.</p>' : ''}
+                            </div>` : ''}
                         </div>
                     </div>
                 `
@@ -4086,18 +4178,16 @@
                 e.preventDefault();
                 submitAssignRequestForm(e);
             });
-            document.getElementById('viewNavPending')?.addEventListener('click', () => {
+            const switchEnrollmentView = (view) => {
                 const viewUrl = new URL(window.location.href);
-                viewUrl.searchParams.set('view', 'pending');
+                viewUrl.searchParams.set('view', view);
                 window.history.replaceState({}, '', viewUrl.toString());
                 applySessionView();
-            });
-            document.getElementById('viewNavActive')?.addEventListener('click', () => {
-                const viewUrl = new URL(window.location.href);
-                viewUrl.searchParams.set('view', 'active');
-                window.history.replaceState({}, '', viewUrl.toString());
-                applySessionView();
-            });
+                renderStudents(document.getElementById('studentsTable'));
+            };
+            document.getElementById('viewNavPending')?.addEventListener('click', () => switchEnrollmentView('pending'));
+            document.getElementById('viewNavActive')?.addEventListener('click', () => switchEnrollmentView('active'));
+            document.getElementById('viewNavBalance')?.addEventListener('click', () => switchEnrollmentView('balance'));
             document.getElementById('openSessionExtensionRequestsModalBtn')?.addEventListener('click', openSessionExtensionRequestsModal);
             document.getElementById('closeSessionExtensionRequestsModalBtn')?.addEventListener('click', closeSessionExtensionRequestsModal);
             document.getElementById('sessionExtensionRequestsModal')?.addEventListener('click', (event) => {

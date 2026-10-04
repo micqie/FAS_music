@@ -18,6 +18,13 @@
             return div.innerHTML;
         }
 
+        function getStudentDisplayId(student) {
+            const savedCode = String(student?.student_code || '').trim();
+            if (savedCode) return savedCode;
+            const studentId = Number(student?.student_id || 0);
+            return studentId > 0 ? `STU-${String(studentId).padStart(4, '0')}` : 'Student ID unavailable';
+        }
+
         function formatTime12Hour(timeString) {
             if (!timeString) return '—';
             const parts = String(timeString).split(':');
@@ -501,6 +508,7 @@
 
             tbody.innerHTML = makeupRows.map(student => {
                 const studentName = `${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}`.trim() || 'Student';
+                const studentDisplayId = getStudentDisplayId(student);
                 const sessionSummary = getNextSessionSummary(student);
                 const pendingCount = getPendingMakeupSessions(student).length;
                 return `
@@ -510,7 +518,7 @@
                                 onclick="openMakeupRescheduleFlow(${Number(student.enrollment_id)})"
                                 class="text-left group">
                                 <div class="font-semibold text-slate-900 group-hover:text-blue-700 transition">${studentName}</div>
-                                <div class="text-xs text-slate-500 truncate max-w-[210px]">${escapeHtml(student.email || '')}</div>
+                                <div class="text-xs text-slate-500 truncate max-w-[210px]">${escapeHtml(studentDisplayId)}</div>
                                 ${pendingCount > 0 ? `<div class="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700"><i class="fas fa-calendar-plus text-[9px]"></i> ${pendingCount} pending</div>` : ''}
                             </button>
                         </td>

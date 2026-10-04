@@ -18,8 +18,10 @@
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001">
     <script src="../../js/table_responsive.js" defer></script>
+    <link rel="stylesheet" href="../../css/portal-loading.css?v=20260927001">
 </head>
 <body class="desk-app bg-[#f1f5f9] text-slate-900 antialiased">
+    <script src="../../js/portal_loading.js?v=20260927001"></script>
 <div class="min-h-screen flex">
 
     <!-- Sidebar -->
@@ -121,7 +123,6 @@
                             <thead class="bg-rose-50/60">
                                 <tr>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
-                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Branch</th>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Package</th>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Absence Details</th>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Payment State</th>
@@ -130,7 +131,7 @@
                                 </tr>
                             </thead>
                             <tbody id="frozenStudentsBody" class="divide-y divide-rose-50">
-                                <tr><td colspan="7" class="px-6 py-10 text-center text-slate-400">
+                                <tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">
                                     <i class="fas fa-spinner fa-spin text-2xl mb-2 block"></i>Loading frozen students...
                                 </td></tr>
                             </tbody>
@@ -188,7 +189,6 @@
                             <thead class="bg-slate-50">
                                 <tr>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
-                                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Branch</th>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</th>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Receipt</th>
@@ -196,7 +196,7 @@
                                 </tr>
                             </thead>
                             <tbody id="freezeHistoryBody" class="divide-y divide-slate-100">
-                                <tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">
+                                <tr><td colspan="5" class="px-6 py-10 text-center text-slate-400">
                                     <i class="fas fa-spinner fa-spin text-2xl mb-2 block"></i>Loading history...
                                 </td></tr>
                             </tbody>
@@ -313,6 +313,13 @@
         const d = document.createElement('div');
         d.textContent = t;
         return d.innerHTML;
+    }
+
+    function getStudentDisplayId(student) {
+        const savedCode = String(student?.student_code || '').trim();
+        if (savedCode) return savedCode;
+        const studentId = Number(student?.student_id || 0);
+        return studentId > 0 ? `STU-${String(studentId).padStart(4, '0')}` : 'Student ID unavailable';
     }
 
     function escapeHtml(value) {
@@ -896,7 +903,7 @@
         if (countEl) countEl.textContent = String(rows.length);
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">
+            tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400">
                 <i class="fas fa-clock-rotate-left text-3xl text-slate-200 block mb-3"></i>
                 No approved or rejected payments yet.
             </td></tr>`;
@@ -915,9 +922,8 @@
             return `<tr class="hover:bg-slate-50 transition">
                 <td class="px-6 py-4">
                     <div class="font-semibold text-slate-900">${name}</div>
-                    <div class="text-xs text-slate-500">${escHtml(r.email || '')}</div>
+                    <div class="text-xs text-slate-500">${escHtml(getStudentDisplayId(r))}</div>
                 </td>
-                <td class="px-6 py-4 text-sm text-slate-700">${escHtml(r.branch_name || '—')}</td>
                 <td class="px-6 py-4 font-bold text-slate-800">₱${Number(r.amount || 100).toFixed(2)}</td>
                 <td class="px-6 py-4">
                     <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusClass}">${statusLabel}</span>
@@ -939,7 +945,7 @@
         if (pendingCountEl) pendingCountEl.textContent = String(pendingPayments);
 
         if (!frozenStudents.length) {
-            tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-10 text-center text-slate-400">
+            tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">
                 <i class="fas fa-snowflake text-3xl text-slate-200 block mb-3"></i>
                 No frozen student accounts found.
             </td></tr>`;
@@ -976,9 +982,8 @@
             return `<tr class="hover:bg-rose-50/30 transition">
                 <td class="px-6 py-4">
                     <div class="font-semibold text-slate-900">${name}</div>
-                    <div class="text-xs text-slate-500">${escHtml(row.email || '')}</div>
+                    <div class="text-xs text-slate-500">${escHtml(getStudentDisplayId(row))}</div>
                 </td>
-                <td class="px-6 py-4 text-sm text-slate-700">${escHtml(row.branch_name || '—')}</td>
                 <td class="px-6 py-4 text-sm text-slate-700">${escHtml(row.package_name || '—')}</td>
                 <td class="px-6 py-4 max-w-xs">
                     <div class="flex items-center gap-2"><span class="font-bold text-rose-600">${Number(row.used_absences || 0)}</span><span class="text-xs text-slate-400">absence${Number(row.used_absences || 0) === 1 ? '' : 's'} · ${Number(row.consecutive_absences || 0)} consecutive</span></div>
@@ -1048,7 +1053,7 @@
             return `<tr class="hover:bg-rose-50/30 transition">
                 <td class="px-6 py-4">
                     <div class="font-semibold text-slate-900">${name}</div>
-                    <div class="text-xs text-slate-500">${escHtml(r.email || '')}</div>
+                    <div class="text-xs text-slate-500">${escHtml(getStudentDisplayId(r))}</div>
                     <div class="text-xs text-slate-400">${escHtml(r.branch_name || '')}</div>
                 </td>
                 <td class="px-6 py-4 text-slate-700 text-sm">${escHtml(r.package_name || '—')}</td>
@@ -1149,7 +1154,7 @@
             renderFrozenStudents();
         } catch (e) {
             const tbody = document.getElementById('frozenStudentsBody');
-            if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-500">Failed to load frozen students. Please try again.</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-red-500">Failed to load frozen students. Please try again.</td></tr>`;
         }
     }
 

@@ -19,8 +19,10 @@
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001">
     <script src="../../js/table_responsive.js" defer></script>
+    <link rel="stylesheet" href="../../css/portal-loading.css?v=20260927001">
 </head>
 <body class="desk-app bg-slate-100 text-slate-900">
+    <script src="../../js/portal_loading.js?v=20260927001"></script>
     <div class="min-h-screen flex">
     <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden flex-col sidebar-scroll">
         <div class="desk-sidebar-brand px-2 pb-4 mb-3 border-b border-white/10">
@@ -107,7 +109,6 @@
                     <thead class="bg-slate-50">
                         <tr>
                             <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
                             <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Session Counter</th>
                             <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Next Session</th>
                             <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
@@ -116,7 +117,7 @@
                     </thead>
                     <tbody id="studentsTable" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="5" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading active sessions...</p>
                             </td>
@@ -1174,21 +1175,37 @@
             return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
         }
 
-        function getSessionStatusBadge(status) {
-            const normalized = String(status || '').toLowerCase();
-            if (normalized === 'completed') {
-                return '<span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">Completed</span>';
+        function getStudentDisplayId(student) {
+            const savedCode = String(student?.student_code || '').trim();
+            if (savedCode) return savedCode;
+            const studentId = Number(student?.student_id || 0);
+            return studentId > 0 ? `STU-${String(studentId).padStart(4, '0')}` : 'Student ID unavailable';
+        }
+
+        function getSessionStatusBadge(session) {
+            const attendance = String(session?.attendance_status || '').trim().toLowerCase();
+            const status = String(session?.status || '').trim().toLowerCase();
+            let label = 'Scheduled';
+            let color = 'bg-blue-100 text-blue-700';
+
+            if (['absent', 'ci', 'excused'].includes(attendance) || status === 'no show') {
+                label = 'Absent';
+                color = 'bg-rose-100 text-rose-700';
+            } else if (attendance === 'teacher absent') {
+                label = 'Teacher absent';
+                color = 'bg-rose-100 text-rose-700';
+            } else if (['present', 'late'].includes(attendance) || ['completed', 'late'].includes(status)) {
+                label = 'Present';
+                color = 'bg-emerald-100 text-emerald-700';
+            } else if (['cancelled', 'cancelled_by_teacher', 'rescheduled'].includes(status)) {
+                label = status === 'rescheduled' ? 'Rescheduled' : 'Cancelled';
+                color = 'bg-slate-100 text-slate-700';
+            } else if (status && status !== 'scheduled') {
+                label = session.status;
+                color = 'bg-slate-100 text-slate-700';
             }
-            if (normalized === 'cancelled_by_teacher') {
-                return '<span class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700">Cancelled</span>';
-            }
-            if (normalized === 'rescheduled') {
-                return '<span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-bold text-sky-700">Rescheduled</span>';
-            }
-            if (normalized === 'scheduled') {
-                return '<span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">Scheduled</span>';
-            }
-            return `<span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">${escapeHtml(status || 'Unknown')}</span>`;
+
+            return `<span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${color}">${escapeHtml(label)}</span>`;
         }
 
         async function fetchRoomsForBranch(branchId) {
@@ -1234,7 +1251,7 @@
                 if (!requests.length) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-inbox text-2xl mb-2 text-gold-500/60"></i>
                                 <p>${uiIsDesk ? 'No pending enrollment requests.' : 'No pending student requests.'}</p>
                             </td>
@@ -1246,6 +1263,7 @@
                 tableBody.innerHTML = requests.map(r => {
                     pendingRequestsById[String(r.request_id)] = r;
                     const studentName = `${escapeHtml(r.first_name || '')} ${escapeHtml(r.last_name || '')}`.trim();
+                    const studentDisplayId = getStudentDisplayId(r);
                     const pkg = escapeHtml(r.package_name || '—');
                     const instruments = Array.isArray(r.instruments) && r.instruments.length
                         ? r.instruments.map(i => escapeHtml(i.instrument_name || 'Instrument')).join(', ')
@@ -1256,7 +1274,7 @@
                         <tr class="hover:bg-slate-50/80 transition">
                             <td class="px-6 py-4">
                                 <div class="font-medium text-slate-900">${studentName || 'Student'}</div>
-                                <div class="text-sm text-slate-500">${escapeHtml(r.email || '')}</div>
+                                <div class="text-sm text-slate-500">${escapeHtml(studentDisplayId)}</div>
                                 <div class="text-xs text-slate-400">${escapeHtml(r.branch_name || '')}</div>
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-700">${pkg}</td>
@@ -1976,7 +1994,7 @@
                 } else {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">
+                            <td colspan="5" class="px-4 py-6 text-center text-slate-500">
                                 <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
                                 <p>No active sessions found.</p>
                             </td>
@@ -1987,9 +2005,9 @@
                 console.error('Failed to load active sessions:', error);
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-4 py-6 text-center text-red-500">
-                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                            <p>Failed to load active sessions. Please try again.</p>
+                            <td colspan="5" class="px-4 py-6 text-center text-red-500">
+                                <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                                <p>Failed to load active sessions. Please try again.</p>
                         </td>
                     </tr>`;
             }
@@ -1999,7 +2017,7 @@
             if (!allStudents.length) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-4 py-6 text-center text-slate-500">
+                        <td colspan="5" class="px-4 py-6 text-center text-slate-500">
                             <i class="fas fa-users text-3xl mb-2 text-gold-500/50"></i>
                             <p>No active sessions found.</p>
                         </td>
@@ -2009,8 +2027,9 @@
 
             tableBody.innerHTML = allStudents.map(student => {
                 const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
+                const studentDisplayId = getStudentDisplayId(student);
                 const sessionsTotal = Number(student.sessions || 0);
-                const completedSessions = Math.min(sessionsTotal, Math.max(0, Number(student.completed_sessions || 0)));
+                const completedSessions = Math.min(sessionsTotal, Math.max(0, Number(student.sessions_used ?? student.completed_sessions ?? 0)));
                 const remainingSessions = Math.max(0, sessionsTotal - completedSessions);
                 const sessionDate = student.first_session_date ? new Date(student.first_session_date).toLocaleDateString() : '—';
                 const sessionTime = student.first_session_date ? `${sessionDate}` : '—';
@@ -2019,9 +2038,8 @@
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="px-3 py-2.5">
                             <div class="font-semibold text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div>
-                            <div class="text-xs text-slate-500">${escapeHtml(student.email || '')}</div>
+                            <div class="text-xs text-slate-500">${escapeHtml(studentDisplayId)}</div>
                         </td>
-                        <td class="px-3 py-2.5 text-slate-700">${escapeHtml(student.branch_name || '—')}</td>
                         <td class="px-3 py-2.5 whitespace-nowrap"><div class="font-bold text-slate-800">${completedSessions} / ${sessionsTotal}</div><div class="text-[11px] text-slate-500">${remainingSessions} remaining</div></td>
                         <td class="px-3 py-2.5 text-slate-700 whitespace-nowrap">${sessionTime}</td>
                         <td class="px-3 py-2.5 text-slate-700">${teacherName}</td>
@@ -2137,7 +2155,7 @@
                             return `
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div class="min-w-0">
-                                        <div class="flex flex-wrap items-center gap-2">${getSessionStatusBadge(slot.status)}<span class="font-semibold text-slate-800">${escapeHtml(dateText)}</span></div>
+                                        <div class="flex flex-wrap items-center gap-2">${getSessionStatusBadge(slot)}<span class="font-semibold text-slate-800">${escapeHtml(dateText)}</span></div>
                                         <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500"><span><i class="fas fa-clock mr-1 text-slate-400"></i>${escapeHtml(timeText)}</span>${slotTeacherName ? `<span><i class="fas fa-user-tie mr-1 text-slate-400"></i>${slotTeacherName}</span>` : ''}</div>
                                     </div>
                                     ${editBtn}
@@ -2581,6 +2599,6 @@
             document.getElementById('addAssignRequestSlotBtn')?.addEventListener('click', () => addAssignRequestSlot());
         });
     </script>
-    <script src="../../js/desk/desk_session_requests.js?v=20260906003"></script>
+    <script src="../../js/desk/desk_session_requests.js?v=20260928005"></script>
 </body>
 </html>

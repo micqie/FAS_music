@@ -181,6 +181,13 @@
             };
         }
 
+        function getStudentDisplayId(student) {
+            const savedCode = String(student?.student_code || '').trim();
+            if (savedCode) return savedCode;
+            const studentId = Number(student?.student_id || 0);
+            return studentId > 0 ? `STU-${String(studentId).padStart(4, '0')}` : 'Student ID unavailable';
+        }
+
         function collectTodaySessions() {
             const seen = new Set();
             const sessions = [];
@@ -367,6 +374,7 @@
 
             table.innerHTML = rows.map(student => {
                 const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
+                const studentDisplayId = getStudentDisplayId(student);
                 const allowed = Number(student.allowed_absences || 0);
                 const used = Number(student.used_absences || 0);
                 const consecutive = Number(student.consecutive_absences || 0);
@@ -374,7 +382,7 @@
                     <tr class="hover:bg-rose-50/50 transition">
                         <td class="px-5 py-4">
                             <div class="font-medium text-slate-900">${escapeHtml(studentName)}</div>
-                            <div class="text-sm text-slate-500">${escapeHtml(student.email || '')}</div>
+                            <div class="text-sm text-slate-500">${escapeHtml(studentDisplayId)}</div>
                         </td>
                         <td class="px-5 py-4 text-slate-700">${escapeHtml(student.package_name || '—')}</td>
                         <td class="px-5 py-4 font-semibold text-rose-600">${used}</td>

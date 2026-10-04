@@ -312,13 +312,13 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
     </button>
 
     <!-- Parent Agreement Modal -->
-    <div id="parentAgreementModal" class="fixed inset-0 z-[110] hidden items-start justify-center overflow-y-auto bg-black/60 p-3 pt-4 pb-4 backdrop-blur-sm sm:items-center sm:p-4">
-        <div class="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-sky-100 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+    <div id="parentAgreementModal" class="fixed inset-0 z-[110] hidden items-center justify-center overflow-hidden bg-black/60 p-2 backdrop-blur-sm sm:p-4">
+        <div id="parentAgreementDialog" class="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-sky-100 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900" style="width: min(100%, 720px); height: min(82vh, 720px); max-height: calc(100dvh - 2rem);">
             <div class="flex shrink-0 items-start justify-between gap-3 border-b border-sky-100 bg-sky-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-sky-950/20">
                 <div>
                     <p class="text-[10px] font-bold uppercase tracking-[0.28em] text-sky-600 dark:text-sky-300">Parent Guide</p>
-                    <h2 class="mt-1 text-xl sm:text-2xl font-serif leading-tight text-zinc-900 dark:text-white">📖 Parent Guide & School Policies</h2>
-                    <p class="mt-1 text-sm text-sky-900/80 dark:text-sky-100/80">Please read these reminders before enrollment.</p>
+                    <h2 class="mt-1 text-xl sm:text-2xl font-serif leading-tight text-zinc-900 dark:text-white">Parent Agreement</h2>
+                    <p class="mt-1 text-sm text-sky-900/80 dark:text-sky-100/80">Latest agreement dated September 20, 2026.</p>
                 </div>
                 <button type="button" onclick="toggleParentAgreementModal(false)" class="rounded-full p-1.5 text-zinc-400 transition hover:bg-white hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white" aria-label="Close agreement modal">
                     <i class="fas fa-times text-lg"></i>
@@ -328,11 +328,33 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
             <div class="shrink-0 border-b border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-zinc-800 dark:bg-sky-950/20 dark:text-sky-100">
                 <div class="flex items-start gap-3">
                     <i class="fas fa-circle-info mt-0.5 text-sm text-sky-500"></i>
-                    <p>Please read these reminders before enrollment. Continuing means you acknowledge the school policies and terms.</p>
+                    <p>Please review the complete agreement below before continuing with enrollment.</p>
                 </div>
             </div>
 
-            <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
+            <div id="parentAgreementContent" class="min-h-0 flex-1 overflow-y-auto bg-zinc-100 p-3 sm:p-5 dark:bg-zinc-950">
+                <article class="space-y-5 rounded-xl border border-zinc-200 bg-white p-5 text-sm leading-relaxed text-zinc-700 shadow-sm sm:p-6 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                    <div class="border-b border-zinc-200 pb-4 text-center dark:border-zinc-700">
+                        <h3 class="text-lg font-bold tracking-wide text-zinc-900 dark:text-white">FATHER &amp; SONS' MUSIC</h3>
+                        <p class="mt-1 text-base font-bold tracking-wide text-zinc-900 dark:text-white"><span aria-hidden="true">📄</span> LETTER OF AGREEMENT</p>
+                        <p class="mt-3 text-left">By enrolling at Father &amp; Sons' Music, the student and/or parent/guardian acknowledges that they have read, understood, and agreed to the following terms and conditions:</p>
+                    </div>
+
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">📝</span> 1. Enrollment</h4><p>The Student Enrollment Form must be completed accurately and in full by the student, parent, legal guardian, or authorized representative.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">💳</span> 2. Registration Fee</h4><p>A one-time Registration Fee of Php 1,000.00 is required prior to the student's first lesson.</p><p class="mt-2 font-semibold">The Registration Fee is non-refundable and non-transferable.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">📦</span> 3. Down Payment &amp; Package Enrollment</h4><p>The following minimum down payments are required upon enrollment:</p><ul class="mt-2 list-disc space-y-1 pl-5"><li>50 Sessions – Php 13,000.00</li></ul><p class="mt-2 font-semibold">All payments made to Father &amp; Sons' Music are non-refundable.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">📅</span> 4. Payment Deadlines</h4><p>The remaining balance must be fully settled on or before:</p><ul class="mt-2 list-disc space-y-1 pl-5"><li>7th session for the 12-Session Package</li><li>11th session for the 20-Session Package</li><li>30th session for the 50-Session Package</li><li>12-Session Package: 3 allowable absences</li><li>20-Session Package: 4 allowable absences</li></ul><p class="mt-2">Failure to settle balances may result in the temporary suspension of lessons until payment is updated.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">⏰</span> 5. Attendance &amp; Punctuality</h4><p>Students are expected to arrive on time for their scheduled lessons. Late arrivals may result in shortened lesson time in consideration of succeeding students and teacher schedules.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">🤒</span> 6. Absence Policy</h4><p>To maintain a fair scheduling system and protect the reserved lesson slots and schedules of both students and instructors, each lesson package includes a limited number of Allowable Absences:</p><ul class="mt-2 list-disc space-y-1 pl-5"><li>50-Session Package: 8 allowable absences</li></ul><p class="mt-2">Allowable absences may be used for illness, emergencies, personal matters, or other valid reasons.</p><p class="mt-2">There are no Make-Up Sessions for absences. An allowable absence simply means that the missed lesson will not be deducted from the student's lesson card, provided that the student has remaining allowable absences.</p><p class="mt-2">Once the student's allowable absences have been fully used, all succeeding absences will be counted as used sessions and deducted from the student's lesson card, regardless of the reason for the absence, except as provided under the Hospital Confinement Exception below.</p><p class="mt-2">Students and parents/guardians are therefore encouraged to use their allowable absences responsibly.</p><p class="mt-3 font-semibold text-zinc-900 dark:text-white"><span aria-hidden="true">🏥</span> Hospital Confinement Exception</p><p>An exception may be granted when a student is confined in a hospital and is medically unable to attend the scheduled lesson. In such cases, the absence will not be counted against the student's remaining allowable absences, subject to reasonable documentation or verification when necessary.</p><p class="mt-2">This policy is implemented to maintain fairness among students, protect instructors' scheduled teaching hours, and prevent the repeated or excessive use of absences from affecting the studio's operations and teacher availability.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">📌</span> 6A. Lesson Slot Holding</h4><p>Students who expect to be absent for three (3) or more consecutive scheduled lessons may request a Lesson Slot Holding.</p><p class="mt-2">To reserve the student's preferred schedule and to support teacher availability, a Slot Holding Fee of Php 100.00 per missed session shall apply.</p><p class="mt-2">The Slot Holding Fee is not forfeited and may be credited toward future lesson payments.</p><p class="mt-2">A Schedule Freeze must be requested and approved by management before the affected scheduled lessons whenever reasonably possible.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">⚠️</span> 6B. Counted-In (CI) Policy</h4><p>A lesson shall be marked as Counted-In (CI) and considered used when:</p><ul class="mt-2 list-disc space-y-1 pl-5"><li>The student's allowable absences have already been fully used; and</li><li>The student fails to attend the scheduled lesson; or</li><li>The student does not qualify for an applicable exception under this Absence Policy.</li></ul><p class="mt-2">For absences where the student still has remaining allowable absences, the lesson shall not be deducted from the student's lesson card.</p><p class="mt-2">An absence shall also be considered Counted-In when the student has no remaining allowable absences and does not qualify for the Hospital Confinement Exception.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">⏳</span> 6C. Lesson Validity</h4><p>Unused lessons must be utilized within three (3) months from the student's last attended lesson.</p><p class="mt-2">Lessons remaining unused beyond this period shall be considered forfeited unless otherwise approved by management.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">🗓️</span> 7. Scheduling Policy</h4><p>Students are expected to follow their assigned lesson schedule. Schedule changes may be accommodated only for valid reasons and are subject to teacher and room availability.</p><p class="mt-2">Students should not rely solely on reminders from the Front Desk, as reminders may not always be sent.</p><p class="mt-2">Failure to attend a scheduled lesson due to a missed reminder does not exempt a student from the Attendance and Counted-In Policies.</p></section>
+                    <section><h4 class="font-bold text-zinc-900 dark:text-white"><span aria-hidden="true">🔄</span> 8. Transfer of Students</h4><p>Students enrolled at Father &amp; Sons' Music are considered clients of the company.</p><p class="mt-2">Parents, students, and instructors agree that lesson arrangements shall only be conducted through Father &amp; Sons' Music during active enrollment.</p></section>
+                </article>
+            </div>
+
+            <div class="hidden">
                 <div class="space-y-3">
                     <section class="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
                         <h3 class="text-base font-bold leading-snug text-zinc-900 dark:text-white">🎵 Enrollment</h3>
@@ -442,6 +464,14 @@ class="text-zinc-600 hover:text-gold-500 dark:text-zinc-400 dark:hover:text-gold
             </div>
 
             <div class="shrink-0 flex items-center justify-end gap-3 border-t border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                <a href="assets/documents/parent-agreement-latest-2026-09-20.pdf" download="parent-agreement-latest-2026-09-20.pdf" class="mr-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gold-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-400 focus:ring-offset-2 dark:focus:ring-offset-zinc-950">
+                    <i class="fas fa-download" aria-hidden="true"></i>
+                    Download PDF
+                </a>
+                <a href="assets/documents/parent-agreement-latest-2026-09-20.pdf" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-bold text-sky-700 transition hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 dark:border-sky-800 dark:bg-zinc-900 dark:text-sky-300 dark:hover:bg-sky-950/40 dark:focus:ring-offset-zinc-950">
+                    <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                    View PDF
+                </a>
                 <button type="button" onclick="toggleParentAgreementModal(false)" class="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
                     I Understand
                 </button>

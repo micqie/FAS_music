@@ -10,7 +10,7 @@
  <link rel="icon" href="../../logo/android-chrome-512x512.png" type="image/x-icon" />
     <link rel="stylesheet" href="../../assets/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="../../css/desk-premium.css?v=20260910001">
-    <link rel="stylesheet" href="../../css/desk-modals.css">
+    <link rel="stylesheet" href="../../css/desk-modals.css?v=20260928003">
     <style>
         :root { --nav-bg: #0b0f18; --gold: #d4af37; }
         body { font-family: 'Space Grotesk', sans-serif; }
@@ -80,8 +80,10 @@
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001">
     <script src="../../js/table_responsive.js" defer></script>
+    <link rel="stylesheet" href="../../css/portal-loading.css?v=20260927001">
 </head>
 <body class="desk-app desk-enrollment-page bg-slate-100 text-slate-900">
+    <script src="../../js/portal_loading.js?v=20260927001"></script>
     <div class="min-h-screen flex">
     <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden flex-col sidebar-scroll">
         <div class="desk-sidebar-brand px-2 pb-4 mb-3 border-b border-white/10">
@@ -144,9 +146,10 @@
                     </div>
                 </div>
                 <div class="mt-2.5 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                    <div class="desk-toolbar-pill inline-flex w-fit items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
+                    <div class="desk-toolbar-pill inline-flex w-fit max-w-full flex-wrap items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
                         <button id="viewNavPending" class="rounded-md px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 sm:text-sm">Pending (<span id="pendingTabCount">0</span>)</button>
                         <button id="viewNavActive" class="rounded-md px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 sm:text-sm">Active (<span id="activeTabCount">0</span>)</button>
+                        <button id="viewNavBalance" type="button" class="rounded-md px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 sm:text-sm"><span class="hidden sm:inline">Need to </span>Collect Balance (<span id="balanceTabCount">0</span>)</button>
                     </div>
                     <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto lg:justify-end">
                         <div class="w-full sm:w-auto">
@@ -185,7 +188,7 @@
                     <thead class="bg-slate-50">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Requested Package</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Requested Sessions</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Instruments</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Preferred Schedule</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
@@ -219,7 +222,7 @@
                     <thead class="bg-slate-50">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Package</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Sessions Used</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Enrollment Fee</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Paid</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Balance</th>
@@ -263,16 +266,16 @@
                     <thead class="sticky top-0 bg-slate-50">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Purchased Sessions</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="sessionExtensionRequestsTable" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">
+                            <td colspan="5" class="px-4 py-6 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading session extension requests...</p>
                             </td>
@@ -722,6 +725,6 @@
 <script src="../../js/index.js?v=20260917004"></script>
     <script src="../../js/session_timeout.js?v=20260826004"></script>
     <script src="../../js/desk/desk_nav.js?v=20260917003"></script>
-    <script src="../../js/desk/desk_enrollment.js?v=20260918001"></script>
+    <script src="../../js/desk/desk_enrollment.js?v=20260928005"></script>
 </body>
 </html>

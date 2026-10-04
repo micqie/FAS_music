@@ -988,6 +988,8 @@ function toggleParentAgreementModal(show) {
     if (!modal) return;
 
     if (show) {
+        const agreementContent = document.getElementById('parentAgreementContent');
+        if (agreementContent) agreementContent.scrollTop = 0;
         modal.classList.remove('hidden');
         modal.classList.add('flex');
     } else {
@@ -12486,6 +12488,7 @@ function initRegistrationsPaginationControls() {
 function renderRegistrationsTable() {
     const tbody = document.getElementById('registrationsTable');
     if (!tbody) return;
+    const showBranchColumn = document.body.dataset.branchRegistrationTable !== '1';
 
     const infoEl = document.getElementById('registrationsPaginationInfo');
     const prevBtn = document.getElementById('registrationsPrevBtn');
@@ -12517,7 +12520,7 @@ function renderRegistrationsTable() {
     if (totalRows === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="px-6 py-8 text-center text-zinc-400">
+                <td colspan="${showBranchColumn ? 7 : 6}" class="px-6 py-8 text-center text-zinc-400">
                     <i class="fas fa-inbox text-2xl mb-2"></i>
                     <p>No registrations found</p>
                 </td>
@@ -12578,7 +12581,7 @@ function renderRegistrationsTable() {
                     <div class="text-sm font-medium text-slate-900 wrap-text" style="color:#0f172a;" title="${escapeHtml((reg.guardian_first_name || '') + ' ' + (reg.guardian_last_name || ''))}">${escapeHtml(reg.guardian_first_name || '')} ${escapeHtml(reg.guardian_last_name || '')}</div>
                     <div class="text-xs text-slate-500 truncate-text" style="color:#64748b;" title="${escapeHtml(reg.guardian_phone || '')}">${escapeHtml(reg.guardian_phone || '')}</div>
                 </td>
-                <td class="px-4 py-2.5 text-sm text-slate-700 table-text-cell truncate-text" style="color:#334155;" title="${escapeHtml(reg.branch_name || '')}">${escapeHtml(reg.branch_name || '')}</td>
+                ${showBranchColumn ? `<td class="px-4 py-2.5 text-sm text-slate-700 table-text-cell truncate-text" style="color:#334155;" title="${escapeHtml(reg.branch_name || '')}">${escapeHtml(reg.branch_name || '')}</td>` : ''}
                 <td class="px-4 py-2.5 table-money-cell">
                     <div class="text-sm text-slate-900 font-semibold" style="color:#0f172a;">₱${parseFloat(reg.registration_fee_amount || 0).toFixed(2)}</div>
                     ${remaining > 0 ? `<div class="text-xs text-red-600">Remaining: ₱${remaining.toFixed(2)}</div>` : ''}
@@ -13482,6 +13485,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const guardianPaymentsRoot = document.getElementById('guardianPaymentsRoot');
     const guardianProfileRoot = document.getElementById('guardianProfileRoot');
     const guardianAbsenceRoot = document.getElementById('guardianAbsenceRoot');
+    const trackPortalPageInitialization = (promise) => window.fasPageLoading?.track(promise);
 
     initAdminSidebarMenu();
     initAdminResponsiveTables();
@@ -13562,34 +13566,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             reloadRegistrationsByActiveMode();
         }
     } else if (studentDashboard) {
-        initStudentDashboardPage();
+        trackPortalPageInitialization(initStudentDashboardPage());
         startPortalPageAutoRefresh('student-dashboard', initStudentDashboardPage);
     } else if (studentProfile) {
-        initStudentProfilePage();
+        trackPortalPageInitialization(initStudentProfilePage());
     } else if (studentSessions) {
-        initStudentSessionsPage();
+        trackPortalPageInitialization(initStudentSessionsPage());
         startPortalPageAutoRefresh('student-sessions', initStudentSessionsPage);
     } else if (studentGrades) {
-        initStudentGradesPage();
+        trackPortalPageInitialization(initStudentGradesPage());
         startPortalPageAutoRefresh('student-grades', initStudentGradesPage);
     } else if (studentAttendance) {
-        initStudentAttendancePage();
+        trackPortalPageInitialization(initStudentAttendancePage());
         startPortalPageAutoRefresh('student-attendance', initStudentAttendancePage);
     } else if (studentQr) {
-        initStudentQrPage();
+        trackPortalPageInitialization(initStudentQrPage());
     } else if (document.getElementById('guardianDashboardRoot')) {
-        initGuardianDashboardPage();
+        trackPortalPageInitialization(initGuardianDashboardPage());
         startPortalPageAutoRefresh('guardian-dashboard', initGuardianDashboardPage);
     } else if (guardianStudentsRoot) {
-        initGuardianStudentsPage();
+        trackPortalPageInitialization(initGuardianStudentsPage());
         startPortalPageAutoRefresh('guardian-students', initGuardianStudentsPage);
     } else if (guardianPaymentsRoot) {
-        initGuardianPaymentsPage();
+        trackPortalPageInitialization(initGuardianPaymentsPage());
         startPortalPageAutoRefresh('guardian-payments', initGuardianPaymentsPage);
     } else if (guardianProfileRoot) {
-        initGuardianProfilePage();
+        trackPortalPageInitialization(initGuardianProfilePage());
     } else if (guardianAbsenceRoot) {
-        initGuardianAbsencePage();
+        trackPortalPageInitialization(initGuardianAbsencePage());
         startPortalPageAutoRefresh('guardian-absence', initGuardianAbsencePage);
     }
 

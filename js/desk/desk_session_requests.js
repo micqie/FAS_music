@@ -10,14 +10,21 @@
         pageSize: 10
     };
 
-    function escapeRequestHtml(value) {
+function escapeRequestHtml(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
-    }
+}
+
+function getRequestStudentDisplayId(student) {
+    const savedCode = String(student?.student_code || '').trim();
+    if (savedCode) return savedCode;
+    const studentId = Number(student?.student_id || 0);
+    return studentId > 0 ? `STU-${String(studentId).padStart(4, '0')}` : 'Student ID unavailable';
+}
 
     function formatRequestMoney(value) {
         return `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -95,11 +102,12 @@
             const requestId = Number(request.request_id || 0);
             const quantity = Math.max(1, Number(request.requested_sessions || 1));
             const studentName = `${request.first_name || ''} ${request.last_name || ''}`.trim() || 'Student';
+            const studentDisplayId = getRequestStudentDisplayId(request);
             const proofButton = request.payment_proof_path
                 ? `<button type="button" data-session-proof="${requestId}" class="mt-1 inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:underline"><i class="fas fa-eye"></i>View proof</button>`
                 : '<div class="mt-1 text-xs text-slate-400">No proof uploaded</div>';
             return `<tr class="transition hover:bg-slate-50/80">
-                <td data-label="Student" class="px-4 py-3"><div class="font-bold text-slate-900">${escapeRequestHtml(studentName)}</div><div class="text-xs text-slate-500">${escapeRequestHtml(request.email || '')}</div><div class="mt-1 text-[11px] font-semibold text-slate-500"><i class="fas fa-location-dot mr-1 text-amber-600"></i>${escapeRequestHtml(request.branch_name || 'Branch')}</div></td>
+                <td data-label="Student" class="px-4 py-3"><div class="font-bold text-slate-900">${escapeRequestHtml(studentName)}</div><div class="text-xs text-slate-500">${escapeRequestHtml(studentDisplayId)}</div><div class="mt-1 text-[11px] font-semibold text-slate-500"><i class="fas fa-location-dot mr-1 text-amber-600"></i>${escapeRequestHtml(request.branch_name || 'Branch')}</div></td>
                 <td data-label="Request" class="px-4 py-3"><div class="font-bold text-slate-900">${quantity} additional session${quantity === 1 ? '' : 's'}</div><div class="mt-1 text-xs text-slate-500">Added to the current package after approval</div></td>
                 <td data-label="Payment" class="px-4 py-3"><div><span class="font-bold text-slate-900">${formatRequestMoney(request.requested_amount)}</span> · ${escapeRequestHtml(request.payment_method || '—')}</div>${proofButton}</td>
                 <td data-label="Submitted" class="px-4 py-3 text-xs text-slate-600">${escapeRequestHtml(formatRequestDate(request.created_at))}</td>

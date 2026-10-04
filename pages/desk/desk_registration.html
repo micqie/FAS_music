@@ -53,8 +53,10 @@
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001">
     <script src="../../js/table_responsive.js" defer></script>
+    <link rel="stylesheet" href="../../css/portal-loading.css?v=20260927001">
 </head>
-<body class="desk-app bg-[#f1f5f9] text-slate-900 antialiased" data-custom-registration-mode="1">
+<body class="desk-app bg-[#f1f5f9] text-slate-900 antialiased" data-custom-registration-mode="1" data-branch-registration-table="1">
+    <script src="../../js/portal_loading.js?v=20260927001"></script>
     <div class="min-h-screen flex">
     <aside class="desk-sidebar w-64 bg-[color:var(--nav-bg)] text-white px-5 py-6 hidden flex-col sidebar-scroll">
         <div class="desk-sidebar-brand px-2 pb-4 mb-3 border-b border-white/10">
@@ -142,7 +144,6 @@
                         <tr>
                             <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Student</th>
                             <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Guardian</th>
-                            <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Branch</th>
                             <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Fee</th>
                             <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Status</th>
                             <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Date</th>
@@ -151,7 +152,7 @@
                     </thead>
                     <tbody id="registrationsTable" class="divide-y divide-slate-100">
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>Loading...</p>
                             </td>
@@ -564,7 +565,7 @@
     <script src="../../assets/vendor/js/axios.min.js"></script>
 <script src="../../js/offline.js?v=20260919001"></script>
     <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
-    <script src="../../js/index.js?v=20260922001"></script>
+    <script src="../../js/index.js?v=20260928004"></script>
     <script src="../../assets/vendor/intl-tel-input/js/intlTelInput.min.js"></script>
     <script src="../../js/intl-phone-input.js"></script>
     <script src="../../js/session_timeout.js"></script>

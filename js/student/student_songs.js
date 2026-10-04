@@ -478,7 +478,8 @@ async function loadStudentSongs() {
     renderStudentSongs();
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
+    const initialization = (async () => {
     if (window.__fasAuthReady) {
         await window.__fasAuthReady;
     }
@@ -508,4 +509,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             songsGrid.innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">Failed to load songs.</div>';
         }
     }
+    })();
+    window.fasPageLoading?.track(initialization);
 });

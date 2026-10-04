@@ -1,4 +1,4 @@
-const CACHE_VERSION = '20260919-3';
+const CACHE_VERSION = '20260928-7';
 const STATIC_CACHE = `fas-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `fas-pages-${CACHE_VERSION}`;
 const OFFLINE_PAGE = './offline.html';
@@ -60,6 +60,7 @@ const PRECACHE = [
   "./css/instructor.css",
   "./css/intl-phone-input.css",
   "./css/manager-shell.css",
+  "./css/portal-loading.css",
   "./css/portal.css",
   "./css/style.css",
   "./css/table-responsive.css",
@@ -112,6 +113,7 @@ const PRECACHE = [
   "./js/manager_featured_posts.js",
   "./js/mode.js",
   "./js/offline.js",
+  "./js/portal_loading.js",
   "./js/portal_sidebar.js",
   "./js/session_timeout.js",
   "./js/shared/teacher_form_ui.js",
