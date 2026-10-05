@@ -1009,6 +1009,7 @@ function toggleLoginModal(show) {
         if (msg) msg.classList.add('hidden');
     }
 }
+window.toggleLoginModal = toggleLoginModal;
 
 // Toggle Register Modal
 function toggleRegisterModal(show) {
