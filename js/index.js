@@ -189,18 +189,28 @@ window.getManilaYmd = getManilaYmd;
 window.getManilaMonthKey = getManilaMonthKey;
 window.addDaysToYmd = addDaysToYmd;
 (function initApiBaseUrl() {
-    // Derive app base from where this script is served (works even if folder is renamed).
+    // Derive the app root from the served script URL. This works both at a
+    // domain root (Render) and in a named subdirectory (local/XAMPP hosting).
     const defaultAppBaseUrl = (() => {
         try {
-            const scriptSrc = document.currentScript && document.currentScript.src ? document.currentScript.src : '';
+            const scriptSrc = (document.currentScript && document.currentScript.src)
+                || Array.from(document.scripts).map(script => script.src || '')
+                    .find(src => /\/js\/index\.js(?:[?#]|$)/i.test(src))
+                || '';
             const scriptUrl = new URL(scriptSrc, window.location.href);
-            // Expected: {origin}/{app}/js/index.js
-            const basePath = scriptUrl.pathname.replace(/\/js\/index\.js$/i, '');
-            return `${scriptUrl.origin}${basePath}`.replace(/\/$/, '');
+            if (/\/js\/index\.js$/i.test(scriptUrl.pathname)) {
+                const basePath = scriptUrl.pathname.replace(/\/js\/index\.js$/i, '');
+                return `${scriptUrl.origin}${basePath}`.replace(/\/$/, '');
+            }
         } catch (e) {
-            // Last-resort fallback for legacy deployments
-            return `${window.location.origin}/FAS_music`;
+            // Resolve from the page URL below if script URL discovery fails.
         }
+
+        const pathname = String(window.location.pathname || '/');
+        const pagesIndex = pathname.toLowerCase().indexOf('/pages/');
+        if (pagesIndex >= 0) return `${window.location.origin}${pathname.slice(0, pagesIndex)}`.replace(/\/$/, '');
+        const pageDirectory = pathname.replace(/\/(?:[^/]+\.html)?$/i, '').replace(/\/$/, '');
+        return `${window.location.origin}${pageDirectory}`.replace(/\/$/, '');
     })();
 
     appBaseUrl = defaultAppBaseUrl;
@@ -725,7 +735,7 @@ const Auth = {
             ? appBaseUrl
             : ((typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
                 ? baseApiUrl.slice(0, -4)
-                : `${window.location.origin}/FAS_music`);
+                : window.location.origin);
         window.location.href = `${appBase}/index.html`;
     },
 
@@ -1646,21 +1656,21 @@ function initLoginForm() {
                 // Redirect based on role
                 setTimeout(() => {
                     const roleCategory = getRoleCategory(data.user.role_name);
-                    if (roleCategory === 'admin') {
-                        window.location.href = 'pages/admin/admin_dashboard.html';
-                    } else if (roleCategory === 'manager') {
-                        window.location.href = 'pages/manager/manager_dashboard.html';
-                    } else if (roleCategory === 'staff') {
-                        window.location.href = 'pages/desk/desk_attendance.html';
-                    } else if (roleCategory === 'instructor') {
-                        window.location.href = 'pages/instructor/instructor_dashboard.html';
-                    } else if (roleCategory === 'student') {
-                        window.location.href = 'pages/student/student_dashboard.html';
-                    } else if (roleCategory === 'guardian') {
-                        window.location.href = 'pages/guardian/guardian_dashboard.html';
-                    } else {
-                        window.location.href = 'index.html';
-                    }
+                    const appRoot = (typeof appBaseUrl === 'string' && appBaseUrl)
+                        ? appBaseUrl.replace(/\/+$/, '')
+                        : window.location.origin;
+                    const dashboardRoutes = {
+                        admin: '/pages/admin/admin_dashboard.html',
+                        manager: '/pages/manager/manager_dashboard.html',
+                        staff: '/pages/desk/desk_attendance.html',
+                        instructor: '/pages/instructor/instructor_dashboard.html',
+                        student: '/pages/student/student_dashboard.html',
+                        guardian: '/pages/guardian/guardian_dashboard.html'
+                    };
+                    const dashboardPath = dashboardRoutes[roleCategory];
+                    window.location.href = dashboardPath
+                        ? `${appRoot}${dashboardPath}`
+                        : `${appRoot}/index.html`;
                 }, 1500);
             } else {
                 const apiMessage = data && typeof data === 'object' ? data.error : '';

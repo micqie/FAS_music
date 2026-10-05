@@ -2,7 +2,6 @@ Options -Indexes
 
 RewriteEngine On
 
-# If someone lands on /FAS_music/pages/ directly, send them to the real
-# app entry point so the login/session redirect can route them back to the
-# correct role dashboard without breaking asset paths.
-RewriteRule ^$ /FAS_music/index.html [R=302,L]
+# If someone opens the pages folder itself, go to the app entry point while
+# preserving whichever root or subdirectory the host uses.
+RewriteRule ^$ ../index.html [R=302,L]

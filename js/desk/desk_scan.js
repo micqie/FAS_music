@@ -523,7 +523,7 @@ function initDeskScanner() {
                 ? window.appBaseUrl
                 : ((typeof window.baseApiUrl === 'string' && window.baseApiUrl.endsWith('/api'))
                     ? window.baseApiUrl.slice(0, -4)
-                    : `${window.location.origin}/FAS_music`);
+                    : window.location.origin);
             window.location.href = `${appBase}/index.html`;
         } catch (_) {}
         return;

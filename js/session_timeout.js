@@ -41,7 +41,10 @@
         if (typeof appBaseUrl === 'string' && appBaseUrl) return appBaseUrl;
         if (typeof baseApiUrl === 'string' && baseApiUrl.endsWith('/api'))
             return baseApiUrl.slice(0, -4);
-        return window.location.origin + '/FAS_music';
+        const pagesIndex = window.location.pathname.toLowerCase().indexOf('/pages/');
+        return pagesIndex >= 0
+            ? window.location.origin + window.location.pathname.slice(0, pagesIndex)
+            : window.location.origin;
     }
 
     function forceLogout(reason) {
