@@ -1,4 +1,4 @@
-const CACHE_VERSION = '20261005-1';
+const CACHE_VERSION = '20261005-2';
 const STATIC_CACHE = `fas-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `fas-pages-${CACHE_VERSION}`;
 const OFFLINE_PAGE = './offline.html';
@@ -214,7 +214,10 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).then(response => {
-      if (response.ok) caches.open(PAGE_CACHE).then(cache => cache.put(request, response.clone()));
+      if (response.ok) {
+        const cacheResponse = response.clone();
+        event.waitUntil(caches.open(PAGE_CACHE).then(cache => cache.put(request, cacheResponse)));
+      }
       return response;
     }).catch(async () => (await caches.match(request, { ignoreSearch: true })) || (await caches.match(OFFLINE_PAGE))));
     return;
@@ -222,7 +225,10 @@ self.addEventListener('fetch', event => {
 
   if (isStaticAsset(url)) {
     event.respondWith(caches.match(request, { ignoreSearch: true }).then(cached => cached || fetch(request).then(response => {
-      if (response.ok && response.type === 'basic') caches.open(STATIC_CACHE).then(cache => cache.put(request, response.clone()));
+      if (response.ok && response.type === 'basic') {
+        const cacheResponse = response.clone();
+        event.waitUntil(caches.open(STATIC_CACHE).then(cache => cache.put(request, cacheResponse)));
+      }
       return response;
     })));
   }
