@@ -127,8 +127,10 @@ if (!function_exists('fas_ensure_password_change_column')) {
 if (!function_exists('fas_is_https_request')) {
     function fas_is_https_request(): bool
     {
+        $forwardedProto = strtolower(trim(explode(',', (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
         return (
             (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || $forwardedProto === 'https'
             || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443
         );
     }
