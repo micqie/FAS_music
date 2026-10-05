@@ -298,8 +298,11 @@ window.addDaysToYmd = addDaysToYmd;
                                     || response?.data?.authentication_required
                                     || response?.data?.session_invalidated
                                 );
+                            const requestUrl = String(response?.config?.url || '');
+                            const isSessionValidationRequest = /\/users\.php(?:\?|&)action=session(?:&|$)/i.test(requestUrl);
                             const isOnLoginPage = /\/(fas_music\/?)?(index\.html)?$/i.test(window.location.pathname);
-                            if (isAuthFailure && !isOnLoginPage && typeof Auth !== 'undefined' && Auth.handleSessionInvalidation) {
+                            if (isAuthFailure && !isSessionValidationRequest && !window.__fasPortalShellFallback
+                                && !isOnLoginPage && typeof Auth !== 'undefined' && Auth.handleSessionInvalidation) {
                                 Auth.handleSessionInvalidation(
                                     response?.data?.error || 'Your session is no longer active. Please log in again.'
                                 );
@@ -740,6 +743,10 @@ const Auth = {
     },
 
     handleSessionInvalidation(message) {
+        if (window.__fasPortalShellFallback) {
+            console.warn('Portal shell remains open, but the server session is not valid. Protected API requests may fail.');
+            return;
+        }
         if (this._sessionInvalidationHandled) {
             return;
         }
@@ -906,6 +913,7 @@ async function ensureProtectedPageSession() {
     if (!isProtectedPortalPage()) {
         return;
     }
+    window.__fasPortalShellFallback = false;
 
     const policy = getProtectedPortalPolicy();
     const root = document.body || document.documentElement;
@@ -914,6 +922,11 @@ async function ensureProtectedPageSession() {
     }
 
     const localUser = Auth.getUser();
+    const localRoleCategory = getRoleCategory(localUser?.role_name);
+    const localUserAllowed = !policy || isRoleAllowedForPolicy(localRoleCategory, policy.role);
+    // Establish the temporary shell fallback before other page scripts can
+    // receive auth errors while the session check is still in flight.
+    window.__fasPortalShellFallback = Boolean(localUser && localUserAllowed);
     let result = null;
 
     if (localUser) {
@@ -928,6 +941,17 @@ async function ensureProtectedPageSession() {
     const user = result?.user || Auth.getUser();
     const roleCategory = getRoleCategory(user?.role_name);
     const allowed = !policy || isRoleAllowedForPolicy(roleCategory, policy.role);
+    if (result?.valid) window.__fasPortalShellFallback = false;
+
+    // Keep the dashboard shell visible for an already signed-in browser profile
+    // if hosted session verification is temporarily rejected. Server APIs still
+    // enforce the signed HttpOnly session cookie and role permissions.
+    if (!result?.valid && localUser && allowed) {
+        window.__fasPortalShellFallback = true;
+        if (root) root.style.visibility = '';
+        console.warn('Showing portal shell without a verified server session; protected API data/actions may be unavailable.');
+        return;
+    }
 
     if (!result?.valid || !allowed) {
         if (root) {
