@@ -1058,14 +1058,18 @@ class AttendanceApi
         }
 
         try {
-            $stmt = $this->conn->prepare("
-                INSERT INTO tbl_makeup_sessions (original_session_id, teacher_id, status)
-                VALUES (?, ?, 'Scheduled')
-                ON DUPLICATE KEY UPDATE teacher_id = VALUES(teacher_id), status = VALUES(status)
-            ");
-            $stmt->execute([$sessionId, (int)$teacherId]);
+            $existing = $this->conn->prepare('SELECT makeup_id FROM tbl_makeup_sessions WHERE original_session_id = ? ORDER BY makeup_id DESC LIMIT 1');
+            $existing->execute([$sessionId]);
+            $makeupId = (int)($existing->fetchColumn() ?: 0);
+            if ($makeupId > 0) {
+                $update = $this->conn->prepare("UPDATE tbl_makeup_sessions SET teacher_id = ?, status = 'Scheduled' WHERE makeup_id = ?");
+                $update->execute([(int)$teacherId, $makeupId]);
+            } else {
+                $insert = $this->conn->prepare("INSERT INTO tbl_makeup_sessions (original_session_id, teacher_id, status) VALUES (?, ?, 'Scheduled')");
+                $insert->execute([$sessionId, (int)$teacherId]);
+            }
         } catch (PDOException $e) {
-            // Ignore if the table does not yet have a unique constraint.
+            // Keep attendance updates working if this optional link cannot be saved.
         }
     }
 
