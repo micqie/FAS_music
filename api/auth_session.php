@@ -674,9 +674,7 @@ if (!function_exists('fas_resolve_authenticated_user')) {
         }
 
         $activeToken = trim((string)($dbUser['active_session_token'] ?? ''));
-        $activeBrowserHash = trim((string)($dbUser['active_browser_token_hash'] ?? ''));
         $browserToken = fas_get_browser_binding_token();
-        $browserHash = $browserToken !== '' ? fas_browser_binding_hash($browserToken) : '';
         if ($browserToken !== '') {
             // Upgrade older session-only browser cookies to the persistent,
             // secure binding used for same-browser recovery after restart.
@@ -686,7 +684,6 @@ if (!function_exists('fas_resolve_authenticated_user')) {
             $activeToken === ''
             || !hash_equals($activeToken, $sessionToken)
             || fas_is_session_timestamp_stale($dbUser['active_session_updated_at'] ?? null)
-            || ($activeBrowserHash !== '' && ($browserHash === '' || !hash_equals($activeBrowserHash, $browserHash)))
         ) {
             return [
                 'ok' => false,
@@ -709,18 +706,9 @@ if (!function_exists('fas_resolve_authenticated_user')) {
             // Ignore heartbeat updates.
         }
 
-        $clientUserId = isset($_SERVER['HTTP_X_FAS_CLIENT_USER_ID'])
-            ? (int)$_SERVER['HTTP_X_FAS_CLIENT_USER_ID']
-            : 0;
-        if ($clientUserId > 0 && $clientUserId !== $userId) {
-            return [
-                'ok' => false,
-                'status' => 409,
-                'error' => 'Your session was replaced by another login in this browser. Please log in again.',
-                'auth_code' => 'CLIENT_SESSION_MISMATCH',
-                'session_invalidated' => true,
-            ];
-        }
+        // The signed HttpOnly authentication cookie is authoritative. Ignore a
+        // stale client-side user ID header so cached browser state cannot end a
+        // valid server session after login or deployment.
 
         return [
             'ok' => true,
