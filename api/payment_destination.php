@@ -21,7 +21,7 @@ try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $actor = fas_require_authenticated_user($conn);
         $role = fas_normalize_role_category($actor['role_name'] ?? '');
-        if (!in_array($role, ['admin', 'owner'], true)) {
+        if (!fas_demo_mode_enabled() && !in_array($role, ['admin', 'owner'], true)) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Only administrators can update payment destinations']);
             exit;

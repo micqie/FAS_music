@@ -4091,6 +4091,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
+            await (window.fasRuntimeConfigReady || Promise.resolve(false));
             applyManagerPageMode();
 
             if (typeof Auth !== 'undefined' && Auth.getUser) {
@@ -4102,13 +4103,13 @@
                 const deskRoles = ['staff', 'desk', 'front desk'];
                 const managerRoles = ['manager', 'branch manager'];
 
-                const isDeskRole = deskRoles.includes(role);
-                const isManager = managerRoles.includes(role);
+                const isDeskRole = window.FAS_DEMO_MODE === true || deskRoles.includes(role);
+                const isManager = window.FAS_DEMO_MODE === true || managerRoles.includes(role);
                 // Desk view is active for desk roles (UI hint is still passed via `mode=desk`).
                 const isDesk = isDeskRole;
                 uiIsDesk = isDesk;
 
-                if (!user || (!isDeskRole && !isManager)) {
+                if (!user || (window.FAS_DEMO_MODE !== true && !isDeskRole && !isManager)) {
                     showMessage('Access denied. Desk/Manager only.', 'error');
                     setTimeout(() => {
                         window.location.href = '../../index.html';

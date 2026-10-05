@@ -1756,11 +1756,12 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
+            await (window.fasRuntimeConfigReady || Promise.resolve(false));
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
             const role = String(user?.role_name || '').toLowerCase();
             const isDeskRole = ['staff', 'desk', 'front desk'].includes(role);
 
-            if (!user || !isDeskRole) {
+            if (!user || (window.FAS_DEMO_MODE !== true && !isDeskRole)) {
                 showMessage('Access denied. Desk only.', 'error');
                 setTimeout(() => {
                     window.location.href = '../../index.html';

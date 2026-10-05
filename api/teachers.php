@@ -1448,8 +1448,8 @@ class TeachersApi
             }
 
             $requesterRole = $this->normalizeRoleName($requester['role_name'] ?? '');
-            $isAdmin = $requesterRole === 'admin';
-            if (!$isAdmin && !$this->isManagerRole($requesterRole)) {
+            $isAdmin = fas_demo_mode_enabled() || $requesterRole === 'admin';
+            if (!fas_demo_mode_enabled() && !$isAdmin && !$this->isManagerRole($requesterRole)) {
                 $this->sendJSON(['error' => 'Only administrators and branch managers can edit teacher availability'], 403);
             }
 

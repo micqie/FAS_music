@@ -1,4 +1,4 @@
-const CACHE_VERSION = '20261005-3';
+const CACHE_VERSION = '20261005-4';
 const STATIC_CACHE = `fas-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `fas-pages-${CACHE_VERSION}`;
 const OFFLINE_PAGE = './offline.html';

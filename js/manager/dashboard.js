@@ -439,6 +439,7 @@
         }
 
         async function initManagerDashboard() {
+            await (window.fasRuntimeConfigReady || Promise.resolve(false));
             if (typeof checkBranchScopedAuth === 'function' && !checkBranchScopedAuth()) {
                 return;
             }
@@ -449,7 +450,7 @@
 
             const user = Auth.getUser();
             const role = String(user?.role_name || '').toLowerCase();
-            if (!['manager', 'branch manager'].includes(role)) {
+            if (window.FAS_DEMO_MODE !== true && !['manager', 'branch manager'].includes(role)) {
                 window.location.href = '../../index.html';
                 return;
             }

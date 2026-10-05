@@ -2380,7 +2380,7 @@ class AttendanceApi
             $session = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$session) $this->sendJSON(['success' => false, 'error' => 'Session not found.'], 404);
             $deskRole = fas_normalize_role_category($deskUser['role_name'] ?? '');
-            if ($deskRole !== 'admin' && (int)($deskUser['branch_id'] ?? 0) !== (int)($session['branch_id'] ?? 0)) {
+            if (!fas_demo_mode_enabled() && $deskRole !== 'admin' && (int)($deskUser['branch_id'] ?? 0) !== (int)($session['branch_id'] ?? 0)) {
                 $this->sendJSON(['success' => false, 'error' => 'You can only correct attendance for your assigned branch.'], 403);
             }
 

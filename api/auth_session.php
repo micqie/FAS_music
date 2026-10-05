@@ -1,5 +1,16 @@
 <?php
 
+if (!function_exists('fas_demo_mode_enabled')) {
+    function fas_demo_mode_enabled(): bool
+    {
+        if (!function_exists('fas_private_setting')) {
+            require_once __DIR__ . '/private_config.php';
+        }
+        $value = strtolower(trim((string)fas_private_setting('DEMO_MODE', 'false')));
+        return in_array($value, ['1', 'true', 'yes', 'on'], true);
+    }
+}
+
 if (!function_exists('fas_browser_binding_cookie_name')) {
     function fas_browser_binding_cookie_name(): string
     {
@@ -533,7 +544,7 @@ if (!function_exists('fas_can_change_user_password')) {
     {
         $actorId = (int)($actor['user_id'] ?? 0);
         if ($actorId < 1 || $targetUserId < 1) return false;
-        if ($adminOverride) return fas_normalize_role_category($actor['role_name'] ?? '') === 'admin';
+        if ($adminOverride) return fas_demo_mode_enabled() || fas_normalize_role_category($actor['role_name'] ?? '') === 'admin';
         return $actorId === $targetUserId;
     }
 }
@@ -735,7 +746,7 @@ if (!function_exists('fas_require_authenticated_user')) {
 
         $user = $resolved['user'];
         $roleCategory = fas_normalize_role_category($user['role_name'] ?? '');
-        if (is_array($allowedRoleCategories) && !empty($allowedRoleCategories)) {
+        if (!fas_demo_mode_enabled() && is_array($allowedRoleCategories) && !empty($allowedRoleCategories)) {
             $allowed = array_map('strval', $allowedRoleCategories);
             if ($roleCategory !== 'admin' && !in_array($roleCategory, $allowed, true)) {
                 fas_send_auth_json([

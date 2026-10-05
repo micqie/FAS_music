@@ -388,15 +388,16 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            await (window.fasRuntimeConfigReady || Promise.resolve(false));
             const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
             const role = String(user?.role_name || '').toLowerCase();
             const deskRoles = ['staff', 'desk', 'front desk'];
             const managerRoles = ['manager', 'branch manager'];
-            const isDeskRole = deskRoles.includes(role);
-            const isManagerRole = managerRoles.includes(role);
+            const isDeskRole = window.FAS_DEMO_MODE === true || deskRoles.includes(role);
+            const isManagerRole = window.FAS_DEMO_MODE === true || managerRoles.includes(role);
 
-            if (!user || (!isDeskRole && !isManagerRole)) {
+            if (!user || (window.FAS_DEMO_MODE !== true && !isDeskRole && !isManagerRole)) {
                 showMessage('Access denied. Desk/Manager only.', 'error');
                 setTimeout(() => {
                     window.location.href = '../../index.html';

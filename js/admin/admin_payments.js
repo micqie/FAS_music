@@ -769,7 +769,7 @@ function openRecordPaymentModal() {
     // Determine if admin is branch-scoped
     const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
     const role = String(user?.role_name || '').toLowerCase();
-    rpState.adminBranchId = ['staff','desk','front desk','manager','branch manager'].includes(role)
+    rpState.adminBranchId = window.FAS_DEMO_MODE === true ? 0 : ['staff','desk','front desk','manager','branch manager'].includes(role)
         ? Number(user?.branch_id || 0)
         : 0;
 

@@ -2188,7 +2188,7 @@ class User
             $registrationSource = 'walkin';
         }
 
-        $isAdmin = fas_normalize_role_category($actor['role_name'] ?? '') === 'admin';
+        $isAdmin = fas_demo_mode_enabled() || fas_normalize_role_category($actor['role_name'] ?? '') === 'admin';
         $scopedBranchId = $isAdmin ? 0 : (int)($actor['branch_id'] ?? 0);
         $requestedBranchId = (int)($data['branch_id'] ?? 0);
         if (!$isAdmin) {

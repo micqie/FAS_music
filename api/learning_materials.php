@@ -81,7 +81,7 @@ $action = $_GET['action'] ?? ($_POST['action'] ?? 'list');
 
 try {
     if ($action === 'my-specializations') {
-        if ($roleCategory !== 'instructor') lm_json(['error'=>'Instructor access required.'],403);
+        if (!fas_demo_mode_enabled() && $roleCategory !== 'instructor') lm_json(['error'=>'Instructor access required.'],403);
         $stmt=$conn->prepare("SELECT DISTINCT it.type_name instrument_type
             FROM tbl_teachers t
             INNER JOIN tbl_teacher_specializations ts ON ts.teacher_id=t.teacher_id
@@ -93,7 +93,7 @@ try {
         lm_json(['success'=>true,'instruments'=>array_values(array_filter(array_column($stmt->fetchAll(PDO::FETCH_ASSOC)?:[],'instrument_type')))]);
     }
     if ($action === 'request') {
-        if ($roleCategory !== 'instructor') lm_json(['error'=>'Instructor access required.'],403);
+        if (!fas_demo_mode_enabled() && $roleCategory !== 'instructor') lm_json(['error'=>'Instructor access required.'],403);
         $data=json_decode(file_get_contents('php://input'),true)?:[];
         $instrument=lm_normalize_name($data['instrument_type']??''); $level=lm_normalize_name($data['level_name']??'');
         $name=lm_normalize_name($data['material_name']??''); $reason=trim((string)($data['request_reason']??''));
@@ -111,11 +111,11 @@ try {
         lm_json(['success'=>true,'message'=>'Book request sent to Admin for approval.']);
     }
     if ($action === 'my-requests') {
-        if ($roleCategory !== 'instructor') lm_json(['error'=>'Instructor access required.'],403);
+        if (!fas_demo_mode_enabled() && $roleCategory !== 'instructor') lm_json(['error'=>'Instructor access required.'],403);
         $stmt=$conn->prepare("SELECT r.* FROM tbl_learning_material_requests r INNER JOIN tbl_teachers t ON t.teacher_id=r.teacher_id WHERE t.user_id=? ORDER BY r.created_at DESC"); $stmt->execute([(int)$user['user_id']]);
         lm_json(['success'=>true,'requests'=>$stmt->fetchAll(PDO::FETCH_ASSOC)?:[]]);
     }
-    if (!in_array($roleCategory, ['admin','owner'], true)) lm_json(['error' => 'Admin or owner access required.'], 403);
+    if (!fas_demo_mode_enabled() && !in_array($roleCategory, ['admin','owner'], true)) lm_json(['error' => 'Admin or owner access required.'], 403);
     if ($action === 'list') {
         $rows = $conn->query("SELECT * FROM tbl_learning_materials ORDER BY status='Active' DESC, instrument_type, level_name, material_name")->fetchAll(PDO::FETCH_ASSOC) ?: [];
         lm_json(['success'=>true,'materials'=>$rows]);

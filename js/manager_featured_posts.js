@@ -1,4 +1,5 @@
-function initManagerFeaturedPosts() {
+async function initManagerFeaturedPosts() {
+    await (window.fasRuntimeConfigReady || Promise.resolve(false));
     const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
     const role = String(user?.role_name || '').toLowerCase();
     const allowedRoles = ['staff', 'desk', 'front desk', 'manager', 'branch manager', 'admin'];
@@ -8,7 +9,7 @@ function initManagerFeaturedPosts() {
     const pageTitleLabel = pageRole === 'desk' ? 'Desk Featured Posts' : 'Featured Posts';
     const listScope = pageRole === 'desk' ? 'desk' : 'manager';
 
-    if (!user || !allowedRoles.includes(role)) {
+    if (!user || (window.FAS_DEMO_MODE !== true && !allowedRoles.includes(role))) {
         if (typeof Swal !== 'undefined') {
             Swal.fire({
                 icon: 'error',

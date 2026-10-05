@@ -5815,7 +5815,7 @@ class StudentsApi
         }
         $actor = fas_require_authenticated_user($this->conn);
         $roleCategory = fas_normalize_role_category($actor['role_name'] ?? '');
-        if ($isWalkinRequest && !in_array($roleCategory, ['admin','owner','manager','staff'], true)) {
+        if ($isWalkinRequest && !fas_demo_mode_enabled() && !in_array($roleCategory, ['admin','owner','manager','staff'], true)) {
             $this->sendJSON(['error'=>'Promotional and walk-in packages can only be assigned by authorized staff'],403);
         }
         $guardianLinkId = 0;
@@ -6261,7 +6261,7 @@ class StudentsApi
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
         $actor = fas_require_authenticated_user($this->conn);
-        if (!in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin', 'owner', 'manager', 'staff'], true)) {
+        if (!fas_demo_mode_enabled() && !in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin', 'owner', 'manager', 'staff'], true)) {
             $this->sendJSON(['error' => 'Only authorized desk staff can approve and schedule additional sessions'], 403);
         }
         if (!$this->tableExists('tbl_sessions')) {
@@ -7674,7 +7674,7 @@ class StudentsApi
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
         $actor = fas_require_authenticated_user($this->conn);
-        if (!in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin','owner','manager','staff'], true)) {
+        if (!fas_demo_mode_enabled() && !in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin','owner','manager','staff'], true)) {
             $this->sendJSON(['error' => 'Only authorized desk staff can approve schedules'], 403);
         }
 
@@ -8264,7 +8264,7 @@ class StudentsApi
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
         $actor = fas_require_authenticated_user($this->conn);
-        if (!in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin','owner','manager','staff'], true)) {
+        if (!fas_demo_mode_enabled() && !in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin','owner','manager','staff'], true)) {
             $this->sendJSON(['error' => 'Only authorized desk staff can reject requests'], 403);
         }
 
@@ -8597,7 +8597,7 @@ class StudentsApi
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->sendJSON(['error' => 'Method not allowed'], 405);
         $actor = fas_require_authenticated_user($this->conn);
-        if (!in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin','owner','manager','staff'], true)) {
+        if (!fas_demo_mode_enabled() && !in_array(fas_normalize_role_category($actor['role_name'] ?? ''), ['admin','owner','manager','staff'], true)) {
             $this->sendJSON(['error' => 'Only authorized desk staff can suggest schedules'], 403);
         }
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
@@ -8709,13 +8709,13 @@ class StudentsApi
             if (!$stmtStudentAccess->fetchColumn()) {
                 $this->sendJSON(['error' => 'You can only pay for your own account'], 403);
             }
-        } elseif (!in_array($roleCategory, $staffRoles, true)) {
+        } elseif (!fas_demo_mode_enabled() && !in_array($roleCategory, $staffRoles, true)) {
             $this->sendJSON(['error' => 'You are not authorized to submit this payment'], 403);
         }
 
         // Student and guardian portals are online-only. Walk-in confirmation is
         // reserved for authorized staff at the branch.
-        if (!in_array($roleCategory, $staffRoles, true)) {
+        if (!fas_demo_mode_enabled() && !in_array($roleCategory, $staffRoles, true)) {
             $source = 'online';
             if ($paymentMethod === 'Cash') {
                 $this->sendJSON(['error' => 'Student and guardian payments must use an online payment method'], 400);

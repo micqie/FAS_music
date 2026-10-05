@@ -123,6 +123,7 @@ class FeaturedPosts
 
     private function canManagePosts($roleName)
     {
+        if (fas_demo_mode_enabled()) return true;
         $role = $this->normalizeRole($roleName);
         return in_array($role, ['admin', 'manager', 'branch manager', 'staff', 'desk', 'front desk'], true);
     }
@@ -291,7 +292,7 @@ class FeaturedPosts
     private function listEditorPosts($userId)
     {
         $editor = $this->getEditorContext($userId);
-        $isAdmin = $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
+        $isAdmin = fas_demo_mode_enabled() || $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
         $scope = $this->normalizeRole($_GET['scope'] ?? '');
         $params = [];
         $where = [];
@@ -341,7 +342,7 @@ class FeaturedPosts
         }
 
         $editor = $this->getEditorContext($userId);
-        $isAdmin = $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
+        $isAdmin = fas_demo_mode_enabled() || $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
         $postId = (int)($data['featured_post_id'] ?? 0);
 
         $title = preg_replace('/\s+/', ' ', $this->safeTrim($data['title'] ?? ''));
@@ -505,7 +506,7 @@ class FeaturedPosts
         }
 
         $editor = $this->getEditorContext($userId);
-        $isAdmin = $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
+        $isAdmin = fas_demo_mode_enabled() || $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
 
         $stmt = $this->conn->prepare("SELECT * FROM tbl_featured_posts WHERE featured_post_id = ? LIMIT 1");
         $stmt->execute([$postId]);
@@ -549,7 +550,7 @@ class FeaturedPosts
         }
 
         $editor = $this->getEditorContext($userId);
-        $isAdmin = $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
+        $isAdmin = fas_demo_mode_enabled() || $this->normalizeRole($editor['role_name'] ?? '') === 'admin';
 
         $stmt = $this->conn->prepare("SELECT * FROM tbl_featured_posts WHERE featured_post_id = ? LIMIT 1");
         $stmt->execute([$postId]);

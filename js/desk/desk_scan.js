@@ -508,11 +508,12 @@ function initManualEntry() {
     document.getElementById('manualCheckinBtn')?.addEventListener('click', submit);
 }
 
-function initDeskScanner() {
+async function initDeskScanner() {
+    await (window.fasRuntimeConfigReady || Promise.resolve(false));
     const user = getDeskUser();
     const role = String(user?.role_name || '').toLowerCase();
     const allowed = ['staff', 'desk', 'front desk'];
-    if (!user || !allowed.includes(role)) {
+    if (!user || (window.FAS_DEMO_MODE !== true && !allowed.includes(role))) {
         setStatus('Access denied. Please log in as desk staff.', 'error');
         const ipLoginNote = !isLocalScannerHost()
             ? '<br><br><strong>Network address note:</strong> Login from this same IP-address URL first. A localhost login cannot be shared with an IP-address URL.'

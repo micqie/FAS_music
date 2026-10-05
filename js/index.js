@@ -242,6 +242,20 @@ window.addDaysToYmd = addDaysToYmd;
     // Keep global access explicit for inline page scripts
     window.baseApiUrl = baseApiUrl;
     window.appBaseUrl = appBaseUrl;
+    window.FAS_DEMO_MODE = null;
+    window.fasRuntimeConfigReady = fetch(`${baseApiUrl}/runtime_config.php`, {
+        credentials: 'same-origin',
+        cache: 'no-store'
+    })
+        .then(response => response.ok ? response.json() : null)
+        .then(payload => {
+            window.FAS_DEMO_MODE = payload?.success === true && payload?.demo_mode === true;
+            return window.FAS_DEMO_MODE;
+        })
+        .catch(() => {
+            window.FAS_DEMO_MODE = false;
+            return false;
+        });
 
     // The calendar's "today" follows the application server, which is set to
     // Asia/Manila. The local clock is only a fallback if this small sync call
@@ -899,6 +913,7 @@ function getProtectedPortalPolicy() {
 }
 
 function isRoleAllowedForPolicy(roleCategory, policyRole) {
+    if (window.FAS_DEMO_MODE === true) return true;
     if (policyRole === 'branch') {
         return roleCategory === 'manager' || roleCategory === 'staff';
     }
@@ -921,6 +936,7 @@ async function ensureProtectedPageSession() {
         root.style.visibility = 'hidden';
     }
 
+    await (window.fasRuntimeConfigReady || Promise.resolve(false));
     const localUser = Auth.getUser();
     const localRoleCategory = getRoleCategory(localUser?.role_name);
     const localUserAllowed = !policy || isRoleAllowedForPolicy(localRoleCategory, policy.role);
@@ -946,7 +962,7 @@ async function ensureProtectedPageSession() {
     // Keep the dashboard shell visible for an already signed-in browser profile
     // if hosted session verification is temporarily rejected. Server APIs still
     // enforce the signed HttpOnly session cookie and role permissions.
-    if (!result?.valid && localUser && allowed) {
+    if (!result?.valid && localUser && allowed && window.FAS_DEMO_MODE !== true) {
         window.__fasPortalShellFallback = true;
         if (root) root.style.visibility = '';
         console.warn('Showing portal shell without a verified server session; protected API data/actions may be unavailable.');
@@ -3006,7 +3022,7 @@ async function promptPasswordChange(user, currentPassword) {
 // Check authentication
 function checkAuth() {
     const user = Auth.getUser();
-    if (!user || getRoleCategory(user.role_name) !== 'admin') {
+    if (!user || (window.FAS_DEMO_MODE === false && getRoleCategory(user.role_name) !== 'admin')) {
         Swal.fire({
             icon: 'warning',
             title: 'Access Denied',
@@ -3028,7 +3044,7 @@ function checkAuth() {
 
 function checkStudentAuth() {
     const user = Auth.getUser();
-    if (!user || getRoleCategory(user.role_name) !== 'student') {
+    if (!user || (window.FAS_DEMO_MODE === false && getRoleCategory(user.role_name) !== 'student')) {
         Swal.fire({
             icon: 'warning',
             title: 'Access Denied',
@@ -3050,7 +3066,7 @@ function checkStudentAuth() {
 
 function checkGuardianAuth() {
     const user = Auth.getUser();
-    if (!user || getRoleCategory(user.role_name) !== 'guardian') {
+    if (!user || (window.FAS_DEMO_MODE === false && getRoleCategory(user.role_name) !== 'guardian')) {
         Swal.fire({
             icon: 'warning',
             title: 'Access Denied',
@@ -3071,7 +3087,7 @@ function checkGuardianAuth() {
 function checkBranchScopedAuth() {
     const user = Auth.getUser();
     const roleCategory = getRoleCategory(user?.role_name);
-    if (!user || (roleCategory !== 'manager' && roleCategory !== 'staff')) {
+    if (!user || (window.FAS_DEMO_MODE === false && roleCategory !== 'manager' && roleCategory !== 'staff')) {
         Swal.fire({
             icon: 'warning',
             title: 'Access Denied',
@@ -3093,7 +3109,7 @@ function checkBranchScopedAuth() {
 
 function checkInstructorAuth() {
     const user = Auth.getUser();
-    if (!user || getRoleCategory(user.role_name) !== 'instructor') {
+    if (!user || (window.FAS_DEMO_MODE === false && getRoleCategory(user.role_name) !== 'instructor')) {
         Swal.fire({
             icon: 'warning',
             title: 'Access Denied',
