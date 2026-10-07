@@ -8869,28 +8869,43 @@ class StudentsApi
                            SELECT fp.freeze_payment_id
                            FROM tbl_freeze_payments fp
                            WHERE fp.enrollment_id = e.enrollment_id
-                           ORDER BY fp.created_at DESC
+                           ORDER BY fp.created_at DESC, fp.freeze_payment_id DESC
                            LIMIT 1
-                       ), 0) AS freeze_payment_id,
+                       ), 0) AS latest_freeze_payment_id,
                        COALESCE((
-                           SELECT fp.status
+                           SELECT CASE
+                               WHEN e.schedule_status = 'Frozen' AND fp.status = 'Paid' THEN 'None'
+                               ELSE fp.status
+                           END
                            FROM tbl_freeze_payments fp
                            WHERE fp.enrollment_id = e.enrollment_id
-                           ORDER BY fp.created_at DESC
+                           ORDER BY fp.created_at DESC, fp.freeze_payment_id DESC
                            LIMIT 1
                        ), 'None') AS freeze_payment_status,
                        (
-                           SELECT fp.payment_method
+                           SELECT COUNT(*) + 1
                            FROM tbl_freeze_payments fp
                            WHERE fp.enrollment_id = e.enrollment_id
-                           ORDER BY fp.created_at DESC
+                             AND fp.status = 'Paid'
+                       ) AS freeze_count,
+                       (
+                           SELECT CASE
+                               WHEN e.schedule_status = 'Frozen' AND fp.status = 'Paid' THEN NULL
+                               ELSE fp.payment_method
+                           END
+                           FROM tbl_freeze_payments fp
+                           WHERE fp.enrollment_id = e.enrollment_id
+                           ORDER BY fp.created_at DESC, fp.freeze_payment_id DESC
                            LIMIT 1
                        ) AS freeze_payment_method,
                        (
-                           SELECT fp.created_at
+                           SELECT CASE
+                               WHEN e.schedule_status = 'Frozen' AND fp.status = 'Paid' THEN NULL
+                               ELSE fp.created_at
+                           END
                            FROM tbl_freeze_payments fp
                            WHERE fp.enrollment_id = e.enrollment_id
-                           ORDER BY fp.created_at DESC
+                           ORDER BY fp.created_at DESC, fp.freeze_payment_id DESC
                            LIMIT 1
                        ) AS freeze_payment_created_at
                 FROM tbl_enrollments e
@@ -8902,6 +8917,14 @@ class StudentsApi
             ");
             $stmt->execute($params);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as &$row) {
+                $row['freeze_payment_id'] = strcasecmp((string)($row['freeze_payment_status'] ?? 'None'), 'None') === 0
+                    ? 0
+                    : (int)($row['latest_freeze_payment_id'] ?? 0);
+                unset($row['latest_freeze_payment_id']);
+                $row['freeze_count'] = max(1, (int)($row['freeze_count'] ?? 1));
+            }
+            unset($row);
 
             // Include the actual absence events which led to the freeze. Counts alone
             // are not enough for staff to explain the account state to a family.

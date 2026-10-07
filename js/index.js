@@ -2919,7 +2919,10 @@ async function promptPasswordChange(user, currentPassword) {
                     }
 
                     if (!matchFeedback) return;
-                    if (!confirmation) {
+                    if (password && password === currentPassword) {
+                        matchFeedback.textContent = 'Choose a password different from the temporary password provided to you.';
+                        matchFeedback.className = 'fas-password-match-feedback is-mismatch';
+                    } else if (!confirmation) {
                         matchFeedback.textContent = 'Re-enter your new password to confirm it.';
                         matchFeedback.className = 'fas-password-match-feedback';
                     } else if (password === confirmation) {
@@ -2932,7 +2935,7 @@ async function promptPasswordChange(user, currentPassword) {
 
                     const confirmButton = Swal.getConfirmButton();
                     if (confirmButton) {
-                        confirmButton.disabled = completed !== 5 || !confirmation || password !== confirmation;
+                        confirmButton.disabled = completed !== 5 || !confirmation || password !== confirmation || password === currentPassword;
                     }
                 };
 
@@ -2962,6 +2965,10 @@ async function promptPasswordChange(user, currentPassword) {
                 }
                 if (newPass !== confirmPass) {
                     Swal.showValidationMessage('Passwords do not match');
+                    return false;
+                }
+                if (newPass === currentPassword) {
+                    Swal.showValidationMessage('Your new password must be different from the temporary password provided to you.');
                     return false;
                 }
                 if (newPass.length < 8 ||
@@ -3837,12 +3844,12 @@ function renderInstrumentChips(instruments) {
 }
 
 function buildStudentQrPayload(student) {
-    // Payload format: FAS_ATTENDANCE|STUDENT|student_id|email|branch_id
+    // Payload format: FAS_ATTENDANCE|STUDENT|student_id|student_number|branch_id
     // branch_id ensures uptown=uptown, downtown=downtown validation at scan
     const sid = student?.student_id ?? '';
-    const email = student?.email ?? '';
+    const studentNumber = student?.student_code || sid;
     const bid = student?.branch_id ?? '';
-    return `FAS_ATTENDANCE|STUDENT|${sid}|${email}|${bid}`;
+    return `FAS_ATTENDANCE|STUDENT|${sid}|${studentNumber}|${bid}`;
 }
 
 async function fetchStudentQrStatus(studentId, email = '') {

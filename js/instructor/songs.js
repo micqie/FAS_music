@@ -726,7 +726,6 @@ function renderAssignments() {
                             </div>
                             <p class="mt-1 text-sm font-semibold text-slate-700">${escapeSongHtml(item.student_name || 'Student')}</p>
                             <p class="mt-0.5 text-xs text-slate-500">${escapeSongHtml([item.artist, item.category, item.difficulty_level].filter(Boolean).join(' · ') || 'Song')} · Given ${formatSongDate(item.assigned_at)}</p>
-                            ${item.assigned_notes ? `<p class="mt-2 text-xs leading-5 text-slate-600">Practice tip: ${escapeSongHtml(item.assigned_notes)}</p>` : ''}
                         </div>
                     </div>
                     <div class="shrink-0 text-left sm:text-right">
@@ -734,6 +733,15 @@ function renderAssignments() {
                         ${latestHistory ? `<div class="mt-1 text-[11px] text-slate-400">Updated ${formatSongDate(latestHistory.lesson_date)}</div>` : ''}
                     </div>
                 </div>
+                ${completed
+                    ? (item.assigned_notes ? `<p class="mt-3 rounded-xl bg-white/70 px-3 py-2 text-sm leading-6 text-slate-600"><span class="font-semibold">Note for student:</span> ${escapeSongHtml(item.assigned_notes)}</p>` : '')
+                    : `<div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <label class="mb-1.5 block text-xs font-bold text-slate-600" for="assignment-note-${Number(item.assignment_id)}">Note for student</label>
+                        <textarea id="assignment-note-${Number(item.assignment_id)}" data-assignment-notes="${Number(item.assignment_id)}" rows="2" class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20" placeholder="Add a practice tip, reminder, or encouragement.">${escapeSongHtml(item.assigned_notes || '')}</textarea>
+                        <div class="mt-2 flex justify-end">
+                            <button type="button" data-save-assignment-note="${Number(item.assignment_id)}" class="rounded-lg bg-gold-500 px-3 py-2 text-xs font-bold text-black transition hover:bg-gold-400">Save note</button>
+                        </div>
+                    </div>`}
             </article>`;
     }).join('');
 
@@ -966,6 +974,26 @@ async function saveAssignmentProgress(assignmentId) {
     renderInstructorSongView();
 }
 
+async function saveAssignmentNote(assignmentId) {
+    const item = instructorSongAssignments.find(row => Number(row.assignment_id) === Number(assignmentId));
+    const notesEl = document.querySelector(`[data-assignment-notes="${assignmentId}"]`);
+    if (!item || !notesEl) return;
+
+    const response = await axios.post(`${baseApiUrl}/songs.php`, {
+        action: 'update-assignment-progress',
+        user_id: Number(currentInstructorUser.user_id || 0),
+        assignment_id: Number(assignmentId),
+        progress_status: item.progress_status || 'assigned',
+        assigned_notes: notesEl.value.trim()
+    });
+    if (!response.data?.success) {
+        throw new Error(response.data?.error || 'Failed to save the student note.');
+    }
+    await loadAssignments();
+    renderInstructorSongView();
+    showInstructorSongToast('Note saved for the student.');
+}
+
 async function saveAssignmentHistory(assignmentId) {
     const dateEl = document.querySelector(`[data-history-date="${assignmentId}"]`);
     const progressEl = document.querySelector(`[data-history-progress="${assignmentId}"]`);
@@ -1021,6 +1049,16 @@ function attachSongEvents() {
                 await saveAssignmentProgress(Number(saveAssignmentBtn.getAttribute('data-save-assignment') || 0));
             } catch (error) {
                 alert(error.response?.data?.error || 'Failed to update song progress.');
+            }
+            return;
+        }
+
+        const saveAssignmentNoteBtn = event.target.closest('[data-save-assignment-note]');
+        if (saveAssignmentNoteBtn) {
+            try {
+                await saveAssignmentNote(Number(saveAssignmentNoteBtn.getAttribute('data-save-assignment-note') || 0));
+            } catch (error) {
+                alert(error.response?.data?.error || error.message || 'Failed to save the student note.');
             }
             return;
         }

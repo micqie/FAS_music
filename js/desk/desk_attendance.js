@@ -24,6 +24,11 @@
             return div.innerHTML;
         }
 
+        function getStudentIdLabel(student) {
+            const studentId = String(student?.studentCode || student?.studentId || '').trim();
+            return studentId ? `Student ID: ${studentId}` : 'Student ID unavailable';
+        }
+
         function padDatePart(value) {
             return String(value).padStart(2, '0');
         }
@@ -208,7 +213,7 @@
                             teacherName: getTeacherLabel(slot, student),
                             packageName: String(student.package_name || '—'),
                             studentName,
-                            email: String(student.email || ''),
+                            studentCode: String(student.student_code || ''),
                             state,
                             status: String(slot.status || 'Scheduled'),
                             completedCount,
@@ -922,7 +927,7 @@
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <div class="min-w-0">
                             <div class="text-base font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
-                            <div class="text-xs text-slate-500">${escapeHtml(event.email || 'No email on file')}</div>
+                            <div class="text-xs text-slate-500">${escapeHtml(getStudentIdLabel(event))}</div>
                             ${frozenBanner}
                         </div>
                         <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${getStateClasses(event.state)}">${escapeHtml(event.state)}</span>
@@ -991,7 +996,7 @@
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="text-base font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
-                            <div class="mt-1 text-xs text-slate-500">${escapeHtml(event.email || 'No email on file')}</div>
+                            <div class="mt-1 text-xs text-slate-500">${escapeHtml(getStudentIdLabel(event))}</div>
                             ${frozenBanner}
                         </div>
                         <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${getStateClasses(event.state)}">${escapeHtml(event.state)}</span>
@@ -1293,7 +1298,7 @@
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="text-lg font-bold text-slate-900">${escapeHtml(event.studentName)}</div>
-                            <div class="mt-1 text-sm text-slate-500">${escapeHtml(event.email || 'No email on file')}</div>
+                            <div class="mt-1 text-sm text-slate-500">${escapeHtml(getStudentIdLabel(event))}</div>
                             <div class="mt-2 flex items-center gap-1.5 rounded-xl bg-rose-100 border border-rose-200 px-3 py-1.5 w-fit text-xs font-semibold text-rose-700">
                                 <i class="fas fa-snowflake text-rose-400"></i>
                                 Account Frozen — ₱100 reservation fee required

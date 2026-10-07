@@ -72,7 +72,7 @@ async function openLearningProgressEditor(index) {
     }
     // A new learning record cannot skip the review step and become exam-ready.
     const readinessOptions = ['Not Ready','Developing','Improving'];
-    const levelOptions = Array.from({ length: 10 }, (_, levelIndex) => `Level ${levelIndex + 1}`);
+    const levelOptions = ['Beginner', ...Array.from({ length: 10 }, (_, levelIndex) => `Level ${levelIndex + 1}`)];
     const topicOptions = ['Fundamentals','Technique Development','Reading and Theory','Rhythm and Timing','Repertoire Practice','Performance Preparation','Promotional Exam Preparation'];
     const skillOptions = ['Foundation skills','Technique and control','Reading and theory','Rhythm and timing','Musical expression','Performance confidence'];
     const improvementOptions = ['Technique consistency','Rhythm consistency','Reading accuracy','Practice preparation','Musical expression','Performance confidence'];

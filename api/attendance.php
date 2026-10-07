@@ -627,8 +627,11 @@ class AttendanceApi
 
     private function getStudentById($studentId)
     {
+        $studentCodeSelect = $this->tableHasColumn('tbl_students', 'student_code')
+            ? 's.student_code'
+            : 'NULL AS student_code';
         $stmt = $this->conn->prepare("
-            SELECT s.student_id, s.first_name, s.last_name, s.email, s.branch_id, b.branch_name
+            SELECT s.student_id, s.first_name, s.last_name, s.email, {$studentCodeSelect}, s.branch_id, b.branch_name
             FROM tbl_students s
             LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
             WHERE s.student_id = ?
@@ -648,6 +651,37 @@ class AttendanceApi
             LIMIT 1
         ");
         $stmt->execute([trim((string)$email)]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    private function getStudentByNumber($studentNumber)
+    {
+        $studentNumber = trim((string)$studentNumber);
+        if ($studentNumber === '') return null;
+
+        if ($this->tableHasColumn('tbl_students', 'student_code')) {
+            $stmt = $this->conn->prepare("
+                SELECT s.student_id, s.first_name, s.last_name, s.email, s.student_code, s.branch_id, b.branch_name
+                FROM tbl_students s
+                LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
+                WHERE LOWER(TRIM(s.student_code)) = LOWER(?)
+                   OR (? REGEXP '^[0-9]+$' AND s.student_id = ?)
+                ORDER BY (LOWER(TRIM(s.student_code)) = LOWER(?)) DESC
+                LIMIT 1
+            ");
+            $stmt->execute([$studentNumber, $studentNumber, (int)$studentNumber, $studentNumber]);
+        } else {
+            if (!ctype_digit($studentNumber)) return null;
+            $stmt = $this->conn->prepare("
+                SELECT s.student_id, s.first_name, s.last_name, s.email, NULL AS student_code, s.branch_id, b.branch_name
+                FROM tbl_students s
+                LEFT JOIN tbl_branches b ON b.branch_id = s.branch_id
+                WHERE s.student_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([(int)$studentNumber]);
+        }
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
@@ -2032,10 +2066,10 @@ class AttendanceApi
         if (count($parts) < 4) return null;
         if ($parts[0] !== 'FAS_ATTENDANCE' || $parts[1] !== 'STUDENT') return null;
         $studentId = (int) ($parts[2] ?? 0);
-        $email = trim((string) ($parts[3] ?? ''));
+        $studentNumber = trim((string) ($parts[3] ?? ''));
         $branchId = isset($parts[4]) ? (int) $parts[4] : null;
-        if ($studentId < 1 || $email === '') return null;
-        return ['student_id' => $studentId, 'email' => $email, 'branch_id' => $branchId];
+        if ($studentId < 1 || $studentNumber === '') return null;
+        return ['student_id' => $studentId, 'student_number' => $studentNumber, 'branch_id' => $branchId];
     }
 
     public function scanQr()
@@ -2052,13 +2086,20 @@ class AttendanceApi
         }
 
         $studentId = (int) $parsed['student_id'];
-        $email = $parsed['email'];
+        $studentNumber = $parsed['student_number'];
         $deskBranchId = (int) ($data['desk_branch_id'] ?? 0);
 
         try {
             $student = $this->getStudentById($studentId);
-            if (!$student || strcasecmp(trim($student['email'] ?? ''), $email) !== 0) {
-                $this->sendJSON(['error' => 'Student not found for this QR'], 404);
+            $storedStudentNumber = trim((string)($student['student_code'] ?? ''));
+            $matchesStudentNumber = ($storedStudentNumber !== ''
+                && strcasecmp($storedStudentNumber, $studentNumber) === 0)
+                || (ctype_digit($studentNumber) && (int)$studentNumber === $studentId);
+            $matchesLegacyEmail = $student
+                && filter_var($studentNumber, FILTER_VALIDATE_EMAIL)
+                && strcasecmp(trim((string)($student['email'] ?? '')), $studentNumber) === 0;
+            if (!$student || (!$matchesStudentNumber && !$matchesLegacyEmail)) {
+                $this->sendJSON(['error' => 'Student number does not match this QR code.'], 404);
             }
 
             if (!$this->ensureAttendanceTable()) {
@@ -2101,6 +2142,7 @@ class AttendanceApi
                     'qr_status' => $qrStatus,
                     'student' => [
                         'student_id' => (int) $student['student_id'],
+                        'student_number' => trim((string)($student['student_code'] ?? '')) ?: (string)$student['student_id'],
                         'first_name' => $student['first_name'],
                         'last_name' => $student['last_name'],
                         'email' => $student['email'],
@@ -2117,6 +2159,7 @@ class AttendanceApi
                     'qr_status' => $qrStatus,
                     'student' => [
                         'student_id' => (int) $student['student_id'],
+                        'student_number' => trim((string)($student['student_code'] ?? '')) ?: (string)$student['student_id'],
                         'first_name' => $student['first_name'],
                         'last_name' => $student['last_name'],
                         'email' => $student['email'],
@@ -2147,6 +2190,7 @@ class AttendanceApi
                 'qr_status' => $this->buildQrStatus($studentId, $todayYmd),
                 'student' => [
                     'student_id' => (int) $student['student_id'],
+                    'student_number' => trim((string)($student['student_code'] ?? '')) ?: (string)$student['student_id'],
                     'first_name' => $student['first_name'],
                     'last_name' => $student['last_name'],
                     'email' => $student['email'],
@@ -2160,27 +2204,27 @@ class AttendanceApi
     }
 
     /**
-     * Record attendance by student email (manual entry).
-     * POST body: { email, desk_branch_id? }
+     * Record attendance by student number (manual entry).
+     * POST body: { student_number, desk_branch_id? }
      */
-    public function recordByEmail()
+    public function recordByStudentNumber()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->sendJSON(['error' => 'Method not allowed'], 405);
         }
 
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
-        $email = trim((string) ($data['email'] ?? ''));
+        $studentNumber = trim((string) ($data['student_number'] ?? ''));
         $deskBranchId = (int) ($data['desk_branch_id'] ?? 0);
 
-        if ($email === '') {
-            $this->sendJSON(['success' => false, 'error' => 'Email is required.'], 400);
+        if ($studentNumber === '') {
+            $this->sendJSON(['success' => false, 'error' => 'Student number is required.'], 400);
         }
 
         try {
-            $student = $this->getStudentByEmail($email);
+            $student = $this->getStudentByNumber($studentNumber);
             if (!$student) {
-                $this->sendJSON(['success' => false, 'error' => 'Student not found for this email.'], 404);
+                $this->sendJSON(['success' => false, 'error' => 'Student not found for this student number.'], 404);
             }
 
             if (!$this->ensureAttendanceTable()) {
@@ -2222,6 +2266,7 @@ class AttendanceApi
                     'qr_status' => $qrStatus,
                     'student' => [
                         'student_id' => $studentId,
+                        'student_number' => trim((string)($student['student_code'] ?? '')) ?: (string)$studentId,
                         'first_name' => $student['first_name'],
                         'last_name' => $student['last_name'],
                         'email' => $student['email'],
@@ -2237,6 +2282,7 @@ class AttendanceApi
                     'qr_status' => $qrStatus,
                     'student' => [
                         'student_id' => $studentId,
+                        'student_number' => trim((string)($student['student_code'] ?? '')) ?: (string)$studentId,
                         'first_name' => $student['first_name'],
                         'last_name' => $student['last_name'],
                         'email' => $student['email'],
@@ -2265,6 +2311,7 @@ class AttendanceApi
                 'qr_status' => $this->buildQrStatus($studentId, $todayYmd),
                 'student' => [
                     'student_id' => $studentId,
+                    'student_number' => trim((string)($student['student_code'] ?? '')) ?: (string)$studentId,
                     'first_name' => $student['first_name'],
                     'last_name' => $student['last_name'],
                     'email' => $student['email'],
@@ -2450,6 +2497,7 @@ class AttendanceApi
                     ts.status,
                     ts.attendance_status,
                     ts.instructor_completed_at,
+                    ts.grading_started_at,
                     e.student_id,
                     s.first_name,
                     s.last_name,
@@ -2471,9 +2519,13 @@ class AttendanceApi
                 $this->sendJSON(['success' => false, 'error' => 'Session not found for this instructor.'], 404);
             }
 
+            if (!empty($session['instructor_completed_at'])) {
+                $this->sendJSON(['success' => true, 'already_marked' => true, 'message' => 'This session has already ended.']);
+            }
+
             $todayYmd = date('Y-m-d');
-            if ((string)($session['session_date'] ?? '') !== $todayYmd) {
-                $this->sendJSON(['success' => false, 'error' => 'Only today\'s assigned session can be marked present by the instructor.'], 400);
+            if ((string)($session['session_date'] ?? '') !== $todayYmd && empty($session['grading_started_at'])) {
+                $this->sendJSON(['success' => false, 'error' => 'Only a lesson that was started on its scheduled date can be ended later.'], 400);
             }
 
             $status = strtolower(trim((string)($session['status'] ?? '')));
@@ -2496,7 +2548,12 @@ class AttendanceApi
                 $this->sendJSON(['success' => true, 'already_marked' => true, 'message' => 'This session has already ended.']);
             }
 
-            $this->conn->prepare("UPDATE tbl_sessions SET instructor_completed_at = COALESCE(instructor_completed_at, NOW()) WHERE session_id = ?")
+            $this->conn->prepare("
+                UPDATE tbl_sessions
+                SET instructor_completed_at = COALESCE(instructor_completed_at, NOW()),
+                    grading_completed_at = COALESCE(grading_completed_at, NOW())
+                WHERE session_id = ?
+            ")
                 ->execute([$sessionId]);
             $guardianEmailsNotified = 0;
             try {
@@ -2728,8 +2785,8 @@ switch ($action) {
     case 'record-attendance':
         $api->scanQr();
         break;
-    case 'record-by-email':
-        $api->recordByEmail();
+    case 'record-by-student-number':
+        $api->recordByStudentNumber();
         break;
     case 'mark-present-by-instructor':
         $api->markPresentByInstructor();

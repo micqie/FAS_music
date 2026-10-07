@@ -212,7 +212,7 @@
                         <div class="mt-4 rounded-[1.25rem] bg-[#10172b] px-4 py-3 text-white">
                             <div class="flex items-center gap-3">
                                 <div class="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white">
-                                    <i class="fas fa-circle"></i>
+                                    <i id="studentCheckInIcon" class="fas fa-circle"></i>
                                 </div>
                                 <div>
                                     <div id="studentCheckInStatus" class="text-base font-bold">Keep practicing this piece</div>
@@ -223,9 +223,6 @@
                         <div class="mt-3 grid gap-2.5 sm:grid-cols-2">
                             <button id="studentMarkSongDoneBtn" type="button" class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-gold-500 px-4 py-2.5 text-sm font-bold text-black transition hover:brightness-95">
                                 <i class="fas fa-check-circle mr-2 text-black"></i>Mark current song done
-                            </button>
-                            <button type="button" class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-2.5 text-sm font-bold text-zinc-800 dark:text-zinc-100">
-                                <i class="fas fa-question-circle mr-2 text-gold-500"></i>I need help
                             </button>
                         </div>
                     </section>
@@ -260,6 +257,27 @@
         </div>
     </main>
 
+    <div id="studentPracticeSongModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-5" style="z-index: 70" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="studentPracticeModalTitle">
+        <button type="button" class="absolute inset-0 h-full w-full cursor-default" data-close-practice-song-modal aria-label="Close song details"></button>
+        <section class="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#141923]">
+            <header class="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4 dark:border-white/10 sm:px-6">
+                <div class="min-w-0">
+                    <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-600">Practice song</p>
+                    <h2 id="studentPracticeModalTitle" class="mt-1 truncate text-2xl font-black text-zinc-900 dark:text-white">Song details</h2>
+                    <p id="studentPracticeModalArtist" class="mt-1 text-sm text-zinc-500 dark:text-zinc-400"></p>
+                </div>
+                <button type="button" class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-zinc-200 text-zinc-500 transition hover:bg-zinc-100 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10" data-close-practice-song-modal aria-label="Close song details">
+                    <i class="fas fa-times"></i>
+                </button>
+            </header>
+            <div id="studentPracticeModalBody" class="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6"></div>
+            <footer class="flex justify-end gap-2 border-t border-zinc-200 px-5 py-4 dark:border-white/10 sm:px-6">
+                <button type="button" class="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5" data-close-practice-song-modal>Close</button>
+                <button type="button" id="studentPracticeModalMarkDoneBtn" class="hidden rounded-xl bg-gold-500 px-4 py-2.5 text-sm font-bold text-black transition hover:brightness-95"><i class="fas fa-circle-check mr-2"></i>Mark song done</button>
+            </footer>
+        </section>
+    </div>
+
     <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
     <script src="../../assets/vendor/js/axios.min.js"></script>
 <script src="../../js/offline.js?v=20260919001"></script>
@@ -267,7 +285,7 @@
     <script src="../../js/index.js?v=20260918001"></script>
     <script src="../../js/mode.js?v=20260918001"></script>
     <script src="../../js/student/student_shell.js?v=20260917001"></script>
-    <script src="../../js/student/student_songs.js"></script>
+    <script src="../../js/student/student_songs.js?v=20261007001"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>
 </html>

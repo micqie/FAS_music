@@ -8,7 +8,7 @@ let scannerStarting = false;
 let invalidScanCount = 0;
 let lastScannedPayload = '';
 let lastScanTime = 0;
-let lastManualEmail = '';
+let lastManualStudentNumber = '';
 let lastManualTime = 0;
 const SCAN_DEBOUNCE_MS = 2000;
 
@@ -33,7 +33,7 @@ function parseQrPayload(payload) {
     if (!payload || typeof payload !== 'string') return null;
     const parts = payload.trim().split('|');
     if (parts.length < 4) return null;
-    return { raw: payload.trim(), student_id: parts[2] || '', email: parts[3] || '', branch_id: parts[4] || '' };
+    return { raw: payload.trim(), student_id: parts[2] || '', student_number: parts[3] || '', branch_id: parts[4] || '' };
 }
 
 function showScanAlert(title, html, icon = 'info') {
@@ -48,8 +48,8 @@ function isValidQrPayload(payload) {
     if (parts.length < 4) return false;
     if (parts[0] !== 'FAS_ATTENDANCE' || parts[1] !== 'STUDENT') return false;
     const sid = parseInt(parts[2], 10);
-    const email = (parts[3] || '').trim();
-    return sid > 0 && email.length > 0;
+    const studentNumber = (parts[3] || '').trim();
+    return sid > 0 && studentNumber.length > 0;
 }
 
 function setText(id, value) {
@@ -205,13 +205,13 @@ async function postScanPayload(payload) {
     }
 }
 
-async function postRecordByEmail(email) {
+async function postRecordByStudentNumber(studentNumber) {
     try {
         const mixedContentError = getScannerMixedContentError();
         if (mixedContentError) return { success: false, error: mixedContentError };
         const branchId = getDeskBranchId();
-        const res = await axios.post(`${baseApiUrl}/attendance.php?action=record-by-email`, {
-            email: email.trim(),
+        const res = await axios.post(`${baseApiUrl}/attendance.php?action=record-by-student-number`, {
+            student_number: studentNumber.trim(),
             desk_branch_id: branchId || undefined
         });
         return res.data;
@@ -245,7 +245,7 @@ function handleApiResponse(data, parsed, payload, isManual) {
     let html = `
         <div class="text-left space-y-2">
             <p><strong>${escapeHtml(name)}</strong></p>
-            <p class="text-sm">Email: ${escapeHtml(student.email || (parsed && parsed.email) || '')}</p>
+            <p class="text-sm">Student number: ${escapeHtml(student.student_number || student.student_code || (parsed && parsed.student_number) || student.student_id || '')}</p>
             <p class="text-sm">Branch: ${escapeHtml(branchName)}</p>
             <p class="text-sm">Checked in: ${escapeHtml(checkinStamp)}</p>
         </div>`;
@@ -272,7 +272,7 @@ async function handleScan(payload) {
         setStatus('Invalid QR format.', 'error');
         const parsed = parseQrPayload(payload);
         showScanAlert('Invalid QR Code', `
-            <p class="text-left text-slate-600 mb-3">Expected format: <code class="text-xs bg-slate-100 px-2 py-1 rounded">FAS_ATTENDANCE|STUDENT|id|email|branch_id</code></p>
+            <p class="text-left text-slate-600 mb-3">Expected format: <code class="text-xs bg-slate-100 px-2 py-1 rounded">FAS_ATTENDANCE|STUDENT|id|student_number|branch_id</code></p>
             <div class="text-left text-sm bg-slate-50 p-3 rounded-lg font-mono text-slate-700 break-all">${escapeHtml(payload || '(empty)')}</div>
         `, 'error');
         fetchDeskSummary();
@@ -284,16 +284,16 @@ async function handleScan(payload) {
     handleApiResponse(data, parseQrPayload(payload), payload, false);
 }
 
-async function handleManualEntry(email) {
-    if (!email || !email.trim()) return;
+async function handleManualEntry(studentNumber) {
+    if (!studentNumber || !studentNumber.trim()) return;
     const now = Date.now();
-    const key = email.trim().toLowerCase();
-    if (key === lastManualEmail && (now - lastManualTime) < SCAN_DEBOUNCE_MS) return;
-    lastManualEmail = key;
+    const key = studentNumber.trim().toLowerCase();
+    if (key === lastManualStudentNumber && (now - lastManualTime) < SCAN_DEBOUNCE_MS) return;
+    lastManualStudentNumber = key;
     lastManualTime = now;
 
-    const data = await postRecordByEmail(email.trim());
-    handleApiResponse(data, null, null, true);
+    const data = await postRecordByStudentNumber(studentNumber.trim());
+    handleApiResponse(data, { student_number: studentNumber.trim() }, null, true);
 }
 
 function stopScanner() {
@@ -382,7 +382,7 @@ async function initScanner() {
         return;
     }
     if (!preview || !navigator.mediaDevices?.getUserMedia) {
-        setStatus('Camera access is not supported by this browser. Use a QR photo or manual email entry.', 'error');
+        setStatus('Camera access is not supported by this browser. Use a QR photo or manual student number entry.', 'error');
         return;
     }
     if (scannerStarting || cameraStream) return;
@@ -392,7 +392,7 @@ async function initScanner() {
         if (mixedContentError) showScannerNetworkHelp(`<strong>API configuration error:</strong> ${escapeHtml(mixedContentError)}`);
         barcodeDetector = await prepareBarcodeDetector();
         if (!barcodeDetector && typeof jsQR !== 'function') {
-            setStatus('QR decoder failed to load. Refresh with an internet connection or use manual email entry.', 'error');
+            setStatus('QR decoder failed to load. Refresh with an internet connection or use manual student number entry.', 'error');
             return;
         }
         cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -415,10 +415,10 @@ async function initScanner() {
         setStatus(denied
             ? 'Camera permission was denied. Allow camera access in the address bar and reload.'
             : (missing
-                ? 'No camera is available on this device. Use a QR photo or manual email entry.'
+                ? 'No camera is available on this device. Use a QR photo or manual student number entry.'
                 : (busy
                     ? 'The camera is already being used by another app or browser tab. Close it there, then retry.'
-                    : 'Camera could not start. Use a QR photo or manual email entry.')), 'warn');
+                    : 'Camera could not start. Use a QR photo or manual student number entry.')), 'warn');
         showScannerNetworkHelp(denied
             ? '<strong>Camera permission denied.</strong> Open this site\'s permissions from the lock icon, allow Camera, then reload the page.'
             : (missing
@@ -435,7 +435,7 @@ async function initScanner() {
 async function decodeQrImageFile(file) {
     if (!file) return;
     if (typeof jsQR !== 'function') {
-        setStatus('QR image reader failed to load. Check the internet connection or use manual email entry.', 'error');
+        setStatus('QR image reader failed to load. Check the internet connection or use manual student number entry.', 'error');
         return;
     }
 
@@ -477,7 +477,7 @@ async function decodeQrImageFile(file) {
         await handleScan(String(result.data).trim());
     } catch (error) {
         console.warn('QR image decode:', error);
-        setStatus('Unable to read that image. Retake it or use manual email entry.', 'error');
+        setStatus('Unable to read that image. Retake it or use manual student number entry.', 'error');
     }
 }
 
@@ -492,20 +492,37 @@ function initImageScanner() {
 }
 
 function initManualEntry() {
-    const input = document.getElementById('user_email');
-    if (!input) return;
-    const submit = () => {
-        const email = input.value.trim();
-        if (!email) return;
-        handleManualEntry(email);
-        input.value = '';
-    };
-    input.addEventListener('keydown', e => {
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        submit();
+    const input = document.getElementById('user_student_number');
+    const form = document.getElementById('manualCheckinForm');
+    const submitButton = document.getElementById('manualCheckinBtn');
+    if (!input || !form) return;
+
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const studentNumber = input.value.trim();
+        if (!studentNumber) {
+            setStatus('Enter the student number to check in.', 'warn');
+            input.focus();
+            return;
+        }
+
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = 'Checking in...';
+            submitButton.classList.add('opacity-70', 'cursor-wait');
+        }
+        try {
+            await (window.fasRuntimeConfigReady || Promise.resolve(false));
+            await handleManualEntry(studentNumber);
+            input.value = '';
+        } finally {
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Time in';
+                submitButton.classList.remove('opacity-70', 'cursor-wait');
+            }
+        }
     });
-    document.getElementById('manualCheckinBtn')?.addEventListener('click', submit);
 }
 
 async function initDeskScanner() {
@@ -545,7 +562,6 @@ async function initDeskScanner() {
     fetchRecentScans();
     initScanner();
     initImageScanner();
-    initManualEntry();
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -555,4 +571,7 @@ document.addEventListener('visibilitychange', () => {
 
 window.addEventListener('pagehide', stopScanner);
 
-document.addEventListener('DOMContentLoaded', initDeskScanner);
+document.addEventListener('DOMContentLoaded', () => {
+    initManualEntry();
+    initDeskScanner();
+}, { once: true });

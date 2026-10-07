@@ -215,6 +215,75 @@ function getPracticeMaterials(song) {
     return materials;
 }
 
+function renderStudentPracticeSongModal(song) {
+    const titleEl = document.getElementById('studentPracticeModalTitle');
+    const artistEl = document.getElementById('studentPracticeModalArtist');
+    const bodyEl = document.getElementById('studentPracticeModalBody');
+    const doneBtn = document.getElementById('studentPracticeModalMarkDoneBtn');
+    if (!titleEl || !artistEl || !bodyEl || !song) return;
+
+    const category = [song.category, song.genre].filter(Boolean).join(' · ') || 'Not specified';
+    const difficulty = song.difficulty_level || 'Not specified';
+    const materials = getPracticeMaterials(song);
+    const assignedNote = String(song.assigned_notes || '').trim();
+    const songNote = String(song.song_notes || '').trim();
+    const currentSong = getCurrentStudentSong();
+    const isCurrentAndActive = currentSong
+        && Number(currentSong.assignment_id || 0) === Number(song.assignment_id || 0)
+        && String(song.progress_status || '').toLowerCase() !== 'completed';
+
+    titleEl.textContent = song.title || 'Untitled song';
+    artistEl.textContent = `${song.artist || 'Unknown artist'} · ${song.teacher_name || 'Your teacher'}`;
+    if (doneBtn) doneBtn.classList.toggle('hidden', !isCurrentAndActive);
+
+    const detail = (label, value) => `
+        <div class="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+            <div class="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">${label}</div>
+            <div class="mt-1 text-sm font-bold text-zinc-900 dark:text-white">${escapeStudentSongHtml(value || 'Not specified')}</div>
+        </div>`;
+    const linksMarkup = materials.length
+        ? materials.map(material => `
+            <a href="${escapeStudentSongHtml(material.href)}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 transition hover:border-gold-300 hover:bg-amber-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10">
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl ${material.bg} ${material.color}"><i class="fas ${material.icon}"></i></span>
+                <span class="min-w-0 flex-1"><span class="block font-bold text-zinc-900 dark:text-white">${escapeStudentSongHtml(material.label)}</span><span class="mt-0.5 block truncate text-xs text-zinc-500 dark:text-zinc-400">${escapeStudentSongHtml(material.subtitle || '')}</span></span>
+                <i class="fas fa-arrow-up-right-from-square text-xs text-zinc-400"></i>
+            </a>`).join('')
+        : '<p class="rounded-2xl border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500 dark:border-white/10 dark:text-zinc-400">Your teacher has not added links or practice materials for this song.</p>';
+
+    bodyEl.innerHTML = `
+        <div class="grid gap-3 sm:grid-cols-2">
+            ${detail('Difficulty', difficulty)}
+            ${detail('Instrument / style', category)}
+            ${detail('Assigned', formatStudentSongDate(song.assigned_at))}
+            ${detail('Status', studentSongStatusLabel(song.progress_status))}
+            ${song.vocal_range ? detail('Vocal range', song.vocal_range) : ''}
+            ${song.tags ? detail('Tags', song.tags) : ''}
+        </div>
+        ${assignedNote ? `<section class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 dark:border-amber-400/20 dark:bg-amber-500/10"><h3 class="text-xs font-black uppercase tracking-[0.18em] text-amber-800 dark:text-amber-200">Note from your teacher</h3><p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950 dark:text-amber-100">${escapeStudentSongHtml(assignedNote)}</p></section>` : ''}
+        ${songNote && songNote !== assignedNote ? `<section class="rounded-2xl border border-zinc-200 px-4 py-4 dark:border-white/10"><h3 class="text-xs font-black uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Song notes</h3><p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700 dark:text-zinc-200">${escapeStudentSongHtml(songNote)}</p></section>` : ''}
+        <section><h3 class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Links and practice materials</h3><div class="space-y-2">${linksMarkup}</div></section>
+    `;
+}
+
+function openStudentPracticeSongModal(song) {
+    const modal = document.getElementById('studentPracticeSongModal');
+    if (!modal || !song) return;
+    renderStudentPracticeSongModal(song);
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
+}
+
+function closeStudentPracticeSongModal() {
+    const modal = document.getElementById('studentPracticeSongModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('overflow-hidden');
+}
+
 function updateStudentSongStats() {
     const counts = studentAssignedSongs.reduce((acc, item) => {
         const key = String(item.progress_status || 'assigned').toLowerCase();
@@ -296,6 +365,7 @@ function renderSelectedSongHeader(song) {
     const queueCountEl = document.getElementById('studentQueueCount');
     const noteTitleEl = document.getElementById('teacherNoteTitle');
     const noteBodyEl = document.getElementById('teacherNoteBody');
+    const checkInIcon = document.getElementById('studentCheckInIcon');
 
     if (!song) {
         if (titleEl) titleEl.textContent = 'No song yet';
@@ -306,6 +376,11 @@ function renderSelectedSongHeader(song) {
         if (goalEl) goalEl.textContent = 'A new piece will appear here once it is assigned.';
         if (goalNoteEl) goalNoteEl.textContent = 'Keep checking back after each lesson.';
         if (checkInEl) checkInEl.textContent = 'Waiting for your first practice piece';
+        if (checkInIcon) {
+            checkInIcon.className = 'fas fa-circle';
+            checkInIcon.parentElement?.classList.remove('bg-emerald-500/20', 'text-emerald-300');
+            checkInIcon.parentElement?.classList.add('bg-white/10', 'text-white');
+        }
         if (queueCountEl) queueCountEl.textContent = '0 songs in queue';
         if (noteTitleEl) noteTitleEl.textContent = 'Your teacher is preparing your next practice steps.';
         if (noteBodyEl) noteBodyEl.textContent = 'Once a piece is assigned, this note will show the focus for your next lesson.';
@@ -317,6 +392,7 @@ function renderSelectedSongHeader(song) {
     const goalText = song.assigned_notes || song.song_notes || 'Focus on small sections, slow tempo, and even rhythm.';
     const teacherName = song.teacher_name || 'Your teacher';
     const statusLabel = studentSongStatusLabel(song.progress_status);
+    const isCompleted = String(song.progress_status || '').toLowerCase() === 'completed';
     const practiceDays = getWeekPracticeDays();
 
     if (titleEl) titleEl.textContent = song.title || 'Untitled';
@@ -327,6 +403,13 @@ function renderSelectedSongHeader(song) {
     if (goalEl) goalEl.textContent = goalText.length > 72 ? `${goalText.slice(0, 72).trim()}...` : goalText;
     if (goalNoteEl) goalNoteEl.textContent = song.assigned_notes || song.song_notes || 'Keep your left hand soft and listen for an even pulse.';
     if (checkInEl) checkInEl.textContent = statusLabel === 'Completed' ? 'Great job, this piece is done' : `Your current status: ${statusLabel}`;
+    if (checkInIcon) {
+        checkInIcon.className = `fas ${isCompleted ? 'fa-circle-check' : 'fa-circle'}`;
+        checkInIcon.parentElement?.classList.toggle('bg-emerald-500/20', isCompleted);
+        checkInIcon.parentElement?.classList.toggle('text-emerald-300', isCompleted);
+        checkInIcon.parentElement?.classList.toggle('bg-white/10', !isCompleted);
+        checkInIcon.parentElement?.classList.toggle('text-white', !isCompleted);
+    }
     if (queueCountEl) {
         const activeSongs = studentAssignedSongs.filter(item => String(item.progress_status || '').toLowerCase() !== 'completed').length;
         const queuedSongs = Math.max(0, activeSongs - 1);
@@ -424,6 +507,7 @@ async function markCurrentStudentSongDone() {
         const response = await axios.post(`${baseApiUrl}/songs.php`, payload);
         if (response.data?.success) {
             await showStudentSongAlert('success', 'Song marked done', 'Nice work — your next assigned song is now ready.');
+            closeStudentPracticeSongModal();
             studentSelectedSongId = 0;
             await loadStudentSongs();
             return;
@@ -493,8 +577,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!button) return;
         studentSelectedSongId = Number(button.getAttribute('data-student-song-open') || 0);
         renderStudentSongs();
-        document.getElementById('featuredTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        openStudentPracticeSongModal(getStudentAssignedSongById(studentSelectedSongId));
     });
+
+    document.getElementById('studentPracticeSongModal')?.addEventListener('click', event => {
+        if (event.target.closest('[data-close-practice-song-modal]')) {
+            closeStudentPracticeSongModal();
+        }
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeStudentPracticeSongModal();
+    });
+    document.getElementById('studentPracticeModalMarkDoneBtn')?.addEventListener('click', markCurrentStudentSongDone);
 
     document.getElementById('studentMarkSongDoneBtn')?.addEventListener('click', () => {
         markCurrentStudentSongDone();

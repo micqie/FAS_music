@@ -235,14 +235,26 @@
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Lesson time used</p>
-                        <p id="lessonTimerHint" class="mt-1 text-xs text-slate-500">Select Present to start the timer.</p>
+                        <p id="lessonTimerHint" class="mt-1 text-xs text-slate-500">Start the lesson to begin the timer.</p>
                     </div>
                     <div class="text-right">
-                        <p id="lessonTimerValue" class="font-mono text-2xl font-bold text-slate-900">00:00:00</p>
+                        <p id="lessonTimerValue" class="font-mono text-2xl font-bold text-emerald-600">00:00:00</p>
                         <p id="lessonTimerRange" class="mt-0.5 text-[11px] text-slate-400">Not started</p>
                     </div>
                 </div>
             </div>
+
+            <section id="gradeLearningProgressCard" class="rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900"><i class="fas fa-book-open mr-2 text-indigo-600"></i>Current learning progress</h3>
+                        <p class="mt-2 text-sm text-slate-600">Level: <span id="gradeCurrentLearningLevel" class="font-semibold text-slate-900">Not set</span></p>
+                        <p class="mt-1 text-sm text-slate-600">Book / material: <span id="gradeCurrentLearningBook" class="font-semibold text-slate-900">No book recorded</span></p>
+                    </div>
+                    <button type="button" id="setGradeLearningLevelBtn" onclick="setLearningLevelFromGrading()" class="hidden rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100">Set starting level</button>
+                </div>
+                <p id="gradeLearningProgressHint" class="mt-2 text-xs text-slate-500">Based on this student’s learning progress for the instrument.</p>
+            </section>
 
             <!-- Lesson Focus -->
             <div id="gradeLessonFocusSection">
@@ -267,7 +279,7 @@
                     <i class="fas fa-lock text-amber-500 text-sm shrink-0"></i>
                     <div>
                         <p class="text-sm font-semibold text-amber-900">Grading is not ready yet</p>
-                        <p id="gradeLockMsg" class="text-xs text-amber-700 mt-0.5">Select Present to continue.</p>
+                        <p id="gradeLockMsg" class="text-xs text-amber-700 mt-0.5">Start the lesson after the student is checked in.</p>
                     </div>
                 </div>
 
@@ -469,7 +481,7 @@
 <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
     <script src="../../js/index.js?v=20260919001"></script>
     <script src="../../js/instructor/instructor_nav.js?v=20260919007"></script>
-<script src="../../js/instructor/grading.js?v=20260911001"></script>
+<script src="../../js/instructor/grading.js?v=20261007005"></script>
 <script src="../../js/instructor/grading_ui.js?v=20260829006"></script>
 <script src="../../js/session_timeout.js"></script>
 

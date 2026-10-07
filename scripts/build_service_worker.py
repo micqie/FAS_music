@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '20261007-5'
+VERSION = '20261007-18'
 assets = {'./', './index.html', './featured.html', './offline.html', './manifest.webmanifest'}
 
 for path in (ROOT / 'pages').rglob('*.html'):

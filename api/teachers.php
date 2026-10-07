@@ -1028,8 +1028,8 @@ class TeachersApi
 
         $insertUser = $this->conn->prepare("
             INSERT INTO tbl_users (
-                username, password, role_id, first_name, last_name, email, phone, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                username, password, role_id, first_name, last_name, email, phone, status, must_change_password
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
         ");
         $insertUser->execute([
             $username,
@@ -1781,6 +1781,9 @@ class TeachersApi
         }
         if ($newPassword !== '') {
             $this->validateStrongPassword($newPassword);
+            if (!fas_ensure_password_change_column($this->conn)) {
+                $this->sendJSON(['error' => 'Unable to enable the required password change for this account'], 500);
+            }
         }
 
         try {
@@ -1867,7 +1870,7 @@ class TeachersApi
                     $this->sendJSON(['error' => 'Unable to resolve teacher user account'], 500);
                 }
                 $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-                $stmtPassword = $this->conn->prepare("UPDATE tbl_users SET password = ? WHERE user_id = ?");
+                $stmtPassword = $this->conn->prepare("UPDATE tbl_users SET password = ?, must_change_password = 1, active_session_token = NULL, active_session_updated_at = NULL, active_browser_token_hash = NULL, active_browser_token_updated_at = NULL WHERE user_id = ?");
                 $stmtPassword->execute([$hashedPassword, $passwordUserId]);
                 $passwordUpdated = true;
             }
@@ -1963,6 +1966,7 @@ class TeachersApi
                     ts.attendance_status,
                     ts.room_id,
                     ts.instrument_id AS assigned_instrument_id,
+                    COALESCE(ts.instrument_id, e.instrument_id) AS learning_instrument_id,
                     ts.instructor_completed_at,
                     ts.grading_started_at,
                     ts.grading_completed_at,
@@ -1975,6 +1979,9 @@ class TeachersApi
                     CASE WHEN ts.instrument_id IS NOT NULL THEN inst.instrument_name ELSE NULL END AS assigned_instrument_name,
                     COALESCE(sp.package_name, CONCAT('Package #', e.package_id)) AS package_name,
                     COALESCE(rm.room_name, NULLIF(TRIM(ts.notes), '')) AS room_name,
+                    current_learning.learning_level_id,
+                    current_learning.level_name AS current_learning_level,
+                    current_learning.book_material AS current_learning_book,
                     prog.progress_id,
                     prog.skill_level,
                     prog.performance_score,
@@ -1993,14 +2000,24 @@ class TeachersApi
                 LEFT JOIN tbl_session_packages sp ON sp.package_id = e.package_id
                 LEFT JOIN tbl_rooms rm ON rm.room_id = ts.room_id
                 LEFT JOIN tbl_student_progress prog ON prog.session_id = ts.session_id
+                LEFT JOIN tbl_student_learning_levels current_learning
+                  ON current_learning.learning_level_id = (
+                      SELECT ll.learning_level_id
+                      FROM tbl_student_learning_levels ll
+                      WHERE ll.student_id = s.student_id
+                        AND ll.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
+                        AND ll.status = 'In Progress'
+                      ORDER BY ll.started_at DESC, ll.learning_level_id DESC
+                      LIMIT 1
+                  )
                 WHERE ts.teacher_id = ?
             ";
             $params = [$teacherId];
 
             if ($filter === 'completed') {
-                $sql .= " AND ts.status = 'Completed' AND COALESCE(ts.attendance_status,'') = 'Present' ";
+                $sql .= " AND ( (ts.status = 'Completed' AND COALESCE(ts.attendance_status,'') = 'Present') OR (ts.grading_started_at IS NOT NULL AND ts.instructor_completed_at IS NULL) ) ";
             } elseif ($filter === 'upcoming') {
-                $sql .= " AND ts.session_date >= CURDATE() ";
+                $sql .= " AND (ts.session_date >= CURDATE() OR (ts.grading_started_at IS NOT NULL AND ts.instructor_completed_at IS NULL)) ";
             } elseif ($filter === 'graded') {
                 $sql .= " AND prog.progress_id IS NOT NULL ";
             } elseif ($filter === 'ungraded') {
@@ -2201,7 +2218,7 @@ class TeachersApi
 
             $this->conn->prepare("
                 UPDATE tbl_sessions
-                SET grading_started_at = COALESCE(grading_started_at, NOW()), grading_completed_at = NOW()
+                SET grading_started_at = COALESCE(grading_started_at, NOW())
                 WHERE session_id = ?
             ")->execute([$sessionId]);
 
@@ -2570,6 +2587,9 @@ class TeachersApi
         }
 
         $this->validateStrongPassword($newPassword);
+        if (!fas_ensure_password_change_column($this->conn)) {
+            $this->sendJSON(['error' => 'Unable to enable the required password change for this account'], 500);
+        }
 
         try {
             $this->conn->beginTransaction();
@@ -2582,7 +2602,7 @@ class TeachersApi
             }
 
             $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-            $update = $this->conn->prepare("UPDATE tbl_users SET password = ? WHERE user_id = ?");
+            $update = $this->conn->prepare("UPDATE tbl_users SET password = ?, must_change_password = 1, active_session_token = NULL, active_session_updated_at = NULL, active_browser_token_hash = NULL, active_browser_token_updated_at = NULL WHERE user_id = ?");
             $update->execute([$hashedPassword, $userId]);
 
             $this->conn->commit();

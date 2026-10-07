@@ -206,8 +206,8 @@
 
                             <!-- Practice tip -->
                             <div>
-                                <label for="quickAssignNotes" class="block text-sm font-semibold text-slate-700 mb-1.5">Practice tip <span class="font-normal text-slate-400">(optional)</span></label>
-                                <textarea id="quickAssignNotes" name="assigned_notes" rows="3" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm outline-none transition focus:border-gold-400 focus:bg-white resize-none" placeholder="Play it slowly and count out loud."></textarea>
+                                <label for="quickAssignNotes" class="block text-sm font-semibold text-slate-700 mb-1.5">Note for the student <span class="font-normal text-slate-400">(optional)</span></label>
+                                <textarea id="quickAssignNotes" name="assigned_notes" rows="3" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm outline-none transition focus:border-gold-400 focus:bg-white resize-none" placeholder="Add a practice focus or encouragement for your student."></textarea>
                             </div>
 
                             <!-- Practice by -->
@@ -239,7 +239,7 @@
                 <!-- Info notice -->
                 <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-slate-200 text-sm text-slate-600 soft-shadow">
                     <i class="fas fa-circle-info text-slate-400 flex-shrink-0"></i>
-                    View songs already given to students and their latest practice status. Assignments are handled only under Give a song.
+                    View songs already given to students, update your notes for them, and check their latest practice status.
                 </div>
                 <!-- Assignment list -->
                 <div id="assignmentList" class="space-y-3"></div>
@@ -323,7 +323,12 @@
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-slate-800 mb-1.5">Difficulty level</label>
-                            <input name="difficulty_level" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20" placeholder="e.g. Beginner, Intermediate">
+                            <select name="difficulty_level" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20">
+                                <option value="">Select difficulty...</option>
+                                <option value="Easy">Easy</option>
+                                <option value="Moderate">Moderate</option>
+                                <option value="Hard">Hard</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-slate-800 mb-1.5">Genre <span class="font-normal text-slate-400">(optional)</span></label>
@@ -387,7 +392,7 @@
     }
     </script>
 
-    <script src="../../js/instructor/songs.js"></script>
+    <script src="../../js/instructor/songs.js?v=20261007001"></script>
     <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>

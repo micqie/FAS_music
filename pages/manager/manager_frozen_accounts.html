@@ -919,13 +919,14 @@
 
     function paymentBadge(status) {
         const key = String(status || 'None');
+        const label = key === 'None' ? 'Needs payment' : key;
         const map = {
             Paid: 'bg-emerald-100 text-emerald-700 border-emerald-200',
             Pending: 'bg-amber-100 text-amber-700 border-amber-200',
             Rejected: 'bg-rose-100 text-rose-700 border-rose-200',
-            None: 'bg-slate-100 text-slate-600 border-slate-200'
+            None: 'bg-amber-100 text-amber-700 border-amber-200'
         };
-        return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${map[key] || map.None}">${escHtml(key)}</span>`;
+        return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${map[key] || map.None}">${escHtml(label)}</span>`;
     }
 
     function setFreezeFilter(f) {
@@ -1021,6 +1022,8 @@
             const name = `${escHtml(row.first_name || '')} ${escHtml(row.last_name || '')}`.trim() || 'Student';
             const paymentStatus = row.freeze_payment_status || 'None';
             const freezePaymentId = Number(row.freeze_payment_id || 0);
+            const paymentToApproveId = paymentStatus === 'Pending' ? freezePaymentId : 0;
+            const freezeCount = Math.max(1, Number(row.freeze_count || 1));
             const enrollmentSince = row.enrollment_created_at ? fmtDate(row.enrollment_created_at) : '—';
             const absenceRecords = Array.isArray(row.absence_records) ? row.absence_records : [];
             const latestAbsence = absenceRecords[0] || null;
@@ -1039,7 +1042,7 @@
                             <button onclick="showFrozenStudent(${row.enrollment_id})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">
                                 <i class="fas fa-eye text-[10px]"></i> Details
                             </button>
-                            <button onclick="payNowFrozenStudent(${row.enrollment_id}, ${row.student_id}, ${freezePaymentId})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-bold transition">
+                            <button onclick="payNowFrozenStudent(${row.enrollment_id}, ${row.student_id}, ${paymentToApproveId})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-bold transition">
                                 <i class="fas fa-money-bill text-[10px]"></i> Pay Now
                             </button>
                        </div>`;
@@ -1052,6 +1055,7 @@
                 <td class="px-6 py-4 text-sm text-slate-700">${escHtml(row.package_name || '—')}</td>
                 <td class="px-6 py-4 max-w-xs">
                     <div class="flex items-center gap-2"><span class="font-bold text-rose-600">${Number(row.used_absences || 0)}</span><span class="text-xs text-slate-400">absence${Number(row.used_absences || 0) === 1 ? '' : 's'} · ${Number(row.consecutive_absences || 0)} consecutive</span></div>
+                    <div class="mt-1 text-[11px] font-semibold text-rose-600">Frozen ${freezeCount} time${freezeCount === 1 ? '' : 's'} · cycle #${freezeCount}</div>
                     <div class="mt-1 truncate text-xs text-slate-600" title="${escHtml(latestAbsence ? absenceReason(latestAbsence) : 'No reason was recorded.')}">${escHtml(latestAbsence ? absenceReason(latestAbsence) : 'No reason was recorded.')}</div>
                     ${latestAbsence ? `<div class="mt-0.5 text-[11px] text-slate-400">Latest: ${fmtDate(latestAbsence.session_date)} · ${absenceType(latestAbsence)}</div>` : ''}
                 </td>
@@ -1144,9 +1148,9 @@
 
         const name = `${escHtml(row.first_name || '')} ${escHtml(row.last_name || '')}`.trim() || 'Student';
         const paymentStatus = row.freeze_payment_status || 'None';
+        const freezeCount = Math.max(1, Number(row.freeze_count || 1));
         const paymentMethod = row.freeze_payment_method || '—';
         const paymentDate = row.freeze_payment_created_at ? fmtDate(row.freeze_payment_created_at) : '—';
-        const freezePaymentId = Number(row.freeze_payment_id || 0);
         const absenceRecords = Array.isArray(row.absence_records) ? row.absence_records : [];
         const absenceHistory = absenceRecords.length
             ? absenceRecords.map(record => `
@@ -1166,7 +1170,7 @@
             didOpen: () => {
                 const btn = document.getElementById('freezeModalPayNowBtn');
                 if (btn && paymentStatus !== 'Paid') {
-                    btn.addEventListener('click', () => payNowFrozenStudent(row.enrollment_id, row.student_id, freezePaymentId));
+                    btn.addEventListener('click', () => payNowFrozenStudent(row.enrollment_id, row.student_id, 0));
                 }
             },
             html: `
@@ -1176,7 +1180,8 @@
                         <div><span class="font-semibold text-slate-900">Package:</span> ${escHtml(row.package_name || '—')}</div>
                         <div><span class="font-semibold text-slate-900">Absences:</span> ${Number(row.used_absences || 0)}</div>
                         <div><span class="font-semibold text-slate-900">Consecutive:</span> ${Number(row.consecutive_absences || 0)}</div>
-                        <div><span class="font-semibold text-slate-900">Payment State:</span> ${escHtml(paymentStatus)}</div>
+                        <div><span class="font-semibold text-slate-900">Times frozen:</span> ${freezeCount}</div>
+                        <div><span class="font-semibold text-slate-900">Current payment:</span> ${escHtml(paymentStatus === 'None' ? 'Needs payment' : paymentStatus)}</div>
                         <div><span class="font-semibold text-slate-900">Payment Method:</span> ${escHtml(paymentMethod)}</div>
                         <div><span class="font-semibold text-slate-900">Payment Submitted:</span> ${escHtml(paymentDate)}</div>
                         <div><span class="font-semibold text-slate-900">Phone:</span> ${escHtml(row.phone || '—')}</div>
@@ -1186,7 +1191,7 @@
                         <div class="max-h-60 space-y-2 overflow-y-auto pr-1">${absenceHistory}</div>
                     </div>
                     ${paymentStatus === 'Paid'
-                        ? '<div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700 font-semibold">Account has already been cleared.</div>'
+                        ? '<div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700 font-semibold">Payment cleared for this freeze cycle.</div>'
                         : paymentStatus === 'Pending'
                             ? `<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700 font-semibold">A payment is already pending approval for this account.</div>`
                             : `<button type="button" id="freezeModalPayNowBtn" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-white font-bold hover:bg-emerald-700 transition"><i class="fas fa-money-bill"></i> Pay Now</button>`}

@@ -1922,6 +1922,12 @@ class User
                 if (!$isOldPasswordValid) {
                     $this->sendJSON(['error' => 'Current password is incorrect'], 400);
                 }
+
+                $isSameAsCurrentPassword = password_verify($newPassword, $storedPassword)
+                    || hash_equals($storedPassword, $newPassword);
+                if ($isSameAsCurrentPassword) {
+                    $this->sendJSON(['error' => 'Your new password must be different from the temporary or current password provided to you.'], 400);
+                }
             }
 
             if (strlen($newPassword) < 8) {
