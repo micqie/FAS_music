@@ -2031,6 +2031,9 @@ class User
         }
 
         $dateOfBirth = trim((string)($data['student_date_of_birth'] ?? ''));
+        // PostgreSQL rejects an empty string for DATE columns. DOB is optional
+        // in basic online registration, so bind SQL NULL when the field is blank.
+        $dateOfBirth = $dateOfBirth !== '' ? $dateOfBirth : null;
         $age = $this->calculateAgeFromDateOfBirth($dateOfBirth);
 
         $password = (string)($data['password'] ?? '');
@@ -2137,10 +2140,11 @@ class User
             if ($this->conn && $this->conn->inTransaction()) {
                 $this->conn->rollBack();
             }
+            error_log('Basic student registration database error: ' . $e->getMessage());
             if ($e->getCode() == 23000 && (strpos($e->getMessage(), 'Duplicate entry') !== false || strpos($e->getMessage(), 'username') !== false || strpos($e->getMessage(), 'email') !== false)) {
                 $this->sendJSON(['error' => 'This email is already registered. Please use a different email address.'], 400);
             }
-            $this->sendJSON(['error' => 'Registration failed: ' . $e->getMessage()], 500);
+            $this->sendJSON(['error' => 'Registration failed. Please check the student details and try again.'], 500);
         } catch (Exception $e) {
             if ($this->conn && $this->conn->inTransaction()) {
                 $this->conn->rollBack();
@@ -2212,7 +2216,9 @@ class User
             }
         }
 
-        $dateOfBirth = $data['student_date_of_birth'] ?? null;
+        $dateOfBirth = trim((string)($data['student_date_of_birth'] ?? ''));
+        $dateOfBirth = $dateOfBirth !== '' ? $dateOfBirth : null;
+        $data['student_date_of_birth'] = $dateOfBirth;
         $age = $this->assertMinimumStudentAge($dateOfBirth, 'register or enroll');
         $isMinor = ($age !== null) && ($age <= 18);
         if ($isMinor) {
@@ -2638,7 +2644,9 @@ class User
         }
 
         // Calculate age from date_of_birth for guardian requirement
-        $dateOfBirth = $data['student_date_of_birth'] ?? null;
+        $dateOfBirth = trim((string)($data['student_date_of_birth'] ?? ''));
+        $dateOfBirth = $dateOfBirth !== '' ? $dateOfBirth : null;
+        $data['student_date_of_birth'] = $dateOfBirth;
         $age = null;
         if (!empty($dateOfBirth)) {
             $dob = new DateTime($dateOfBirth);

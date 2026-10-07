@@ -64,7 +64,7 @@
     <script src="manager_shared.js?v=20260919002" defer></script>
     <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001">
     <script src="../../js/table_responsive.js" defer></script>
-    <link rel="stylesheet" href="../../css/manager-shell.css?v=20260919001">
+    <link rel="stylesheet" href="../../css/manager-shell.css?v=20261007001">
     <link rel="stylesheet" href="../../css/portal-loading.css?v=20260927002">
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
@@ -173,12 +173,6 @@
                             <i class="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                             <input id="searchInput" type="text" placeholder="Search student, teacher, package" class="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 shadow-sm focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
                         </div>
-                        <select id="branchFilter" class="w-full md:w-44 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 transition-all">
-                            <option value="">All branches</option>
-                        </select>
-                        <button id="openScheduleSessionBtn" class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-gold-500 to-gold-400 px-5 py-3 text-sm font-bold text-black shadow-lg shadow-gold-500/20 transition hover:from-gold-400 hover:to-gold-500 whitespace-nowrap">
-                            <i class="fas fa-calendar-plus mr-2"></i> Schedule Session
-                        </button>
                     </div>
                 </div>
             </div>
@@ -767,6 +761,9 @@
 <script src="../../js/index.js?v=20260919002"></script>
     <script>
         let allStudents = [];
+        let completedStudents = [];
+        let completedStudentsLoaded = false;
+        let completedStudentsLoading = false;
         let packagePagePackages = [];
         let availableRoomsByBranch = {};
         let managerBranchId = 0;
@@ -950,6 +947,7 @@
                 if (title) title.textContent = 'Completed Sessions';
                 if (subtitle) subtitle.textContent = 'View finished sessions';
                 updateTabNavigation('completed');
+                void loadCompletedStudents();
             } else {
                 // Default to active
                 if (activeSection) activeSection.classList.remove('hidden');
@@ -2252,6 +2250,73 @@
             }
         }
 
+        async function loadCompletedStudents(forceReload = false) {
+            const tableBody = document.getElementById('completedTable');
+            if (!tableBody || completedStudentsLoading || (completedStudentsLoaded && !forceReload)) return;
+            if (!requireManagerBranch()) return;
+
+            completedStudentsLoading = true;
+            tableBody.innerHTML = `
+                <tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                    <p>Loading completed sessions…</p>
+                </td></tr>`;
+
+            try {
+                const url = `${baseApiUrl}/students.php?action=get-active-enrollments&branch_id=${encodeURIComponent(managerBranchId)}&status=completed`;
+                const response = await axios.get(url);
+                const data = response.data || {};
+                if (!data.success || !Array.isArray(data.enrollments)) {
+                    throw new Error(data.error || 'Unable to load completed sessions.');
+                }
+
+                completedStudents = data.enrollments;
+                completedStudentsLoaded = true;
+                renderCompletedStudents();
+            } catch (error) {
+                console.error('Failed to load completed sessions:', error);
+                tableBody.innerHTML = `
+                    <tr><td colspan="6" class="px-6 py-8 text-center text-rose-600">
+                        <p>Could not load completed sessions.</p>
+                        <button type="button" id="retryCompletedSessionsBtn" class="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">Try again</button>
+                    </td></tr>`;
+                document.getElementById('retryCompletedSessionsBtn')?.addEventListener('click', () => loadCompletedStudents(true));
+            } finally {
+                completedStudentsLoading = false;
+            }
+        }
+
+        function renderCompletedStudents() {
+            const tableBody = document.getElementById('completedTable');
+            const countEl = document.getElementById('completedCount');
+            const tabCountEl = document.getElementById('completedTabCount');
+            if (!tableBody) return;
+
+            if (countEl) countEl.textContent = `${completedStudents.length} completed`;
+            if (tabCountEl) tabCountEl.textContent = String(completedStudents.length);
+            if (!completedStudents.length) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No completed sessions for this branch yet.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = completedStudents.map((student) => {
+                const completed = Math.max(0, Number(student.sessions_used ?? student.completed_sessions ?? 0));
+                const total = Math.max(0, Number(student.sessions || 0));
+                const teacherName = `${escapeHtml(student.teacher_first_name || '')} ${escapeHtml(student.teacher_last_name || '')}`.trim() || '—';
+                const scheduleText = buildFixedScheduleText(student);
+                const nextDate = student.first_session_date ? formatDateShort(student.first_session_date) : '—';
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="px-6 py-4"><div class="font-medium text-slate-900">${escapeHtml(student.first_name || '')} ${escapeHtml(student.last_name || '')}</div><div class="text-sm text-slate-500">${escapeHtml(getStudentDisplayId(student))}</div></td>
+                        <td class="px-6 py-4 text-slate-700"><div class="font-bold text-slate-900">${completed} / ${total}</div><div class="mt-1 text-xs text-slate-500">Completed</div></td>
+                        <td class="px-6 py-4 text-slate-700"><div>${escapeHtml(scheduleText)}</div><div class="mt-1 text-xs text-slate-500">Starts: ${escapeHtml(nextDate)}</div></td>
+                        <td class="px-6 py-4 text-slate-700">${teacherName}</td>
+                        <td class="hidden px-6 py-4 text-slate-700">${escapeHtml(student.assigned_room || '—')}</td>
+                        <td class="px-6 py-4"><button type="button" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100" onclick="openSessionScheduleModal(${Number(student.enrollment_id)})">View Schedule</button></td>
+                    </tr>`;
+            }).join('');
+        }
+
         function renderStudents(tableBody) {
             if (!allStudents.length) {
                 tableBody.innerHTML = `
@@ -2348,7 +2413,8 @@
             const teacherLabel = document.getElementById('scheduleTeacherLabel');
             if (!modal || !body || !meta) return;
 
-            const row = allStudents.find(r => Number(r.enrollment_id) === Number(enrollmentId));
+            const row = allStudents.find(r => Number(r.enrollment_id) === Number(enrollmentId))
+                || completedStudents.find(r => Number(r.enrollment_id) === Number(enrollmentId));
             if (!row) {
                 showMessage('Enrollment not found.', 'error');
                 return;

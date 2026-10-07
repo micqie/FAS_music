@@ -10,6 +10,23 @@ body > aside.manager-sidebar {
     scrollbar-color: #64748b #0f1115;
 }
 
+/* Keep page-level dialogs above the shared branch manager sidebar. */
+body .fixed.inset-0.z-50 {
+    z-index: 70 !important;
+}
+
+.manager-dialog-panel {
+    max-height: calc(100dvh - 2rem);
+    min-height: 0;
+}
+
+.manager-dialog-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
 body > aside.manager-sidebar::-webkit-scrollbar {
     display: block !important;
     width: 8px !important;

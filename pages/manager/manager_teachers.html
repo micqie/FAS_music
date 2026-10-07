@@ -27,7 +27,7 @@
     <script src="manager_shared.js?v=20260919002" defer></script>
     <link rel="stylesheet" href="../../css/table-responsive.css?v=20260918001">
     <script src="../../js/table_responsive.js" defer></script>
-    <link rel="stylesheet" href="../../css/manager-shell.css?v=20260919001">
+    <link rel="stylesheet" href="../../css/manager-shell.css?v=20261007001">
     <link rel="stylesheet" href="../../css/portal-loading.css?v=20260927002">
 </head>
 <body class="bg-[#f1f5f9] text-slate-900 antialiased">
@@ -217,9 +217,9 @@
     </main>
 
     <div id="teacherModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
+        <div class="manager-dialog-panel bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col">
             <!-- Modal Header -->
-            <div class="bg-gradient-to-r from-gold-500 to-gold-400 px-6 py-4 flex items-center justify-between">
+            <div class="bg-gradient-to-r from-gold-500 to-gold-400 px-6 py-4 flex items-center justify-between flex-shrink-0">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
                         <i class="fas fa-chalkboard-teacher text-white text-lg"></i>
@@ -235,7 +235,7 @@
             </div>
 
             <!-- Modal Body -->
-            <form id="teacherForm" class="p-6">
+            <form id="teacherForm" class="manager-dialog-scroll p-6">
                 <input type="hidden" id="teacherId">
                 <input type="hidden" id="branchId">
                 

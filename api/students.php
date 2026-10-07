@@ -6694,6 +6694,8 @@ class StudentsApi
         }
 
         $branchId = isset($_GET['branch_id']) ? (int) $_GET['branch_id'] : 0;
+        $requestedStatus = strtolower(trim((string)($_GET['status'] ?? 'active')));
+        $enrollmentStatus = $requestedStatus === 'completed' ? 'Completed' : 'Active';
         $this->ensureSessionPackagesTable();
         $this->ensureStudentCodesAssigned();
 
@@ -6794,9 +6796,9 @@ class StudentsApi
                 LEFT JOIN tbl_teachers t ON t.teacher_id = fs.teacher_id
                 LEFT JOIN tbl_teachers at ON at.teacher_id = e.assigned_teacher_id
                 LEFT JOIN tbl_rooms rm ON rm.room_id = COALESCE(e.fixed_room_id, fs.room_id)
-                WHERE e.status = 'Active'
+                WHERE e.status = ?
             ";
-            $params = [];
+            $params = [$enrollmentStatus];
             if ($branchId > 0) {
                 $sql .= " AND s.branch_id = ? ";
                 $params[] = $branchId;
