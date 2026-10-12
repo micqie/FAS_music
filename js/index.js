@@ -1,4 +1,4 @@
-﻿// Base API URL (same-origin, deployment-path safe)
+// Base API URL (same-origin, deployment-path safe)
 let baseApiUrl;
 let appBaseUrl;
 const FAS_TIME_ZONE = 'Asia/Manila';
@@ -243,10 +243,16 @@ window.addDaysToYmd = addDaysToYmd;
     window.baseApiUrl = baseApiUrl;
     window.appBaseUrl = appBaseUrl;
     window.FAS_DEMO_MODE = null;
-    window.fasRuntimeConfigReady = fetch(`${baseApiUrl}/runtime_config.php`, {
-        credentials: 'same-origin',
-        cache: 'no-store'
-    })
+    const fetchStartupConfig = (url) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+        return fetch(url, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            signal: controller.signal
+        }).finally(() => clearTimeout(timeoutId));
+    };
+    window.fasRuntimeConfigReady = fetchStartupConfig(`${baseApiUrl}/runtime_config.php`)
         .then(response => response.ok ? response.json() : null)
         .then(payload => {
             window.FAS_DEMO_MODE = payload?.success === true && payload?.demo_mode === true;
@@ -260,7 +266,7 @@ window.addDaysToYmd = addDaysToYmd;
     // The calendar's "today" follows the application server, which is set to
     // Asia/Manila. The local clock is only a fallback if this small sync call
     // is unavailable (for example, while offline).
-    window.fasServerTimeReady = fetch(`${baseApiUrl}/server_time.php`, { credentials: 'same-origin' })
+    window.fasServerTimeReady = fetchStartupConfig(`${baseApiUrl}/server_time.php`)
         .then((response) => response.ok ? response.json() : null)
         .then((payload) => {
             const serverEpochMs = Date.parse(String(payload?.now || ''));
@@ -348,6 +354,81 @@ window.addDaysToYmd = addDaysToYmd;
 
 // Let students and guardians verify newly selected proof files without leaving
 // the form. Event delegation also covers enrollment dialogs rendered later.
+function setOnlineProofFieldError(input, errorElement, message = '') {
+    if (!input) return;
+    const invalid = Boolean(message);
+    input.classList.toggle('!border-rose-500', invalid);
+    input.classList.toggle('dark:!border-rose-500', invalid);
+    input.classList.toggle('ring-1', invalid);
+    input.classList.toggle('ring-rose-500', invalid);
+    input.setAttribute('aria-invalid', invalid ? 'true' : 'false');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.classList.toggle('hidden', !invalid);
+    }
+}
+
+function validateOnlineProofFile(input, errorElement, { required = false, label = 'Proof' } = {}) {
+    const file = input?.files?.[0] || null;
+    let error = '';
+    if (!file && required) {
+        error = `${label} is required. Choose a file to continue.`;
+    } else if (file) {
+        const extension = String(file.name || '').split('.').pop().toLowerCase();
+        if (!['jpg', 'jpeg', 'png', 'webp', 'pdf'].includes(extension)) {
+            error = `${label} must be JPG, JPEG, PNG, WEBP, or PDF.`;
+        } else if (file.size > 5 * 1024 * 1024) {
+            error = `${label} must be 5 MB or smaller.`;
+        }
+    }
+    if (error && file && input) input.value = '';
+    setOnlineProofFieldError(input, errorElement, error);
+    return !error;
+}
+
+function formatGroupedPaymentReference(input) {
+    if (!input || !/^[\d\s]*$/.test(input.value)) return;
+    const value = input.value;
+    const caret = input.selectionStart ?? value.length;
+    const digitsBeforeCaret = value.slice(0, caret).replace(/\D/g, '').length;
+    const digits = value.replace(/\D/g, '');
+    let formatted = digits.slice(0, 4);
+    if (digits.length > 4) formatted += `-${digits.slice(4, 7)}`;
+    if (digits.length > 7) formatted += `-${digits.slice(7)}`;
+    input.value = formatted;
+
+    let nextCaret = 0;
+    let digitsSeen = 0;
+    while (nextCaret < formatted.length && digitsSeen < digitsBeforeCaret) {
+        if (/\d/.test(formatted[nextCaret])) digitsSeen++;
+        nextCaret++;
+    }
+    if (formatted[nextCaret] === '-') nextCaret++;
+    input.setSelectionRange(nextCaret, nextCaret);
+}
+
+function setPaymentReferencePattern(input, paymentMethod) {
+    if (!input) return;
+    const method = String(paymentMethod || '').trim().toLowerCase();
+    const useGroupedFormat = method === 'gcash' || method === 'bank transfer';
+    if (useGroupedFormat) {
+        input.dataset.paymentReferencePattern = 'grouped';
+        input.inputMode = 'numeric';
+        input.placeholder = '0000-000-00000';
+        formatGroupedPaymentReference(input);
+    } else {
+        delete input.dataset.paymentReferencePattern;
+        input.inputMode = 'text';
+    }
+}
+
+document.addEventListener('input', (event) => {
+    const input = event.target;
+    if (input instanceof HTMLInputElement && input.dataset.paymentReferencePattern === 'grouped') {
+        formatGroupedPaymentReference(input);
+    }
+});
+
 (function initSelectedProofPreview() {
     const previewableInputIds = new Set([
         'regPayProof',
@@ -799,6 +880,7 @@ const Auth = {
         this._sessionValidationPromise = (async () => {
             try {
                 const response = await axios.get(`${baseApiUrl}/users.php?action=session`, {
+                    timeout: 5000,
                     validateStatus: () => true
                 });
                 const data = response.data || {};
@@ -1617,6 +1699,41 @@ async function promptEmailVerification(email, initialCode = '') {
 function initLoginForm() {
     const loginForm = document.getElementById('loginForm');
     if (!loginForm) return;
+
+    document.getElementById('forgotPasswordBtn')?.addEventListener('click', async () => {
+        const loginValue = document.getElementById('loginUsername')?.value.trim() || '';
+        const result = await Swal.fire({
+            title: 'Reset your password',
+            text: 'Enter the email address connected to your account. We will send a one-time reset link if it matches an active account.',
+            input: 'email',
+            inputValue: loginValue.includes('@') ? loginValue : '',
+            inputPlaceholder: 'you@example.com',
+            inputAttributes: { autocomplete: 'email', maxlength: 254 },
+            showCancelButton: true,
+            confirmButtonText: 'Send reset link',
+            confirmButtonColor: '#b8860b',
+            inputValidator: value => value?.trim() ? undefined : 'Enter your account email address.'
+        });
+        if (!result.isConfirmed) return;
+
+        try {
+            const response = await axios.post(`${baseApiUrl}/users.php?action=request-password-reset`, {
+                email: result.value.trim()
+            }, { validateStatus: () => true });
+            if (response.data?.success) {
+                await Swal.fire({
+                    icon: 'info',
+                    title: 'Password reset requested',
+                    text: 'If an active account uses that email, a reset link will be sent. Check your inbox and spam folder. If it does not arrive within a few minutes, contact the school office. @fas.com system logins cannot receive email.',
+                    confirmButtonColor: '#b8860b'
+                });
+            } else {
+                await Swal.fire({ icon: 'error', title: 'Unable to request reset', text: response.data?.error || 'Please try again later.' });
+            }
+        } catch (error) {
+            await Swal.fire({ icon: 'error', title: 'Request failed', text: 'Could not contact the server. Please try again.' });
+        }
+    });
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -3378,6 +3495,7 @@ function getStudentCertificateState(portal) {
         studentName: `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || 'Student',
         packageName: enrollment?.package_name || student?.package_name || 'Lesson Package',
         achievedLevel: certificate?.achieved_level || 'Achieved Level',
+        bookMaterial: certificate?.book_material || '',
         instrumentName: certificate?.instrument_name || 'Music',
         certificateNumber: certificate?.certificate_number || '',
         teacherName: certificate?.teacher_name || `${enrollment?.teacher_first_name || ''} ${enrollment?.teacher_last_name || ''}`.trim() || 'Teacher',
@@ -3601,13 +3719,15 @@ function buildStudentCertificateMarkup(portal) {
                         in <span class="font-bold text-zinc-900">${escapeHtml(state.instrumentName)}</span>
                         at <span class="font-bold text-zinc-900">${escapeHtml(state.branchName)}</span>.
                     </p>
+                    ${state.bookMaterial ? `<p class="mt-1 text-xs text-zinc-500">Completed book / material: <span class="font-bold text-zinc-700">${escapeHtml(state.bookMaterial)}</span></p>` : ''}
                 </div>
 
-                <div class="mt-6 grid grid-cols-3 gap-2">
+                <div class="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <div class="rounded-xl border border-zinc-200 bg-white/80 px-3 py-3 text-center">
                         <div class="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Level</div>
                         <div class="mt-1 text-sm font-black text-zinc-900">${escapeHtml(state.achievedLevel)}</div>
                     </div>
+                    ${state.bookMaterial ? `<div class="rounded-xl border border-zinc-200 bg-white/80 px-3 py-3 text-center"><div class="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Book / material</div><div class="mt-1 text-xs font-black text-zinc-900">${escapeHtml(state.bookMaterial)}</div></div>` : ''}
                     <div class="rounded-xl border border-zinc-200 bg-white/80 px-3 py-3 text-center">
                         <div class="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Instrument</div>
                         <div class="mt-1 text-sm font-black text-zinc-900">${escapeHtml(state.instrumentName)}</div>
@@ -3749,6 +3869,11 @@ async function fetchGuardianPortalDataByEmail(email) {
         data.students.forEach(item => capturePortalDecisionState(item, 'guardian'));
     }
     return data;
+}
+
+async function fetchGuardianPaymentHistory() {
+    const res = await axios.get(`${baseApiUrl}/students.php?action=get-guardian-payment-history`);
+    return res.data;
 }
 
 async function fetchAttendanceSummary(studentId) {
@@ -3980,6 +4105,49 @@ function fetchPaymentDestination() {
     return paymentDestinationRequest;
 }
 
+function openPaymentQrPreview({ imageUrl = '', payload = '' } = {}) {
+    document.getElementById('paymentQrPreviewModal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'paymentQrPreviewModal';
+    modal.className = 'fixed inset-0 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm';
+    modal.style.zIndex = '1400';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Expanded payment QR code');
+    modal.innerHTML = `
+        <div class="relative flex max-h-[92dvh] w-full max-w-lg flex-col items-center rounded-3xl bg-white p-5 shadow-2xl dark:bg-zinc-900 sm:p-7">
+            <button type="button" class="payment-qr-preview-close absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20" aria-label="Close enlarged payment QR">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="mb-4 pr-10 text-center">
+                <h2 class="text-lg font-black text-zinc-900 dark:text-white">Scan to pay</h2>
+                <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-300">Use your payment app to scan this QR code.</p>
+            </div>
+            <div class="grid place-items-center overflow-hidden rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700" style="width:min(76vw,400px);height:min(76vw,400px);max-height:70dvh;max-width:100%">
+                ${imageUrl
+                    ? `<img src="${escapeHtml(imageUrl)}" alt="Enlarged payment QR code" style="max-width:100%;max-height:100%;object-fit:contain">`
+                    : '<div class="payment-qr-preview-generated" aria-label="Enlarged GCash payment QR code"></div>'}
+            </div>
+            <p class="mt-4 text-xs text-zinc-500 dark:text-zinc-400">Tap outside this panel or press Escape to close.</p>
+        </div>`;
+    document.body.appendChild(modal);
+    const close = () => {
+        document.removeEventListener('keydown', onKeyDown);
+        modal.remove();
+    };
+    const onKeyDown = event => {
+        if (event.key === 'Escape') close();
+    };
+    modal.querySelector('.payment-qr-preview-close')?.addEventListener('click', close);
+    modal.addEventListener('click', event => { if (event.target === modal) close(); });
+    document.addEventListener('keydown', onKeyDown);
+    const target = modal.querySelector('.payment-qr-preview-generated');
+    if (target && payload && typeof QRCode !== 'undefined') {
+        new QRCode(target, { text: payload, width: 360, height: 360, colorDark: '#111827', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+    }
+    modal.querySelector('.payment-qr-preview-close')?.focus();
+}
+
 function renderPaymentDestination(container, method, recipient) {
     if (!container) return;
     const selectedMethod = String(method || '').trim().toLowerCase();
@@ -3996,6 +4164,7 @@ function renderPaymentDestination(container, method, recipient) {
 
     const contact = String(recipient?.contact_number || '').trim();
     const gcash = String(recipient?.gcash_number || contact).trim();
+    const gcashAccountName = String(recipient?.gcash_account_name || '').trim();
     const gcashQrPath = String(recipient?.gcash_qr_path || '').trim();
     const bankName = String(recipient?.bank_name || '').trim();
     const bankAccountName = String(recipient?.bank_account_name || '').trim();
@@ -4008,7 +4177,7 @@ function renderPaymentDestination(container, method, recipient) {
         heading = 'GCash';
         copyValue = gcash;
         details = gcash
-            ? `<span class="font-extrabold text-zinc-900 dark:text-white">${escapeHtml(gcash)}</span>`
+            ? `${gcashAccountName ? `${escapeHtml(gcashAccountName)}<span class="mx-1">•</span>` : ''}<span class="font-extrabold text-zinc-900 dark:text-white">${escapeHtml(gcash)}</span>`
             : 'Contact the branch desk for the current GCash number.';
     } else if (selectedMethod.includes('bank')) {
         heading = 'Bank transfer destination';
@@ -4022,10 +4191,23 @@ function renderPaymentDestination(container, method, recipient) {
                 : 'Contact the branch desk for the current bank account details before sending.';
         }
     } else {
-        details = contact
-            ? `<span class="font-extrabold text-zinc-900 dark:text-white">${escapeHtml(contact)}</span>`
-            : 'Contact the branch desk before sending your payment.';
-        copyValue = contact;
+        const custom = (Array.isArray(recipient?.payment_methods) ? recipient.payment_methods : []).find(item =>
+            String(item?.name || '').trim().toLowerCase() === selectedMethod && !['gcash', 'bank transfer'].includes(selectedMethod)
+        );
+        if (custom) {
+            heading = String(custom.name || 'Payment destination');
+            const accountName = String(custom.account_name || '').trim();
+            const accountNumber = String(custom.account_number || '').trim();
+            const extra = String(custom.details || '').trim();
+            copyValue = accountNumber;
+            details = [accountName ? escapeHtml(accountName) : '', accountNumber ? `<span class="font-extrabold text-zinc-900 dark:text-white">${escapeHtml(accountNumber)}</span>` : '', extra ? escapeHtml(extra) : ''].filter(Boolean).join('<span class="mx-1">•</span>');
+            if (!details) details = 'Contact the branch desk for payment details.';
+        } else {
+            details = contact
+                ? `<span class="font-extrabold text-zinc-900 dark:text-white">${escapeHtml(contact)}</span>`
+                : 'Contact the branch desk before sending your payment.';
+            copyValue = contact;
+        }
     }
 
     container.innerHTML = `
@@ -4036,14 +4218,23 @@ function renderPaymentDestination(container, method, recipient) {
                 ${copyValue ? `<button type="button" class="payment-destination-copy mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-bold text-amber-800 hover:bg-amber-100 dark:text-gold-200" data-copy-value="${escapeHtml(copyValue)}"><i class="fas fa-copy"></i>Copy</button>` : ''}
             </div>
             ${selectedMethod === 'gcash' && gcash ? (gcashQrPath
-                ? `<img src="${escapeHtml(buildPublicFileUrl(gcashQrPath))}" alt="GCash payment QR" class="h-16 w-16 shrink-0 rounded-lg border border-amber-200 bg-white object-contain p-1">`
-                : '<div class="payment-gcash-qr h-16 w-16 shrink-0 rounded-lg border border-amber-200 bg-white p-1" aria-label="GCash number QR code"></div>') : ''}
+                ? `<button type="button" class="payment-qr-preview-trigger shrink-0 rounded-lg border border-amber-200 bg-white p-1 transition hover:ring-2 hover:ring-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500" style="width:80px;height:80px;min-width:80px" data-payment-qr-image="${escapeHtml(buildPublicFileUrl(gcashQrPath))}" aria-label="Enlarge GCash payment QR code"><img src="${escapeHtml(buildPublicFileUrl(gcashQrPath))}" alt="GCash payment QR. Click to enlarge" onerror="this.parentElement.remove()" style="width:100%;height:100%;object-fit:contain" class="rounded-md"></button>`
+                : (typeof QRCode !== 'undefined'
+                    ? '<button type="button" class="payment-qr-preview-trigger shrink-0 rounded-lg border border-amber-200 bg-white p-1 transition hover:ring-2 hover:ring-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500" style="width:80px;height:80px;min-width:80px" aria-label="Enlarge GCash number QR code"><div class="payment-gcash-qr" style="width:68px;height:68px" aria-hidden="true"></div></button>'
+                    : '')) : ''}
         </div>
     `;
     const qrTarget = container.querySelector('.payment-gcash-qr');
     if (qrTarget && typeof QRCode !== 'undefined') {
-        new QRCode(qrTarget, { text: gcash, width: 54, height: 54, colorDark: '#111827', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+        new QRCode(qrTarget, { text: gcash, width: 68, height: 68, colorDark: '#111827', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
     }
+    container.querySelector('.payment-qr-preview-trigger')?.addEventListener('click', event => {
+        const trigger = event.currentTarget;
+        openPaymentQrPreview({
+            imageUrl: trigger.dataset.paymentQrImage || '',
+            payload: trigger.dataset.paymentQrImage ? '' : gcash
+        });
+    });
     container.querySelector('.payment-destination-copy')?.addEventListener('click', async event => {
         const button = event.currentTarget;
         const value = String(button?.dataset?.copyValue || '');
@@ -4057,6 +4248,41 @@ function renderPaymentDestination(container, method, recipient) {
             // The number remains visible for manual copying when clipboard access is unavailable.
         }
     });
+}
+
+function applyOnlinePaymentMethodAvailability(select, recipient) {
+    if (!(select instanceof HTMLSelectElement)) return;
+    const methods = [
+        { key: 'gcash', label: 'GCash', enabled: recipient?.gcash_enabled !== false },
+        { key: 'bank transfer', label: 'Bank Transfer', enabled: recipient?.bank_transfer_enabled !== false }
+    ];
+    (Array.isArray(recipient?.payment_methods) ? recipient.payment_methods : []).forEach(method => {
+        const label = String(method?.name || '').trim();
+        if (!label || ['gcash', 'bank transfer'].includes(label.toLowerCase())) return;
+        const key = label.toLowerCase();
+        if (!Array.from(select.options).some(option => String(option.value || option.textContent || '').trim().toLowerCase() === key)) {
+            select.add(new Option(label, label));
+        }
+        methods.push({ key, label, enabled: method.enabled !== false });
+    });
+    methods.forEach(method => {
+        Array.from(select.options).forEach(option => {
+            if (String(option.value || option.textContent || '').trim().toLowerCase() !== method.key) return;
+            option.disabled = !method.enabled;
+            option.hidden = !method.enabled;
+        });
+    });
+    const selected = String(select.value || '').trim().toLowerCase();
+    const selectedMethod = methods.find(method => method.key === selected);
+    if (selectedMethod && !selectedMethod.enabled) {
+        const nextMethod = methods.find(method => method.enabled && Array.from(select.options).some(option =>
+            String(option.value || option.textContent || '').trim().toLowerCase() === method.key
+        ));
+        select.value = nextMethod
+            ? Array.from(select.options).find(option => String(option.value || option.textContent || '').trim().toLowerCase() === nextMethod.key)?.value || ''
+            : '';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
 }
 
 function mountPaymentDestinationControl(select) {
@@ -4092,7 +4318,11 @@ function mountPaymentDestinationControl(select) {
     } else {
         select.insertAdjacentElement('afterend', container);
     }
-    const refresh = async () => renderPaymentDestination(container, select.value, await fetchPaymentDestination());
+    const refresh = async () => {
+        const recipient = await fetchPaymentDestination();
+        applyOnlinePaymentMethodAvailability(select, recipient || {});
+        renderPaymentDestination(container, select.value, recipient);
+    };
     select.addEventListener('change', refresh);
     void refresh();
 }
@@ -4102,6 +4332,15 @@ function initPaymentDestinationReferences() {
     const scan = root => {
         if (root instanceof Element && root.matches(selector)) mountPaymentDestinationControl(root);
         root.querySelectorAll?.(selector).forEach(mountPaymentDestinationControl);
+        const selects = [];
+        if (root instanceof HTMLSelectElement) selects.push(root);
+        root.querySelectorAll?.('select').forEach(select => selects.push(select));
+        const paymentSelects = selects.filter(select => Array.from(select.options).some(option =>
+            ['gcash', 'bank transfer'].includes(String(option.value || option.textContent || '').trim().toLowerCase())
+        ));
+        if (paymentSelects.length) {
+            void fetchPaymentDestination().then(recipient => paymentSelects.forEach(select => applyOnlinePaymentMethodAvailability(select, recipient || {})));
+        }
     };
     scan(document);
     if (!window.__paymentDestinationObserver) {
@@ -4318,7 +4557,9 @@ function renderCurrentEnrollmentSummary(enrollment) {
 
 function renderPortalBalanceSection(enrollment, showPackage = false) {
     if (!enrollment || String(enrollment.status) !== 'Active') return '';
-    const balance = Number(enrollment.balance_amount ?? Math.max(0, Number(enrollment.total_amount || 0) - Number(enrollment.paid_amount || 0)));
+    const recordedBalance = Number(enrollment.balance_amount ?? Math.max(0, Number(enrollment.total_amount || 0) - Number(enrollment.paid_amount || 0)));
+    const pendingAmount = Math.min(recordedBalance, Math.max(0, Number(enrollment.pending_amount || 0)));
+    const balance = Math.max(0, recordedBalance - pendingAmount);
     const status = String(enrollment.payment_status || (balance > 0 ? 'Partial' : 'Fully Paid'));
     const history = Array.isArray(enrollment.payment_history) ? enrollment.payment_history : [];
     const deadline = Number(enrollment.deadline_session || 0);
@@ -4327,25 +4568,27 @@ function renderPortalBalanceSection(enrollment, showPackage = false) {
     const pending = status === 'Pending Online Payment';
     const overdue = status === 'Payment Overdue';
     const soon = due && !overdue && deadline > 0 && used >= deadline - 1;
-    const tone = !due ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+    const tone = pendingAmount > 0 || pending ? 'border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10'
+        : !due ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10'
         : overdue ? 'border-rose-300 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10'
         : 'border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10';
-    const accent = !due ? 'text-emerald-700 dark:text-emerald-300'
+    const accent = pendingAmount > 0 || pending ? 'text-amber-800 dark:text-amber-300'
+        : !due ? 'text-emerald-700 dark:text-emerald-300'
         : overdue ? 'text-rose-700 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300';
-    const label = !due ? 'Paid in full' : pending ? 'Payment under review' : overdue ? 'Payment overdue' : soon ? 'Balance due soon' : 'Balance to pay';
+    const label = pending ? 'Payment under review' : !due ? (pendingAmount > 0 ? 'No balance due' : 'Paid in full') : overdue ? 'Payment overdue' : soon ? 'Balance due soon' : 'Balance to pay';
     const packageLabel = showPackage ? `<div class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">${escapeHtml(enrollment.package_name || 'Session package')}</div>` : '';
     const historyHtml = history.length ? `<details class="mt-3 border-t border-zinc-200/80 pt-3 text-sm dark:border-white/10"><summary class="w-fit cursor-pointer font-semibold text-zinc-700 dark:text-zinc-200">Payment history</summary><div class="mt-2 space-y-2">${history.map(p => `<div class="flex flex-wrap justify-between gap-2 text-zinc-600 dark:text-zinc-300"><span>${escapeHtml(p.purpose || 'Payment')} · ${escapeHtml(p.payment_method || '')} · ${escapeHtml(p.payment_date || '')}</span><span class="font-semibold">${formatCurrencyPHP(p.amount)} · ${escapeHtml(p.status || '')}</span></div>`).join('')}</div></details>` : '';
     return `<div class="rounded-2xl border ${tone} p-4 sm:p-5">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
-                <div class="flex items-center gap-2 text-sm font-bold ${accent}"><i class="fas ${due ? 'fa-circle-exclamation' : 'fa-circle-check'}" aria-hidden="true"></i>${label}</div>
+                <div class="flex items-center gap-2 text-sm font-bold ${accent}"><i class="fas ${due || pendingAmount > 0 || pending ? 'fa-circle-exclamation' : 'fa-circle-check'}" aria-hidden="true"></i>${label}</div>
                 <div class="mt-1 text-2xl font-black tracking-tight text-zinc-900 dark:text-white sm:text-3xl">${formatCurrencyPHP(balance)}</div>
                 ${packageLabel}
             </div>
-            ${due && !pending ? `<button type="button" onclick="openPortalBalancePayment(${Number(enrollment.enrollment_id)})" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-extrabold text-zinc-950 transition hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600">Pay balance</button>` : ''}
+            ${due && !pending && pendingAmount <= 0 ? `<button type="button" onclick="openPortalBalancePayment(${Number(enrollment.enrollment_id)})" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-extrabold text-zinc-950 transition hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600">Pay balance</button>` : ''}
         </div>
         ${due ? `<div class="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs font-medium text-zinc-700 dark:text-zinc-200"><span>Due before session <strong>${deadline}</strong></span><span><strong>${used}</strong> sessions used</span><span>Paid <strong>${formatCurrencyPHP(enrollment.paid_amount)}</strong></span></div>` : ''}
-        ${pending ? '<div class="mt-3 text-xs font-medium text-amber-800 dark:text-amber-200">Your payment is awaiting approval.</div>' : ''}
+        ${pendingAmount > 0 ? `<div class="mt-3 text-xs font-medium text-amber-800 dark:text-amber-200">Pending approval: <strong>${formatCurrencyPHP(pendingAmount)}</strong></div>` : (pending ? '<div class="mt-3 text-xs font-medium text-amber-800 dark:text-amber-200">Your payment is awaiting approval.</div>' : '')}
         ${historyHtml}
     </div>`;
 }
@@ -4354,8 +4597,8 @@ async function openPortalBalancePayment(enrollmentId) {
     try {
         const response = await axios.get(`${baseApiUrl}/students.php?action=get-enrollment-balance&enrollment_id=${encodeURIComponent(enrollmentId)}`);
         const enrollment = response.data?.enrollment;
-        if (!enrollment || Number(enrollment.balance_amount) <= 0 || enrollment.payment_status === 'Pending Online Payment') {
-            showMessage('This balance is no longer available for payment. Refresh the page.', 'info');
+        if (!enrollment || Number(enrollment.balance_amount) <= 0 || Number(enrollment.pending_amount || 0) > 0 || enrollment.payment_status === 'Pending Online Payment') {
+            showMessage('A payment is awaiting approval or this balance is no longer available. Refresh the page.', 'info');
             return;
         }
         document.getElementById('portalBalancePaymentModal')?.remove();
@@ -4368,14 +4611,18 @@ async function openPortalBalancePayment(enrollmentId) {
             <label class="mt-4 block text-sm font-semibold">Method<select name="payment_method" required class="mt-1 w-full rounded-lg border p-2"><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option></select></label>
             <div id="portalBalanceDestination" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"></div>
             <label class="mt-3 block text-sm font-semibold">Reference number<input name="reference_number" required maxlength="100" class="mt-1 w-full rounded-lg border p-2"></label>
-            <label class="mt-3 block text-sm font-semibold">Payment proof<input name="proof_file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required class="mt-1 w-full rounded-lg border p-2"></label>
+            <label for="portalBalanceProofFile" class="mt-3 block text-sm font-semibold">Payment proof <span class="text-rose-600">* Required</span></label><input id="portalBalanceProofFile" name="proof_file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" aria-required="true" class="mt-1 w-full rounded-lg border p-2"><p id="portalBalanceProofFileError" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p>
             <p id="portalBalancePaymentError" class="mt-3 text-sm text-red-700" role="alert"></p>
             <button type="submit" class="mt-4 w-full rounded-lg bg-amber-500 px-4 py-2.5 font-bold text-black">Submit payment</button>
             <p class="mt-2 text-center text-xs text-slate-500">Balance updates after approval.</p>
         </form>`;
         document.body.appendChild(modal);
         const methodSelect = modal.querySelector('[name="payment_method"]');
+        const referenceInput = modal.querySelector('[name="reference_number"]');
         const destination = modal.querySelector('#portalBalanceDestination');
+        const updateReferenceFormat = () => setPaymentReferencePattern(referenceInput, methodSelect?.value);
+        methodSelect?.addEventListener('change', updateReferenceFormat);
+        updateReferenceFormat();
         fetchPaymentDestination().then(recipient => {
             if (!modal.isConnected) return;
             const updateDestination = () => renderPaymentDestination(destination, methodSelect.value, recipient);
@@ -4384,9 +4631,18 @@ async function openPortalBalancePayment(enrollmentId) {
         });
         modal.querySelector('#closePortalBalancePayment').onclick = () => modal.remove();
         modal.addEventListener('click', event => { if (event.target === modal) modal.remove(); });
+        const proofInput = modal.querySelector('#portalBalanceProofFile');
+        const proofError = modal.querySelector('#portalBalanceProofFileError');
+        proofInput?.addEventListener('change', () => {
+            validateOnlineProofFile(proofInput, proofError, { required: true, label: 'Payment proof' });
+        });
         modal.querySelector('form').addEventListener('submit', async event => {
             event.preventDefault();
             const form = event.currentTarget;
+            if (!validateOnlineProofFile(proofInput, proofError, { required: true, label: 'Payment proof' })) {
+                proofInput?.focus();
+                return;
+            }
             const button = form.querySelector('[type="submit"]');
             button.disabled = true;
             const data = new FormData(form);
@@ -4396,7 +4652,14 @@ async function openPortalBalancePayment(enrollmentId) {
                 modal.remove();
                 window.location.reload();
             } catch (error) {
-                form.querySelector('#portalBalancePaymentError').textContent = error?.response?.data?.error || 'Payment could not be submitted.';
+                const errorText = error?.response?.data?.error || 'Payment could not be submitted.';
+                if (/payment proof|proof of payment/i.test(errorText)) {
+                    if (proofInput) proofInput.value = '';
+                    setOnlineProofFieldError(proofInput, proofError, errorText);
+                    proofInput?.focus();
+                } else {
+                    form.querySelector('#portalBalancePaymentError').textContent = errorText;
+                }
                 button.disabled = false;
             }
         });
@@ -4490,6 +4753,7 @@ function renderStudentProfileEnrollmentMeta(enrollment, instruments, branchName)
 }
 
 let guardianPortalStudents = [];
+let guardianAbsenceRequests = [];
 let guardianActiveStudentIndex = null;
 
 function bindGuardianPortalNav() {
@@ -4582,6 +4846,7 @@ function applyStudentPortalIdentity(user, studentOrPortal = null) {
     setText('studentMobileMenuName', displayName);
     ['studentSidebarName', 'studentSidebarMobileName', 'studentName', 'studentNameMobile'].forEach((id) => setText(id, displayName));
     ['studentSidebarEmail', 'studentSidebarMobileEmail', 'studentEmail', 'studentEmailMobile'].forEach((id) => setText(id, email));
+    setText('studentQrId', student?.student_code || student?.student_id || '—');
     if (typeof window.setPortalBranchText === 'function') {
         window.setPortalBranchText('#studentSidebarBranch, #studentSidebarMobileBranch, #studentBranch, #studentBranchMobile', branchName);
     } else {
@@ -4599,14 +4864,31 @@ function applyGuardianPortalIdentity(user, guardianOrPortal = null) {
     const guardian = portal
         ? (getGuardianPrimaryGuardian(portal, user) || {})
         : (guardianOrPortal || {});
-    const portalGuardian = Array.isArray(portal?.guardians) ? portal.guardians[0] : null;
-    const portalUserAccount = portal?.user_account || portal?.user || null;
-    const displayName = `${guardian?.first_name || ''} ${guardian?.last_name || ''}`.trim()
+    const guardianCandidates = [guardian, portal?.primary_guardian, ...(Array.isArray(portal?.guardians) ? portal.guardians : [])];
+    const namedGuardian = guardianCandidates.find((candidate) =>
+        `${candidate?.first_name || ''} ${candidate?.last_name || ''}`.trim() !== ''
+    );
+    const userDisplayName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim();
+    const guardianIdentityKey = String(user?.email || user?.username || '').trim().toLowerCase();
+    let savedDisplayName = '';
+    if (guardianIdentityKey) {
+        try {
+            savedDisplayName = sessionStorage.getItem(`fasGuardianDisplayName:${guardianIdentityKey}`) || '';
+        } catch (_) { /* Ignore unavailable session storage. */ }
+    }
+    const currentNavName = String(document.getElementById('guardianNavName')?.textContent || '').trim();
+    const displayName = (namedGuardian
+        ? `${namedGuardian.first_name || ''} ${namedGuardian.last_name || ''}`.trim()
+        : '')
+        || userDisplayName
+        || savedDisplayName
+        || window.__guardianPortalDisplayName
+        || (currentNavName && currentNavName.toLowerCase() !== 'guardian' ? currentNavName : '')
         || user?.username
         || user?.email
-        || portalGuardian?.first_name
-        || portalGuardian?.last_name
         || 'Guardian';
+    const portalGuardian = Array.isArray(portal?.guardians) ? portal.guardians[0] : null;
+    const portalUserAccount = portal?.user_account || portal?.user || null;
     const email = guardian?.email
         || portalGuardian?.email
         || portalUserAccount?.email
@@ -4623,6 +4905,12 @@ function applyGuardianPortalIdentity(user, guardianOrPortal = null) {
         || window.__guardianPortalBranchLabel
         || '—';
 
+    window.__guardianPortalDisplayName = displayName;
+    if (guardianIdentityKey && (namedGuardian || userDisplayName)) {
+        try {
+            sessionStorage.setItem(`fasGuardianDisplayName:${guardianIdentityKey}`, displayName);
+        } catch (_) { /* Ignore unavailable session storage. */ }
+    }
     window.__guardianPortalEmail = email;
     window.__guardianPortalBranchLabel = branchName;
 
@@ -4663,14 +4951,69 @@ async function updateGuardianProfileRequest(payload) {
 
 function getGuardianSessionStatusMetrics(item) {
     const rows = getGuardianSessionRows(item);
-    return rows.reduce((acc, row) => {
+    const metrics = rows.reduce((acc, row) => {
         const raw = String(row?.attendance_status || row?.status || 'Scheduled').trim().toLowerCase();
         if (['present', 'late', 'completed'].includes(raw)) acc.completed += 1;
         else if (raw === 'absent') acc.absent += 1;
         else if (raw === 'excused') acc.excused += 1;
-        else acc.upcoming += 1;
         return acc;
     }, { completed: 0, absent: 0, excused: 0, upcoming: 0 });
+    metrics.upcoming = getGuardianAbsenceEligibleSessions(item).length;
+    return metrics;
+}
+
+function getGuardianAbsenceEligibleSessions(item) {
+    const today = getManilaYmd();
+    return getGuardianSessionRows(item).filter((row) => {
+        const sessionStatus = String(row?.status || '').trim().toLowerCase();
+        const attendanceStatus = String(row?.attendance_status || '').trim().toLowerCase();
+        const sessionDate = String(row?.session_date || '').slice(0, 10);
+        return sessionStatus === 'scheduled'
+            && !['present', 'absent'].includes(attendanceStatus)
+            && sessionDate >= today;
+    });
+}
+
+function populateGuardianAbsenceSessionDates(student) {
+    const dateSelect = document.getElementById('guardianAbsenceSessionDate');
+    const submitButton = document.getElementById('guardianAbsenceSubmitBtn');
+    if (!dateSelect) return [];
+
+    const studentId = Number(student?.student?.student_id || 0);
+    const studentRequests = guardianAbsenceRequests.filter((request) => Number(request?.student_id || 0) === studentId);
+    const requestsByDate = new Map();
+    studentRequests.forEach((request) => {
+        const date = String(request?.session_date || '').slice(0, 10);
+        if (date && !requestsByDate.has(date)) {
+            requestsByDate.set(date, String(request?.status || '').trim().toLowerCase());
+        }
+    });
+    const sessionsByDate = new Map();
+    getGuardianAbsenceEligibleSessions(student).forEach((session) => {
+        const date = String(session?.session_date || '').slice(0, 10);
+        const requestStatus = requestsByDate.get(date);
+        if (date && !['reviewed', 'approved', 'declined'].includes(requestStatus) && !sessionsByDate.has(date)) {
+            sessionsByDate.set(date, { session, requestStatus });
+        }
+    });
+    const options = [...sessionsByDate.entries()].map(([date, entry]) => {
+        const session = entry.session;
+        const time = session.start_time ? ` • ${formatTime12Hour(session.start_time)}` : '';
+        const pending = entry.requestStatus === 'pending' ? ' — Request pending' : '';
+        return `<option value="${escapeHtml(date)}" data-request-status="${escapeHtml(entry.requestStatus || '')}">${escapeHtml(formatDateLong(date))}${escapeHtml(time)}${escapeHtml(pending)}</option>`;
+    });
+    dateSelect.innerHTML = `<option value="">${options.length ? 'Choose scheduled session' : 'No upcoming scheduled sessions'}</option>${options.join('')}`;
+    dateSelect.disabled = options.length === 0;
+    if (submitButton) submitButton.disabled = options.length === 0;
+    updateGuardianAbsencePendingNotice();
+    return options;
+}
+
+function updateGuardianAbsencePendingNotice() {
+    const dateSelect = document.getElementById('guardianAbsenceSessionDate');
+    const notice = document.getElementById('guardianAbsencePendingNotice');
+    const isPending = dateSelect?.selectedOptions?.[0]?.dataset?.requestStatus === 'pending';
+    notice?.classList.toggle('hidden', !isPending);
 }
 
 function renderGuardianAbsenceStudentOptions(items) {
@@ -4811,7 +5154,7 @@ async function openGuardianAbsenceStudentPicker(items, currentStudentId = '') {
                 });
             });
         },
-        preConfirm: () => {
+        preConfirm: async () => {
             if (!selectedStudentId) {
                 Swal.showValidationMessage('Please choose a student.');
                 return false;
@@ -4831,7 +5174,6 @@ function openAbsenceModal(studentId, studentName = '') {
     const modal = document.getElementById('absenceRequestModal');
     const hiddenStudentId = document.getElementById('selectedStudentId');
     const modalStudentName = document.getElementById('modalStudentName');
-    const dateInput = document.getElementById('guardianAbsenceSessionDate');
     const reasonInput = document.getElementById('guardianAbsenceReason');
     const notesInput = document.getElementById('guardianAbsenceNotes');
     if (!modal || !hiddenStudentId || !modalStudentName) return;
@@ -4843,9 +5185,7 @@ function openAbsenceModal(studentId, studentName = '') {
     const student = matchIndex >= 0 ? guardianPortalStudents[matchIndex] : null;
     const resolvedName = studentName || (student ? getGuardianAbsenceStudentSummary(student, matchIndex).studentName : 'Student');
     modalStudentName.textContent = resolvedName;
-    if (dateInput && !dateInput.value) {
-        dateInput.value = getManilaYmd();
-    }
+    populateGuardianAbsenceSessionDates(student);
     if (reasonInput) reasonInput.value = '';
     if (notesInput) notesInput.value = '';
     modal.classList.remove('hidden');
@@ -4860,6 +5200,14 @@ function closeAbsenceModal() {
     if (!modal) return;
     if (hiddenStudentId) hiddenStudentId.value = '';
     if (modalStudentName) modalStudentName.textContent = '';
+    const dateSelect = document.getElementById('guardianAbsenceSessionDate');
+    const submitButton = document.getElementById('guardianAbsenceSubmitBtn');
+    if (dateSelect) {
+        dateSelect.innerHTML = '<option value="">Choose session date</option>';
+        dateSelect.disabled = false;
+    }
+    updateGuardianAbsencePendingNotice();
+    if (submitButton) submitButton.disabled = false;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
     document.body.classList.remove('overflow-hidden');
@@ -5053,6 +5401,7 @@ function collectGuardianUpcomingSessions(items, limit = 6) {
 function renderGuardianDashboardAlerts(students) {
     const rows = Array.isArray(students) ? students : [];
     const dueStudents = rows.filter((item) => getGuardianPaymentMetrics(item).totalBalance > 0);
+    const pendingStudents = rows.filter((item) => getGuardianPaymentMetrics(item).totalPending > 0);
     const alerts = [];
 
     const completionAlerts = rows.map((item) => {
@@ -5163,6 +5512,15 @@ function renderGuardianDashboardAlerts(students) {
         `);
     }
 
+    if (pendingStudents.length > 0) {
+        const pendingTotal = pendingStudents.reduce((sum, item) => sum + getGuardianPaymentMetrics(item).totalPending, 0);
+        alerts.push(`
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                <span class="font-bold">Payments awaiting approval: ${formatCurrencyPHP(pendingTotal)}.</span> This amount is shown separately from the balance due.
+            </div>
+        `);
+    }
+
     const upcoming = collectGuardianUpcomingSessions(rows, 1);
     if (upcoming.length > 0) {
         const entry = upcoming[0];
@@ -5209,8 +5567,8 @@ function renderGuardianDashboardUpcomingList(items) {
 function renderGuardianDashboardBalanceList(items) {
     const rows = (Array.isArray(items) ? items : [])
         .map((item, index) => ({ item, index, metrics: getGuardianPaymentMetrics(item) }))
-        .filter((row) => row.metrics.totalBalance > 0)
-        .sort((a, b) => b.metrics.totalBalance - a.metrics.totalBalance);
+        .filter((row) => row.metrics.totalBalance > 0 || row.metrics.totalPending > 0)
+        .sort((a, b) => (b.metrics.totalBalance + b.metrics.totalPending) - (a.metrics.totalBalance + a.metrics.totalPending));
 
     if (!rows.length) {
         return `<div class="rounded-2xl border border-dashed border-zinc-200 dark:border-white/10 px-4 py-8 text-center text-sm text-emerald-600 dark:text-emerald-300">All linked students are fully paid for now.</div>`;
@@ -5222,8 +5580,9 @@ function renderGuardianDashboardBalanceList(items) {
             <a href="guardian_payments.html" class="block rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/20 p-4 hover:border-gold-300 transition">
                 <div class="flex items-center justify-between gap-3">
                     <div class="font-bold text-zinc-900 dark:text-white">${escapeHtml(name)}</div>
-                    <div class="text-lg font-black text-gold-600 dark:text-gold-400">${formatCurrencyPHP(metrics.totalBalance)}</div>
+                    <div class="text-right"><div class="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Balance due</div><div class="text-lg font-black text-gold-600 dark:text-gold-400">${formatCurrencyPHP(metrics.totalBalance)}</div></div>
                 </div>
+                ${metrics.totalPending > 0 ? `<div class="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">Pending approval: ${formatCurrencyPHP(metrics.totalPending)}</div>` : ''}
             </a>
         `;
     }).join('');
@@ -5293,6 +5652,7 @@ function renderGuardianStudentCard(item, index) {
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${badgeClassForRegistrationStatus(regStatus)}">${escapeHtml(regStatus)}</span>
+                    ${paymentMetrics.totalPending > 0 ? `<span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">${formatCurrencyPHP(paymentMetrics.totalPending)} pending</span>` : ''}
                     ${getScheduleFreezeReservationNotice(enrollment) ? `<span class="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300"><i class="fas fa-snowflake text-[9px]"></i> Frozen</span>` : ''}
                     ${paymentMetrics.totalBalance > 0 ? `<span class="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-3 py-1 text-xs font-bold text-gold-700 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-400">${formatCurrencyPHP(paymentMetrics.totalBalance)} due</span>` : ''}
                 </div>
@@ -5541,24 +5901,19 @@ function updateGuardianTotals(items) {
     const rows = Array.isArray(items) ? items : [];
     let totalBalance = 0;
     let totalPaid = 0;
+    let totalPending = 0;
 
     rows.forEach(item => {
-        const s = item?.student || {};
-        const enrollment = item?.current_enrollment || null;
-        const regPaid = Number(s.registration_fee_paid || 0);
-        const regTotal = Number(s.registration_fee_amount || 0);
-        const regRemaining = Math.max(0, regTotal - regPaid);
-        const pkgTotal = Number(enrollment?.total_amount || s.package_price || 0);
-        const pkgPaid = Number(enrollment?.paid_amount || 0);
-        const pkgRemaining = Math.max(0, pkgTotal - pkgPaid);
-
-        totalBalance += regRemaining + pkgRemaining;
-        totalPaid += regPaid + pkgPaid;
+        const metrics = getGuardianPaymentMetrics(item);
+        totalBalance += metrics.totalBalance;
+        totalPaid += metrics.totalPaid;
+        totalPending += metrics.totalPending;
     });
 
     setText('guardianStudentCount', String(rows.length));
     setText('guardianTotalBalance', formatCurrencyPHP(totalBalance));
     setText('guardianTotalPaid', formatCurrencyPHP(totalPaid));
+    setText('guardianTotalPending', formatCurrencyPHP(totalPending));
 }
 
 function getGuardianPaymentMetrics(item) {
@@ -5566,19 +5921,26 @@ function getGuardianPaymentMetrics(item) {
     const enrollment = item?.current_enrollment || null;
     const registrationPaid = Number(student.registration_fee_paid || 0);
     const registrationTotal = Number(student.registration_fee_amount || 0);
-    const registrationBalance = Math.max(0, registrationTotal - registrationPaid);
+    const registrationUnpaid = Math.max(0, registrationTotal - registrationPaid);
+    const registrationPending = Math.min(registrationUnpaid, Math.max(0, Number(student.registration_fee_pending || 0)));
+    const registrationBalance = Math.max(0, registrationUnpaid - registrationPending);
     const packagePaid = Number(enrollment?.paid_amount || 0);
     const packageTotal = Number(enrollment?.total_amount || student.package_price || 0);
-    const packageBalance = Math.max(0, packageTotal - packagePaid);
+    const packageUnpaid = Math.max(0, Number(enrollment?.balance_amount ?? (packageTotal - packagePaid)));
+    const packagePending = Math.min(packageUnpaid, Math.max(0, Number(enrollment?.pending_amount || 0)));
+    const packageBalance = Math.max(0, packageUnpaid - packagePending);
 
     return {
         registrationPaid,
         registrationTotal,
+        registrationPending,
         registrationBalance,
         packagePaid,
         packageTotal,
+        packagePending,
         packageBalance,
         totalPaid: registrationPaid + packagePaid,
+        totalPending: registrationPending + packagePending,
         totalBalance: registrationBalance + packageBalance
     };
 }
@@ -5615,18 +5977,52 @@ function renderGuardianPaymentsList(items) {
     return items.map((item, index) => renderGuardianPaymentCard(item, index)).join('');
 }
 
+function renderGuardianPaymentHistory(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+        return '<tr><td colspan="7" class="px-5 py-8 text-center text-zinc-500 dark:text-zinc-400">No payment records found for your linked children.</td></tr>';
+    }
+
+    return rows.map(payment => {
+        const status = String(payment.status || '—');
+        const statusClass = status.toLowerCase() === 'paid'
+            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+            : status.toLowerCase() === 'pending'
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                : status.toLowerCase() === 'rejected' || status.toLowerCase() === 'failed'
+                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
+                    : 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300';
+        const dateValue = payment.payment_date || payment.created_at || '';
+        const dateLabel = dateValue ? (formatDateLong(dateValue) || dateValue) : '—';
+        const receiptLabel = payment.receipt_number || payment.reference_number || '—';
+        return `
+            <tr class="text-zinc-700 dark:text-zinc-200">
+                <td class="whitespace-nowrap px-5 py-4">${escapeHtml(dateLabel)}</td>
+                <td class="px-5 py-4 font-semibold text-zinc-900 dark:text-white">${escapeHtml(payment.student_name || 'Student')}</td>
+                <td class="px-5 py-4">${escapeHtml(payment.payment_label || 'Payment')}</td>
+                <td class="px-5 py-4">${escapeHtml(payment.payment_method || '—')}</td>
+                <td class="whitespace-nowrap px-5 py-4 text-right font-bold">${escapeHtml(formatCurrencyPHP(payment.amount))}</td>
+                <td class="px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${statusClass}">${escapeHtml(status)}</span></td>
+                <td class="px-5 py-4">${escapeHtml(receiptLabel)}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
 function updateGuardianPaymentTotals(items) {
     const rows = Array.isArray(items) ? items : [];
     let totalPaid = 0;
     let totalBalance = 0;
+    let totalPending = 0;
     rows.forEach((item) => {
         const metrics = getGuardianPaymentMetrics(item);
         totalPaid += metrics.totalPaid;
         totalBalance += metrics.totalBalance;
+        totalPending += metrics.totalPending;
     });
     setText('guardianPaymentStudentCount', String(rows.length));
     setText('guardianPaymentTotalPaid', formatCurrencyPHP(totalPaid));
     setText('guardianPaymentTotalBalance', formatCurrencyPHP(totalBalance));
+    setText('guardianPaymentTotalPending', formatCurrencyPHP(totalPending));
 }
 
 async function hydrateGuardianAttendance(items) {
@@ -5762,6 +6158,42 @@ async function guardianRegisterNewStudent() {
     const branchId = getGuardianPortalDefaultBranchId();
     const guardianEmail = getGuardianPortalCurrentEmail();
     const branchOptionsHtml = await fetchGuardianBranchOptionsHtml(branchId);
+    const validateGuardianIdProof = () => {
+        const input = document.getElementById('guardian-new-id-proof');
+        const error = document.getElementById('guardian-new-id-proof-error');
+        const valid = validateOnlineProofFile(input, error, { required: true, label: 'Verification proof' });
+        if (!valid) input?.focus();
+        return valid;
+    };
+    const setGuardianDobError = (message) => {
+        const input = document.getElementById('guardian-new-dob');
+        const guidance = document.getElementById('guardian-new-age-guidance');
+        if (guidance) {
+            guidance.textContent = message;
+            guidance.className = 'md:col-span-2 -mt-1 text-xs font-semibold text-rose-600';
+        }
+        input?.classList.toggle('!border-rose-500', Boolean(message));
+        input?.classList.toggle('dark:!border-rose-500', Boolean(message));
+        input?.setAttribute('aria-invalid', message ? 'true' : 'false');
+    };
+    const setGuardianFieldError = (inputId, errorId, message) => {
+        const input = document.getElementById(inputId);
+        const error = document.getElementById(errorId);
+        const invalid = Boolean(message);
+        input?.classList.toggle('!border-rose-500', invalid);
+        input?.classList.toggle('dark:!border-rose-500', invalid);
+        input?.setAttribute('aria-invalid', invalid ? 'true' : 'false');
+        if (error) {
+            error.textContent = message;
+            error.classList.toggle('hidden', !invalid);
+        }
+    };
+    const setGuardianFormError = (message) => {
+        const error = document.getElementById('guardian-new-form-error');
+        if (!error) return;
+        error.textContent = message;
+        error.classList.toggle('hidden', !message);
+    };
     const result = await Swal.fire({
         width: 920,
         padding: '0',
@@ -5781,6 +6213,7 @@ async function guardianRegisterNewStudent() {
                     <div class="rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
                         Fill in only the details that are not already saved in your guardian portal. The request stays pending until the academy reviews it and assigns the Student ID.
                     </div>
+                    <p id="guardian-new-form-error" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700" role="alert"></p>
 
                     <div class="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
                         <div class="space-y-4">
@@ -5791,21 +6224,24 @@ async function guardianRegisterNewStudent() {
                                 </div>
                                 <div class="px-4 py-4 space-y-3">
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        <input id="guardian-new-first" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="First name">
-                                        <input id="guardian-new-last" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Last name">
+                                        <div><input id="guardian-new-first" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="First name"><p id="guardian-new-first-error" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p></div>
+                                        <div><input id="guardian-new-last" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" placeholder="Last name"><p id="guardian-new-last-error" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p></div>
                                         <input id="guardian-new-dob" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" type="date" placeholder="Date of birth">
                                         <input id="guardian-new-age" class="w-full px-3 py-2 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-500 dark:text-zinc-300 cursor-not-allowed" type="text" readonly placeholder="Age will appear here">
+                                        <p id="guardian-new-age-guidance" class="md:col-span-2 -mt-1 text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite">Date of birth is required. Students must be at least 3 years old to register.</p>
                                         <div class="relative">
                                             <input id="guardian-new-password" class="w-full px-3 py-2 pr-11 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" type="password" placeholder="Password">
                                             <button type="button" onclick="togglePassword('guardian-new-password', 'guardian-new-password-eye')" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" aria-label="Toggle password visibility">
                                                 <i id="guardian-new-password-eye" class="fas fa-eye"></i>
                                             </button>
+                                            <p id="guardian-new-password-error" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                                         </div>
                                         <div class="relative">
                                             <input id="guardian-new-password-confirm" class="w-full px-3 py-2 pr-11 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" type="password" placeholder="Confirm password">
                                             <button type="button" onclick="togglePassword('guardian-new-password-confirm', 'guardian-new-password-confirm-eye')" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" aria-label="Toggle confirm password visibility">
                                                 <i id="guardian-new-password-confirm-eye" class="fas fa-eye"></i>
                                             </button>
+                                            <p id="guardian-new-password-confirm-error" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                                         </div>
                                         <div class="md:col-span-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3">
                                             <div class="flex gap-1">
@@ -5824,6 +6260,7 @@ async function guardianRegisterNewStudent() {
                                                 ${branchOptionsHtml}
                                             </select>
                                             <div class="mt-1 text-[11px] text-zinc-400">Choose the branch where the student should register.</div>
+                                            <p id="guardian-new-branch-error" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                                         </div>
                                     </div>
                                 </div>
@@ -5846,20 +6283,24 @@ async function guardianRegisterNewStudent() {
                                         <option value="GCash">GCash</option>
                                         <option value="Bank Transfer">Bank Transfer</option>
                                     </select>
+                                    <p id="guardian-new-payment-method-error" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Reference Number *</label>
                                     <input id="guardian-new-reference-number" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500" type="text" placeholder="Transaction / reference no.">
+                                    <p id="guardian-new-reference-number-error" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                                     <p class="mt-1 text-[11px] text-zinc-400">Enter the payment reference or transaction number.</p>
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Registration Proof *</label>
-                                    <input id="guardian-new-registration-proof" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" type="file" accept=".jpg,.jpeg,.png,.pdf,image/*">
+                                    <label for="guardian-new-registration-proof" class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Registration Proof <span class="text-rose-600">* Required</span></label>
+                                    <input id="guardian-new-registration-proof" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" type="file" required accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                    <p id="guardian-new-registration-proof-error" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                                     <p class="mt-1 text-[11px] text-zinc-400">Upload proof of payment for the ₱1,000 registration.</p>
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">ID Proof *</label>
-                                    <input id="guardian-new-id-proof" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" type="file" accept=".jpg,.jpeg,.png,.pdf,image/*">
+                                    <label for="guardian-new-id-proof" class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">ID Proof <span class="text-rose-600">* Required</span></label>
+                                    <input id="guardian-new-id-proof" class="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" type="file" required accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                    <p id="guardian-new-id-proof-error" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                                     <p class="mt-1 text-[11px] text-zinc-400">Upload a valid ID or school ID proof.</p>
                                 </div>
                             </div>
@@ -5873,8 +6314,17 @@ async function guardianRegisterNewStudent() {
             const firstInput = document.getElementById('guardian-new-first');
             if (firstInput) firstInput.focus();
 
+            const paymentMethodInput = document.getElementById('guardian-new-payment-method');
+            const referenceNumberInput = document.getElementById('guardian-new-reference-number');
+            const updateGuardianReferenceFormat = () => setPaymentReferencePattern(referenceNumberInput, paymentMethodInput?.value);
+            paymentMethodInput?.addEventListener('change', updateGuardianReferenceFormat);
+            updateGuardianReferenceFormat();
+
             const dobInput = document.getElementById('guardian-new-dob');
             const ageInput = document.getElementById('guardian-new-age');
+            const idProofInput = document.getElementById('guardian-new-id-proof');
+            const paymentProofInput = document.getElementById('guardian-new-registration-proof');
+            const paymentProofError = document.getElementById('guardian-new-registration-proof-error');
             const passwordInput = document.getElementById('guardian-new-password');
             const confirmInput = document.getElementById('guardian-new-password-confirm');
             const strengthText = document.getElementById('guardian-pass-strength');
@@ -5889,7 +6339,27 @@ async function guardianRegisterNewStudent() {
                 if (!dobInput || !ageInput) return;
                 const age = calculateAgeFromBirthdate(dobInput.value);
                 ageInput.value = age === null || age < 0 ? '' : `${age} years old`;
+                const guidance = document.getElementById('guardian-new-age-guidance');
+                const today = new Date();
+                const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                dobInput.max = todayValue;
+                if (!dobInput.value) {
+                    setGuardianDobError('Date of birth is required.');
+                } else if (dobInput.value > todayValue || age === null) {
+                    setGuardianDobError('Enter a valid date of birth that is not in the future.');
+                } else if (age < 3) {
+                    setGuardianDobError('Student must be at least 3 years old.');
+                } else {
+                    guidance.textContent = 'Age verified.';
+                    guidance.className = 'md:col-span-2 -mt-1 text-xs text-emerald-700 dark:text-emerald-300';
+                    dobInput.classList.remove('!border-rose-500', 'dark:!border-rose-500');
+                    dobInput.setAttribute('aria-invalid', 'false');
+                }
             };
+            idProofInput?.addEventListener('change', validateGuardianIdProof);
+            paymentProofInput?.addEventListener('change', () => {
+                if (!validateOnlineProofFile(paymentProofInput, paymentProofError, { required: true, label: 'Registration proof' })) paymentProofInput.focus();
+            });
             const resetBars = () => {
                 bars.forEach((bar) => {
                     if (bar) bar.className = 'h-1 flex-1 rounded bg-zinc-200';
@@ -5953,11 +6423,28 @@ async function guardianRegisterNewStudent() {
             updateGuardianAge();
             dobInput?.addEventListener('input', updateGuardianAge);
             dobInput?.addEventListener('change', updateGuardianAge);
+            [
+                ['guardian-new-first', 'guardian-new-first-error'],
+                ['guardian-new-last', 'guardian-new-last-error'],
+                ['guardian-new-branch', 'guardian-new-branch-error'],
+                ['guardian-new-payment-method', 'guardian-new-payment-method-error'],
+                ['guardian-new-reference-number', 'guardian-new-reference-number-error'],
+                ['guardian-new-password', 'guardian-new-password-error'],
+                ['guardian-new-password-confirm', 'guardian-new-password-confirm-error']
+            ].forEach(([inputId, errorId]) => {
+                const input = document.getElementById(inputId);
+                const clearFieldError = () => {
+                    setGuardianFormError('');
+                    if (String(input?.value || '').trim()) setGuardianFieldError(inputId, errorId, '');
+                };
+                input?.addEventListener('input', clearFieldError);
+                input?.addEventListener('change', clearFieldError);
+            });
             updateGuardianPasswordChecker();
             passwordInput?.addEventListener('input', updateGuardianPasswordChecker);
             confirmInput?.addEventListener('input', updateGuardianPasswordChecker);
         },
-        preConfirm: () => {
+        preConfirm: async () => {
             const paymentProofFile = document.getElementById('guardian-new-registration-proof')?.files?.[0] || null;
             const idProofFile = document.getElementById('guardian-new-id-proof')?.files?.[0] || null;
             const paymentMethod = String(document.getElementById('guardian-new-payment-method')?.value || '').trim();
@@ -5977,83 +6464,153 @@ async function guardianRegisterNewStudent() {
                 age_verification_proof_file: idProofFile
             };
 
-            if (!data.student_first_name || !data.student_last_name || !data.student_date_of_birth) {
-                Swal.showValidationMessage('Please fill in all required student fields.');
+            const paymentInput = document.getElementById('guardian-new-registration-proof');
+            const paymentError = document.getElementById('guardian-new-registration-proof-error');
+            const paymentProofValid = validateOnlineProofFile(paymentInput, paymentError, { required: true, label: 'Registration proof' });
+            const idProofValid = validateOnlineProofFile(
+                document.getElementById('guardian-new-id-proof'),
+                document.getElementById('guardian-new-id-proof-error'),
+                { required: true, label: 'ID proof' }
+            );
+            if (!paymentProofValid || !idProofValid) {
+                (!paymentProofValid ? paymentInput : document.getElementById('guardian-new-id-proof'))?.focus();
                 return false;
             }
-            if (!data.branch_id) {
-                Swal.showValidationMessage('Please choose a branch.');
-                return false;
+            setGuardianFormError('');
+            let firstInvalidInput = null;
+            const markField = (inputId, errorId, message) => {
+                setGuardianFieldError(inputId, errorId, message);
+                if (message && !firstInvalidInput) firstInvalidInput = document.getElementById(inputId);
+            };
+            markField('guardian-new-first', 'guardian-new-first-error', data.student_first_name ? '' : 'First name is required.');
+            markField('guardian-new-last', 'guardian-new-last-error', data.student_last_name ? '' : 'Last name is required.');
+            if (!data.student_date_of_birth) {
+                setGuardianDobError('Date of birth is required.');
+                if (!firstInvalidInput) firstInvalidInput = document.getElementById('guardian-new-dob');
+            } else {
+                const studentAge = calculateAgeFromBirthdate(data.student_date_of_birth);
+                const today = new Date();
+                const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                if (data.student_date_of_birth > todayValue || studentAge === null) {
+                    setGuardianDobError('Enter a valid date of birth that is not in the future.');
+                    if (!firstInvalidInput) firstInvalidInput = document.getElementById('guardian-new-dob');
+                } else if (studentAge < 3) {
+                    setGuardianDobError('Student must be at least 3 years old.');
+                    if (!firstInvalidInput) firstInvalidInput = document.getElementById('guardian-new-dob');
+                }
             }
-            if (!data.payment_method) {
-                Swal.showValidationMessage('Please select a payment method.');
-                return false;
+            markField('guardian-new-branch', 'guardian-new-branch-error', data.branch_id ? '' : 'Choose a branch.');
+            markField('guardian-new-payment-method', 'guardian-new-payment-method-error', data.payment_method ? '' : 'Select a payment method.');
+            markField('guardian-new-reference-number', 'guardian-new-reference-number-error', data.reference_number ? '' : 'Reference number is required.');
+            const passwordMessage = password1 ? '' : 'Password is required.';
+            const confirmMessage = password2 ? '' : 'Confirm password is required.';
+            markField('guardian-new-password', 'guardian-new-password-error', passwordMessage);
+            markField('guardian-new-password-confirm', 'guardian-new-password-confirm-error', confirmMessage);
+            if (!firstInvalidInput && password1 && password2 && password1 !== password2) {
+                markField('guardian-new-password-confirm', 'guardian-new-password-confirm-error', 'Passwords do not match.');
             }
-            if (!data.reference_number) {
-                Swal.showValidationMessage('Please enter the payment reference number.');
-                return false;
-            }
-            if (!data.registration_proof_file) {
-                Swal.showValidationMessage('Please upload proof of payment.');
-                return false;
-            }
-            if (!data.age_verification_proof_file) {
-                Swal.showValidationMessage('Please upload an ID proof.');
-                return false;
-            }
-            if (!password1 || !password2) {
-                Swal.showValidationMessage('Please fill in both password fields.');
-                return false;
-            }
-            if (password1 !== password2) {
-                Swal.showValidationMessage('Passwords do not match.');
-                return false;
-            }
-            if (
+            if (!firstInvalidInput && password1 && password2 && (
                 password1.length < 8 ||
                 !/[A-Z]/.test(password1) ||
                 !/[a-z]/.test(password1) ||
                 !/[0-9]/.test(password1) ||
                 !/[!@#$%^&*]/.test(password1)
-            ) {
-                Swal.showValidationMessage('Password does not meet the requirements.');
+            )) {
+                markField('guardian-new-password', 'guardian-new-password-error', 'Use 8+ characters with uppercase, lowercase, number, and special character.');
+            }
+            if (firstInvalidInput) {
+                firstInvalidInput.focus();
                 return false;
             }
-            return data;
+            if (password1 !== password2) {
+                return false;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'guardian-register-child');
+            formData.append('guardian_email', guardianEmail);
+            formData.append('student_first_name', data.student_first_name);
+            formData.append('student_last_name', data.student_last_name);
+            formData.append('student_date_of_birth', data.student_date_of_birth);
+            formData.append('branch_id', String(data.branch_id || branchId || 0));
+            formData.append('password', data.password1);
+            formData.append('payment_method', data.payment_method);
+            formData.append('reference_number', data.reference_number);
+            formData.append('registration_proof_file', data.registration_proof_file);
+            formData.append('age_verification_proof_file', data.age_verification_proof_file);
+
+            try {
+                Swal.showLoading();
+                const response = await postStudentPackageRequest(formData);
+                if (!response?.success) throw new Error(response?.error || 'Failed to register student.');
+                return { ...data, registrationResponse: response };
+            } catch (error) {
+                const errorText = error?.response?.data?.error || error?.message || 'Failed to register student.';
+                if (/verification proof|age verification proof/i.test(errorText)) {
+                    const idProofInput = document.getElementById('guardian-new-id-proof');
+                    const idProofError = document.getElementById('guardian-new-id-proof-error');
+                    if (idProofInput) idProofInput.value = '';
+                    setOnlineProofFieldError(idProofInput, idProofError, errorText);
+                    idProofInput?.focus();
+                    return false;
+                }
+                if (/registration proof|payment proof/i.test(errorText)) {
+                    const paymentInput = document.getElementById('guardian-new-registration-proof');
+                    const paymentError = document.getElementById('guardian-new-registration-proof-error');
+                    if (paymentInput) paymentInput.value = '';
+                    setOnlineProofFieldError(paymentInput, paymentError, errorText);
+                    paymentInput?.focus();
+                    return false;
+                }
+                if (/3 years old|date of birth/i.test(errorText)) {
+                    const dobInput = document.getElementById('guardian-new-dob');
+                    setGuardianDobError(errorText);
+                    dobInput?.focus();
+                    return false;
+                }
+                if (/payment method/i.test(errorText)) {
+                    setGuardianFieldError('guardian-new-payment-method', 'guardian-new-payment-method-error', errorText);
+                    document.getElementById('guardian-new-payment-method')?.focus();
+                    return false;
+                }
+                if (/reference|transaction number/i.test(errorText)) {
+                    setGuardianFieldError('guardian-new-reference-number', 'guardian-new-reference-number-error', errorText);
+                    document.getElementById('guardian-new-reference-number')?.focus();
+                    return false;
+                }
+                if (/branch/i.test(errorText)) {
+                    setGuardianFieldError('guardian-new-branch', 'guardian-new-branch-error', errorText);
+                    document.getElementById('guardian-new-branch')?.focus();
+                    return false;
+                }
+                if (/password/i.test(errorText)) {
+                    const passwordId = /match/i.test(errorText) ? 'guardian-new-password-confirm' : 'guardian-new-password';
+                    const passwordErrorId = `${passwordId}-error`;
+                    setGuardianFieldError(passwordId, passwordErrorId, errorText);
+                    document.getElementById(passwordId)?.focus();
+                    return false;
+                }
+                setGuardianFormError(errorText);
+                return false;
+            }
         }
         });
 
     if (!result.isConfirmed) return;
 
     try {
-        const formData = new FormData();
-        formData.append('action', 'guardian-register-child');
-        formData.append('guardian_email', guardianEmail);
-        formData.append('student_first_name', result.value.student_first_name);
-        formData.append('student_last_name', result.value.student_last_name);
-        formData.append('student_date_of_birth', result.value.student_date_of_birth);
-        formData.append('branch_id', String(result.value.branch_id || branchId || 0));
-        formData.append('password', result.value.password1);
-        formData.append('payment_method', result.value.payment_method);
-        formData.append('reference_number', result.value.reference_number);
-        if (result.value.registration_proof_file) {
-            formData.append('registration_proof_file', result.value.registration_proof_file);
-        }
-        if (result.value.age_verification_proof_file) {
-            formData.append('age_verification_proof_file', result.value.age_verification_proof_file);
-        }
-
-        const data = await postStudentPackageRequest(formData);
-        if (!data.success) {
-            throw new Error(data.error || 'Failed to register student.');
-        }
-
+        const registrationResponse = result.value?.registrationResponse || {};
+        const guardianContactEmail = registrationResponse.contact_email || registrationResponse.guardian_email || guardianEmail;
+        const registrationEmailStatus = registrationResponse.guardian_notification_sent
+            ? `<p class="mt-2">A confirmation was sent to <strong>${escapeHtml(guardianContactEmail)}</strong>.</p>`
+            : `<p class="mt-2 text-amber-700">The registration was saved, but we could not send the confirmation email to ${escapeHtml(guardianContactEmail)}. Please contact the academy if you need help.</p>`;
         await Swal.fire({
             icon: 'success',
             title: 'Registration Submitted',
             html: `
                 <div class="text-left text-sm leading-6">
                     <p>The student registration is now pending review.</p>
+                    ${registrationEmailStatus}
                     <p class="mt-2">The guardian will be notified once the academy accepts the registration.</p>
                     <p class="mt-2">After approval, the school will email you the Student ID / login for <strong>${escapeHtml(`${result.value.student_first_name || ''} ${result.value.student_last_name || ''}`.trim())}</strong>.</p>
                     <p class="mt-2 text-xs text-zinc-500">That email will include the student name as a reference so it is easier to distinguish if you manage more than one child.</p>
@@ -6120,17 +6677,20 @@ async function initGuardianDashboardPage() {
 
     let totalBalance = 0;
     let totalPaid = 0;
+    let totalPending = 0;
     let upcomingCount = 0;
     students.forEach((item) => {
         const metrics = getGuardianPaymentMetrics(item);
         totalBalance += metrics.totalBalance;
         totalPaid += metrics.totalPaid;
+        totalPending += metrics.totalPending;
         upcomingCount += getGuardianSessionStatusMetrics(item).upcoming;
     });
 
     setText('guardianDashboardStudentCount', String(students.length));
     setText('guardianDashboardTotalBalance', formatCurrencyPHP(totalBalance));
     setText('guardianDashboardTotalPaid', formatCurrencyPHP(totalPaid));
+    setText('guardianDashboardTotalPending', formatCurrencyPHP(totalPending));
     setText('guardianDashboardUpcomingCount', String(upcomingCount));
 
     setHtml('guardianDashboardAlerts', renderGuardianDashboardAlerts(students));
@@ -6200,6 +6760,14 @@ async function initGuardianPaymentsPage() {
     startGuardianSessionRefreshWatcher();
     updateGuardianPaymentTotals(students);
     setHtml('guardianPaymentsList', renderGuardianPaymentsList(students));
+    try {
+        const history = await fetchGuardianPaymentHistory();
+        setHtml('guardianPaymentHistoryBody', history?.success
+            ? renderGuardianPaymentHistory(history.payments)
+            : '<tr><td colspan="7" class="px-5 py-8 text-center text-rose-600">Could not load payment history.</td></tr>');
+    } catch (error) {
+        setHtml('guardianPaymentHistoryBody', '<tr><td colspan="7" class="px-5 py-8 text-center text-rose-600">Could not load payment history. Please refresh and try again.</td></tr>');
+    }
     await hydrateGuardianAttendance(students);
     bindGuardianStudentModalEvents();
 }
@@ -6222,8 +6790,9 @@ async function initGuardianProfilePage() {
     const metrics = students.reduce((acc, item) => {
         const payment = getGuardianPaymentMetrics(item);
         acc.balance += payment.totalBalance;
+        acc.pending += payment.totalPending;
         return acc;
-    }, { balance: 0 });
+    }, { balance: 0, pending: 0 });
 
     window.__guardianPortalBranchLabel = getGuardianPortalBranchLabel(portal);
     applyGuardianPortalIdentity(user, portal);
@@ -6233,6 +6802,7 @@ async function initGuardianProfilePage() {
     setText('guardianProfileHeading', `${guardian.first_name || ''} ${guardian.last_name || ''}`.trim() || 'Guardian Profile');
     setText('guardianProfileLinkedStudents', String(students.length));
     setText('guardianProfileBalance', formatCurrencyPHP(metrics.balance));
+    setText('guardianProfilePending', formatCurrencyPHP(metrics.pending));
 
     const fieldMap = {
         guardianProfileGuardianId: guardian.guardian_id || '',
@@ -6334,6 +6904,7 @@ async function initGuardianAbsencePage() {
     setText('guardianAbsenceUpcomingCount', String(totalUpcoming));
 
     const requestRows = Array.isArray(absenceData?.requests) ? absenceData.requests : [];
+    guardianAbsenceRequests = requestRows;
     setText('guardianAbsencePendingCount', String(requestRows.filter((row) => String(row.status || '').toLowerCase() === 'pending').length));
     setHtml('guardianAbsenceRequestsList', renderGuardianAbsenceRequests(requestRows));
 
@@ -6359,10 +6930,11 @@ async function initGuardianAbsencePage() {
             }
         });
 
-        const dateInput = document.getElementById('guardianAbsenceSessionDate');
-        if (dateInput && !dateInput.value) {
-            dateInput.value = getManilaYmd();
-        }
+    const dateSelect = document.getElementById('guardianAbsenceSessionDate');
+    if (dateSelect && dateSelect.dataset.pendingNoticeBound !== 'true') {
+        dateSelect.dataset.pendingNoticeBound = 'true';
+        dateSelect.addEventListener('change', updateGuardianAbsencePendingNotice);
+    }
 
     const form = document.getElementById('guardianAbsenceForm');
     if (!form || form.dataset.bound === 'true') return;
@@ -6387,18 +6959,28 @@ async function initGuardianAbsencePage() {
             if (data?.success) {
                 showMessage(data.message || 'Absence request submitted.', 'success');
                 form.reset();
-                if (dateInput) dateInput.value = getManilaYmd();
                 closeAbsenceModal();
 
                 const refreshed = await fetchGuardianAbsenceRequests(Auth.getUser()?.email || '');
                 const rows = Array.isArray(refreshed?.requests) ? refreshed.requests : [];
+                guardianAbsenceRequests = rows;
                 setText('guardianAbsencePendingCount', String(rows.filter((row) => String(row.status || '').toLowerCase() === 'pending').length));
                 setHtml('guardianAbsenceRequestsList', renderGuardianAbsenceRequests(rows));
             } else {
                 showMessage(data?.error || 'Failed to submit absence request.', 'error');
             }
         } catch (error) {
-            showMessage(error?.response?.data?.error || 'Network error while submitting absence request.', 'error');
+            const responseData = error?.response?.data || {};
+            if (responseData.code === 'ABSENCE_REQUEST_PENDING' && typeof Swal !== 'undefined') {
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Request pending',
+                    text: responseData.error || 'This absence request is pending staff review.',
+                    confirmButtonColor: '#b8860b'
+                });
+            } else {
+                showMessage(responseData.error || 'Network error while submitting absence request.', 'error');
+            }
         } finally {
             if (submitBtn) submitBtn.disabled = false;
         }
@@ -6716,23 +7298,36 @@ function renderStudentInstructorAvailabilityCalendar(statusMessage = '') {
     const studentId = Number(state.student?.student_id || 0);
     const ownProjectedDates = new Set(buildProjectedRecurringDates(state.selectedSlots, state.sessionCount).flat());
     const ownReservedSlots = state.reservedSlots.filter(slot => studentId > 0 && Number(slot.student_id || 0) === studentId);
-    const otherReservedDates = new Set(state.reservedSlots
+    const otherReservedCounts = state.reservedSlots
         .filter(slot => !studentId || Number(slot.student_id || 0) !== studentId)
-        .map(slot => String(slot.session_date || '')));
+        .reduce((counts, slot) => {
+            const date = String(slot.session_date || '');
+            counts[date] = (counts[date] || 0) + 1;
+            return counts;
+        }, {});
     const ownBookedKeys = new Set(state.bookedSessions.map(slot => `${String(slot.session_date || '')}|${String(slot.start_time || '')}|${String(slot.end_time || '')}`));
     const ownBookedDates = new Set(state.bookedSessions.map(slot => String(slot.session_date || '')));
     const ownReservedDates = new Set(ownReservedSlots.map(slot => String(slot.session_date || '')));
-    const occupiedDates = new Set(state.occupiedSlots
+    const occupiedCounts = state.occupiedSlots
         .filter(slot => !ownBookedKeys.has(`${String(slot.session_date || '')}|${String(slot.start_time || '')}|${String(slot.end_time || '')}`))
-        .map(slot => String(slot.session_date || '')));
+        .reduce((counts, slot) => {
+            const date = String(slot.session_date || '');
+            counts[date] = (counts[date] || 0) + 1;
+            return counts;
+        }, {});
     const todayKey = getManilaYmd();
     let html = Array.from({ length: first.getDay() }, () => '<div class="h-14"></div>').join('');
     for (let day = 1; day <= daysInMonth; day += 1) {
         const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const available = (grouped[dateKey] || []).length;
         const ownRequest = ownProjectedDates.has(dateKey) || ownReservedDates.has(dateKey) || ownBookedDates.has(dateKey);
-        const reservedByOthers = otherReservedDates.has(dateKey);
-        const occupied = occupiedDates.has(dateKey);
+        const ownReservedCount = ownReservedSlots.filter(slot => String(slot.session_date || '') === dateKey).length;
+        const ownBookedCount = state.bookedSessions.filter(slot => String(slot.session_date || '') === dateKey).length;
+        const reservedCount = (otherReservedCounts[dateKey] || 0) + ownReservedCount;
+        const occupiedCount = (occupiedCounts[dateKey] || 0) + ownBookedCount;
+        const busyCount = reservedCount + occupiedCount;
+        const totalCount = available + busyCount;
+        const isFull = available === 0 && occupiedCount > 0;
         const selected = dateKey === studentInstructorAvailabilityState.selectedDate;
         const dateDay = getDayOfWeekFromDate(dateKey);
         const usedByAnotherSlot = studentInstructorAvailabilityState.selectedSlots.some((slot, index) => {
@@ -6740,21 +7335,29 @@ function renderStudentInstructorAvailabilityCalendar(statusMessage = '') {
             return (slot.day_of_week || getDayOfWeekFromDate(slot.session_date)) === dateDay;
         });
         const disabled = !studentInstructorAvailabilityState.selectedTeacherId || !available || dateKey < todayKey || usedByAnotherSlot;
-        const colorClass = ownRequest
+        const colorClass = isFull
+            ? 'cursor-not-allowed border-red-300 bg-red-100 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300'
+            : ownRequest
             ? `border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 ${available && !disabled ? 'hover:bg-amber-200' : 'cursor-not-allowed'}`
+            : busyCount
+            ? `${available && !disabled ? 'border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15' : 'cursor-not-allowed border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'}`
             : available && !disabled
             ? (selected ? 'border-gold-500 bg-amber-50 ring-1 ring-gold-500/30 dark:bg-gold-500/10' : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10')
-            : occupied || reservedByOthers ? 'cursor-not-allowed border-red-300 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-500/10' : 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400 dark:border-white/5 dark:bg-white/[.02] dark:text-zinc-700';
+            : 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400 dark:border-white/5 dark:bg-white/[.02] dark:text-zinc-700';
+        const ratioText = isFull ? 'Full schedule' : occupiedCount ? `${occupiedCount}/${totalCount} occupied${reservedCount ? ` · ${reservedCount} pending` : ''}` : reservedCount ? `${reservedCount}/${totalCount} pending` : `${available} available`;
+        const ratioBadge = busyCount
+            ? `<span class="rounded-full ${isFull ? 'bg-red-600' : 'bg-amber-600'} px-1.5 py-0.5 text-[9px] font-bold text-white">${busyCount}/${totalCount}</span>`
+            : available && !disabled ? `<span class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${available}</span>` : '';
         html += `<button type="button" data-student-availability-date="${dateKey}" ${disabled ? 'disabled' : ''} class="h-14 rounded-lg border p-1.5 text-left transition ${colorClass}">
-            <div class="flex items-start justify-between gap-1"><span class="text-sm font-bold ${available && !disabled ? 'text-zinc-900 dark:text-white' : ''}">${day}</span>${available && !disabled ? `<span class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${available}</span>` : ''}</div>
-            ${ownRequest ? `<div class="mt-1 text-[9px] font-bold text-amber-800">${ownBookedDates.has(dateKey) ? 'Your session' : 'Your request'}</div>` : available && !disabled ? '<div class="mt-1 text-[9px] font-bold text-emerald-700 dark:text-emerald-400">Available</div>' : reservedByOthers ? '<div class="mt-1 text-[9px] font-bold text-red-700">Reserved by others</div>' : occupied ? '<div class="mt-1 text-[9px] font-bold text-red-700">Occupied by others</div>' : '<div class="mt-1 text-[9px] font-bold text-zinc-500">Unavailable</div>'}
+            <div class="flex items-start justify-between gap-1"><span class="text-sm font-bold ${available && !disabled ? 'text-zinc-900 dark:text-white' : ''}">${day}</span>${ratioBadge}</div>
+            <div class="mt-1 text-[9px] font-bold leading-tight ${isFull ? 'text-red-700 dark:text-red-300' : busyCount ? 'text-amber-800 dark:text-amber-300' : available && !disabled ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-500'}">${ownRequest ? `${ownBookedDates.has(dateKey) ? 'Your session' : 'Your request'} · ` : ''}${ratioText}</div>
         </button>`;
     }
     grid.innerHTML = html;
     if (statusMessage) status.innerHTML = statusMessage;
     else if (!studentInstructorAvailabilityState.selectedTeacherId) status.textContent = 'Select an instructor to display available dates.';
     else if (!studentInstructorAvailabilityState.slots.length && !ownProjectedDates.size && !ownReservedDates.size && !ownBookedDates.size) status.textContent = 'This instructor has no open one-hour slots in the current scheduling window.';
-    else status.textContent = 'Green: available · Yellow: your 12-session request/schedule · Red: occupied or reserved by others · Gray: unavailable.';
+    else status.textContent = 'Green: open slots · Yellow: partly occupied or pending · Red: occupied sessions or full schedule · Gray: unavailable. Counts show used slots / total slots.';
     const inlineTimes = document.getElementById('studentInstructorTimeSlots');
     if (inlineTimes) inlineTimes.innerHTML = '';
 }
@@ -6792,9 +7395,14 @@ function openStudentInstructorTimePickerModal(dateKey) {
     const ownBookedKeys = new Set(ownBookedRows.map(slot => `${String(slot.start_time || '')}|${String(slot.end_time || '')}`));
     const occupiedRows = studentInstructorAvailabilityState.occupiedSlots.filter(slot => String(slot.session_date || '') === normalizedDate && !ownBookedKeys.has(`${String(slot.start_time || '')}|${String(slot.end_time || '')}`));
     if (!rows.length) return;
+    const availableCards = rows.map((slot, index) => `<button type="button" class="student-time-picker-option rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-400 hover:bg-emerald-100" data-slot-index="${index}"><div class="font-black text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs text-zinc-500">Select this preferred time</div></button>`).join('');
+    const ownReservedCards = ownReservedRows.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="font-black text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-amber-700">Your pending request</div></div>`).join('');
+    const ownBookedCards = ownBookedRows.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="font-black text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-red-700">Your scheduled session</div></div>`).join('');
+    const reservedCards = reservedByOthersRows.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="font-black text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-amber-700">Pending reservation</div></div>`).join('');
+    const occupiedCards = occupiedRows.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="font-black text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-red-700">Occupied session</div></div>`).join('');
     Swal.fire({
         title: formatDateLong(normalizedDate) || normalizedDate,
-        html: `<div class="mb-4 text-sm text-zinc-500">Green: available · Yellow: yours · Red: occupied/reserved by others</div><div class="grid grid-cols-1 gap-2 text-left sm:grid-cols-2">${rows.map((slot, index) => `<button type="button" class="student-time-picker-option rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-400 hover:bg-emerald-100" data-slot-index="${index}"><div class="font-black text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs text-zinc-500">Select this preferred time</div></button>`).join('')}${ownReservedRows.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="font-black text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-amber-700">Your pending request</div></div>`).join('')}${ownBookedRows.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="font-black text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-amber-700">Your scheduled session</div></div>`).join('')}${reservedByOthersRows.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="font-black text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-red-700">Reserved by another student</div></div>`).join('')}${occupiedRows.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="font-black text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold text-red-700">Occupied by another student</div></div>`).join('')}</div>`,
+        html: `<div class="mb-4 text-sm text-zinc-500">Green: available · Yellow: partial occupancy or pending · Red: occupied session or full schedule · Gray: unavailable.</div><div class="grid grid-cols-1 gap-2 text-left sm:grid-cols-2">${availableCards}${ownReservedCards}${ownBookedCards}${reservedCards}${occupiedCards}</div>`,
         showConfirmButton: false,
         showCloseButton: true,
         width: '42rem',
@@ -7117,7 +7725,7 @@ async function fetchStudentRequestMetaByEmail(email, options = {}) {
 
 function ensureGuardianEnrollmentModal() {
     if (document.getElementById('studentRequestModal')) return;
-    document.body.insertAdjacentHTML('beforeend', `<div id="studentRequestModal" class="fixed inset-0 z-[80] hidden overflow-y-auto bg-black/60 p-0 backdrop-blur-sm sm:p-4" aria-hidden="true"><div class="flex min-h-full items-stretch justify-center sm:items-center"><div class="flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-obsidian sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-zinc-200 dark:sm:border-white/10"><div class="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-white/10"><div><div class="text-[10px] font-bold uppercase tracking-[.22em] text-gold-600">Enrollment Request</div><h2 id="guardianEnrollmentStudentName" class="mt-1 text-lg font-black text-zinc-900 dark:text-white">Enroll Student</h2></div><button type="button" onclick="closeStudentRequestModal()" class="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-100 dark:border-white/10 dark:hover:bg-white/10"><i class="fas fa-times"></i></button></div><div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"><div id="studentRequestStatus"></div><form id="studentPackageRequestForm" class="mt-4 space-y-4"><div class="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_300px]"><div class="space-y-4"><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">1.</span>Choose the 12-session package</div><select id="studentRequestPackage" class="hidden"><option value="">Select package</option></select><div id="studentRequestPackageCards" class="space-y-2"></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">2.</span>Choose payment</div><div class="grid gap-3 sm:grid-cols-2"><select id="studentRequestPaymentMode" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="Partial Payment">Partial Payment</option><option value="Full Payment">Full Payment</option></select><select id="studentRequestPaymentMethod" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="">Select payment method</option><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option></select></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">3.</span>Choose one instrument</div><div id="studentRequestInstrumentContainer"></div><label class="mt-4 block text-xs font-bold uppercase tracking-wider text-zinc-500">Payment proof</label><input id="studentRequestPaymentProof" name="package_payment_proof_file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="mt-2 w-full rounded-xl border border-dashed border-zinc-300 p-3 text-sm dark:border-zinc-700"><p id="guardianEnrollmentProofName" class="mt-1 hidden text-xs text-gold-600"></p></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-1 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">4.</span>Request a class schedule</div><p class="mb-3 text-xs text-zinc-500 dark:text-zinc-400">Select a preferred date and an available one-hour window.</p><div class="grid gap-3 sm:grid-cols-2"><div><label for="studentRequestPreferredDate" class="mb-1 block text-xs font-bold text-zinc-500">Preferred date</label><input id="studentRequestPreferredDate" type="date" required class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"></div><div><label for="studentRequestPreferredTime" class="mb-1 block text-xs font-bold text-zinc-500">Preferred time</label><select id="studentRequestPreferredTime" required class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="">Choose a date first</option></select></div></div><div id="studentRequestScheduleHint" class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-200">The desk will confirm this request or adjust it if an instructor or room is unavailable.</div></section></div><aside class="self-start rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/5"><div class="text-sm font-extrabold text-zinc-900 dark:text-white">Payment Summary</div><div id="studentRequestAmount" class="mt-3 text-sm"></div></aside></div><div id="studentAvailabilityCalendar" class="hidden"></div><div id="studentRequestAutoDay" class="mt-3 text-xs text-zinc-500"></div><div class="mt-5 flex flex-col-reverse gap-2 border-t border-zinc-200 pt-4 dark:border-white/10 sm:flex-row sm:justify-end"><button type="button" onclick="closeStudentRequestModal()" class="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-bold dark:border-white/10">Cancel</button><button id="studentSubmitRequestBtn" type="submit" class="rounded-xl bg-gold-500 px-6 py-3 text-sm font-extrabold text-black hover:bg-gold-400"><i class="fas fa-paper-plane mr-2"></i>Submit Request</button></div></form></div></div></div></div>`);
+    document.body.insertAdjacentHTML('beforeend', `<div id="studentRequestModal" class="fixed inset-0 z-[80] hidden overflow-y-auto bg-black/60 p-0 backdrop-blur-sm sm:p-4" aria-hidden="true"><div class="flex min-h-full items-stretch justify-center sm:items-center"><div class="flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-obsidian sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-zinc-200 dark:sm:border-white/10"><div class="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-white/10"><div><div class="text-[10px] font-bold uppercase tracking-[.22em] text-gold-600">Enrollment Request</div><h2 id="guardianEnrollmentStudentName" class="mt-1 text-lg font-black text-zinc-900 dark:text-white">Enroll Student</h2></div><button type="button" onclick="closeStudentRequestModal()" class="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-100 dark:border-white/10 dark:hover:bg-white/10"><i class="fas fa-times"></i></button></div><div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"><div id="studentRequestStatus"></div><form id="studentPackageRequestForm" class="mt-4 space-y-4"><div class="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_300px]"><div class="space-y-4"><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">1.</span>Choose the 12-session package</div><select id="studentRequestPackage" class="hidden"><option value="">Select package</option></select><div id="studentRequestPackageCards" class="space-y-2"></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">2.</span>Choose payment</div><div class="grid gap-3 sm:grid-cols-2"><select id="studentRequestPaymentMode" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="Partial Payment">Partial Payment</option><option value="Full Payment">Full Payment</option></select><select id="studentRequestPaymentMethod" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="">Select payment method</option><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option></select></div></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-3 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">3.</span>Choose one instrument</div><div id="studentRequestInstrumentContainer"></div><label for="studentRequestPaymentProof" class="mt-4 block text-xs font-bold uppercase tracking-wider text-zinc-500">Payment proof <span id="studentRequestPaymentProofRequired" class="text-rose-600">* Required</span></label><input id="studentRequestPaymentProof" name="package_payment_proof_file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="mt-2 w-full rounded-xl border border-dashed border-zinc-300 p-3 text-sm dark:border-zinc-700"><p id="studentRequestPaymentProofError" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p><p id="guardianEnrollmentProofName" class="mt-1 hidden text-xs text-gold-600"></p></section><section class="rounded-2xl border border-zinc-200 p-4 dark:border-white/10"><div class="mb-1 text-sm font-extrabold text-zinc-900 dark:text-white"><span class="mr-2 text-gold-600">4.</span>Request a class schedule</div><p class="mb-3 text-xs text-zinc-500 dark:text-zinc-400">Select a preferred date and an available one-hour window.</p><div class="grid gap-3 sm:grid-cols-2"><div><label for="studentRequestPreferredDate" class="mb-1 block text-xs font-bold text-zinc-500">Preferred date</label><input id="studentRequestPreferredDate" type="date" required class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"></div><div><label for="studentRequestPreferredTime" class="mb-1 block text-xs font-bold text-zinc-500">Preferred time</label><select id="studentRequestPreferredTime" required class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"><option value="">Choose a date first</option></select></div></div><div id="studentRequestScheduleHint" class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-gold-500/20 dark:bg-gold-500/10 dark:text-gold-200">The desk will confirm this request or adjust it if an instructor or room is unavailable.</div></section></div><aside class="self-start rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/5"><div class="text-sm font-extrabold text-zinc-900 dark:text-white">Payment Summary</div><div id="studentRequestAmount" class="mt-3 text-sm"></div></aside></div><div id="studentAvailabilityCalendar" class="hidden"></div><div id="studentRequestAutoDay" class="mt-3 text-xs text-zinc-500"></div><div class="mt-5 flex flex-col-reverse gap-2 border-t border-zinc-200 pt-4 dark:border-white/10 sm:flex-row sm:justify-end"><button type="button" onclick="closeStudentRequestModal()" class="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-bold dark:border-white/10">Cancel</button><button id="studentSubmitRequestBtn" type="submit" class="rounded-xl bg-gold-500 px-6 py-3 text-sm font-extrabold text-black hover:bg-gold-400"><i class="fas fa-paper-plane mr-2"></i>Submit Request</button></div></form></div></div></div></div>`);
     const scheduleHint = document.getElementById('studentRequestScheduleHint');
     const guardianModalPanel = document.getElementById('studentRequestModal')?.querySelector(':scope > div > div');
     if (guardianModalPanel) {
@@ -7145,16 +7753,18 @@ function ensureGuardianEnrollmentModal() {
         evidenceGrid.innerHTML = `<div><label for="studentRequestReferenceNumber" class="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Reference Number</label><input id="studentRequestReferenceNumber" type="text" autocomplete="off" placeholder="Transaction / reference no." class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-gold-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"></div>`;
         const guardianProofInput = document.getElementById('studentRequestPaymentProof');
         const guardianProofLabel = guardianProofInput?.previousElementSibling;
+        const guardianProofError = document.getElementById('studentRequestPaymentProofError');
         const guardianProofName = document.getElementById('guardianEnrollmentProofName');
         if (guardianProofInput) {
             const proofWrap = document.createElement('div');
             if (guardianProofLabel) {
                 guardianProofLabel.className = 'mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400';
-                guardianProofLabel.textContent = 'Payment Proof';
+                guardianProofLabel.innerHTML = 'Payment Proof <span id="studentRequestPaymentProofRequired" class="text-rose-600">* Required</span>';
                 proofWrap.appendChild(guardianProofLabel);
             }
             guardianProofInput.className = 'w-full rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900';
             proofWrap.appendChild(guardianProofInput);
+            if (guardianProofError) proofWrap.appendChild(guardianProofError);
             if (guardianProofName) proofWrap.appendChild(guardianProofName);
             evidenceGrid.appendChild(proofWrap);
         }
@@ -7264,6 +7874,8 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
     const form = document.getElementById('studentPackageRequestForm');
     const submitBtn = document.getElementById('studentSubmitRequestBtn');
     const paymentProofEl = document.getElementById('studentRequestPaymentProof');
+    const paymentProofErrorEl = document.getElementById('studentRequestPaymentProofError');
+    const paymentProofRequiredEl = document.getElementById('studentRequestPaymentProofRequired');
     const paymentProofNameEl = document.getElementById('studentRequestProofFileName') || document.getElementById('guardianEnrollmentProofName');
     const autoDayEl = document.getElementById('studentRequestAutoDay');
     const preferredDateEl = document.getElementById('studentRequestPreferredDate');
@@ -7275,14 +7887,27 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
     if (!statusEl || !packageSelect || !packageCardsContainer || !amountEl || !instrumentsContainer || !paymentModeEl || !paymentMethodEl || !availabilityCalendar || !form || !submitBtn || !preferredDateEl || !preferredTimeEl) {
         return;
     }
+    const updateStudentRequestReferenceFormat = () => setPaymentReferencePattern(referenceNumberEl, paymentMethodEl.value);
+    paymentMethodEl.addEventListener('change', updateStudentRequestReferenceFormat);
+    updateStudentRequestReferenceFormat();
     if (paymentProofEl) {
+        const updateProofRequirement = () => {
+            const required = Boolean(paymentMethodEl.value) && paymentMethodEl.value !== 'Cash';
+            paymentProofEl.setAttribute('aria-required', required ? 'true' : 'false');
+            if (paymentProofRequiredEl) paymentProofRequiredEl.classList.toggle('hidden', !required);
+            if (!paymentProofEl.files?.length) setOnlineProofFieldError(paymentProofEl, paymentProofErrorEl, '');
+        };
         paymentProofEl.onchange = event => {
-            const file = event.target.files?.[0];
+            const required = Boolean(paymentMethodEl.value) && paymentMethodEl.value !== 'Cash';
+            validateOnlineProofFile(paymentProofEl, paymentProofErrorEl, { required, label: 'Payment proof' });
+            const file = paymentProofEl.files?.[0] || null;
             if (paymentProofNameEl) {
                 paymentProofNameEl.textContent = file ? `Selected: ${file.name}` : '';
                 paymentProofNameEl.classList.toggle('hidden', !file);
             }
         };
+        paymentMethodEl.addEventListener('change', updateProofRequirement);
+        updateProofRequirement();
     }
 
     const packages = Array.isArray(requestMeta?.packages) ? requestMeta.packages : [];
@@ -7669,6 +8294,11 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
     form.onsubmit = async (e) => {
         e.preventDefault();
         if (submitBtn.disabled) return;
+        const currentPaymentMethod = String(paymentMethodEl.value || '').trim();
+        if (!validateOnlineProofFile(paymentProofEl, paymentProofErrorEl, { required: Boolean(currentPaymentMethod) && currentPaymentMethod !== 'Cash', label: 'Payment proof' })) {
+            paymentProofEl?.focus();
+            return;
+        }
 
         const packageId = parseInt(packageSelect.value, 10);
         const paymentType = String(paymentModeEl.value || '').trim();
@@ -7696,8 +8326,9 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
             return;
         }
         const paymentProofFile = paymentProofEl && paymentProofEl.files && paymentProofEl.files[0] ? paymentProofEl.files[0] : null;
-        if (paymentMethod !== 'Cash' && !paymentProofFile) {
-            showMessage('Upload proof of payment for non-cash enrollment payments.', 'error');
+        const paymentProofRequired = Boolean(paymentMethod) && paymentMethod !== 'Cash';
+        if (!validateOnlineProofFile(paymentProofEl, paymentProofErrorEl, { required: paymentProofRequired, label: 'Payment proof' })) {
+            paymentProofEl?.focus();
             return;
         }
 
@@ -7749,10 +8380,26 @@ function initStudentRequestSection(student, requestMeta, options = {}) {
                 }
                 if (typeof options.onSuccess === 'function') await options.onSuccess();
             } else {
-                showMessage(response.error || 'Failed to submit request.', 'error');
+                const errorText = response.error || 'Failed to submit request.';
+                if (/payment proof|proof of payment/i.test(errorText)) {
+                    if (paymentProofEl) paymentProofEl.value = '';
+                    if (paymentProofNameEl) paymentProofNameEl.classList.add('hidden');
+                    setOnlineProofFieldError(paymentProofEl, paymentProofErrorEl, errorText);
+                    paymentProofEl?.focus();
+                } else {
+                    showMessage(errorText, 'error');
+                }
             }
         } catch (error) {
-            showMessage('Network error. Please try again.', 'error');
+            const errorText = error?.response?.data?.error || error?.message || 'Network error. Please try again.';
+            if (/payment proof|proof of payment/i.test(errorText)) {
+                if (paymentProofEl) paymentProofEl.value = '';
+                if (paymentProofNameEl) paymentProofNameEl.classList.add('hidden');
+                setOnlineProofFieldError(paymentProofEl, paymentProofErrorEl, errorText);
+                paymentProofEl?.focus();
+            } else {
+                showMessage(errorText, 'error');
+            }
         } finally {
             if (!keepDisabled) {
                 submitBtn.disabled = false;
@@ -7867,6 +8514,13 @@ function openFreezePaymentModal(options = null) {
         cancelButtonText: 'Cancel',
         confirmButtonColor: '#b8860b',
         allowOutsideClick: false,
+        didOpen: () => {
+            const methodInput = document.getElementById('fpMethod');
+            const referenceInput = document.getElementById('fpReference');
+            const updateReferenceFormat = () => setPaymentReferencePattern(referenceInput, methodInput?.value);
+            methodInput?.addEventListener('change', updateReferenceFormat);
+            updateReferenceFormat();
+        },
         html: `
             <div class="text-left space-y-4 py-2">
                 <div class="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 flex items-center justify-between">
@@ -8231,6 +8885,7 @@ function renderStudentRegistrationModal(student, portal) {
                                         <input id="regAge" readonly class="w-full bg-transparent text-center text-sm font-bold text-zinc-700 dark:text-zinc-200 cursor-not-allowed focus:outline-none leading-tight sm:mt-0.5 p-0" style="min-width:32px;max-width:44px;" />
                                     </div>
                                 </div>
+                                <p id="regDobError" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                             </div>
                             <div class="min-w-0">
                                 <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Email</label>
@@ -8359,16 +9014,18 @@ function renderStudentRegistrationModal(student, portal) {
                             <div id="regPayReferenceHint" class="mt-1.5 text-[11px] text-zinc-400 break-words">Enter the reference or transaction number.</div>
                         </div>
                         <div class="min-w-0">
-                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Proof of Payment *</label>
-                            <input type="file" id="regPayProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full min-w-0 max-w-full px-2 py-2.5 sm:px-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
+                            <label for="regPayProof" class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Proof of Payment <span class="text-rose-600">* Required</span></label>
+                            <input type="file" id="regPayProof" required accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full min-w-0 max-w-full px-2 py-2.5 sm:px-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
+                            <p id="regPayProofError" class="mt-1.5 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                             <p class="mt-1.5 text-[11px] text-zinc-400">Screenshot or receipt · JPG, PNG, PDF</p>
                             <button type="button" id="regPayProofViewBtn" class="hidden mt-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-flex items-center gap-1">
                                 <i class="fas fa-eye text-[10px]"></i> Click to view uploaded file
                             </button>
                         </div>
                         <div class="min-w-0">
-                            <label class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Valid ID / Proof of Age *</label>
-                            <input type="file" id="regAgeProof" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full min-w-0 max-w-full px-2 py-2.5 sm:px-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
+                            <label for="regAgeProof" class="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">Valid ID / Proof of Age <span class="text-rose-600">* Required</span></label>
+                            <input type="file" id="regAgeProof" required accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full min-w-0 max-w-full px-2 py-2.5 sm:px-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg sm:rounded-xl text-xs text-zinc-700 dark:text-zinc-200 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:bg-gold-500/20 file:text-gold-600 file:text-xs file:font-semibold" />
+                            <p id="regAgeProofError" class="mt-1.5 hidden text-xs font-semibold text-rose-600" role="alert"></p>
                             <p class="mt-1.5 text-[11px] text-zinc-400">Birth certificate, valid ID, etc. · JPG, PNG, PDF</p>
                             <button type="button" id="regAgeProofViewBtn" class="hidden mt-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-flex items-center gap-1">
                                 <i class="fas fa-eye text-[10px]"></i> Click to view uploaded file
@@ -8859,8 +9516,17 @@ function wireStudentOnboardingActions(student, meta, portal) {
     const regPayReferenceHint = document.getElementById('regPayReferenceHint');
     const regPayProof = document.getElementById('regPayProof');
     const regAgeProof = document.getElementById('regAgeProof');
+    const regPayProofError = document.getElementById('regPayProofError');
+    const regAgeProofError = document.getElementById('regAgeProofError');
     const submitAllBtn = document.getElementById('submitRegistrationRequestBtn');
     const submitAllStatus = document.getElementById('submitRegistrationStatus');
+
+    regPayProof?.addEventListener('change', () => {
+        if (!validateOnlineProofFile(regPayProof, regPayProofError, { required: true, label: 'Proof of payment' })) regPayProof.focus();
+    });
+    regAgeProof?.addEventListener('change', () => {
+        if (!validateOnlineProofFile(regAgeProof, regAgeProofError, { required: true, label: 'ID proof' })) regAgeProof.focus();
+    });
 
     const hasGuardian = Array.isArray(portal?.guardians) && portal.guardians.length > 0;
     const getCurrentAge = () => computeAgeFromDob(document.getElementById('regDob')?.value || '');
@@ -8977,28 +9643,27 @@ function wireStudentOnboardingActions(student, meta, portal) {
             const age = computeAgeFromDob(regDob.value || '');
             regAge.value = age === null ? '' : String(age);
 
-            // Date validation with red indicator
             const dobValue = regDob.value;
+            const dobError = document.getElementById('regDobError');
+            let dobErrorMessage = '';
             if (dobValue) {
                 const dobDate = new Date(dobValue);
                 const today = new Date();
                 const minDate = new Date(1900, 0, 1);
-
-                // Check if date is valid and within reasonable range
                 if (isNaN(dobDate.getTime()) || dobDate > today || dobDate < minDate) {
-                    regDob.classList.add('!border-red-500', 'dark:!border-red-500');
-                    regAge.classList.add('!border-red-500', 'dark:!border-red-500');
+                    dobErrorMessage = 'Enter a valid date of birth that is not in the future.';
                 } else if (age !== null && age < 3) {
-                    // Minimum age 3 years old
-                    regDob.classList.add('!border-red-500', 'dark:!border-red-500');
-                    regAge.classList.add('!border-red-500', 'dark:!border-red-500');
-                } else {
-                    regDob.classList.remove('!border-red-500', 'dark:!border-red-500');
-                    regAge.classList.remove('!border-red-500', 'dark:!border-red-500');
+                    dobErrorMessage = 'Student must be at least 3 years old.';
                 }
-            } else {
-                regDob.classList.remove('!border-red-500', 'dark:!border-red-500');
-                regAge.classList.remove('!border-red-500', 'dark:!border-red-500');
+            }
+            regDob.classList.toggle('!border-rose-500', Boolean(dobErrorMessage));
+            regDob.classList.toggle('dark:!border-rose-500', Boolean(dobErrorMessage));
+            regAge.classList.toggle('!border-rose-500', Boolean(dobErrorMessage));
+            regAge.classList.toggle('dark:!border-rose-500', Boolean(dobErrorMessage));
+            regDob.setAttribute('aria-invalid', dobErrorMessage ? 'true' : 'false');
+            if (dobError) {
+                dobError.textContent = dobErrorMessage;
+                dobError.classList.toggle('hidden', !dobErrorMessage);
             }
 
             syncGuardianState();
@@ -9018,18 +9683,41 @@ function wireStudentOnboardingActions(student, meta, portal) {
         const method = String(document.getElementById('regPayMethod')?.value || 'Other').trim();
         if (!regPayReference || !regPayReferenceHint) return;
         const isCash = method === 'Cash';
-        regPayReference.placeholder = isCash
-            ? 'Enter official receipt or transaction number'
-            : `Enter ${method || 'payment'} reference number`;
+        setPaymentReferencePattern(regPayReference, method);
+        if (isCash) regPayReference.placeholder = 'Enter official receipt or transaction number';
         regPayReferenceHint.textContent = isCash
             ? 'For cash payments, enter the official receipt or transaction number.'
-            : 'Required together with the uploaded proof of payment.';
+            : 'Enter the reference in the format 0000-000-00000. Required with proof of payment.';
     };
     document.getElementById('regPayMethod')?.addEventListener('change', updateRegistrationReferenceUI);
     updateRegistrationReferenceUI();
 
     if (submitAllBtn) {
         submitAllBtn.onclick = async () => {
+            const currentDob = String(regDob?.value || '').trim();
+            const currentAge = computeAgeFromDob(currentDob);
+            const dobError = document.getElementById('regDobError');
+            if (!currentDob || currentAge === null || currentAge < 3) {
+                const message = !currentDob
+                    ? 'Date of birth is required.'
+                    : currentAge === null
+                        ? 'Enter a valid date of birth that is not in the future.'
+                        : 'Student must be at least 3 years old.';
+                if (dobError) {
+                    dobError.textContent = message;
+                    dobError.classList.remove('hidden');
+                }
+                regDob?.classList.add('!border-rose-500', 'dark:!border-rose-500');
+                regDob?.setAttribute('aria-invalid', 'true');
+                regDob?.focus();
+                return;
+            }
+            const paymentProofValid = validateOnlineProofFile(regPayProof, regPayProofError, { required: true, label: 'Proof of payment' });
+            const ageProofValid = validateOnlineProofFile(regAgeProof, regAgeProofError, { required: true, label: 'ID proof' });
+            if (!paymentProofValid || !ageProofValid) {
+                (!paymentProofValid ? regPayProof : regAgeProof)?.focus();
+                return;
+            }
             const guardianRequired = isGuardianRequired();
             if (guardianRequired) {
                 if (!guardianEmailInput?.value?.trim()) {
@@ -9072,7 +9760,12 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 return;
             }
             if (!proofFile) {
-                showMessage('Upload proof of payment for admin approval.', 'error');
+                validateOnlineProofFile(regPayProof, regPayProofError, { required: true, label: 'Proof of payment' });
+                regPayProof?.focus();
+                return;
+            }
+            if (!validateOnlineProofFile(regPayProof, regPayProofError, { required: true, label: 'Proof of payment' })) {
+                regPayProof?.focus();
                 return;
             }
             if (!referenceNumber) {
@@ -9080,7 +9773,12 @@ function wireStudentOnboardingActions(student, meta, portal) {
                 return;
             }
             if (!ageProofFile) {
-                showMessage('Upload proof ID for age verification.', 'error');
+                validateOnlineProofFile(regAgeProof, regAgeProofError, { required: true, label: 'ID proof' });
+                regAgeProof?.focus();
+                return;
+            }
+            if (!validateOnlineProofFile(regAgeProof, regAgeProofError, { required: true, label: 'ID proof' })) {
+                regAgeProof?.focus();
                 return;
             }
 
@@ -9481,6 +10179,29 @@ function wireStudentOnboardingActions(student, meta, portal) {
             } catch (err) {
                 const msg = err?.response?.data?.error || err?.message || 'Failed to submit registration request.';
                 if (submitAllStatus) submitAllStatus.textContent = msg;
+                if (/payment proof|registration proof/i.test(msg)) {
+                    if (regPayProof) regPayProof.value = '';
+                    setOnlineProofFieldError(regPayProof, regPayProofError, msg);
+                    regPayProof?.focus();
+                    return;
+                }
+                if (/verification proof|age verification proof|id proof/i.test(msg)) {
+                    if (regAgeProof) regAgeProof.value = '';
+                    setOnlineProofFieldError(regAgeProof, regAgeProofError, msg);
+                    regAgeProof?.focus();
+                    return;
+                }
+                if (/3 years old|date of birth/i.test(msg)) {
+                    const dobError = document.getElementById('regDobError');
+                    if (dobError) {
+                        dobError.textContent = msg;
+                        dobError.classList.remove('hidden');
+                    }
+                    regDob?.classList.add('!border-rose-500', 'dark:!border-rose-500');
+                    regDob?.setAttribute('aria-invalid', 'true');
+                    regDob?.focus();
+                    return;
+                }
                 showMessage(msg, 'error');
             } finally {
                 submitAllBtn.disabled = false;
@@ -9932,6 +10653,8 @@ function buildStudentGradeDetailsMarkup(row) {
     const sessionEnd = sessionEndValue ? new Date(sessionEndValue) : null;
     const isFutureSession = sessionEnd && !Number.isNaN(sessionEnd.getTime()) && sessionEnd.getTime() > Date.now();
     const remarksText = cleanSessionNoteText(row.teacher_remarks || row.remarks, '');
+    const learningLevel = String(row.learning_level || '').trim() || 'Level not set';
+    const learningBook = String(row.learning_book || '').trim();
     const savedCriteria = hasGrade && Array.isArray(row.criteria_scores) && row.criteria_scores.length
         ? row.criteria_scores.map(item => [item.name || 'Criterion', Number(item.score || 0)])
         : (hasGrade ? [
@@ -9945,6 +10668,21 @@ function buildStudentGradeDetailsMarkup(row) {
     const gradedDate = formatDateLong(row.assessment_date || row.updated_at || row.session_date || '') || 'Date not recorded';
     const scoreMeaning = (value) => ({ 1:'Needs attention', 2:'Developing', 3:'Good', 4:'Very good', 5:'Excellent' }[Number(value)] || 'Rated');
     const overallMeaning = scoreMeaning(Math.max(1, Math.min(5, Math.round(Number(averageScore || 0)))));
+    const learningProgressSection = `
+        <section class="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-4 py-3.5">
+            <div class="flex items-center gap-2 text-sm font-extrabold text-zinc-900">
+                <i class="fas fa-book-open text-indigo-600"></i>
+                <span>Current learning progress</span>
+            </div>
+            <div class="mt-3 grid grid-cols-1 ${learningBook ? 'sm:grid-cols-2' : ''} gap-3">
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Level</div>
+                    <div class="mt-0.5 text-sm font-bold text-zinc-900">${escapeHtml(learningLevel)}</div>
+                </div>
+                ${learningBook ? `<div><div class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Book / material</div><div class="mt-0.5 text-sm font-bold text-zinc-900">${escapeHtml(learningBook)}</div></div>` : ''}
+            </div>
+        </section>
+    `;
     const scorePills = ratedCriteria.map(([label, value]) => `
         <div class="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3.5">
             <div class="min-h-[2.5rem] text-sm font-bold leading-5 text-zinc-800">${escapeHtml(label)}</div>
@@ -10034,6 +10772,7 @@ function buildStudentGradeDetailsMarkup(row) {
                     </div>
                 </div>
 
+                ${learningProgressSection}
                 ${resultSection}
 
                 <div class="sticky bottom-0 mt-6 border-t border-zinc-100 bg-white/95 pt-4 backdrop-blur">
@@ -10564,52 +11303,77 @@ async function openGuardianAdditionalSessions(index) {
                 <p class="text-sm leading-5 text-zinc-600"><strong>${escapeHtml(`${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student')}</strong> · ₱650 per session</p>
                 <div><label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Number of sessions</label><input id="guardianAdditionalQuantity" type="number" min="1" max="50" value="1" class="swal2-input guardian-additional-field !m-0 !w-full"></div>
                 <div><label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Payment method</label><select id="guardianAdditionalPaymentMethod" class="swal2-select guardian-additional-field !m-0 !w-full"><option value="GCash">GCash</option><option value="Bank Transfer">Bank Transfer</option><option value="Cash">Cash</option></select></div>
-                <div><label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Payment proof</label><input id="guardianAdditionalProof" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="block w-full text-xs"><div class="mt-1 text-[11px] text-zinc-500">Required for GCash and bank transfer.</div></div>
+                <div><label for="guardianAdditionalProof" class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Payment proof <span id="guardianAdditionalProofRequired" class="text-rose-600">* Required</span></label><input id="guardianAdditionalProof" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="block w-full rounded-lg border border-zinc-300 p-2 text-xs"><p id="guardianAdditionalProofError" class="mt-1 hidden text-xs font-semibold text-rose-600" role="alert"></p><div class="mt-1 text-[11px] text-zinc-500">Required for GCash and bank transfer.</div></div>
                 <div><label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Notes <span class="font-medium normal-case tracking-normal">(optional)</span></label><textarea id="guardianAdditionalNotes" class="swal2-textarea guardian-additional-field !m-0 !w-full" rows="2"></textarea></div>
                 <div class="flex items-center justify-between rounded-xl bg-amber-50 px-3.5 py-2.5"><span class="text-sm text-zinc-600">Total</span><strong id="guardianAdditionalTotal" class="text-base">₱650.00</strong></div>
             </div>`,
         didOpen: () => {
             const quantity = document.getElementById('guardianAdditionalQuantity');
+            const paymentMethod = document.getElementById('guardianAdditionalPaymentMethod');
+            const proofInput = document.getElementById('guardianAdditionalProof');
+            const proofError = document.getElementById('guardianAdditionalProofError');
+            const proofRequired = document.getElementById('guardianAdditionalProofRequired');
+            const updateProofRequired = () => {
+                const required = paymentMethod?.value !== 'Cash';
+                if (proofInput) proofInput.required = required;
+                proofRequired?.classList.toggle('hidden', !required);
+            };
+            paymentMethod?.addEventListener('change', updateProofRequired);
+            proofInput?.addEventListener('change', () => {
+                validateOnlineProofFile(proofInput, proofError, { required: paymentMethod?.value !== 'Cash', label: 'Payment proof' });
+            });
+            updateProofRequired();
             quantity?.addEventListener('input', () => {
                 const count = Math.min(50, Math.max(1, Number(quantity.value || 1)));
                 const total = document.getElementById('guardianAdditionalTotal');
                 if (total) total.textContent = formatCurrencyPHP(count * 650);
             });
         },
-        preConfirm: () => {
+        preConfirm: async () => {
             const quantity = Math.min(50, Math.max(1, Number(document.getElementById('guardianAdditionalQuantity')?.value || 1)));
             const paymentMethod = document.getElementById('guardianAdditionalPaymentMethod')?.value || '';
-            const proof = document.getElementById('guardianAdditionalProof')?.files?.[0] || null;
-            if (paymentMethod !== 'Cash' && !proof) {
-                Swal.showValidationMessage('Upload proof of payment for this payment method.');
+            const proofInput = document.getElementById('guardianAdditionalProof');
+            const proofError = document.getElementById('guardianAdditionalProofError');
+            const proof = proofInput?.files?.[0] || null;
+            if (!validateOnlineProofFile(proofInput, proofError, { required: paymentMethod !== 'Cash', label: 'Payment proof' })) {
+                proofInput?.focus();
                 return false;
             }
-            return { quantity, paymentMethod, proof, notes: document.getElementById('guardianAdditionalNotes')?.value.trim() || '' };
+            const notes = document.getElementById('guardianAdditionalNotes')?.value.trim() || '';
+            const payload = new FormData();
+            payload.append('action', 'submit-session-extension-request');
+            payload.append('student_id', String(student.student_id));
+            payload.append('requested_sessions', String(quantity));
+            payload.append('payment_method', paymentMethod);
+            payload.append('notes', notes);
+            if (proof) payload.append('session_payment_proof_file', proof);
+            try {
+                Swal.showLoading();
+                const response = await axios.post(`${baseApiUrl}/students.php`, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+                if (!response.data?.success) throw new Error(response.data?.error || 'Unable to submit request.');
+                return { quantity, paymentMethod, proof, notes, response: response.data };
+            } catch (error) {
+                const errorText = error?.response?.data?.error || error?.message || 'Unable to submit request.';
+                if (/payment proof|proof of payment/i.test(errorText)) {
+                    if (proofInput) proofInput.value = '';
+                    setOnlineProofFieldError(proofInput, proofError, errorText);
+                    proofInput?.focus();
+                } else {
+                    Swal.showValidationMessage(errorText);
+                }
+                return false;
+            }
         }
     });
     if (!result.isConfirmed || !result.value) return;
-
-    const payload = new FormData();
-    payload.append('action', 'submit-session-extension-request');
-    payload.append('student_id', String(student.student_id));
-    payload.append('requested_sessions', String(result.value.quantity));
-    payload.append('payment_method', result.value.paymentMethod);
-    payload.append('notes', result.value.notes);
-    if (result.value.proof) payload.append('session_payment_proof_file', result.value.proof);
-    try {
-        const response = await axios.post(`${baseApiUrl}/students.php`, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
-        if (!response.data?.success) throw new Error(response.data?.error || 'Unable to submit request.');
-        item.latest_session_extension_request = {
-            status: 'Pending',
-            requested_sessions: result.value.quantity,
-            requested_amount: result.value.quantity * 650
-        };
-        showMessage(response.data.message || 'Additional-session request submitted.', 'success');
-        closeGuardianStudentModal();
-        setHtml('guardianStudentsList', renderGuardianStudentsList(guardianPortalStudents));
-    } catch (error) {
-        showMessage(error?.response?.data?.error || error.message || 'Unable to submit request.', 'error');
-    }
+    item.latest_session_extension_request = {
+        status: 'Pending',
+        requested_sessions: result.value.quantity,
+        requested_amount: result.value.quantity * 650
+    };
+    showMessage(result.value.response?.message || 'Additional-session request submitted.', 'success');
+    closeGuardianStudentModal();
+    setHtml('guardianStudentsList', renderGuardianStudentsList(guardianPortalStudents));
 }
 
 window.openGuardianAdditionalSessions = openGuardianAdditionalSessions;
@@ -12094,6 +12858,18 @@ function writeStudentSessionCompletionState(sessionId, state) {
     catch (e) { /* Ignore storage failures. */ }
 }
 
+function formatExactSessionDuration(startedAt, endedAt) {
+    if (!startedAt || !endedAt) return '';
+    const started = new Date(String(startedAt).replace(' ', 'T'));
+    const ended = new Date(String(endedAt).replace(' ', 'T'));
+    if (Number.isNaN(started.getTime()) || Number.isNaN(ended.getTime())) return '';
+    const totalSeconds = Math.max(0, Math.floor((ended.getTime() - started.getTime()) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 function getStudentPortalSessionRows(portal) {
     return (Array.isArray(portal?.current_session_grades) ? portal.current_session_grades : [])
         .slice()
@@ -12130,6 +12906,8 @@ function renderStudentSessionCompletionAlert(portal) {
     const dateLabel = completed.session_date ? formatDateLong(completed.session_date) : 'Today';
     const timeLabel = completed.start_time && completed.end_time
         ? `${formatTime12Hour(completed.start_time)} - ${formatTime12Hour(completed.end_time)}` : '';
+    const timerEndedAt = completed.grading_completed_at || completed.instructor_completed_at;
+    const timerDuration = formatExactSessionDuration(completed.grading_started_at, timerEndedAt);
     alert.innerHTML = `
         <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm dark:border-emerald-500/25 dark:bg-emerald-500/10">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -12138,7 +12916,7 @@ function renderStudentSessionCompletionAlert(portal) {
                     <div>
                         <div class="text-xs font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Session Ended</div>
                         <div class="mt-0.5 text-sm font-bold text-zinc-900 dark:text-white">Your instructor completed this lesson.</div>
-                        <div class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">${escapeHtml(completed.instrument_name || 'Music lesson')} · ${escapeHtml(dateLabel)}${timeLabel ? ` · ${escapeHtml(timeLabel)}` : ''}</div>
+                        <div class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">${escapeHtml(completed.instrument_name || 'Music lesson')} · ${escapeHtml(dateLabel)}${timeLabel ? ` · ${escapeHtml(timeLabel)}` : ''}${timerDuration ? ` · Timer used ${escapeHtml(timerDuration)}` : ''}</div>
                     </div>
                 </div>
                 <div class="flex gap-2">
@@ -12669,15 +13447,15 @@ function renderRegistrationsTable() {
 
     ${reg.registration_status === 'Pending' ? `
 
-        <!-- PAY -->
+        <!-- APPROVE -->
         <button onclick="openPaymentModal(${reg.student_id})"
             class="inline-flex items-center gap-1 px-2.5 py-1.5
-                   bg-amber-50 text-amber-600 border border-amber-100
-                   hover:bg-amber-500 hover:text-white
+                   bg-emerald-50 text-emerald-700 border border-emerald-100
+                   hover:bg-emerald-600 hover:text-white
                    rounded-lg text-xs font-semibold
                    transition-all duration-200 shadow-sm hover:shadow">
-            <i class="fas fa-money-bill-wave text-xs"></i>
-            <span>Pay</span>
+            <i class="fas fa-check text-xs"></i>
+            <span>Approve</span>
         </button>
 
         <!-- REJECT -->

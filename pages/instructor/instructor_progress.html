@@ -98,7 +98,7 @@
     <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
     <script src="../../js/index.js?v=20260919001"></script>
     <script src="../../js/instructor/instructor_nav.js?v=20260919007"></script>
-    <script src="../../js/instructor/learning_progress.js?v=20260911001"></script>
+    <script src="../../js/instructor/learning_progress.js?v=20261008001"></script>
     <script>
         function toggleInstructorMenu(){const menu=document.getElementById('instructorMobileMenu');const icon=document.getElementById('instructorMenuIcon');const opening=menu.classList.contains('hidden');menu.classList.toggle('hidden');icon.classList.toggle('fa-bars',!opening);icon.classList.toggle('fa-times',opening)}
         document.addEventListener('DOMContentLoaded',()=>{const user=typeof Auth!=='undefined'?Auth.getUser():null;const name=[user?.first_name,user?.last_name].filter(Boolean).join(' ')||user?.username||'Instructor';const label=document.getElementById('instructorNameNav');if(label)label.textContent=name;document.getElementById('progressSearch')?.addEventListener('input',event=>{window.filterInstructorLearningProgress?.(event.target.value||'')});document.getElementById('requestBookBtn')?.addEventListener('click',()=>window.openLearningMaterialRequest?.())});

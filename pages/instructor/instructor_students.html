@@ -371,6 +371,7 @@
                     if (!byEnrollment.has(enrollmentId)) {
                         byEnrollment.set(enrollmentId, {
                             enrollment_id: enrollmentId,
+                            enrollment_created_at: session.enrollment_created_at || '',
                             student_id: sid,
                             name: `${session.student_first_name || ''} ${session.student_last_name || ''}`.trim() || 'Student',
                             phone: session.student_phone || '',
@@ -426,7 +427,11 @@
                 });
 
                 instructorStudents = Array.from(byEnrollment.values())
-                    .sort((a, b) => a.name.localeCompare(b.name));
+                    .sort((a, b) => {
+                        const dateA = Date.parse(String(a.enrollment_created_at || '').replace(' ', 'T')) || 0;
+                        const dateB = Date.parse(String(b.enrollment_created_at || '').replace(' ', 'T')) || 0;
+                        return dateB - dateA || Number(b.enrollment_id || 0) - Number(a.enrollment_id || 0);
+                    });
 
             } catch (err) {
                 console.error('Failed to load instructor students:', err);

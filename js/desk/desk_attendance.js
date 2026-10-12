@@ -25,8 +25,10 @@
         }
 
         function getStudentIdLabel(student) {
-            const studentId = String(student?.studentCode || student?.studentId || '').trim();
-            return studentId ? `Student ID: ${studentId}` : 'Student ID unavailable';
+            const studentCode = String(student?.studentCode || student?.student_code || '').trim();
+            const studentId = String(student?.studentId || student?.student_id || '').trim();
+            const displayId = studentCode || studentId;
+            return displayId ? `Student ID: ${displayId}` : 'Student ID unavailable';
         }
 
         function padDatePart(value) {
@@ -1137,9 +1139,10 @@
         }
 
         function isEnrollmentFrozen(event) {
-            const status = String(event.scheduleStatus || '').toLowerCase();
-            const freezePaymentStatus = String(event.freezePaymentStatus || 'None').toLowerCase();
-            return status === 'frozen' && freezePaymentStatus !== 'paid';
+            const status = String(event?.scheduleStatus ?? event?.schedule_status ?? '').toLowerCase();
+            // Freeze payment status is historical per enrollment; a previous Paid row
+            // must not unlock a new freeze cycle. schedule_status is the current state.
+            return status === 'frozen';
         }
 
         function showFrozenAttendanceAlert(event) {
@@ -1604,8 +1607,7 @@
                 return;
             }
 
-            const isFrozen = String(student.schedule_status || '').toLowerCase() === 'frozen'
-                && String(student.freeze_payment_status || 'None').toLowerCase() !== 'paid';
+            const isFrozen = isEnrollmentFrozen(student);
             const usedAbsences = Number(student.used_absences || 0);
 
             // If frozen, show the blocked alert instead of the details modal

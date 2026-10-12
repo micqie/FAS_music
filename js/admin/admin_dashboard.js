@@ -162,6 +162,59 @@ function renderExecutiveStats(branches, registrations, revenueData, enrollments)
     if (classesTodayMetaEl) classesTodayMetaEl.textContent = `${ongoingNow} ongoing now`;
 }
 
+let dashboardHistoryRegistrations = [];
+let dashboardHistoryEnrollments = [];
+
+function registrationHistoryStatus(registration) {
+    const studentId = Number(registration?.student_id || 0);
+    const isEnrolled = studentId > 0 && dashboardHistoryEnrollments.some(enrollment => Number(enrollment?.student_id || 0) === studentId);
+    return isEnrolled ? 'Registered & Enrolled' : 'Registered';
+}
+
+function renderHistoryItems(items, kind) {
+    if (!items.length) {
+        return `<div class="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No ${kind === 'registration' ? 'registrations' : 'enrollments'} found.</div>`;
+    }
+    return `<div class="max-h-[38vh] space-y-2 overflow-y-auto pr-1">${items.slice(0, 12).map(item => {
+        const student = `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Student';
+        const date = kind === 'registration'
+            ? formatDateTime(item.created_at)
+            : formatDateTime(item.created_at || item.start_date);
+        const details = kind === 'registration'
+            ? `${item.branch_name || 'No branch'} · Registered ${date}`
+            : `${item.instrument_name || 'Instrument'} · ${item.package_name || 'Package'} · ${item.branch_name || 'No branch'} · ${date}`;
+        const status = kind === 'registration' ? registrationHistoryStatus(item) : (item.status || 'Unknown');
+        const normalizedStatus = String(status).toLowerCase();
+        const statusClass = normalizedStatus.includes('enrolled') || normalizedStatus === 'active' || normalizedStatus === 'completed'
+            ? 'bg-emerald-50 text-emerald-700'
+            : normalizedStatus === 'registered' || normalizedStatus === 'approved'
+                ? 'bg-blue-50 text-blue-700'
+                : 'bg-amber-50 text-amber-700';
+        return `<article class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left">
+            <div class="flex min-w-0 items-start gap-3"><span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600"><i class="fas ${kind === 'registration' ? 'fa-user-plus' : 'fa-music'}"></i></span>
+                <div class="min-w-0"><div class="truncate text-sm font-bold text-slate-900">${escapeHtml(student)}</div><div class="mt-0.5 text-xs leading-5 text-slate-500">${escapeHtml(details)}</div></div>
+            </div><span class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${statusClass}">${escapeHtml(status)}</span>
+        </article>`;
+    }).join('')}</div>`;
+}
+
+function openDashboardEnrollmentHistory() {
+    const registrations = [...dashboardHistoryRegistrations].sort((a, b) => (parseDate(b.created_at)?.getTime() || 0) - (parseDate(a.created_at)?.getTime() || 0));
+    const enrollments = [...dashboardHistoryEnrollments].sort((a, b) => (parseDate(b.created_at || b.start_date)?.getTime() || 0) - (parseDate(a.created_at || a.start_date)?.getTime() || 0));
+    Swal.fire({
+        title: 'Registration & Enrollment History',
+        width: 920,
+        customClass: { popup: 'rounded-2xl' },
+        html: `<div class="grid gap-5 text-left md:grid-cols-2">
+            <section><div class="mb-2 flex items-center justify-between"><h3 class="text-sm font-black text-slate-800">Recent Registrations</h3><span class="text-xs text-slate-500">${registrations.length} total</span></div>${renderHistoryItems(registrations, 'registration')}</section>
+            <section><div class="mb-2 flex items-center justify-between"><h3 class="text-sm font-black text-slate-800">Recent Enrollments</h3><span class="text-xs text-slate-500">${enrollments.length} total</span></div>${renderHistoryItems(enrollments, 'enrollment')}</section>
+        </div>`,
+        confirmButtonText: 'Close',
+        confirmButtonColor: '#b8860b'
+    });
+}
+window.openDashboardEnrollmentHistory = openDashboardEnrollmentHistory;
+
 function displayRecentActivity(registrations) {
     const recentDiv = document.getElementById('recentActivity');
     if (!recentDiv) return;
@@ -184,13 +237,10 @@ function displayRecentActivity(registrations) {
 
     const recent = sorted.slice(0, 5);
     recentDiv.innerHTML = recent.map(reg => {
-        const statusColors = {
-            'Pending': 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-            'Fee Paid': 'bg-green-500/10 text-green-600 border-green-500/20',
-            'Approved': 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-            'Rejected': 'bg-red-500/10 text-red-600 border-red-500/20'
-        };
-        const statusClass = statusColors[reg.registration_status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+        const displayStatus = registrationHistoryStatus(reg);
+        const statusClass = displayStatus.includes('Enrolled')
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            : 'bg-blue-50 text-blue-700 border-blue-200';
 
         return `
             <div class="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition mb-2">
@@ -204,7 +254,7 @@ function displayRecentActivity(registrations) {
                     </div>
                 </div>
                 <span class="px-3 py-1 rounded-full text-xs font-semibold border ${statusClass}">
-                    ${escapeHtml(reg.registration_status || 'Unknown')}
+                    ${escapeHtml(displayStatus)}
                 </span>
             </div>
         `;
@@ -453,11 +503,12 @@ function renderPopularInstruments(enrollments) {
 
 async function loadDashboardData() {
     try {
-        const [branchesResult, registrationsResult, revenueResult, enrollmentsResult, teachersResult] = await Promise.allSettled([
+        const [branchesResult, registrationsResult, revenueResult, enrollmentsResult, completedEnrollmentsResult, teachersResult] = await Promise.allSettled([
             axios.get(`${baseApiUrl}/branch.php?action=get-branches-all`),
             axios.get(`${baseApiUrl}/admin.php?action=get-all-registrations`),
             axios.get(`${baseApiUrl}/admin.php?action=get-revenue-summary`),
             axios.get(`${baseApiUrl}/students.php?action=get-active-enrollments`),
+            axios.get(`${baseApiUrl}/students.php?action=get-active-enrollments&status=completed`),
             axios.get(`${baseApiUrl}/teachers.php?action=get-teachers&status=Active`)
         ]);
 
@@ -465,11 +516,15 @@ async function loadDashboardData() {
         const registrationsData = registrationsResult.status === 'fulfilled' ? registrationsResult.value.data : null;
         const revenueData = revenueResult.status === 'fulfilled' ? revenueResult.value.data : null;
         const enrollmentsData = enrollmentsResult.status === 'fulfilled' ? enrollmentsResult.value.data : null;
+        const completedEnrollmentsData = completedEnrollmentsResult.status === 'fulfilled' ? completedEnrollmentsResult.value.data : null;
         const teachersData = teachersResult.status === 'fulfilled' ? teachersResult.value.data : null;
 
         const branches = branchesData?.success && Array.isArray(branchesData.branches) ? branchesData.branches : [];
         const registrations = registrationsData?.success && Array.isArray(registrationsData.registrations) ? registrationsData.registrations : [];
         const enrollments = enrollmentsData?.success && Array.isArray(enrollmentsData.enrollments) ? enrollmentsData.enrollments : [];
+        const completedEnrollments = completedEnrollmentsData?.success && Array.isArray(completedEnrollmentsData.enrollments) ? completedEnrollmentsData.enrollments : [];
+        dashboardHistoryRegistrations = registrations;
+        dashboardHistoryEnrollments = [...enrollments, ...completedEnrollments];
         const teachers = teachersData?.success && Array.isArray(teachersData.teachers) ? teachersData.teachers : [];
 
         renderExecutiveStats(branches, registrations, revenueData, enrollments);
@@ -492,6 +547,7 @@ async function loadDashboardData() {
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
+    document.getElementById('viewRegistrationHistoryBtn')?.addEventListener('click', openDashboardEnrollmentHistory);
     if (window.__fasAuthReady) {
         await window.__fasAuthReady;
     }

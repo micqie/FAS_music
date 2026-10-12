@@ -27,11 +27,63 @@ try {
             exit;
         }
 
+        $methodsJson = (string)($_POST['methods_json'] ?? '');
+        if ($methodsJson === '') {
+            // Keep the Payment Center's legacy destination editor working.
+            $existing = [];
+            $stmtExisting = $conn->query("SELECT setting_key, setting_value FROM tbl_settings WHERE setting_key IN ('payment_gcash_enabled','payment_bank_transfer_enabled','payment_custom_methods_json')");
+            foreach ($stmtExisting->fetchAll(PDO::FETCH_ASSOC) as $row) $existing[$row['setting_key']] = (string)$row['setting_value'];
+            $custom = json_decode($existing['payment_custom_methods_json'] ?? '[]', true);
+            $methods = [
+                ['id' => 'gcash', 'name' => 'GCash', 'enabled' => ($existing['payment_gcash_enabled'] ?? '1') !== '0', 'account_number' => trim((string)($_POST['gcash_number'] ?? ''))],
+                ['id' => 'bank_transfer', 'name' => 'Bank Transfer', 'enabled' => ($existing['payment_bank_transfer_enabled'] ?? '1') !== '0', 'details' => trim((string)($_POST['bank_name'] ?? '')), 'account_name' => trim((string)($_POST['bank_account_name'] ?? '')), 'account_number' => trim((string)($_POST['bank_account_number'] ?? ''))]
+            ];
+            if (is_array($custom)) $methods = array_merge($methods, $custom);
+        } else {
+            $methods = json_decode($methodsJson, true);
+        }
+        if (!is_array($methods) || count($methods) > 20) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Payment methods are invalid or exceed the 20 method limit']);
+            exit;
+        }
+        $normalized = [];
+        foreach ($methods as $method) {
+            if (!is_array($method)) continue;
+            $id = preg_replace('/[^a-z0-9_-]/', '', strtolower(trim((string)($method['id'] ?? ''))));
+            $name = trim((string)($method['name'] ?? ''));
+            if ($id === '' || $name === '' || strlen($name) > 240) continue;
+            $normalized[] = [
+                'id' => $id,
+                'name' => $name,
+                'enabled' => !empty($method['enabled']),
+                'account_name' => substr(trim((string)($method['account_name'] ?? '')), 0, 600),
+                'account_number' => substr(trim((string)($method['account_number'] ?? '')), 0, 400),
+                'details' => substr(trim((string)($method['details'] ?? '')), 0, 1000)
+            ];
+        }
+        $gcash = null;
+        $bank = null;
+        $customMethods = [];
+        foreach ($normalized as $method) {
+            if ($method['id'] === 'gcash') $gcash = $method;
+            elseif ($method['id'] === 'bank_transfer') $bank = $method;
+            else $customMethods[] = $method;
+        }
+        if (!$gcash) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'GCash must remain in the payment list']);
+            exit;
+        }
         $values = [
-            'payment_gcash_number' => trim((string)($_POST['gcash_number'] ?? '')),
-            'payment_bank_name' => trim((string)($_POST['bank_name'] ?? '')),
-            'payment_bank_account_name' => trim((string)($_POST['bank_account_name'] ?? '')),
-            'payment_bank_account_number' => trim((string)($_POST['bank_account_number'] ?? ''))
+            'payment_gcash_number' => $gcash['account_number'],
+            'payment_gcash_account_name' => $gcash['account_name'],
+            'payment_gcash_enabled' => $gcash['enabled'] ? '1' : '0',
+            'payment_bank_name' => $bank['details'] ?? '',
+            'payment_bank_account_name' => $bank['account_name'] ?? '',
+            'payment_bank_account_number' => $bank['account_number'] ?? '',
+            'payment_bank_transfer_enabled' => !empty($bank['enabled']) ? '1' : '0',
+            'payment_custom_methods_json' => json_encode($customMethods, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
         ];
         if ($values['payment_gcash_number'] !== '' && !preg_match('/^[0-9+() -]{7,24}$/', $values['payment_gcash_number'])) {
             http_response_code(400);
@@ -78,10 +130,14 @@ try {
     $keys = [
         'payment_contact_number',
         'payment_gcash_number',
+        'payment_gcash_account_name',
+        'payment_gcash_enabled',
         'payment_bank_name',
         'payment_bank_account_name',
         'payment_bank_account_number',
-        'payment_gcash_qr_path'
+        'payment_bank_transfer_enabled',
+        'payment_gcash_qr_path',
+        'payment_custom_methods_json'
     ];
     $placeholders = implode(',', array_fill(0, count($keys), '?'));
     $stmtSettings = $conn->prepare("SELECT setting_key, setting_value FROM tbl_settings WHERE setting_key IN ({$placeholders})");
@@ -107,15 +163,29 @@ try {
     $contactNumber = $settings['payment_contact_number'] ?? $adminPhone;
     $gcashNumber = $settings['payment_gcash_number'] ?? $contactNumber;
 
+    $customMethods = json_decode((string)($settings['payment_custom_methods_json'] ?? '[]'), true);
+    if (!is_array($customMethods)) $customMethods = [];
+    $paymentMethods = [
+        ['id' => 'gcash', 'name' => 'GCash', 'enabled' => ($settings['payment_gcash_enabled'] ?? '1') !== '0', 'account_name' => $settings['payment_gcash_account_name'] ?? '', 'account_number' => $gcashNumber, 'details' => ''],
+        ['id' => 'bank_transfer', 'name' => 'Bank Transfer', 'enabled' => ($settings['payment_bank_transfer_enabled'] ?? '1') !== '0', 'account_name' => $settings['payment_bank_account_name'] ?? '', 'account_number' => $settings['payment_bank_account_number'] ?? '', 'details' => $settings['payment_bank_name'] ?? '']
+    ];
+    foreach ($customMethods as $method) {
+        if (is_array($method) && !empty($method['id']) && !empty($method['name'])) $paymentMethods[] = $method;
+    }
+
     echo json_encode([
         'success' => true,
         'recipient' => [
             'contact_number' => $contactNumber,
             'gcash_number' => $gcashNumber,
+            'gcash_account_name' => $settings['payment_gcash_account_name'] ?? '',
+            'gcash_enabled' => ($settings['payment_gcash_enabled'] ?? '1') !== '0',
             'gcash_qr_path' => $settings['payment_gcash_qr_path'] ?? '',
+            'bank_transfer_enabled' => ($settings['payment_bank_transfer_enabled'] ?? '1') !== '0',
             'bank_name' => $settings['payment_bank_name'] ?? '',
             'bank_account_name' => $settings['payment_bank_account_name'] ?? '',
-            'bank_account_number' => $settings['payment_bank_account_number'] ?? ''
+            'bank_account_number' => $settings['payment_bank_account_number'] ?? '',
+            'payment_methods' => $paymentMethods
         ]
     ], JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {

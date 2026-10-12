@@ -551,6 +551,7 @@ class User
             'from_address' => $fromAddress,
             'from_name' => $fileValue('MAIL_FROM_NAME', $env('MAIL_FROM_NAME', 'Father & Sons Music Academy')),
             'reply_to' => $replyTo,
+            'app_url' => rtrim((string)$fileValue('APP_URL', $env('APP_URL', '')), '/'),
             'verify_peer' => filter_var($fileValue('MAIL_VERIFY_PEER', $env('MAIL_VERIFY_PEER', 'true')), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE),
             'debug' => filter_var($fileValue('MAIL_DEBUG', $env('MAIL_DEBUG', 'false')), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE)
         ];
@@ -911,6 +912,19 @@ class User
     {
         $contentType = $_SERVER['CONTENT_TYPE'] ?? ($_SERVER['HTTP_CONTENT_TYPE'] ?? '');
         return stripos((string)$contentType, 'multipart/form-data') !== false;
+    }
+
+    private function ensureRegistrationPaymentMethodColumn()
+    {
+        try {
+            $stmt = $this->conn->query("SHOW COLUMNS FROM tbl_registration_payments LIKE 'payment_method'");
+            $column = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
+            if ($column && stripos((string)($column['Type'] ?? ''), 'enum(') === 0) {
+                $this->conn->exec("ALTER TABLE tbl_registration_payments MODIFY COLUMN payment_method VARCHAR(80) NOT NULL DEFAULT 'Cash'");
+            }
+        } catch (PDOException $e) {
+            // Keep the existing registration flow available if the DB account cannot alter the column.
+        }
     }
 
     private function ensureStudentRegistrationProofColumn()
@@ -1299,6 +1313,151 @@ class User
         return 'uploads/payment_proofs/' . $scope . '/' . $safeName;
     }
 
+    private function ensurePasswordResetTable(): void
+    {
+        $this->conn->exec("CREATE TABLE IF NOT EXISTS tbl_password_reset_tokens (
+            token_hash VARCHAR(64) PRIMARY KEY,
+            user_id INT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME NULL
+        )");
+    }
+
+    public function requestPasswordReset($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+        $data = json_decode($json, true);
+        $email = strtolower(trim((string)($data['email'] ?? '')));
+        $generic = [
+            'success' => true,
+            'message' => 'If an active account uses that email address, a password-reset link will be sent.'
+        ];
+        if (!$this->isValidEmailAddress($email)) {
+            $this->sendJSON($generic);
+        }
+
+        try {
+            $this->ensurePasswordResetTable();
+            $mail = $this->getMailSettings();
+            $appUrl = $this->getPasswordResetAppUrl($mail);
+            if (!$this->isMailConfigured() || $appUrl === '') {
+                error_log('Password reset is unavailable: SMTP or APP_URL is not configured.');
+                $this->sendJSON($generic);
+            }
+
+            $this->conn->beginTransaction();
+            $userStmt = $this->conn->prepare("SELECT user_id, email, first_name, last_name
+                FROM tbl_users
+                WHERE LOWER(TRIM(COALESCE(email, ''))) = ? AND status = 'Active'
+                LIMIT 1 FOR UPDATE");
+            $userStmt->execute([$email]);
+            $user = $userStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$user || preg_match('/@fas\\.com$/i', (string)($user['email'] ?? ''))) {
+                $this->conn->commit();
+                $this->sendJSON($generic);
+            }
+
+            $cooldownSince = date('Y-m-d H:i:s', time() - 60);
+            $recentStmt = $this->conn->prepare('SELECT 1 FROM tbl_password_reset_tokens WHERE user_id = ? AND created_at >= ? LIMIT 1');
+            $recentStmt->execute([(int)$user['user_id'], $cooldownSince]);
+            if ($recentStmt->fetchColumn()) {
+                $this->conn->commit();
+                $this->sendJSON($generic);
+            }
+
+            $this->conn->prepare('UPDATE tbl_password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL')
+                ->execute([(int)$user['user_id']]);
+            $token = bin2hex(random_bytes(32));
+            $tokenHash = hash('sha256', $token);
+            $expiresAt = date('Y-m-d H:i:s', time() + 1800);
+            $insert = $this->conn->prepare('INSERT INTO tbl_password_reset_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)');
+            $insert->execute([$tokenHash, (int)$user['user_id'], $expiresAt]);
+            $this->conn->commit();
+
+            $resetUrl = $appUrl . '/reset_password.html?token=' . rawurlencode($token);
+            $name = trim((string)($user['first_name'] ?? '') . ' ' . (string)($user['last_name'] ?? ''));
+            if (!$this->sendPasswordResetEmail((string)$user['email'], $name, $resetUrl)) {
+                $this->conn->prepare('DELETE FROM tbl_password_reset_tokens WHERE token_hash = ?')->execute([$tokenHash]);
+            }
+            $this->sendJSON($generic);
+        } catch (Throwable $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            error_log('Password reset request failed: ' . $e->getMessage());
+            $this->sendJSON($generic);
+        }
+    }
+
+    public function resetPassword($json)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+        $data = json_decode($json, true);
+        $token = strtolower(trim((string)($data['token'] ?? '')));
+        $password = (string)($data['password'] ?? '');
+        $confirmPassword = (string)($data['confirm_password'] ?? '');
+        if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+            $this->sendJSON(['error' => 'This password-reset link is invalid or has expired. Request a new one.'], 400);
+        }
+        if ($password !== $confirmPassword) {
+            $this->sendJSON(['error' => 'The passwords do not match.'], 400);
+        }
+        if (strlen($password) < 8) {
+            $this->sendJSON(['error' => 'Password must be at least 8 characters long.'], 400);
+        }
+        if (!preg_match('/[A-Z]/', $password)
+            || !preg_match('/[a-z]/', $password)
+            || !preg_match('/[0-9]/', $password)
+            || !preg_match('/[!@#$%^&*]/', $password)) {
+            $this->sendJSON(['error' => 'Use at least 8 characters with uppercase, lowercase, a number, and a special character (!@#$%^&*).'], 400);
+        }
+
+        try {
+            $this->ensurePasswordResetTable();
+            $this->ensureUserSecurityColumns();
+            $hasPasswordChangeFlag = $this->ensureUserPasswordChangeColumn();
+            $tokenHash = hash('sha256', $token);
+            $this->conn->beginTransaction();
+            $lookup = $this->conn->prepare("SELECT t.user_id
+                FROM tbl_password_reset_tokens t
+                INNER JOIN tbl_users u ON u.user_id = t.user_id
+                WHERE t.token_hash = ? AND t.used_at IS NULL
+                  AND t.expires_at > CURRENT_TIMESTAMP AND u.status = 'Active'
+                LIMIT 1 FOR UPDATE");
+            $lookup->execute([$tokenHash]);
+            $userId = (int)($lookup->fetchColumn() ?: 0);
+            if ($userId < 1) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'This password-reset link is invalid or has expired. Request a new one.'], 400);
+            }
+
+            $sets = ['password = ?'];
+            $values = [password_hash($password, PASSWORD_DEFAULT)];
+            if ($hasPasswordChangeFlag) $sets[] = 'must_change_password = 0';
+            foreach (['active_session_token', 'active_session_updated_at', 'active_browser_token_hash', 'active_browser_token_updated_at'] as $column) {
+                if ($this->hasUserColumn($column)) $sets[] = $column . ' = NULL';
+            }
+            $values[] = $userId;
+            $update = $this->conn->prepare('UPDATE tbl_users SET ' . implode(', ', $sets) . ' WHERE user_id = ? AND status = \'Active\'');
+            $update->execute($values);
+            if ($update->rowCount() !== 1) {
+                $this->conn->rollBack();
+                $this->sendJSON(['error' => 'This password-reset link is invalid or has expired. Request a new one.'], 400);
+            }
+            $this->conn->prepare('UPDATE tbl_password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL')
+                ->execute([$userId]);
+            $this->conn->commit();
+            $this->sendJSON(['success' => true, 'message' => 'Your password has been reset. You can now sign in.']);
+        } catch (Throwable $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            error_log('Password reset failed: ' . $e->getMessage());
+            $this->sendJSON(['error' => 'Unable to reset the password right now. Please request a new reset link.'], 500);
+        }
+    }
+
     public function login($json)
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1539,6 +1698,79 @@ class User
             'authenticated' => true,
             'user' => $this->publicAuthUser($resolved),
         ]);
+    }
+
+    private function getPasswordResetAppUrl(array $mail): string
+    {
+        $configuredUrl = trim((string)($mail['app_url'] ?? ''));
+        if ($configuredUrl !== '') {
+            $parts = parse_url($configuredUrl);
+            if (is_array($parts)
+                && in_array(strtolower((string)($parts['scheme'] ?? '')), ['http', 'https'], true)
+                && !empty($parts['host'])
+                && empty($parts['user'])
+                && empty($parts['pass'])
+                && empty($parts['query'])
+                && empty($parts['fragment'])) {
+                return rtrim($configuredUrl, '/');
+            }
+            return '';
+        }
+
+        // XAMPP development fallback only. Production reset links must use APP_URL
+        // so an untrusted Host header cannot redirect a password-reset token.
+        $host = strtolower(trim((string)($_SERVER['HTTP_HOST'] ?? '')));
+        if (!preg_match('/^(localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::\d{1,5})?$/', $host)) {
+            return '';
+        }
+        $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '/api/users.php'));
+        $appPath = dirname(dirname($scriptName));
+        $appPath = $appPath === '/' || $appPath === '.' ? '' : '/' . trim($appPath, '/');
+        return 'http://' . $host . $appPath;
+    }
+
+    private function sendPasswordResetEmail(string $toEmail, string $toName, string $resetUrl): bool
+    {
+        $this->ensurePhpMailerLoaded();
+        $this->lastMailError = null;
+        if (!$this->isMailConfigured()) {
+            $this->lastMailError = 'SMTP is not configured on the server.';
+            return false;
+        }
+
+        $mailer = null;
+        try {
+            $mail = $this->getMailSettings();
+            $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $this->configurePhpMailer($mailer, $mail);
+            $mailer->addAddress($toEmail, $toName !== '' ? $toName : $toEmail);
+            $safeName = htmlspecialchars($toName !== '' ? $toName : 'there', ENT_QUOTES, 'UTF-8');
+            $safeUrl = htmlspecialchars($resetUrl, ENT_QUOTES, 'UTF-8');
+            $mailer->Subject = 'Reset your Father & Sons password';
+            $mailer->Body = '
+                <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827;max-width:560px;margin:auto">
+                    <h2 style="color:#b8860b">Password reset</h2>
+                    <p>Hello ' . $safeName . ',</p>
+                    <p>We received a request to reset your Father &amp; Sons account password. Use the button below within 30 minutes:</p>
+                    <p style="margin:24px 0"><a href="' . $safeUrl . '" style="background:#111827;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:bold">Reset password</a></p>
+                    <p>If the button does not work, copy this link into your browser:</p>
+                    <p style="word-break:break-all"><a href="' . $safeUrl . '">' . $safeUrl . '</a></p>
+                    <p>If you did not request a password reset, you can ignore this email. Your password will not change.</p>
+                </div>
+            ';
+            $mailer->AltBody = "Hello {$toName},\n\nReset your Father & Sons password using this link within 30 minutes:\n{$resetUrl}\n\nIf you did not request this, ignore this email.";
+            $mailer->send();
+            return true;
+        } catch (\PHPMailer\PHPMailer\Exception $e) {
+            $rawError = trim($e->getMessage() . ' ' . ($mailer->ErrorInfo ?? ''));
+            $this->lastMailError = $this->getFriendlyMailError($rawError);
+            error_log('Password reset email failed: ' . $rawError);
+            return false;
+        } catch (\Throwable $e) {
+            $this->lastMailError = $this->getFriendlyMailError($e->getMessage());
+            error_log('Password reset email failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
     public function getOptionalSession()
@@ -2264,6 +2496,7 @@ class User
             $this->ensureStudentRegistrationProofColumn();
             $this->ensureStudentAgeVerificationProofColumn();
             $this->ensureStudentRegistrationSourceColumn();
+            $this->ensureRegistrationPaymentMethodColumn();
             $this->conn->beginTransaction();
 
             $roleStmt = $this->conn->prepare("SELECT role_id FROM tbl_roles WHERE role_name = 'Student' LIMIT 1");
@@ -2734,6 +2967,7 @@ class User
             $this->ensureStudentAgeVerificationProofColumn();
             $this->ensureStudentRegistrationColumns();
             $this->ensureStudentRegistrationSourceColumn();
+            $this->ensureRegistrationPaymentMethodColumn();
             $this->conn->beginTransaction();
 
             // Get default role for students
@@ -3034,6 +3268,7 @@ class User
         try {
             $this->ensureStudentAgeVerificationProofColumn();
             $this->ensureStudentRegistrationProofColumn();
+            $this->ensureRegistrationPaymentMethodColumn();
             $this->conn->beginTransaction();
 
             $stmtStudent = $this->conn->prepare("
@@ -3169,6 +3404,8 @@ $action = $_GET['action'] ?? '';
 
 $publicActions = [
     'login',
+    'request-password-reset',
+    'reset-password',
     'optional-session',
     'register',
     'register-basic',
@@ -3186,6 +3423,12 @@ if (!in_array($action, $publicActions, true)) {
 switch ($action) {
     case 'login':
         $user->login(file_get_contents('php://input'));
+        break;
+    case 'request-password-reset':
+        $user->requestPasswordReset(file_get_contents('php://input'));
+        break;
+    case 'reset-password':
+        $user->resetPassword(file_get_contents('php://input'));
         break;
     case 'session':
         $user->getCurrentSession();

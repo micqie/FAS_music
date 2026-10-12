@@ -62,8 +62,12 @@ function lm_ensure(PDO $conn) {
 
 function lm_upload($file) {
     if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return [null, null];
-    if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) lm_json(['error' => 'The material file could not be uploaded.'], 400);
-    if ((int)($file['size'] ?? 0) > 10 * 1024 * 1024) lm_json(['error' => 'Material files may not exceed 10 MB.'], 400);
+    $uploadError = (int)($file['error'] ?? UPLOAD_ERR_OK);
+    if ($uploadError === UPLOAD_ERR_INI_SIZE || $uploadError === UPLOAD_ERR_FORM_SIZE) {
+        lm_json(['error' => 'The material file exceeds the server upload limit. Choose a file under 35 MB.'], 400);
+    }
+    if ($uploadError !== UPLOAD_ERR_OK) lm_json(['error' => 'The material file could not be uploaded. Please try again.'], 400);
+    if ((int)($file['size'] ?? 0) > 35 * 1024 * 1024) lm_json(['error' => 'Material files may not exceed 35 MB.'], 400);
     $allowed = ['application/pdf'=>'pdf','application/msword'=>'doc','application/vnd.openxmlformats-officedocument.wordprocessingml.document'=>'docx'];
     $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
     if (!isset($allowed[$mime])) lm_json(['error' => 'Upload a PDF, DOC, or DOCX file.'], 400);

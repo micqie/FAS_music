@@ -4,8 +4,9 @@
 -- Existing enrollment: 12-session Ukulele package
 -- Password for both accounts after import: Test1234!
 --
--- No users, admins, instructors, students, enrollments, exams, or certificates
--- are created. This prepares the existing pair for a manual end-to-end test.
+-- No users, admins, instructors, students, or enrollments are created.
+-- Arman is seeded with passed Levels 1-4, issued certificates, and Level 5
+-- (Intermediate) in progress so the student progress page has a complete example.
 
 START TRANSACTION;
 
@@ -80,7 +81,7 @@ SET completed_sessions=8, schedule_status='Active', used_absences=0,
     consecutive_absences=0, status='Active'
 WHERE enrollment_id=@enrollment;
 
--- Clear this pair's learning test results so you can perform the flow yourself.
+-- Reset this pair's learning test results before seeding the achievement history.
 DELETE FROM tbl_student_certificates WHERE student_id=@student AND instrument_id=@instrument;
 DELETE FROM tbl_promotional_exams WHERE student_id=@student AND instrument_id=@instrument;
 DELETE FROM tbl_student_learning_levels WHERE student_id=@student AND instrument_id=@instrument;
@@ -88,19 +89,138 @@ DELETE p FROM tbl_student_progress p
 INNER JOIN tbl_sessions s ON s.session_id=p.session_id
 WHERE s.enrollment_id=@enrollment;
 
--- Current learning record only: there is deliberately no exam/certificate yet.
+-- Add the eight completed-session assessments. The five scored areas feed the
+-- certificate skill-strength summary shown on the student's page.
+INSERT INTO tbl_student_progress (
+    student_id, session_id, instrument_id, skill_level,
+    performance_score, technique_score, rhythm_score, focus_score, assignment_score,
+    criteria_scores, remarks, assessment_date
+)
+SELECT
+    e.student_id,
+    ts.session_id,
+    COALESCE(ts.instrument_id,e.instrument_id),
+    CASE WHEN ts.session_number >= 7 THEN 'Advanced' ELSE 'Developing' END,
+    5, 5, 5, 5, 5,
+    '[{"name":"Performance","score":5},{"name":"Technique","score":5},{"name":"Rhythm & Timing","score":5},{"name":"Focus & Discipline","score":5},{"name":"Assignment & Practice","score":5}]',
+    'Demo assessment: excellent progress.',
+    ts.session_date
+FROM tbl_enrollments e
+INNER JOIN tbl_sessions ts ON ts.enrollment_id=e.enrollment_id
+WHERE e.enrollment_id=@enrollment
+  AND e.student_id=@student
+  AND ts.status='Completed'
+  AND ts.attendance_status='Present'
+  AND NOT EXISTS (
+      SELECT 1 FROM tbl_student_progress p
+      WHERE p.student_id=e.student_id AND p.session_id=ts.session_id
+  );
+
+-- Each passed promotional exam records an achieved level and its certificate.
+-- Link the levels so the history accurately shows the Level 1 → Level 4 path.
 INSERT INTO tbl_student_learning_levels
     (student_id,instrument_id,teacher_id,level_name,book_material,current_topic,
      instructor_notes,skills_developing,areas_for_improvement,
-     assessment_readiness,status,started_at)
+     assessment_readiness,status,started_at,achieved_at)
 VALUES
-    (@student,@instrument,@teacher,'Level 1',
-     'Hal Leonard Ukulele Method Book 1',
-     'Chord transitions, rhythm, and performance preparation',
-     'Arman is progressing quickly after eight lessons. Save a session grade, then mark him Ready for Assessment.',
-     'Clean chord changes; steady rhythm; musical expression',
-     'Keep a consistent tempo during faster chord transitions',
-     'Improving','In Progress',CURDATE()-INTERVAL 8 WEEK);
+    (@student,@instrument,@teacher,'Level 1','Hal Leonard Ukulele Method Book 1',
+     'Ukulele posture, tuning, and basic chords',
+     'Completed foundational ukulele technique and passed the Level 1 assessment.',
+     'Instrument care; C, F, and G7 chords; steady down-strums',
+     'Continue building relaxed fretting-hand movement',
+     'Ready for Assessment','Achieved',CURDATE()-INTERVAL 8 WEEK,CURDATE()-INTERVAL 7 WEEK);
+SET @level1 := LAST_INSERT_ID();
+INSERT INTO tbl_promotional_exams
+    (student_id,instrument_id,learning_level_id,teacher_id,assessed_level,exam_date,grade_rating,result,examiner_notes)
+VALUES
+    (@student,@instrument,@level1,@teacher,'Level 1',CURDATE()-INTERVAL 7 WEEK,'Excellent — 5/5','Passed','Secure posture, tuning, basic chords, and steady rhythm.');
+SET @exam1 := LAST_INSERT_ID();
+UPDATE tbl_student_learning_levels SET achieved_exam_id=@exam1 WHERE learning_level_id=@level1;
+INSERT INTO tbl_student_certificates
+    (student_id,promotional_exam_id,learning_level_id,instrument_id,achieved_level,certificate_number,issued_at,issued_by,status)
+VALUES
+    (@student,@exam1,@level1,@instrument,'Level 1',CONCAT('FAS-',YEAR(CURDATE()),'-',LPAD(@student,5,'0'),'-UKU-L1'),CURDATE()-INTERVAL 7 WEEK,@teacher,'Issued');
+
+INSERT INTO tbl_student_learning_levels
+    (student_id,instrument_id,teacher_id,level_name,book_material,current_topic,
+     instructor_notes,skills_developing,areas_for_improvement,
+     assessment_readiness,status,started_at,achieved_at,previous_learning_level_id)
+VALUES
+    (@student,@instrument,@teacher,'Level 2','Hal Leonard Ukulele Method Book 1',
+     'Chord transitions and changing strumming patterns',
+     'Completed Level 2 with consistent chord transitions and rhythm.',
+     'Clean C–F–G7 changes; down-up strumming; metronome practice',
+     'Keep dynamics even during longer patterns',
+     'Ready for Assessment','Achieved',CURDATE()-INTERVAL 7 WEEK,CURDATE()-INTERVAL 5 WEEK,@level1);
+SET @level2 := LAST_INSERT_ID();
+INSERT INTO tbl_promotional_exams
+    (student_id,instrument_id,learning_level_id,teacher_id,assessed_level,exam_date,grade_rating,result,examiner_notes)
+VALUES
+    (@student,@instrument,@level2,@teacher,'Level 2',CURDATE()-INTERVAL 5 WEEK,'Excellent — 5/5','Passed','Accurate chord changes and reliable tempo.');
+SET @exam2 := LAST_INSERT_ID();
+UPDATE tbl_student_learning_levels SET achieved_exam_id=@exam2 WHERE learning_level_id=@level2;
+INSERT INTO tbl_student_certificates
+    (student_id,promotional_exam_id,learning_level_id,instrument_id,achieved_level,certificate_number,issued_at,issued_by,status)
+VALUES
+    (@student,@exam2,@level2,@instrument,'Level 2',CONCAT('FAS-',YEAR(CURDATE()),'-',LPAD(@student,5,'0'),'-UKU-L2'),CURDATE()-INTERVAL 5 WEEK,@teacher,'Issued');
+
+INSERT INTO tbl_student_learning_levels
+    (student_id,instrument_id,teacher_id,level_name,book_material,current_topic,
+     instructor_notes,skills_developing,areas_for_improvement,
+     assessment_readiness,status,started_at,achieved_at,previous_learning_level_id)
+VALUES
+    (@student,@instrument,@teacher,'Level 3','Hal Leonard Ukulele Method Book 1',
+     'Syncopation, dynamics, and musical phrasing',
+     'Completed Level 3 and demonstrated expressive, controlled playing.',
+     'Syncopated rhythm; dynamics; musical phrasing',
+     'Keep tone consistent across string changes',
+     'Ready for Assessment','Achieved',CURDATE()-INTERVAL 5 WEEK,CURDATE()-INTERVAL 3 WEEK,@level2);
+SET @level3 := LAST_INSERT_ID();
+INSERT INTO tbl_promotional_exams
+    (student_id,instrument_id,learning_level_id,teacher_id,assessed_level,exam_date,grade_rating,result,examiner_notes)
+VALUES
+    (@student,@instrument,@level3,@teacher,'Level 3',CURDATE()-INTERVAL 3 WEEK,'Excellent — 5/5','Passed','Strong timing, dynamics, focus, and musical phrasing.');
+SET @exam3 := LAST_INSERT_ID();
+UPDATE tbl_student_learning_levels SET achieved_exam_id=@exam3 WHERE learning_level_id=@level3;
+INSERT INTO tbl_student_certificates
+    (student_id,promotional_exam_id,learning_level_id,instrument_id,achieved_level,certificate_number,issued_at,issued_by,status)
+VALUES
+    (@student,@exam3,@level3,@instrument,'Level 3',CONCAT('FAS-',YEAR(CURDATE()),'-',LPAD(@student,5,'0'),'-UKU-L3'),CURDATE()-INTERVAL 3 WEEK,@teacher,'Issued');
+
+INSERT INTO tbl_student_learning_levels
+    (student_id,instrument_id,teacher_id,level_name,book_material,current_topic,
+     instructor_notes,skills_developing,areas_for_improvement,
+     assessment_readiness,status,started_at,achieved_at,previous_learning_level_id)
+VALUES
+    (@student,@instrument,@teacher,'Level 4','Hal Leonard Ukulele Method Book 1',
+     'Performance preparation and complete song arrangements',
+     'Passed Level 4 after performing a complete arrangement with confidence.',
+     'Performance confidence; clean transitions; steady tempo; musical expression',
+     'Explore more complex chord voicings in the next level',
+     'Ready for Assessment','Achieved',CURDATE()-INTERVAL 3 WEEK,CURDATE()-INTERVAL 1 WEEK,@level3);
+SET @level4 := LAST_INSERT_ID();
+INSERT INTO tbl_promotional_exams
+    (student_id,instrument_id,learning_level_id,teacher_id,assessed_level,exam_date,grade_rating,result,examiner_notes)
+VALUES
+    (@student,@instrument,@level4,@teacher,'Level 4',CURDATE()-INTERVAL 1 WEEK,'Excellent — 5/5','Passed','Confident full-song performance with strong technique and timing.');
+SET @exam4 := LAST_INSERT_ID();
+UPDATE tbl_student_learning_levels SET achieved_exam_id=@exam4 WHERE learning_level_id=@level4;
+INSERT INTO tbl_student_certificates
+    (student_id,promotional_exam_id,learning_level_id,instrument_id,achieved_level,certificate_number,issued_at,issued_by,status)
+VALUES
+    (@student,@exam4,@level4,@instrument,'Level 4',CONCAT('FAS-',YEAR(CURDATE()),'-',LPAD(@student,5,'0'),'-UKU-L4'),CURDATE()-INTERVAL 1 WEEK,@teacher,'Issued');
+
+INSERT INTO tbl_student_learning_levels
+    (student_id,instrument_id,teacher_id,level_name,book_material,current_topic,
+     instructor_notes,skills_developing,areas_for_improvement,
+     assessment_readiness,status,started_at,previous_learning_level_id)
+VALUES
+    (@student,@instrument,@teacher,'Level 5 — Intermediate','Hal Leonard Ukulele Method Book 2',
+     'Intermediate chord vocabulary, fingerpicking, and arranging',
+     'Arman has completed Levels 1–4 and is beginning the Intermediate course.',
+     'Barre chords; fingerpicking patterns; syncopated accompaniment; song arranging',
+     'Build clean barre-chord transitions and maintain an even fingerpicking pulse',
+     'Developing','In Progress',CURDATE()-INTERVAL 1 WEEK,@level4);
 
 -- Small song masterfile for Bon's Ukulele specialization.
 DELETE FROM tbl_song_library
@@ -123,7 +243,11 @@ SELECT @teacher AS teacher_id, @instructor_login AS instructor_login,
        'Test1234!' AS test_password;
 SELECT e.total_sessions AS purchased, e.completed_sessions AS completed,
        e.total_sessions-e.completed_sessions AS remaining,
-       ll.level_name, ll.assessment_readiness, ll.status AS learning_status
+       ll.level_name, ll.assessment_readiness, ll.status AS learning_status,
+       (SELECT COUNT(*) FROM tbl_student_learning_levels h
+        WHERE h.student_id=e.student_id AND h.instrument_id=e.instrument_id AND h.status='Achieved') AS achieved_levels,
+       (SELECT COUNT(*) FROM tbl_student_certificates c
+        WHERE c.student_id=e.student_id AND c.instrument_id=e.instrument_id AND c.status='Issued') AS issued_certificates
 FROM tbl_enrollments e
 INNER JOIN tbl_student_learning_levels ll
   ON ll.student_id=e.student_id AND ll.instrument_id=e.instrument_id

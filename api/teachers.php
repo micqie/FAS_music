@@ -524,22 +524,14 @@ class TeachersApi
         }
     }
 
-    private function normalizeProgressSkillLevel($value)
+    private function deriveProgressSkillLevel(array $scores)
     {
-        $raw = trim((string)$value);
-        if ($raw === '') return '';
-        // Keep accepting the legacy evaluation labels while supporting the
-        // current instructor grading UI's overall-level choices.
-        $allowed = [
-            'Beginner', 'Developing', 'Proficient', 'Advanced',
-            'Needs Improvement', 'Good', 'Very Good', 'Excellent'
-        ];
-        foreach ($allowed as $item) {
-            if (strcasecmp($raw, $item) === 0) {
-                return $item;
-            }
-        }
-        return '';
+        if (!$scores) return '';
+        $average = (int)round(array_sum($scores) / count($scores));
+        if ($average <= 2) return 'Beginner';
+        if ($average === 3) return 'Developing';
+        if ($average === 4) return 'Proficient';
+        return 'Advanced';
     }
 
     private function normalizeProgressScore($value)
@@ -1291,6 +1283,7 @@ class TeachersApi
                     s.first_name AS student_first_name,
                     s.last_name AS student_last_name,
                     s.phone AS student_phone,
+                    e.created_at AS enrollment_created_at,
                     e.status AS enrollment_status,
                     e.schedule_status,
                     e.total_sessions AS package_sessions,
@@ -1982,6 +1975,11 @@ class TeachersApi
                     current_learning.learning_level_id,
                     current_learning.level_name AS current_learning_level,
                     current_learning.book_material AS current_learning_book,
+                    current_learning.current_topic AS current_learning_topic,
+                    current_learning.skills_developing AS current_learning_skills,
+                    current_learning.areas_for_improvement AS current_learning_improvement,
+                    current_learning.instructor_notes AS current_learning_notes,
+                    current_learning.assessment_readiness AS current_learning_readiness,
                     prog.progress_id,
                     prog.skill_level,
                     prog.performance_score,
@@ -2067,7 +2065,6 @@ class TeachersApi
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $teacherId = $this->resolveLearningWorkflowTeacherId((int)($data['teacher_id'] ?? 0), (int)($data['user_id'] ?? 0));
         $sessionId = (int)($data['session_id'] ?? 0);
-        $skillLevel = $this->normalizeProgressSkillLevel($data['skill_level'] ?? '');
         $performanceScore = $this->normalizeProgressScore($data['performance_score'] ?? null);
         $techniqueScore = $this->normalizeProgressScore($data['technique_score'] ?? null);
         $rhythmScore = $this->normalizeProgressScore($data['rhythm_score'] ?? null);
@@ -2080,13 +2077,11 @@ class TeachersApi
         if ($teacherId < 1 || $sessionId < 1) {
             $this->sendJSON(['error' => 'teacher_id/user_id and session_id are required'], 400);
         }
-        if ($skillLevel === '') {
-            $this->sendJSON(['error' => 'A valid skill level is required'], 400);
-        }
         if (!$criteriaScores) {
             $this->sendJSON(['error' => 'Provide between 1 and 20 named criteria with scores from 1 to 5'], 400);
         }
         $legacyScores = array_column($criteriaScores, 'score');
+        $skillLevel = $this->deriveProgressSkillLevel($legacyScores);
         $performanceScore = $legacyScores[0] ?? null;
         $techniqueScore = $legacyScores[1] ?? null;
         $rhythmScore = $legacyScores[2] ?? null;
@@ -2234,9 +2229,23 @@ class TeachersApi
             $completedStmt->execute([(int)$session['enrollment_id']]);
 
             $absenceCountStmt = $this->conn->prepare("
-                SELECT COUNT(*) FROM tbl_sessions
-                WHERE enrollment_id = ?
-                  AND (attendance_status IN ('Absent','CI') OR status IN ('No Show','Cancelled'))
+                SELECT COUNT(*)
+                FROM tbl_sessions counted_absence
+                INNER JOIN tbl_enrollments absence_enrollment
+                    ON absence_enrollment.enrollment_id = counted_absence.enrollment_id
+                WHERE counted_absence.enrollment_id = ?
+                  AND (
+                      counted_absence.attendance_status IN ('Absent','CI')
+                      OR counted_absence.status IN ('No Show','Cancelled')
+                  )
+                  AND (
+                      absence_enrollment.absence_reset_at IS NULL
+                      OR CONCAT(
+                          counted_absence.session_date,
+                          ' ',
+                          COALESCE(counted_absence.start_time, '23:59:59')
+                      ) > absence_enrollment.absence_reset_at
+                  )
             ");
             $absenceCountStmt->execute([(int)$session['enrollment_id']]);
             $usedAbsences = (int)($absenceCountStmt->fetchColumn() ?: 0);
@@ -2275,9 +2284,22 @@ class TeachersApi
 
         $stmt = $this->conn->prepare("
             SELECT ts.session_id, ts.session_date, ts.room_id, ts.instrument_id,
-                   ts.grading_started_at, ts.grading_completed_at, p.progress_id
+                   ts.grading_started_at, ts.grading_completed_at, p.progress_id,
+                   current_learning.level_name AS current_learning_level,
+                   current_learning.book_material AS current_learning_book
             FROM tbl_sessions ts
+            INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
             LEFT JOIN tbl_student_progress p ON p.session_id = ts.session_id
+            LEFT JOIN tbl_student_learning_levels current_learning
+              ON current_learning.learning_level_id = (
+                  SELECT ll.learning_level_id
+                  FROM tbl_student_learning_levels ll
+                  WHERE ll.student_id = e.student_id
+                    AND ll.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
+                    AND ll.status = 'In Progress'
+                  ORDER BY ll.started_at DESC, ll.learning_level_id DESC
+                  LIMIT 1
+              )
             WHERE ts.session_id = ? AND ts.teacher_id = ? LIMIT 1
         ");
         $stmt->execute([$sessionId, $teacherId]);
@@ -2288,6 +2310,10 @@ class TeachersApi
         }
         if ((int)($session['room_id'] ?? 0) < 1 || (int)($session['instrument_id'] ?? 0) < 1) {
             $this->sendJSON(['error' => 'Desk must assign both a room and a physical instrument before the lesson can start.'], 400);
+        }
+        if (trim((string)($session['current_learning_level'] ?? '')) === ''
+            || trim((string)($session['current_learning_book'] ?? '')) === '') {
+            $this->sendJSON(['error' => 'Set the student’s current learning level and select an approved book/material before starting the lesson.'], 400);
         }
         if ((string)$session['session_date'] !== date('Y-m-d')) {
             $this->sendJSON(['error' => 'The lesson timer can only start on the scheduled date.'], 400);
@@ -2382,8 +2408,11 @@ class TeachersApi
             $materialsStmt = $this->conn->prepare("
                 SELECT material_id, level_name, material_name, description, file_path, original_filename
                 FROM tbl_learning_materials
-                WHERE status = 'Active' AND (instrument_type = ? OR instrument_type = 'General')
-                ORDER BY instrument_type = 'General', level_name, material_name
+                WHERE status = 'Active'
+                  AND (LOWER(TRIM(instrument_type)) = LOWER(TRIM(?))
+                       OR LOWER(TRIM(instrument_type)) = 'general')
+                ORDER BY CASE WHEN LOWER(TRIM(instrument_type)) = 'general' THEN 1 ELSE 0 END,
+                         level_name, material_name
             ");
             foreach ($rows as &$row) {
                 $historyStmt->execute([(int)$row['student_id'], (int)$row['instrument_id']]);

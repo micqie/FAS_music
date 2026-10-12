@@ -16,7 +16,7 @@
     'use strict';
 
     /* ── Configuration ─────────────────────────────────────────── */
-    const DEFAULT_IDLE_MINUTES = 30;
+    const DEFAULT_IDLE_MINUTES = 10;
     const DEFAULT_WARN_SECONDS = 60;
     const configuredIdleMinutes = Number(window.SESSION_TIMEOUT_MINUTES || DEFAULT_IDLE_MINUTES);
     const configuredWarnSeconds = Number(window.SESSION_WARN_SECONDS || DEFAULT_WARN_SECONDS);
@@ -203,7 +203,7 @@
             if (stay) {
                 _resetTimer();
             } else {
-                forceLogout('User chose to log out from the session timeout prompt.');
+                forceLogout('User chose to log out from the session timeout prom2pt.');
             }
         }
     }

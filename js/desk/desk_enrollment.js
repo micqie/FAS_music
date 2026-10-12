@@ -2955,11 +2955,15 @@
             const reservedForDate = assignRequestReservedSlots.filter(slot => String(slot.session_date || '') === normalizedDate);
             const occupiedForDate = assignRequestOccupiedSlots.filter(slot => String(slot.session_date || '') === normalizedDate);
             if (!groupedSlots.length || typeof Swal === 'undefined') return;
+            const totalSlots = groupedSlots.length + reservedForDate.length + occupiedForDate.length;
+            const occupancySummary = occupiedForDate.length
+                ? `${occupiedForDate.length}/${totalSlots} occupied${reservedForDate.length ? ` · ${reservedForDate.length} pending` : ''}`
+                : reservedForDate.length ? `${reservedForDate.length}/${totalSlots} pending` : `${groupedSlots.length} available`;
 
             Swal.fire({
                 title: formatDateLong(normalizedDate) || normalizedDate,
                 html: `
-                    <div class="mb-4 text-sm text-slate-500">${groupedSlots.length} available time slot${groupedSlots.length === 1 ? '' : 's'}</div>
+                    <div class="mb-4 text-sm text-slate-500">${occupancySummary} · ${groupedSlots.length} available time slot${groupedSlots.length === 1 ? '' : 's'}</div>
                     <div class="grid grid-cols-1 gap-2 text-left sm:grid-cols-2">
                         ${groupedSlots.map((slot, index) => `
                             <button type="button" class="assign-request-slot-picker-btn rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100" data-slot-index="${index}">
@@ -2968,7 +2972,7 @@
                             </button>
                         `).join('')}
                         ${reservedForDate.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="text-base font-bold text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold uppercase tracking-wide text-amber-700">Pending reservation</div></div>`).join('')}
-                        ${occupiedForDate.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="text-base font-bold text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold uppercase tracking-wide text-red-700">Occupied</div></div>`).join('')}
+                        ${occupiedForDate.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="text-base font-bold text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold uppercase tracking-wide text-red-700">Occupied session</div></div>`).join('')}
                     </div>
                 `,
                 showConfirmButton: false,
@@ -3106,16 +3110,19 @@
                 const isOccupied = occupiedDates.has(dateKey);
                 const reservationCount = assignRequestReservedSlots.filter(slot => String(slot.session_date || '') === dateKey).length;
                 const occupiedCount = assignRequestOccupiedSlots.filter(slot => String(slot.session_date || '') === dateKey).length;
+                const usedCount = reservationCount + occupiedCount;
+                const totalCount = daySlots.length + usedCount;
+                const isFull = daySlots.length === 0 && occupiedCount > 0;
                 const isSelected = dateKey === assignRequestAvailabilitySelectedDate;
                 button.className = `h-14 rounded-lg border p-1.5 text-left transition ${
                     dateAlreadySelected
                         ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                        : isFull
+                        ? 'cursor-not-allowed border-red-300 bg-red-100 text-red-900'
+                        : usedCount
+                        ? (hasSlots && !dateAlreadySelected ? 'border-amber-300 bg-amber-100 text-amber-900 hover:border-amber-400 hover:bg-amber-200' : 'cursor-not-allowed border-amber-300 bg-amber-50 text-amber-800')
                         : hasSlots
                         ? (isSelected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100')
-                        : hasReservation
-                        ? 'cursor-not-allowed border-amber-300 bg-amber-100 text-amber-900'
-                        : isOccupied
-                        ? 'cursor-not-allowed border-red-300 bg-red-100 text-red-900'
                         : 'cursor-not-allowed border-slate-300 bg-slate-100 text-slate-500'
                 }`;
                 button.disabled = dateAlreadySelected || !hasSlots;
@@ -3124,11 +3131,9 @@
                 button.innerHTML = `
                     <div class="flex items-start justify-between gap-1">
                         <span class="text-sm font-semibold leading-none text-slate-900">${escapeHtml(dayNumber)}</span>
-                        ${hasSlots ? `<span class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${daySlots.length}</span>` : ''}
-                        ${reservationCount ? `<span class="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white">${reservationCount}</span>` : ''}
-                        ${occupiedCount ? `<span class="rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${occupiedCount}</span>` : ''}
+                        ${hasSlots || usedCount ? `<span class="rounded-full ${isFull ? 'bg-red-600' : usedCount ? 'bg-amber-600' : 'bg-emerald-600'} px-1.5 py-0.5 text-[9px] font-bold text-white">${usedCount ? `${usedCount}/${totalCount}` : daySlots.length}</span>` : ''}
                     </div>
-                    ${dateAlreadySelected ? '<div class="mt-1 text-[9px] font-semibold leading-tight text-slate-500">Selected</div>' : hasSlots ? '<div class="mt-1 text-[9px] font-semibold leading-tight text-emerald-700">Available</div>' : hasReservation ? '<div class="mt-1 text-[9px] font-semibold leading-tight text-amber-800">Reserved</div>' : isOccupied ? '<div class="mt-1 text-[9px] font-semibold leading-tight text-red-700">Occupied</div>' : '<div class="mt-1 text-[9px] font-semibold leading-tight text-slate-500">Unavailable</div>'}
+                    ${dateAlreadySelected ? '<div class="mt-1 text-[9px] font-semibold leading-tight text-slate-500">Selected</div>' : isFull ? '<div class="mt-1 text-[9px] font-semibold leading-tight text-red-700">Full schedule</div>' : occupiedCount ? `<div class="mt-1 text-[9px] font-semibold leading-tight text-amber-800">${occupiedCount}/${totalCount} occupied${reservationCount ? ` · ${reservationCount} pending` : ''}</div>` : reservationCount ? `<div class="mt-1 text-[9px] font-semibold leading-tight text-amber-800">${reservationCount}/${totalCount} pending</div>` : hasSlots ? '<div class="mt-1 text-[9px] font-semibold leading-tight text-emerald-700">Available</div>' : '<div class="mt-1 text-[9px] font-semibold leading-tight text-slate-500">Unavailable</div>'}
                 `;
             });
             if (statusMessage) {
@@ -3136,7 +3141,7 @@
             } else if (!teacherId) {
                 statusEl.textContent = 'Select an instructor to show availability.';
             } else {
-                statusEl.textContent = 'Green: available · Yellow: pending reservation · Red: occupied · Gray: unavailable.';
+                statusEl.textContent = 'Green: open slots · Yellow: partly occupied or pending · Red: occupied sessions or full schedule · Gray: unavailable. Counts show used slots / total slots.';
             }
         }
 

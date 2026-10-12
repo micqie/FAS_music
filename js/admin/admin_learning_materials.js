@@ -135,11 +135,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     lmEl('deleteMaterialBtn')?.addEventListener('click', () => { const id = Number(lmEl('materialId')?.value || 0); if (id) lmDelete(id); });
     lmEl('materialForm')?.addEventListener('submit', async event => {
         event.preventDefault();
+        const selectedFile = lmEl('materialFile')?.files?.[0];
+        if (selectedFile && selectedFile.size > 35 * 1024 * 1024) {
+            Swal.fire({ icon: 'error', title: 'File is too large', text: 'Choose a PDF, DOC, or DOCX file under 35 MB.' });
+            return;
+        }
+        const submitButton = event.target.querySelector('button[type="submit"]');
+        const originalButtonHtml = submitButton?.innerHTML || '';
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving…';
+        }
         try {
             const isNewMaterial = !Number(lmEl('materialId')?.value || 0);
             const payload = new FormData(event.target);
+            // Let the browser/Axios set the multipart boundary so PHP receives
+            // the material fields and optional file in $_POST / $_FILES.
             const response = await axios.post(`${lmApi}?action=save`, payload, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+                // index.js sets a site-wide JSON content type. Suppress it for
+                // this FormData request so the browser supplies the multipart boundary.
+                headers: { 'Content-Type': false }
             });
             if (!response.data?.success) throw new Error(response.data?.error || 'The material could not be saved.');
             lmClose();
@@ -152,6 +167,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             lmToast('success', isNewMaterial ? 'Material added' : 'Material updated');
         } catch (error) {
             Swal.fire({ icon: 'error', title: 'Unable to save', text: error.response?.data?.error || error.message });
+        } finally {
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonHtml;
+            }
         }
     });
     try { await Promise.all([lmLoad(), lmLoadRequests()]); }

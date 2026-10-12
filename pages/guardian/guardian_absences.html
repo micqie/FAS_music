@@ -16,6 +16,7 @@
         .portal-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); }
         html.dark .portal-nav { background: rgba(15,17,21,0.92); }
         .sidebar-item-active { background: linear-gradient(to right, #d4af37, #b8860b); color: #0f1115 !important; }
+        #guardianAbsenceSessionDate option[data-request-status="pending"] { background-color: #fef3c7; color: #92400e; font-weight: 700; }
     </style>
     <link rel="stylesheet" href="../../css/table-responsive.css">
     <link rel="stylesheet" href="../../css/portal-loading.css?v=20260927001">
@@ -164,6 +165,10 @@
                     <select id="guardianAbsenceSessionDate" required class="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-gold-500">
                         <option value="">Choose session date</option>
                     </select>
+                    <div id="guardianAbsencePendingNotice" class="hidden mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                        <div class="flex items-center gap-2 font-bold"><i class="fas fa-triangle-exclamation text-amber-600 dark:text-amber-300"></i><span>Request pending</span></div>
+                        <p class="mt-1 pl-6 text-xs">Staff are reviewing an absence request for this session date.</p>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Reason</label>
@@ -184,7 +189,7 @@
                     <button type="button" onclick="closeAbsenceModal()" class="flex-1 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5 transition">
                         Cancel
                     </button>
-                    <button type="submit" class="flex-1 px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold transition">
+                    <button id="guardianAbsenceSubmitBtn" type="submit" class="flex-1 px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50">
                         Submit Request
                     </button>
                 </div>
@@ -198,7 +203,7 @@
     <script src="../../js/mode.js"></script>
     <button id="themeToggle" aria-label="Toggle dark or light mode"><div class="relative w-6 h-6 flex items-center justify-center"><i id="sunIcon" class="fas fa-sun absolute inset-0 m-auto transition-opacity duration-300"></i><i id="moonIcon" class="fas fa-moon absolute inset-0 m-auto transition-opacity duration-300 opacity-0"></i></div></button>
     <script src="../../js/portal_sidebar.js"></script>
-    <script src="../../js/index.js?v=20260918001"></script>
+    <script src="../../js/index.js?v=20261009005"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>
 </html>

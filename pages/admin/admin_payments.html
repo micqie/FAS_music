@@ -49,6 +49,9 @@
                         <p id="profileMenuName" class="text-sm font-semibold text-white truncate">Administrator</p>
                         <p class="text-[10px] uppercase tracking-widest text-gold-400 font-bold mt-1">Account</p>
                     </div>
+                    <a href="admin_settings.html" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/5 transition-all">
+                        <i class="fas fa-sliders-h text-gold-400"></i> System Settings
+                    </a>
                     <button onclick="logout()" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-300 hover:text-red-200 hover:bg-red-400/10 transition-all">
                         <i class="fas fa-sign-out-alt"></i> Sign Out
                     </button>
@@ -127,18 +130,11 @@
                     <p class="text-sm text-slate-500 mt-1">Collections and student balances.</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button id="openPaymentDestinationBtn" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm transition hover:bg-amber-100">
-                        <i class="fas fa-qrcode"></i> Payment Details
-                    </button>
                     <button id="paymentPrintBtn" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50">
                         <i class="fas fa-print text-slate-500"></i> Print
                     </button>
                     <button id="paymentExportBtn" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50">
                         <i class="fas fa-download text-slate-500"></i> Export CSV
-                    </button>
-                    <button id="openRecordPaymentModalBtn" type="button"
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-obsidian px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800">
-                        <i class="fas fa-plus"></i> Record Payment
                     </button>
                 </div>
             </div>
@@ -324,7 +320,7 @@
     </main>
     <script src="../../assets/vendor/js/axios.min.js?v=20260909001"></script>
 <script src="../../js/admin/admin_responsive.js?v=20260910008"></script>
-    <script src="../../js/index.js?v=20260917005"></script>
+    <script src="../../js/index.js?v=20261011003"></script>
     <script src="../../js/admin/admin_payments.js?v=20260918002"></script>
     <script src="../../js/session_timeout.js"></script>
 

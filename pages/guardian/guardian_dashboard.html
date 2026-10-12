@@ -118,7 +118,7 @@
 
             <div id="guardianDashboardAlerts" class="mb-6 space-y-3"></div>
 
-            <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+            <div class="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-8">
                 <div class="portal-stat-card rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-xl dark:shadow-black/40">
                     <div class="portal-stat-label">Students</div>
                     <div id="guardianDashboardStudentCount" class="portal-stat-value text-zinc-900 dark:text-white">0</div>
@@ -126,6 +126,10 @@
                 <div class="portal-stat-card rounded-3xl border border-gold-200 dark:border-gold-500/20 bg-gold-50 dark:bg-gold-500/10 p-5 shadow-xl dark:shadow-black/40">
                     <div class="portal-stat-label text-gold-700 dark:text-gold-300">Balance Due</div>
                     <div id="guardianDashboardTotalBalance" class="portal-stat-value text-gold-600 dark:text-gold-400">₱0.00</div>
+                </div>
+                <div class="portal-stat-card rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 p-5 shadow-xl dark:shadow-black/40">
+                    <div class="portal-stat-label text-amber-700 dark:text-amber-300">Pending Approval</div>
+                    <div id="guardianDashboardTotalPending" class="portal-stat-value text-amber-700 dark:text-amber-300">₱0.00</div>
                 </div>
                 <div class="portal-stat-card rounded-3xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 p-5 shadow-xl dark:shadow-black/40">
                     <div class="portal-stat-label text-emerald-700 dark:text-emerald-300">Paid</div>
@@ -186,7 +190,7 @@
     <script src="../../js/mode.js"></script>
     <button id="themeToggle" aria-label="Toggle dark or light mode"><div class="relative w-6 h-6 flex items-center justify-center"><i id="sunIcon" class="fas fa-sun absolute inset-0 m-auto transition-opacity duration-300"></i><i id="moonIcon" class="fas fa-moon absolute inset-0 m-auto transition-opacity duration-300 opacity-0"></i></div></button>
     <script src="../../js/portal_sidebar.js"></script>
-    <script src="../../js/index.js?v=20260918001"></script>
+    <script src="../../js/index.js?v=20261009004"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>
 </html>

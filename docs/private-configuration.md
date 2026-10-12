@@ -19,8 +19,11 @@ Example (replace the placeholders with your own values):
   "MAIL_PASSWORD": "mail-app-password",
   "MAIL_FROM_ADDRESS": "sender@example.com",
   "MAIL_FROM_NAME": "Father & Sons Music School",
-  "MAIL_REPLY_TO": "sender@example.com"
+  "MAIL_REPLY_TO": "sender@example.com",
+  "APP_URL": "http://localhost/FAS_music"
 }
 ```
+
+Set `APP_URL` to the public base URL of the site (for example, `https://music.example.com`) so password-reset emails point to the correct host. Local XAMPP can use `http://localhost/FAS_music`.
 
 SMTP certificate verification remains enabled. Rotate any database or mail passwords that were previously committed to the repository; removing them from current files does not remove them from Git history.

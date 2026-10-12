@@ -8,7 +8,8 @@ let reportCharts = {
 let latestReportPayload = {
     branches: [],
     registrations: [],
-    enrollments: []
+    enrollments: [],
+    freezePayments: []
 };
 
 function setReportText(id, value) {
@@ -159,28 +160,43 @@ function applyScopeToRows(registrations, enrollments, scope) {
     };
 }
 
-function computeBranchMetrics(branches, registrations, enrollments) {
+function computeBranchMetrics(branches, registrations, enrollments, freezePayments = []) {
     return (branches || []).map(branch => {
         const branchId = Number(branch.branch_id || 0);
         const branchRegistrations = registrations.filter(item => Number(item.branch_id || 0) === branchId);
         const branchEnrollments = enrollments.filter(item => Number(item.branch_id || 0) === branchId);
+        const branchFreezePayments = freezePayments.filter(item => Number(item.branch_id || 0) === branchId);
         const registrationRevenue = branchRegistrations.reduce((sum, item) => sum + Number(item.registration_paid || 0), 0);
         const enrollmentRevenue = branchEnrollments.reduce((sum, item) => sum + Number(item.paid_amount || 0), 0);
-        const outstanding = branchRegistrations.reduce((sum, item) => sum + Number(item.registration_balance || 0), 0)
-            + branchEnrollments.reduce((sum, item) => sum + Number(item.balance_amount || 0), 0);
+        const registrationOutstanding = branchRegistrations.reduce((sum, item) => sum + Number(item.registration_balance || 0), 0);
+        const enrollmentOutstanding = branchEnrollments.reduce((sum, item) => sum + Number(item.balance_amount || 0), 0);
+        const outstanding = registrationOutstanding + enrollmentOutstanding;
+        const outstandingStudents = new Set([
+            ...branchRegistrations.filter(item => Number(item.registration_balance || 0) > 0).map(item => Number(item.student_id || 0)),
+            ...branchEnrollments.filter(item => Number(item.balance_amount || 0) > 0).map(item => Number(item.student_id || 0))
+        ].filter(Boolean)).size;
         const activeStudents = new Set(branchEnrollments.map(item => Number(item.student_id || 0)).filter(Boolean)).size;
-        const approvedFees = branchRegistrations.filter(item => ['approved', 'fee paid'].includes(String(item.registration_status || '').toLowerCase())).length;
+        const registrationApprovedFees = branchRegistrations.filter(item => ['approved', 'fee paid'].includes(String(item.registration_status || '').toLowerCase())).length;
+        const freezePaymentFees = branchFreezePayments.length;
+        const approvedFees = registrationApprovedFees + freezePaymentFees;
         const pendingFees = branchRegistrations.filter(item => String(item.registration_status || '').toLowerCase() === 'pending').length;
-        const totalRevenue = registrationRevenue + enrollmentRevenue;
+        const frozenAccountRevenue = branchFreezePayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        const totalRevenue = registrationRevenue + enrollmentRevenue + frozenAccountRevenue;
         const collectionBase = totalRevenue + outstanding;
         return {
             ...branch,
             totalRevenue,
             registrationRevenue,
             enrollmentRevenue,
+            frozenAccountRevenue,
             outstanding,
+            registrationOutstanding,
+            enrollmentOutstanding,
+            outstandingStudents,
             activeStudents,
             approvedFees,
+            registrationApprovedFees,
+            freezePaymentFees,
             pendingFees,
             collectionRate: collectionBase > 0 ? (totalRevenue / collectionBase) * 100 : 0
         };
@@ -193,20 +209,21 @@ function computeBranchMetrics(branches, registrations, enrollments) {
     );
 }
 
-function buildSummary(registrations, enrollments, branchMetrics) {
+function buildSummary(registrations, enrollments, freezePayments, branchMetrics) {
     const totalRegistrations = registrations.length;
     const pendingRegistrations = registrations.filter(item => String(item.registration_status || '').toLowerCase() === 'pending').length;
-    const approvedFees = registrations.filter(item => ['approved', 'fee paid'].includes(String(item.registration_status || '').toLowerCase())).length;
+    const approvedFees = registrations.filter(item => ['approved', 'fee paid'].includes(String(item.registration_status || '').toLowerCase())).length + freezePayments.length;
     const activeEnrollments = enrollments.length;
     const registrationRevenue = registrations.reduce((sum, item) => sum + Number(item.registration_paid || 0), 0);
     const enrollmentRevenue = enrollments.reduce((sum, item) => sum + Number(item.paid_amount || 0), 0);
+    const frozenAccountRevenue = freezePayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const outstanding = registrations.reduce((sum, item) => sum + Number(item.registration_balance || 0), 0)
         + enrollments.reduce((sum, item) => sum + Number(item.balance_amount || 0), 0);
     const fullPayments = enrollments.filter(item => String(item.payment_type || '').toLowerCase() === 'full payment').length;
     const partialPayments = enrollments.filter(item => String(item.payment_type || '').toLowerCase() === 'partial payment').length;
     const installmentPayments = enrollments.filter(item => String(item.payment_type || '').toLowerCase() === 'installment').length;
     const processRate = totalRegistrations > 0 ? (activeEnrollments / totalRegistrations) * 100 : 0;
-    const revenue = registrationRevenue + enrollmentRevenue;
+    const revenue = registrationRevenue + enrollmentRevenue + frozenAccountRevenue;
     const collectionRate = revenue + outstanding > 0 ? (revenue / (revenue + outstanding)) * 100 : 0;
     const topBranch = [...branchMetrics].sort((a, b) => Number(b.totalRevenue || 0) - Number(a.totalRevenue || 0))[0] || null;
 
@@ -217,6 +234,7 @@ function buildSummary(registrations, enrollments, branchMetrics) {
         activeEnrollments,
         registrationRevenue,
         enrollmentRevenue,
+        frozenAccountRevenue,
         outstanding,
         revenue,
         processRate,
@@ -234,7 +252,21 @@ function updateHeroAndStats(summary) {
     setReportText('reportStatEnrollments', String(summary.activeEnrollments));
     setReportText('reportStatRevenue', reportCurrency(summary.revenue));
     setReportText('reportStatOutstanding', reportCurrency(summary.outstanding));
-    setReportText('heroCollectionRate', reportPercent(summary.collectionRate));
+    setReportText('reportStatFreezePayments', reportCurrency(summary.frozenAccountRevenue));
+}
+
+function normalizeFreezePaymentRows(rows, branchMap) {
+    return (rows || [])
+        .filter(row => String(row.status || '').toLowerCase() === 'paid')
+        .map(row => {
+            const branchId = Number(row.branch_id || 0);
+            return {
+                ...row,
+                branch_id: branchId,
+                branch_name: row.branch_name || branchMap.get(branchId)?.branch_name || 'Unassigned Branch',
+                amount: Number(row.amount || 0)
+            };
+        });
 }
 
 function renderFunnelChart(summary) {
@@ -277,10 +309,10 @@ function renderRevenueChart(summary) {
     reportCharts.revenue = makeChart(canvas, reportCharts.revenue, {
         type: 'doughnut',
         data: {
-            labels: ['Registration Revenue', 'Enrollment Revenue', 'Outstanding Balance'],
+            labels: ['Registration Revenue', 'Enrollment Revenue', 'Frozen Account Payments', 'Unpaid Student Balances'],
             datasets: [{
-                data: [summary.registrationRevenue, summary.enrollmentRevenue, summary.outstanding],
-                backgroundColor: ['#d4af37', '#0f766e', '#f59e0b'],
+                data: [summary.registrationRevenue, summary.enrollmentRevenue, summary.frozenAccountRevenue, summary.outstanding],
+                backgroundColor: ['#d4af37', '#0f766e', '#14b8a6', '#f59e0b'],
                 borderWidth: 0
             }]
         },
@@ -310,14 +342,14 @@ function renderBranchChart(branchMetrics) {
             labels: topBranches.map(item => item.branch_name || 'Branch'),
             datasets: [
                 {
-                    label: 'Collected',
+                    label: 'Collected (including frozen account payments)',
                     data: topBranches.map(item => Number(item.totalRevenue || 0)),
                     backgroundColor: '#0f766e',
                     borderRadius: 10,
                     borderSkipped: false
                 },
                 {
-                    label: 'Outstanding',
+                    label: 'Unpaid Student Balances',
                     data: topBranches.map(item => Number(item.outstanding || 0)),
                     backgroundColor: '#f59e0b',
                     borderRadius: 10,
@@ -411,7 +443,7 @@ function renderBranchRanking(branchMetrics, sortMode, scope) {
                     <div class="mt-2 text-lg font-black text-emerald-900">${reportCurrency(item.totalRevenue)}</div>
                 </div>
                 <div class="rounded-2xl bg-amber-50 border border-amber-100 px-3 py-3">
-                    <div class="text-[10px] uppercase tracking-[0.18em] text-amber-700 font-bold">Outstanding</div>
+                    <div class="text-[10px] uppercase tracking-[0.18em] text-amber-700 font-bold">Unpaid Student Balances</div>
                     <div class="mt-2 text-lg font-black text-amber-900">${reportCurrency(item.outstanding)}</div>
                 </div>
             </div>
@@ -422,7 +454,8 @@ function renderBranchRanking(branchMetrics, sortMode, scope) {
                 </div>
                 <div class="rounded-2xl border border-slate-200 bg-white px-3 py-3">
                     <div class="text-xs text-slate-500">Fee Approved</div>
-                    <div class="mt-1 font-bold text-slate-900">${item.approvedFees}</div>
+                <div class="mt-1 font-bold text-slate-900">${item.approvedFees}</div>
+                <div class="mt-0.5 text-[10px] text-slate-500">Includes paid freeze fees</div>
                 </div>
                 <div class="rounded-2xl border border-slate-200 bg-white px-3 py-3">
                     <div class="text-xs text-slate-500">Fee Pending</div>
@@ -441,7 +474,7 @@ function renderBranchBreakdown(branchMetrics, sortMode) {
     if (!branchMetrics.length) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="6" class="px-5 py-8 text-center text-sm text-slate-500">
+                <td colspan="5" class="px-5 py-8 text-center text-sm text-slate-500">
                     No branch records match the current filter.
                 </td>
             </tr>
@@ -468,10 +501,11 @@ function renderBranchBreakdown(branchMetrics, sortMode) {
                 <div class="text-xs text-slate-500 mt-1">${escapeHtml(item.address || 'Branch snapshot')}</div>
             </td>
             <td class="px-5 py-4 text-slate-700">${Number(item.activeStudents || 0)}</td>
-            <td class="px-5 py-4 text-slate-700">${Number(item.approvedFees || 0)}${Number(item.pendingFees || 0) ? ` <span class="text-amber-600">(${Number(item.pendingFees || 0)} pending)</span>` : ''}</td>
+            <td class="px-5 py-4 text-slate-700">${Number(item.registrationApprovedFees || 0)}${Number(item.pendingFees || 0) ? ` <span class="text-amber-600">(${Number(item.pendingFees || 0)} pending)</span>` : ''}</td>
             <td class="px-5 py-4 font-semibold text-slate-900">${reportCurrency(item.totalRevenue)}</td>
-            <td class="px-5 py-4 font-semibold text-amber-600">${reportCurrency(item.outstanding)}</td>
-            <td class="px-5 py-4 font-semibold text-slate-900">${reportPercent(item.collectionRate)}</td>
+            <td class="px-5 py-4 font-semibold text-amber-600">
+                <div>${reportCurrency(item.outstanding)}</div>
+            </td>
         </tr>
     `).join('');
 }
@@ -480,14 +514,15 @@ function renderReports(data) {
     const filters = getReportFilters();
     const filteredRegistrations = filterRows(data.registrations, filters.branchId);
     const filteredEnrollments = filterRows(data.enrollments, filters.branchId);
+    const freezePayments = filterRows(data.freezePayments || [], filters.branchId);
     const scopedRows = applyScopeToRows(filteredRegistrations, filteredEnrollments, filters.scope);
     const registrations = scopedRows.registrations;
     const enrollments = scopedRows.enrollments;
     const branches = filters.branchId > 0
         ? data.branches.filter(branch => Number(branch.branch_id || 0) === filters.branchId)
         : data.branches;
-    const branchMetrics = computeBranchMetrics(branches, registrations, enrollments);
-    const summary = buildSummary(registrations, enrollments, branchMetrics);
+    const branchMetrics = computeBranchMetrics(branches, registrations, enrollments, freezePayments);
+    const summary = buildSummary(registrations, enrollments, freezePayments, branchMetrics);
 
     updateHeroAndStats(summary);
     renderFunnelChart(summary);
@@ -498,15 +533,17 @@ function renderReports(data) {
 }
 
 async function loadReportsData() {
-    const [branchesResult, registrationsResult, enrollmentsResult] = await Promise.allSettled([
+    const [branchesResult, registrationsResult, enrollmentsResult, freezePaymentsResult] = await Promise.allSettled([
         axios.get(`${baseApiUrl}/branch.php?action=get-branches-all`),
         axios.get(`${baseApiUrl}/admin.php?action=get-all-registrations`),
-        axios.get(`${baseApiUrl}/students.php?action=get-active-enrollments`)
+        axios.get(`${baseApiUrl}/students.php?action=get-active-enrollments`),
+        axios.get(`${baseApiUrl}/students.php?action=get-freeze-payments&status=Paid`)
     ]);
 
     const branchesData = branchesResult.status === 'fulfilled' ? branchesResult.value.data : null;
     const registrationsData = registrationsResult.status === 'fulfilled' ? registrationsResult.value.data : null;
     const enrollmentsData = enrollmentsResult.status === 'fulfilled' ? enrollmentsResult.value.data : null;
+    const freezePaymentsData = freezePaymentsResult.status === 'fulfilled' ? freezePaymentsResult.value.data : null;
 
     const branches = branchesData?.success && Array.isArray(branchesData.branches) ? branchesData.branches : [];
     const branchMap = mapBranches(branches);
@@ -518,13 +555,17 @@ async function loadReportsData() {
         enrollmentsData?.success && Array.isArray(enrollmentsData.enrollments) ? enrollmentsData.enrollments : [],
         branchMap
     );
+    const freezePayments = normalizeFreezePaymentRows(
+        freezePaymentsData?.success && Array.isArray(freezePaymentsData.payments) ? freezePaymentsData.payments : [],
+        branchMap
+    );
 
-    if (!branches.length && !registrations.length && !enrollments.length) {
+    if (!branches.length && !registrations.length && !enrollments.length && !freezePayments.length) {
         showReportsMessage('No live report records were returned from the database yet.', 'info');
     }
 
     populateReportBranchFilter(branches);
-    return { branches, registrations, enrollments };
+    return { branches, registrations, enrollments, freezePayments };
 }
 
 function attachReportFilters(refresh) {
@@ -536,22 +577,27 @@ function attachReportFilters(refresh) {
 }
 
 function buildReportCsvRows(data) {
-    const rows = [['Branch', 'Students', 'Registrations', 'Revenue', 'Outstanding', 'Collected']];
+    const rows = [['Branch', 'Students', 'Registrations', 'Fees Approved (Registration + Freeze)', 'Revenue', 'Frozen Account Payments', 'Unpaid Student Balances', 'Registration Balance', 'Enrollment Balance', 'Students With Balance']];
     const branchMap = mapBranches(data.branches);
     const metrics = computeBranchMetrics(
         data.branches,
         data.registrations,
-        data.enrollments
+        data.enrollments,
+        data.freezePayments || []
     ).sort((a, b) => Number(b.totalRevenue || 0) - Number(a.totalRevenue || 0));
 
     metrics.forEach((item) => {
         rows.push([
             item.branch_name || branchMap.get(Number(item.branch_id || 0))?.branch_name || 'Branch',
             String(Number(item.activeStudents || 0)),
-            String(Number(item.approvedFees || 0) + Number(item.pendingFees || 0)),
+            String(Number(item.registrationApprovedFees || 0) + Number(item.pendingFees || 0)),
+            String(Number(item.approvedFees || 0)),
             String(Number(item.totalRevenue || 0)),
+            String(Number(item.frozenAccountRevenue || 0)),
             String(Number(item.outstanding || 0)),
-            String(Number(item.collectionRate || 0))
+            String(Number(item.registrationOutstanding || 0)),
+            String(Number(item.enrollmentOutstanding || 0)),
+            String(Number(item.outstandingStudents || 0))
         ]);
     });
 

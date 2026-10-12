@@ -397,6 +397,77 @@ class StudentsApi
         return true;
     }
 
+    private function sendGuardianChildRegistrationReceivedEmail($toEmail, $guardianName, $studentName)
+    {
+        $toEmail = strtolower(trim((string)$toEmail));
+        if (!$this->isValidEmailAddress($toEmail)) {
+            return false;
+        }
+
+        try {
+            $mail = $this->getMailSettings();
+            if (empty($mail['host']) || !$this->isValidEmailAddress($mail['from_address'] ?? '')) {
+                return false;
+            }
+            $this->ensurePhpMailerLoaded();
+            $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $this->configurePhpMailer($mailer, $mail);
+            $mailer->addAddress($toEmail, $guardianName ?: $toEmail);
+
+            $safeGuardianName = htmlspecialchars($guardianName ?: 'Guardian', ENT_QUOTES, 'UTF-8');
+            $safeStudentName = htmlspecialchars($studentName ?: 'Student', ENT_QUOTES, 'UTF-8');
+            $mailer->Subject = 'Registration request received for ' . $studentName;
+            $mailer->isHTML(true);
+            $mailer->Body = '
+                <!doctype html>
+                <html lang="en">
+                <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Registration request received</title></head>
+                <body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+                    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">We received the registration request for ' . $safeStudentName . '. It is now under academy review.</div>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f5f7;padding:32px 12px;">
+                        <tr><td align="center">
+                            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
+                                <tr><td style="height:7px;background-color:#d4af37;font-size:0;line-height:0;">&nbsp;</td></tr>
+                                <tr><td style="padding:25px 32px;background-color:#111827;">
+                                    <div style="font-size:12px;line-height:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#e4c65a;">Father &amp; Sons Music School</div>
+                                    <div style="margin-top:5px;font-size:13px;line-height:20px;color:#d1d5db;">Guardian registration update</div>
+                                </td></tr>
+                                <tr><td style="padding:34px 32px 14px;">
+                                    <div style="display:inline-block;padding:6px 11px;border:1px solid #f2e4b4;border-radius:999px;background-color:#fdfaf1;color:#8a6500;font-size:11px;line-height:16px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Request received</div>
+                                    <h1 style="margin:15px 0 0;color:#111827;font-size:25px;line-height:32px;">Registration request received</h1>
+                                    <p style="margin:20px 0 0;font-size:15px;line-height:24px;color:#374151;">Hello ' . $safeGuardianName . ',</p>
+                                    <p style="margin:12px 0 0;font-size:15px;line-height:24px;color:#374151;">We received the registration request for <strong style="color:#111827;">' . $safeStudentName . '</strong>.</p>
+                                </td></tr>
+                                <tr><td style="padding:16px 32px 0;">
+                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#fdfaf1;border:1px solid #f2e4b4;border-radius:12px;">
+                                        <tr><td style="padding:17px 19px;">
+                                            <div style="font-size:12px;line-height:18px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8a6500;">What happens next</div>
+                                            <p style="margin:8px 0 0;font-size:14px;line-height:22px;color:#374151;">The registration and payment are pending academy review. We will email you at this address when the registration is approved.</p>
+                                        </td></tr>
+                                    </table>
+                                </td></tr>
+                                <tr><td style="padding:24px 32px 32px;">
+                                    <p style="margin:0;font-size:13px;line-height:21px;color:#6b7280;">You do not need to submit the request again. Please keep this email for your records.</p>
+                                </td></tr>
+                                <tr><td style="padding:18px 32px;background-color:#f9fafb;border-top:1px solid #e5e7eb;">
+                                    <div style="font-size:12px;line-height:19px;font-weight:700;color:#374151;">Father &amp; Sons Music School</div>
+                                    <div style="font-size:11px;line-height:18px;color:#9ca3af;">This is an automated message about a guardian registration request.</div>
+                                </td></tr>
+                            </table>
+                        </td></tr>
+                    </table>
+                </body>
+                </html>
+            ';
+            $mailer->AltBody = "We received the registration request for {$studentName}. The request and registration payment are pending academy review. We will email you when the registration is approved.";
+            $mailer->send();
+            return true;
+        } catch (\Throwable $e) {
+            error_log('Guardian child registration email failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     private function issueEmailVerificationCode($userId, $toEmail, $toName)
     {
         $this->ensureUserVerificationColumns();
@@ -1094,17 +1165,16 @@ class StudentsApi
         }
         try {
             $stmt = $this->conn->query("SHOW COLUMNS FROM tbl_payments LIKE 'payment_type'");
-            if ($stmt && $stmt->rowCount() > 0) {
-                return;
+            if (!$stmt || $stmt->rowCount() === 0) {
+                $afterClause = $this->tableHasColumn('tbl_payments', 'payment_method')
+                    ? ' AFTER payment_method'
+                    : ($this->tableHasColumn('tbl_payments', 'amount') ? ' AFTER amount' : '');
+                $this->conn->exec("ALTER TABLE tbl_payments ADD COLUMN payment_type ENUM('Full Payment','Partial Payment','Installment') NOT NULL DEFAULT 'Partial Payment' {$afterClause}");
             }
-            $afterClause = $this->tableHasColumn('tbl_payments', 'payment_method')
-                ? ' AFTER payment_method'
-                : ($this->tableHasColumn('tbl_payments', 'amount') ? ' AFTER amount' : '');
-            $this->conn->exec("
-                ALTER TABLE tbl_payments
-                ADD COLUMN payment_type ENUM('Full Payment','Partial Payment','Installment') NOT NULL DEFAULT 'Partial Payment'
-                {$afterClause}
-            ");
+            $methodColumn = $this->conn->query("SHOW COLUMNS FROM tbl_payments LIKE 'payment_method'")->fetch(PDO::FETCH_ASSOC);
+            if ($methodColumn && stripos((string)($methodColumn['Type'] ?? ''), 'enum(') === 0) {
+                $this->conn->exec("ALTER TABLE tbl_payments MODIFY COLUMN payment_method VARCHAR(80) NOT NULL DEFAULT 'Cash'");
+            }
         } catch (PDOException $e) {
             // Do not break API.
         }
@@ -1134,6 +1204,19 @@ class StudentsApi
         if (in_array($v, ['gcash', 'g-cash'], true)) return 'GCash';
         if (in_array($v, ['bank transfer', 'banktransfer', 'bank'], true)) return 'Bank Transfer';
         if (in_array($v, ['other'], true)) return 'Other';
+        try {
+            $stmt = $this->conn->prepare("SELECT setting_value FROM tbl_settings WHERE setting_key = 'payment_custom_methods_json' LIMIT 1");
+            $stmt->execute();
+            $methods = json_decode((string)$stmt->fetchColumn(), true);
+            if (is_array($methods)) {
+                foreach ($methods as $method) {
+                    $name = trim((string)($method['name'] ?? ''));
+                    if ($name !== '' && strcasecmp($name, trim((string)$raw)) === 0) return $name;
+                }
+            }
+        } catch (Throwable $e) {
+            // Unknown custom payment labels remain invalid when settings cannot be read.
+        }
         return '';
     }
 
@@ -1350,6 +1433,8 @@ class StudentsApi
             'operation_id' => "ALTER TABLE tbl_sessions ADD COLUMN operation_id INT NULL AFTER room_id",
             'attendance_status' => "ALTER TABLE tbl_sessions ADD COLUMN attendance_status ENUM('Pending','Present','Absent','Late','Excused','CI','Teacher Absent') NOT NULL DEFAULT 'Pending' AFTER status",
             'instructor_completed_at' => "ALTER TABLE tbl_sessions ADD COLUMN instructor_completed_at DATETIME NULL AFTER attendance_status",
+            'grading_started_at' => "ALTER TABLE tbl_sessions ADD COLUMN grading_started_at DATETIME NULL AFTER instructor_completed_at",
+            'grading_completed_at' => "ALTER TABLE tbl_sessions ADD COLUMN grading_completed_at DATETIME NULL AFTER grading_started_at",
             'absence_notice' => "ALTER TABLE tbl_sessions ADD COLUMN absence_notice ENUM('None','Prior','NoNotice','Teacher') NOT NULL DEFAULT 'None' AFTER attendance_status",
             'counted_in' => "ALTER TABLE tbl_sessions ADD COLUMN counted_in TINYINT(1) NOT NULL DEFAULT 0 AFTER absence_notice",
             'makeup_eligible' => "ALTER TABLE tbl_sessions ADD COLUMN makeup_eligible TINYINT(1) NOT NULL DEFAULT 0 AFTER counted_in",
@@ -1442,10 +1527,14 @@ class StudentsApi
                     ts.attendance_status,
                     ts.counted_in,
                     ts.instructor_completed_at,
+                    ts.grading_started_at,
+                    ts.grading_completed_at,
                     ts.absence_notice,
                     ts.attendance_notes,
                     ts.notes,
                     ts.notes AS lesson_focus,
+                    current_learning.level_name AS learning_level,
+                    current_learning.book_material AS learning_book,
                     {$roomExpr} AS room_name,
                     {$packageNameExpr} AS package_name,
                     COALESCE(NULLIF(TRIM(inst_type.type_name), ''), inst.instrument_name, CONCAT('Instrument #', COALESCE(ts.instrument_id, e.instrument_id))) AS instrument_name,
@@ -1471,6 +1560,16 @@ class StudentsApi
                 LEFT JOIN tbl_instruments inst ON inst.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
                 LEFT JOIN tbl_instrument_types inst_type ON inst_type.type_id = inst.type_id
                 LEFT JOIN tbl_teachers t ON t.teacher_id = ts.teacher_id
+                LEFT JOIN tbl_student_learning_levels current_learning
+                    ON current_learning.learning_level_id = (
+                        SELECT ll.learning_level_id
+                        FROM tbl_student_learning_levels ll
+                        WHERE ll.student_id = e.student_id
+                          AND ll.instrument_id = COALESCE(ts.instrument_id, e.instrument_id)
+                          AND ll.status = 'In Progress'
+                        ORDER BY ll.started_at DESC, ll.learning_level_id DESC
+                        LIMIT 1
+                    )
                 {$packageJoin}
                 {$roomJoin}
                 LEFT JOIN tbl_student_progress prog
@@ -3834,7 +3933,7 @@ class StudentsApi
             $sql .= " AND s.branch_id = ?";
             $params[] = $branchId;
         }
-        $sql .= " ORDER BY s.first_name ASC, s.last_name ASC";
+        $sql .= " ORDER BY s.created_at DESC, s.student_id DESC";
 
         try {
             $stmt = $this->conn->prepare($sql);
@@ -3972,6 +4071,7 @@ class StudentsApi
                 s.*,
                 COALESCE(rf.registration_fee_amount, 1000.00) AS registration_fee_amount,
                 COALESCE(rf.registration_fee_paid, 0.00) AS registration_fee_paid,
+                COALESCE(rf.registration_fee_pending, 0.00) AS registration_fee_pending,
                 COALESCE(rf.registration_status, 'Pending') AS registration_status,
                 (SELECT rp.status FROM tbl_registration_payments rp WHERE rp.student_id = s.student_id ORDER BY rp.registration_payment_id DESC LIMIT 1) AS registration_payment_status,
                 (SELECT rp.payment_method FROM tbl_registration_payments rp WHERE rp.student_id = s.student_id ORDER BY rp.registration_payment_id DESC LIMIT 1) AS registration_payment_method,
@@ -3985,6 +4085,7 @@ class StudentsApi
                     rp.student_id,
                     1000.00 AS registration_fee_amount,
                     COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_paid,
+                    COALESCE(SUM(CASE WHEN rp.status = 'Pending' THEN rp.amount ELSE 0 END), 0.00) AS registration_fee_pending,
                     CASE
                         WHEN COALESCE(SUM(CASE WHEN rp.status = 'Paid' THEN rp.amount ELSE 0 END), 0.00) >= 1000.00 THEN 'Approved'
                         ELSE 'Pending'
@@ -4212,7 +4313,7 @@ class StudentsApi
             foreach ($allEnrollments as &$enrollmentRow) {
                 $balanceData = $this->balanceEnrollment((int)$enrollmentRow['enrollment_id']);
                 if ($balanceData) {
-                    foreach (['total_amount', 'paid_amount', 'balance_amount', 'deadline_session',
+                    foreach (['total_amount', 'paid_amount', 'pending_amount', 'balance_amount', 'deadline_session',
                         'sessions_used', 'sessions_remaining', 'payment_status', 'payment_history'] as $field) {
                         $enrollmentRow[$field] = $balanceData[$field];
                     }
@@ -4260,12 +4361,15 @@ class StudentsApi
                 try {
                     $stmtCertificate = $this->conn->prepare("
                         SELECT c.certificate_id, c.certificate_number, c.achieved_level,
+                               achieved_learning.book_material AS achieved_book_material,
                                c.issued_at, c.instrument_id,
                                COALESCE(NULLIF(TRIM(it.type_name), ''), i.instrument_name) AS instrument_name,
                                pe.exam_id AS promotional_exam_id, pe.exam_date, pe.result AS exam_result,
                                pe.grade_rating AS exam_rating, pe.examiner_notes,
                                CONCAT(COALESCE(ct.first_name, ''), ' ', COALESCE(ct.last_name, '')) AS issuing_teacher_name
                         FROM tbl_student_certificates c
+                        LEFT JOIN tbl_student_learning_levels achieved_learning
+                          ON achieved_learning.learning_level_id = c.learning_level_id
                         LEFT JOIN tbl_instruments i ON i.instrument_id = c.instrument_id
                         LEFT JOIN tbl_instrument_types it ON it.type_id = i.type_id
                         LEFT JOIN tbl_promotional_exams pe ON pe.exam_id = c.promotional_exam_id
@@ -4330,7 +4434,7 @@ class StudentsApi
                     LEFT JOIN tbl_student_certificates c
                       ON c.learning_level_id = ll.learning_level_id AND c.status = 'Issued'
                     WHERE ll.student_id = ?
-                    ORDER BY ll.instrument_id, ll.started_at DESC, ll.learning_level_id DESC
+                    ORDER BY ll.instrument_id, ll.started_at ASC, ll.learning_level_id ASC
                 ");
                 $stmtLearning->execute([(int)$student['student_id']]);
                 $learningRows = $stmtLearning->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -4377,6 +4481,7 @@ class StudentsApi
                 'certificate_id' => $issuedCertificate['certificate_id'] ?? null,
                 'certificate_number' => $issuedCertificate['certificate_number'] ?? null,
                 'achieved_level' => $issuedCertificate['achieved_level'] ?? null,
+                'book_material' => $issuedCertificate['achieved_book_material'] ?? null,
                 'instrument_name' => $issuedCertificate['instrument_name'] ?? null,
                 'promotional_exam_id' => $issuedCertificate['promotional_exam_id'] ?? null,
                 'exam_date' => $issuedCertificate['exam_date'] ?? null,
@@ -4854,8 +4959,11 @@ class StudentsApi
         }
 
         $age = $this->calculateAgeFromDateOfBirth($studentDob);
-        if ($age === null || $age < 3) {
-            $this->sendJSON(['error' => 'Student date of birth is invalid or too young'], 400);
+        if ($age === null) {
+            $this->sendJSON(['error' => 'Enter a valid date of birth that is not in the future.'], 400);
+        }
+        if ($age < 3) {
+            $this->sendJSON(['error' => 'Students must be at least 3 years old to register.'], 400);
         }
         if (strlen($password) < 8 || !preg_match('/[A-Z]/', $password) || !preg_match('/[a-z]/', $password) || !preg_match('/[0-9]/', $password) || !preg_match('/[!@#$%^&*]/', $password)) {
             $this->sendJSON(['error' => 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character'], 400);
@@ -5040,6 +5148,15 @@ class StudentsApi
 
             $this->conn->commit();
 
+            $guardianName = trim((string)($guardian['first_name'] ?? '') . ' ' . (string)($guardian['last_name'] ?? ''));
+            $studentName = trim($studentFirstName . ' ' . $studentLastName);
+            $guardianContactEmail = trim((string)($guardian['email'] ?? $guardianEmail));
+            $guardianNotificationSent = $this->sendGuardianChildRegistrationReceivedEmail(
+                $guardianContactEmail,
+                $guardianName,
+                $studentName
+            );
+
             $this->sendJSON([
                 'success' => true,
                 'message' => 'Child registration submitted successfully and is now pending review.',
@@ -5049,7 +5166,9 @@ class StudentsApi
                 'verification_required' => false,
                 'verification_email' => $studentEmail,
                 'guardian_id' => (int)$guardian['guardian_id'],
-                'guardian_email' => $guardianEmail,
+                'guardian_email' => $guardianContactEmail,
+                'contact_email' => $guardianContactEmail,
+                'guardian_notification_sent' => $guardianNotificationSent,
                 'registration_status' => 'Pending',
                 'registration_fee_amount' => $registrationFeeAmount,
                 'payment_method' => $paymentMethod,
@@ -5111,9 +5230,15 @@ class StudentsApi
 
             $placeholders = implode(',', array_fill(0, count($guardianIds), '?'));
             $stmtStudents = $this->conn->prepare("
-                SELECT DISTINCT sg.student_id
-                FROM tbl_student_guardians sg
-                WHERE sg.guardian_id IN ({$placeholders})
+                SELECT s.student_id
+                FROM tbl_students s
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM tbl_student_guardians sg
+                    WHERE sg.student_id = s.student_id
+                      AND sg.guardian_id IN ({$placeholders})
+                )
+                ORDER BY s.created_at DESC, s.student_id DESC
             ");
             $stmtStudents->execute($guardianIds);
             $studentIds = $stmtStudents->fetchAll(PDO::FETCH_COLUMN);
@@ -5133,6 +5258,96 @@ class StudentsApi
             ]);
         } catch (PDOException $e) {
             $this->sendJSON(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getGuardianPaymentHistory(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->sendJSON(['error' => 'Method not allowed'], 405);
+        }
+
+        $actor = fas_require_authenticated_user($this->conn);
+        if (fas_normalize_role_category($actor['role_name'] ?? '') !== 'guardian') {
+            $this->sendJSON(['error' => 'Guardian account required'], 403);
+        }
+        $email = trim((string)($actor['email'] ?? ''));
+        if ($email === '') {
+            $this->sendJSON(['error' => 'Guardian email is unavailable'], 403);
+        }
+
+        try {
+            $guardianStmt = $this->conn->prepare('SELECT guardian_id FROM tbl_guardians WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))');
+            $guardianStmt->execute([$email]);
+            $guardianIds = array_values(array_filter(array_map('intval', $guardianStmt->fetchAll(PDO::FETCH_COLUMN) ?: [])));
+            if (!$guardianIds) {
+                $this->sendJSON(['success' => true, 'payments' => []]);
+            }
+
+            $guardianPlaceholders = implode(',', array_fill(0, count($guardianIds), '?'));
+            $studentStmt = $this->conn->prepare("SELECT DISTINCT student_id FROM tbl_student_guardians WHERE guardian_id IN ({$guardianPlaceholders})");
+            $studentStmt->execute($guardianIds);
+            $studentIds = array_values(array_filter(array_map('intval', $studentStmt->fetchAll(PDO::FETCH_COLUMN) ?: [])));
+            if (!$studentIds) {
+                $this->sendJSON(['success' => true, 'payments' => []]);
+            }
+
+            $studentPlaceholders = implode(',', array_fill(0, count($studentIds), '?'));
+            $studentName = "CONCAT_WS(' ', s.first_name, s.last_name)";
+            $payments = [];
+            $appendFrom = function (string $table, string $alias, string $from, string $idColumn, string $label) use (&$payments, $studentName, $studentPlaceholders, $studentIds): void {
+                if (!$this->tableExists($table) || !$this->tableHasColumn($table, 'amount') || !$this->tableHasColumn($table, $idColumn)) {
+                    return;
+                }
+                $hasPaymentDate = $this->tableHasColumn($table, 'payment_date');
+                $hasCreatedAt = $this->tableHasColumn($table, 'created_at');
+                $dateExpression = $hasPaymentDate && $hasCreatedAt
+                    ? "COALESCE({$alias}.payment_date, {$alias}.created_at)"
+                    : ($hasPaymentDate ? "{$alias}.payment_date" : ($hasCreatedAt ? "{$alias}.created_at" : 'NULL'));
+                $methodExpression = $this->tableHasColumn($table, 'payment_method') ? "COALESCE({$alias}.payment_method, '—')" : "'—'";
+                $statusExpression = $this->tableHasColumn($table, 'status') ? "COALESCE({$alias}.status, '—')" : "'—'";
+                $receiptExpression = $this->tableHasColumn($table, 'receipt_number') ? "{$alias}.receipt_number" : 'NULL';
+                $referenceExpression = $this->tableHasColumn($table, 'reference_number') ? "{$alias}.reference_number" : 'NULL';
+                $sql = "SELECT {$alias}.{$idColumn} AS source_id, {$dateExpression} AS payment_date,
+                    {$studentName} AS student_name, {$methodExpression} AS payment_method,
+                    {$statusExpression} AS status, {$alias}.amount,
+                    {$receiptExpression} AS receipt_number, {$referenceExpression} AS reference_number,
+                    '{$label}' AS payment_label {$from} WHERE s.student_id IN ({$studentPlaceholders})";
+                $stmt = $this->conn->prepare($sql);
+                $stmt->execute($studentIds);
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                    $payments[] = $row;
+                }
+            };
+
+            $appendFrom(
+                'tbl_registration_payments', 'rp',
+                'FROM tbl_registration_payments rp INNER JOIN tbl_students s ON s.student_id = rp.student_id',
+                'registration_payment_id', 'Registration fee'
+            );
+            if ($this->tableExists('tbl_payments') && $this->tableExists('tbl_enrollments') && $this->tableHasColumn('tbl_payments', 'enrollment_id')) {
+                $appendFrom(
+                    'tbl_payments', 'p',
+                    'FROM tbl_payments p INNER JOIN tbl_enrollments e ON e.enrollment_id = p.enrollment_id INNER JOIN tbl_students s ON s.student_id = e.student_id',
+                    'payment_id', 'Enrollment payment'
+                );
+            }
+            if ($this->tableExists('tbl_freeze_payments') && $this->tableHasColumn('tbl_freeze_payments', 'student_id')) {
+                $appendFrom(
+                    'tbl_freeze_payments', 'fp',
+                    'FROM tbl_freeze_payments fp INNER JOIN tbl_students s ON s.student_id = fp.student_id',
+                    'freeze_payment_id', 'Schedule-freeze fee'
+                );
+            }
+
+            usort($payments, static function (array $left, array $right): int {
+                $dateCompare = strcmp((string)($right['payment_date'] ?? ''), (string)($left['payment_date'] ?? ''));
+                return $dateCompare !== 0 ? $dateCompare : ((int)($right['source_id'] ?? 0) <=> (int)($left['source_id'] ?? 0));
+            });
+            $this->sendJSON(['success' => true, 'payments' => $payments]);
+        } catch (Throwable $e) {
+            error_log('Guardian payment history failed: ' . $e->getMessage());
+            $this->sendJSON(['error' => 'Unable to load payment history right now'], 500);
         }
     }
 
@@ -5639,7 +5854,7 @@ class StudentsApi
             }
         }
         if ($paymentMethod !== 'Cash' && !$paymentProofPath) {
-            $this->sendJSON(['error' => 'Upload proof of payment for GCash or Bank Transfer requests.'], 400);
+            $this->sendJSON(['error' => 'Upload proof of payment for online payment requests.'], 400);
         }
 
         try {
@@ -6243,7 +6458,7 @@ class StudentsApi
                 $sql .= " AND r.branch_id = ?";
                 $params[] = $branchId;
             }
-            $sql .= " ORDER BY r.request_id DESC";
+            $sql .= " ORDER BY r.created_at DESC, r.request_id DESC";
 
             $stmt = $this->conn->prepare($sql);
             $stmt->execute($params);
@@ -6602,7 +6817,7 @@ class StudentsApi
                 $sql .= " AND s.branch_id = ?";
                 $params[] = $branchId;
             }
-            $sql .= " ORDER BY e.enrollment_id DESC";
+            $sql .= " ORDER BY e.created_at DESC, e.enrollment_id DESC";
 
             $stmt = $this->conn->prepare($sql);
             $stmt->execute($params);
@@ -6803,7 +7018,7 @@ class StudentsApi
                 $sql .= " AND s.branch_id = ? ";
                 $params[] = $branchId;
             }
-            $sql .= " ORDER BY e.enrollment_id DESC ";
+            $sql .= " ORDER BY e.created_at DESC, e.enrollment_id DESC ";
 
             $stmt = $this->conn->prepare($sql);
             $stmt->execute($params);
@@ -8586,6 +8801,13 @@ class StudentsApi
             ");
         } catch (PDOException $e) { /* table may already exist */ }
 
+        try {
+            $methodColumn = $this->conn->query("SHOW COLUMNS FROM tbl_freeze_payments LIKE 'payment_method'")->fetch(PDO::FETCH_ASSOC);
+            if ($methodColumn && stripos((string)($methodColumn['Type'] ?? ''), 'enum(') === 0) {
+                $this->conn->exec("ALTER TABLE tbl_freeze_payments MODIFY COLUMN payment_method VARCHAR(80) NOT NULL DEFAULT 'Cash'");
+            }
+        } catch (PDOException $e) { /* preserve existing freeze payment records */ }
+
         // Preserve old attendance records while starting a new absence cycle
         // whenever the reservation/freeze payment is settled.
         try {
@@ -9090,9 +9312,11 @@ class StudentsApi
         $payments->execute([$enrollmentId]);
         $history = $payments->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $paid = 0.0;
+        $pendingAmount = 0.0;
         $pending = false;
         foreach ($history as &$payment) {
             if ($payment['status'] === 'Paid') $paid += (float)$payment['amount'];
+            if ($payment['status'] === 'Pending') $pendingAmount += (float)$payment['amount'];
             $paymentMeta = $this->decodeRequestMeta($payment['notes'] ?? '');
             if ($payment['status'] === 'Pending' && ($paymentMeta['kind'] ?? '') === 'balance_online') $pending = true;
             $payment['purpose'] = ($paymentMeta['kind'] ?? '') === 'balance_online' || ($paymentMeta['kind'] ?? '') === 'balance_desk'
@@ -9109,6 +9333,7 @@ class StudentsApi
         $used = max($used, (int)$usedStmt->fetchColumn());
         $row['total_amount'] = round($total, 2);
         $row['paid_amount'] = round($paid, 2);
+        $row['pending_amount'] = round(min($pendingAmount, max(0, $total - $paid)), 2);
         $row['balance_amount'] = round(max(0, $total - $paid), 2);
         $row['deadline_session'] = $deadline;
         $row['sessions_used'] = $used;
@@ -9404,6 +9629,9 @@ switch ($action) {
         break;
     case 'get-guardian-portal':
         $studentsApi->getGuardianPortal();
+        break;
+    case 'get-guardian-payment-history':
+        $studentsApi->getGuardianPaymentHistory();
         break;
     case 'update-guardian-profile':
         $studentsApi->updateGuardianProfile();

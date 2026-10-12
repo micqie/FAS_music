@@ -433,14 +433,38 @@ class AttendanceApi
 
         try {
             $dupStmt = $this->conn->prepare("
-                SELECT request_id
+                SELECT status
                 FROM tbl_guardian_absence_requests
-                WHERE guardian_id = ? AND student_id = ? AND session_date = ? AND status IN ('Pending','Reviewed','Approved')
+                WHERE guardian_id = ? AND student_id = ? AND session_date = ?
+                ORDER BY created_at DESC, request_id DESC
                 LIMIT 1
             ");
             $dupStmt->execute([(int)$guardian['guardian_id'], $studentId, $sessionDate]);
-            if ($dupStmt->fetch(PDO::FETCH_ASSOC)) {
-                $this->sendJSON(['error' => 'An absence request already exists for this student and date'], 400);
+            $existingStatus = strtolower(trim((string)$dupStmt->fetchColumn()));
+            if ($existingStatus === 'pending') {
+                $this->sendJSON([
+                    'error' => 'This absence request is pending staff review.',
+                    'code' => 'ABSENCE_REQUEST_PENDING'
+                ], 400);
+            }
+            if (in_array($existingStatus, ['reviewed', 'approved', 'declined'], true)) {
+                $this->sendJSON(['error' => 'This absence request has already been reviewed by staff.'], 400);
+            }
+
+            $scheduledStmt = $this->conn->prepare("
+                SELECT ts.session_id
+                FROM tbl_sessions ts
+                INNER JOIN tbl_enrollments e ON e.enrollment_id = ts.enrollment_id
+                WHERE e.student_id = ?
+                  AND ts.session_date = ?
+                  AND ts.session_date >= CURDATE()
+                  AND ts.status = 'Scheduled'
+                  AND COALESCE(ts.attendance_status, 'Pending') NOT IN ('Present', 'Absent')
+                LIMIT 1
+            ");
+            $scheduledStmt->execute([$studentId, $sessionDate]);
+            if (!$scheduledStmt->fetch(PDO::FETCH_ASSOC)) {
+                $this->sendJSON(['error' => 'Choose an upcoming scheduled session that has not already been marked present or absent'], 400);
             }
 
             $insert = $this->conn->prepare("

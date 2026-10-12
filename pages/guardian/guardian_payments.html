@@ -137,11 +137,40 @@
                         <span class="portal-stat-label">Due</span>
                         <span id="guardianPaymentTotalBalance" class="ml-2 font-bold text-gold-500">₱0.00</span>
                     </div>
+                    <div class="rounded-2xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-2">
+                        <span class="portal-stat-label">Pending</span>
+                        <span id="guardianPaymentTotalPending" class="ml-2 font-bold text-amber-700 dark:text-amber-300">₱0.00</span>
+                    </div>
                 </div>
             </div>
 
             <section class="rounded-3xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 sm:p-6 shadow-xl dark:shadow-black/40">
                 <div id="guardianPaymentsList" class="grid grid-cols-1 gap-4"></div>
+            </section>
+
+            <section class="mt-6 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl dark:border-white/10 dark:bg-white/5 dark:shadow-black/40">
+                <div class="border-b border-zinc-200 px-5 py-4 dark:border-white/10 sm:px-6">
+                    <h2 class="text-lg font-black text-zinc-900 dark:text-white">Payment History</h2>
+                    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Payments recorded for your linked children, including registration, enrollment, and schedule-freeze fees.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[760px] text-left text-sm">
+                        <thead class="bg-zinc-50 text-xs uppercase tracking-wider text-zinc-500 dark:bg-black/20 dark:text-zinc-400">
+                            <tr>
+                                <th class="px-5 py-3 font-bold">Date</th>
+                                <th class="px-5 py-3 font-bold">Student</th>
+                                <th class="px-5 py-3 font-bold">Payment</th>
+                                <th class="px-5 py-3 font-bold">Method</th>
+                                <th class="px-5 py-3 text-right font-bold">Amount</th>
+                                <th class="px-5 py-3 font-bold">Status</th>
+                                <th class="px-5 py-3 font-bold">Receipt / Reference</th>
+                            </tr>
+                        </thead>
+                        <tbody id="guardianPaymentHistoryBody" class="divide-y divide-zinc-100 dark:divide-white/10">
+                            <tr><td colspan="7" class="px-5 py-8 text-center text-zinc-500 dark:text-zinc-400">Loading payment history…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
         </div>
     </main>
@@ -166,7 +195,7 @@
     <script src="../../js/mode.js"></script>
     <button id="themeToggle" aria-label="Toggle dark or light mode"><div class="relative w-6 h-6 flex items-center justify-center"><i id="sunIcon" class="fas fa-sun absolute inset-0 m-auto transition-opacity duration-300"></i><i id="moonIcon" class="fas fa-moon absolute inset-0 m-auto transition-opacity duration-300 opacity-0"></i></div></button>
     <script src="../../js/portal_sidebar.js"></script>
-    <script src="../../js/index.js?v=20260918003"></script>
+    <script src="../../js/index.js?v=20261009004"></script>
     <script src="../../js/session_timeout.js"></script>
 </body>
 </html>

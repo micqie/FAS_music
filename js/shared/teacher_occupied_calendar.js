@@ -46,9 +46,9 @@
     function ensureModal() {
         if (document.getElementById('teacherOccupiedCalendarModal')) return;
         document.body.insertAdjacentHTML('beforeend', `
-            <div id="teacherOccupiedCalendarModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-slate-950/70 p-3 backdrop-blur-sm" aria-hidden="true">
-                <div class="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-                    <div class="flex items-center justify-between gap-4 bg-gradient-to-r from-slate-900 to-slate-700 px-5 py-4 text-white sm:px-6">
+            <div id="teacherOccupiedCalendarModal" class="fixed inset-0 z-[80] hidden items-center justify-center overflow-y-auto bg-slate-950/70 p-2 backdrop-blur-sm sm:p-4" aria-hidden="true">
+                <div class="flex max-h-[90vh] max-h-[90dvh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+                    <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-slate-900 to-slate-700 px-4 py-3 text-white sm:px-6 sm:py-4">
                         <div class="min-w-0">
                             <div class="text-[10px] font-bold uppercase tracking-[.2em] text-amber-300">Teaching calendar</div>
                             <h3 id="teacherOccupiedCalendarTitle" class="mt-1 truncate text-xl font-black">Instructor Calendar</h3>
@@ -56,7 +56,7 @@
                         </div>
                         <button type="button" data-close-teacher-calendar class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 hover:bg-white/20" aria-label="Close calendar"><i class="fas fa-times"></i></button>
                     </div>
-                    <div class="min-h-0 overflow-y-auto p-4 sm:p-6">
+                    <div class="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
                         <div class="flex items-center justify-between gap-3">
                             <button type="button" id="teacherOccupiedCalendarPrev" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"><i class="fas fa-chevron-left mr-2"></i>Prev</button>
                             <div id="teacherOccupiedCalendarMonth" class="text-base font-black text-slate-900"></div>
@@ -64,7 +64,7 @@
                         </div>
                         <div class="mt-5 grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
                         <div id="teacherOccupiedCalendarGrid" class="mt-2 grid grid-cols-7 gap-1.5"></div>
-                        <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">Green: available · Yellow: pending reservation · Red: occupied by a scheduled session · Gray: unavailable.</div>
+                        <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">Green: open slots · Yellow: partly occupied or pending · Red: occupied sessions or full schedule · Gray: unavailable. Counts show used slots / total slots.</div>
                         <div id="teacherOccupiedCalendarDetails" class="mt-4"></div>
                         <div id="teacherOccupiedCalendarStatus" class="mt-4 text-sm text-slate-500" aria-live="polite"></div>
                     </div>
@@ -111,7 +111,7 @@
             return;
         }
         const cards = [
-            ...occupied.map(slot => ({ slot, label: 'Occupied session', classes: 'border-red-300 bg-red-50 text-red-800' })),
+            ...occupied.map(slot => ({ slot, label: 'Occupied session', classes: 'border-red-300 bg-red-100 text-red-800' })),
             ...reserved.map(slot => ({ slot, label: 'Pending reservation', classes: 'border-amber-300 bg-amber-50 text-amber-800' })),
             ...available.map(slot => ({ slot, label: 'Available', classes: 'border-emerald-300 bg-emerald-50 text-emerald-800' }))
         ].sort((a, b) => String(a.slot.start_time || '').localeCompare(String(b.slot.start_time || '')));
@@ -135,11 +135,15 @@
             const openCount = (available[date] || []).length;
             const reservedCount = (reserved[date] || []).length;
             const occupiedCount = (occupied[date] || []).length;
+            const usedCount = reservedCount + occupiedCount;
+            const totalCount = openCount + usedCount;
+            const isFull = totalCount > 0 && openCount === 0 && occupiedCount > 0;
             const hasInfo = openCount || reservedCount || occupiedCount;
             const selected = state.selectedDate === date;
-            const color = occupiedCount ? 'border-red-300 bg-red-100 text-red-900' : reservedCount ? 'border-amber-300 bg-amber-100 text-amber-900' : openCount ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-100 text-slate-400';
-            const status = occupiedCount ? `${occupiedCount} occupied` : reservedCount ? `${reservedCount} reserved` : openCount ? `${openCount} available` : 'Unavailable';
-            html += `<button type="button" data-teacher-calendar-date="${date}" class="h-16 rounded-xl border p-2 text-left transition ${color} ${hasInfo ? 'hover:brightness-95' : ''} ${selected ? 'ring-2 ring-slate-900/30' : ''}"><div class="flex items-start justify-between"><span class="font-black">${day}</span>${occupiedCount ? `<span class="rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${occupiedCount}</span>` : reservedCount ? `<span class="rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${reservedCount}</span>` : openCount ? `<span class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${openCount}</span>` : ''}</div><div class="mt-1 text-[9px] font-bold">${status}</div></button>`;
+            const color = isFull ? 'border-red-300 bg-red-100 text-red-900' : usedCount ? 'border-amber-300 bg-amber-100 text-amber-900' : openCount ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-100 text-slate-400';
+            const status = isFull ? 'Full schedule' : occupiedCount ? `${occupiedCount}/${totalCount} occupied${reservedCount ? ` · ${reservedCount} pending` : ''}` : reservedCount ? `${reservedCount}/${totalCount} pending` : openCount ? `${openCount} available` : 'Unavailable';
+            const badgeClass = isFull ? 'bg-red-600' : usedCount ? 'bg-amber-600' : 'bg-emerald-600';
+            html += `<button type="button" data-teacher-calendar-date="${date}" class="min-h-14 rounded-xl border p-1.5 text-left transition sm:h-16 sm:p-2 ${color} ${hasInfo ? 'hover:brightness-95' : ''} ${selected ? 'ring-2 ring-slate-900/30' : ''}"><div class="flex items-start justify-between gap-1"><span class="font-black">${day}</span>${hasInfo ? `<span class="rounded-full ${badgeClass} px-1.5 py-0.5 text-[9px] font-bold text-white">${usedCount ? `${usedCount}/${totalCount}` : openCount}</span>` : ''}</div><div class="mt-1 text-[9px] font-bold leading-tight">${status}</div></button>`;
         }
         grid.innerHTML = html;
         renderDetails(available[state.selectedDate] || [], reserved[state.selectedDate] || [], occupied[state.selectedDate] || []);

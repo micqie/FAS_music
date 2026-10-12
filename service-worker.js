@@ -1,4 +1,4 @@
-const CACHE_VERSION = '20261007-18';
+const CACHE_VERSION = '20261012-03';
 const STATIC_CACHE = `fas-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `fas-pages-${CACHE_VERSION}`;
 const OFFLINE_PAGE = './offline.html';
@@ -79,6 +79,7 @@ const PRECACHE = [
   "./js/admin/admin_reports.js",
   "./js/admin/admin_responsive.js",
   "./js/admin/admin_sessions.js",
+  "./js/admin/admin_settings.js",
   "./js/admin/admin_student_ledger.js",
   "./js/admin/admin_students.js",
   "./js/admin/admin_teachers.js",
@@ -115,6 +116,7 @@ const PRECACHE = [
   "./js/offline.js",
   "./js/portal_loading.js",
   "./js/portal_sidebar.js",
+  "./js/reset_password.js",
   "./js/session_timeout.js",
   "./js/shared/teacher_form_ui.js",
   "./js/shared/teacher_occupied_calendar.js",
@@ -144,6 +146,7 @@ const PRECACHE = [
   "./pages/admin/admin_reports.html",
   "./pages/admin/admin_room.html",
   "./pages/admin/admin_sessions.html",
+  "./pages/admin/admin_settings.html",
   "./pages/admin/admin_specializations.html",
   "./pages/admin/admin_student_ledger.html",
   "./pages/admin/admin_students.html",
@@ -184,7 +187,8 @@ const PRECACHE = [
   "./pages/student/student_profile.html",
   "./pages/student/student_qr.html",
   "./pages/student/student_sessions.html",
-  "./pages/student/student_songs.html"
+  "./pages/student/student_songs.html",
+  "./reset_password.html"
 ];
 
 self.addEventListener('install', event => {
@@ -220,6 +224,17 @@ self.addEventListener('fetch', event => {
       }
       return response;
     }).catch(async () => (await caches.match(request, { ignoreSearch: true })) || (await caches.match(OFFLINE_PAGE))));
+    return;
+  }
+
+  if (/\/js\/index\.js$/i.test(url.pathname)) {
+    event.respondWith(fetch(request).then(response => {
+      if (response.ok && response.type === 'basic') {
+        const cacheResponse = response.clone();
+        event.waitUntil(caches.open(STATIC_CACHE).then(cache => cache.put(request, cacheResponse)));
+      }
+      return response;
+    }).catch(async () => (await caches.open(STATIC_CACHE)).match(request, { ignoreSearch: true }) || Response.error()));
     return;
   }
 

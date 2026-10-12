@@ -36,12 +36,6 @@
             border-color: #0d9488 !important;
         }
 
-        /* Skill level buttons */
-        .skill-level-btn.selected {
-            background: #d1fae5 !important;
-            border-color: #0d9488 !important;
-        }
-
         /* Grading panel slide */
         #gradingPanel.show {
             transform: translateX(0);
@@ -312,31 +306,14 @@
                 <input type="hidden" id="focusScoreInput">
                 <input type="hidden" id="assignmentScoreInput">
 
-                <!-- 3. Overall level -->
+                <!-- 3. Overall level is derived from the criteria average -->
                 <section>
                     <h3 class="text-base font-semibold text-gray-900 mb-1">3. Overall level</h3>
-                    <p class="text-sm text-gray-500 mb-4">Where the student sits right now on their instrument.</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button type="button" onclick="selectSkillLevel('Beginner')" data-level="Beginner"
-                            class="skill-level-btn text-left rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 hover:border-gray-300 transition">
-                            <p class="text-sm font-semibold text-gray-900">Beginner</p>
-                            <p class="text-xs text-gray-500 mt-0.5">Learning the fundamentals with guidance.</p>
-                        </button>
-                        <button type="button" onclick="selectSkillLevel('Developing')" data-level="Developing"
-                            class="skill-level-btn text-left rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 hover:border-gray-300 transition">
-                            <p class="text-sm font-semibold text-gray-900">Developing</p>
-                            <p class="text-xs text-gray-500 mt-0.5">Plays assigned material with some support.</p>
-                        </button>
-                        <button type="button" onclick="selectSkillLevel('Proficient')" data-level="Proficient"
-                            class="skill-level-btn text-left rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 hover:border-gray-300 transition">
-                            <p class="text-sm font-semibold text-gray-900">Proficient</p>
-                            <p class="text-xs text-gray-500 mt-0.5">Independent and consistent week to week.</p>
-                        </button>
-                        <button type="button" onclick="selectSkillLevel('Advanced')" data-level="Advanced"
-                            class="skill-level-btn text-left rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 hover:border-gray-300 transition">
-                            <p class="text-sm font-semibold text-gray-900">Advanced</p>
-                            <p class="text-xs text-gray-500 mt-0.5">Performs with confidence and interpretation.</p>
-                        </button>
+                    <p class="text-sm text-gray-500 mb-4">Calculated automatically from the average of the criteria ratings.</p>
+                    <div class="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3.5">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Calculated student level</div>
+                        <div id="derivedSkillLevelLabel" class="mt-1 text-base font-bold text-gray-900">Rate every criterion to calculate the level.</div>
+                        <p class="mt-1 text-xs text-indigo-700">Rounded average: 1–2 Beginner · 3 Developing · 4 Proficient · 5 Advanced</p>
                     </div>
                     <input type="hidden" id="skillLevelInput">
                 </section>
@@ -481,7 +458,7 @@
 <script src="../../assets/vendor/js/sweetalert2.min.js"></script>
     <script src="../../js/index.js?v=20260919001"></script>
     <script src="../../js/instructor/instructor_nav.js?v=20260919007"></script>
-<script src="../../js/instructor/grading.js?v=20261007005"></script>
+<script src="../../js/instructor/grading.js?v=20261008004"></script>
 <script src="../../js/instructor/grading_ui.js?v=20260829006"></script>
 <script src="../../js/session_timeout.js"></script>
 

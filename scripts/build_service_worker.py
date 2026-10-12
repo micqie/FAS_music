@@ -2,8 +2,8 @@ from pathlib import Path
 import json
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '20261007-18'
-assets = {'./', './index.html', './featured.html', './offline.html', './manifest.webmanifest'}
+VERSION = '20261012-03'
+assets = {'./', './index.html', './featured.html', './reset_password.html', './offline.html', './manifest.webmanifest'}
 
 for path in (ROOT / 'pages').rglob('*.html'):
     assets.add('./' + path.relative_to(ROOT).as_posix())
@@ -49,15 +49,32 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).then(response => {
-      if (response.ok) caches.open(PAGE_CACHE).then(cache => cache.put(request, response.clone()));
+      if (response.ok) {
+        const cacheResponse = response.clone();
+        event.waitUntil(caches.open(PAGE_CACHE).then(cache => cache.put(request, cacheResponse)));
+      }
       return response;
     }).catch(async () => (await caches.match(request, { ignoreSearch: true })) || (await caches.match(OFFLINE_PAGE))));
     return;
   }
 
+  if (/\/js\/index\.js$/i.test(url.pathname)) {
+    event.respondWith(fetch(request).then(response => {
+      if (response.ok && response.type === 'basic') {
+        const cacheResponse = response.clone();
+        event.waitUntil(caches.open(STATIC_CACHE).then(cache => cache.put(request, cacheResponse)));
+      }
+      return response;
+    }).catch(async () => (await caches.open(STATIC_CACHE)).match(request, { ignoreSearch: true }) || Response.error()));
+    return;
+  }
+
   if (isStaticAsset(url)) {
     event.respondWith(caches.match(request, { ignoreSearch: true }).then(cached => cached || fetch(request).then(response => {
-      if (response.ok && response.type === 'basic') caches.open(STATIC_CACHE).then(cache => cache.put(request, response.clone()));
+      if (response.ok && response.type === 'basic') {
+        const cacheResponse = response.clone();
+        event.waitUntil(caches.open(STATIC_CACHE).then(cache => cache.put(request, cacheResponse)));
+      }
       return response;
     })));
   }

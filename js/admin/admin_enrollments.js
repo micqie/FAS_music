@@ -1180,12 +1180,16 @@
             const reservedSlots = adminAssignReservedSlots.filter(slot => String(slot.session_date || '') === date);
             const occupiedSlots = adminAssignOccupiedSlots.filter(slot => String(slot.session_date || '') === date);
             if (!slots.length && !reservedSlots.length && !occupiedSlots.length) return;
+            const totalSlots = slots.length + reservedSlots.length + occupiedSlots.length;
+            const occupancySummary = occupiedSlots.length
+                ? `${occupiedSlots.length}/${totalSlots} occupied${reservedSlots.length ? ` · ${reservedSlots.length} pending` : ''}`
+                : reservedSlots.length ? `${reservedSlots.length}/${totalSlots} pending` : `${slots.length} available`;
             Swal.fire({
                 title: formatAdminAssignDate(date),
-                html: `<div class="text-sm text-slate-500 mb-4">Green slots are available. Red slots are already occupied or reserved.</div>
+                html: `<div class="text-sm text-slate-500 mb-4">${occupancySummary}<br>Green: available · Yellow: partly occupied or pending · Red: occupied session or full schedule.</div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
                         ${slots.map(({ slot, index }) => `<button type="button" class="admin-assign-slot-picker-btn assign-request-slot-picker-btn rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100" data-slot-index="${index}"><div class="text-base font-bold text-emerald-800">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">${escapeHtml(slot.day_of_week || '')}</div></button>`).join('')}
-                        ${reservedSlots.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="text-base font-bold text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold uppercase tracking-wide text-red-700">Reserved by pending request</div></div>`).join('')}
+                        ${reservedSlots.map(slot => `<div class="rounded-xl border border-amber-300 bg-amber-100 px-4 py-3"><div class="text-base font-bold text-amber-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold uppercase tracking-wide text-amber-700">Reserved by pending request</div></div>`).join('')}
                         ${occupiedSlots.map(slot => `<div class="rounded-xl border border-red-300 bg-red-100 px-4 py-3"><div class="text-base font-bold text-red-900">${escapeHtml(`${formatTime12Hour(slot.start_time)} - ${formatTime12Hour(slot.end_time)}`)}</div><div class="mt-1 text-xs font-bold uppercase tracking-wide text-red-700">Occupied by scheduled session</div></div>`).join('')}
                     </div>`,
                 showConfirmButton: false,
@@ -1238,14 +1242,22 @@
                 const elapsedToday = adminAssignElapsedAvailabilityDates.has(date);
                 const hasReservation = reservedDates.has(date);
                 const isOccupied = occupiedDates.has(date);
+                const reservationCount = adminAssignReservedSlots.filter(slot => String(slot.session_date || '') === date).length;
+                const occupiedCount = adminAssignOccupiedSlots.filter(slot => String(slot.session_date || '') === date).length;
+                const usedCount = reservationCount + occupiedCount;
+                const totalCount = count + usedCount;
+                const isFull = count === 0 && occupiedCount > 0;
                 const hasScheduleInfo = count > 0 || hasReservation || isOccupied;
-                const cellClass = count
-                    ? (selected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100')
-                    : hasReservation || isOccupied
+                const cellClass = isFull
                     ? 'border-red-300 bg-red-100 text-red-900 hover:bg-red-200'
+                    : usedCount
+                    ? (selected ? 'border-gold-400 bg-amber-100 shadow-sm' : 'border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100')
+                    : count
+                    ? (selected ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100')
                     : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300';
-                const statusLabel = count ? 'Available' : hasReservation ? 'Reserved' : isOccupied ? 'Occupied' : elapsedToday ? 'Ended today' : 'Unavailable';
-                cells.push(`<button type="button" ${hasScheduleInfo ? `onclick="openAdminAssignAvailabilityDatePicker('${date}')"` : 'disabled'} class="h-14 rounded-lg border p-1.5 text-left transition ${cellClass}"><div class="flex items-start justify-between gap-1"><span class="text-sm font-semibold leading-none ${hasScheduleInfo ? 'text-slate-900' : 'text-slate-400'}">${day}</span>${count ? `<span class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">${count}</span>` : ''}${hasReservation || isOccupied ? '<span class="rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-bold text-white">!</span>' : ''}</div><div class="mt-1 text-[9px] font-semibold leading-tight ${count ? 'text-emerald-700' : hasReservation || isOccupied ? 'text-red-700' : elapsedToday ? 'text-amber-600' : 'text-slate-400'}">${statusLabel}</div></button>`);
+                const statusLabel = isFull ? 'Full schedule' : occupiedCount ? `${occupiedCount}/${totalCount} occupied${reservationCount ? ` · ${reservationCount} pending` : ''}` : reservationCount ? `${reservationCount}/${totalCount} pending` : count ? `${count} available` : elapsedToday ? 'Ended today' : 'Unavailable';
+                const badgeClass = isFull ? 'bg-red-600' : usedCount ? 'bg-amber-600' : 'bg-emerald-600';
+                cells.push(`<button type="button" ${hasScheduleInfo ? `onclick="openAdminAssignAvailabilityDatePicker('${date}')"` : 'disabled'} class="h-14 rounded-lg border p-1.5 text-left transition ${cellClass}"><div class="flex items-start justify-between gap-1"><span class="text-sm font-semibold leading-none ${hasScheduleInfo ? 'text-slate-900' : 'text-slate-400'}">${day}</span>${hasScheduleInfo ? `<span class="rounded-full ${badgeClass} px-1.5 py-0.5 text-[9px] font-bold text-white">${usedCount ? `${usedCount}/${totalCount}` : count}</span>` : ''}</div><div class="mt-1 text-[9px] font-semibold leading-tight ${isFull ? 'text-red-700' : usedCount ? 'text-amber-800' : count ? 'text-emerald-700' : elapsedToday ? 'text-amber-600' : 'text-slate-400'}">${statusLabel}</div></button>`);
             }
             const monthLabel = new Date(Date.UTC(year, month - 1, 15, 12)).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'Asia/Manila' });
             listEl.innerHTML = `
@@ -1257,7 +1269,7 @@
                 </div>
                 <div class="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
                 <div class="grid grid-cols-7 gap-1.5">${cells.join('')}</div>
-                <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">Green: available · Red: occupied or reserved. Select a colored date to view its time slots.</div>
+                <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">Green: open slots · Yellow: partly occupied or pending · Red: occupied sessions or full schedule. Counts show used slots / total slots.</div>
                 </div>`;
         }
 

@@ -4,6 +4,10 @@ function learningHtml(value) {
     return typeof escapeHtml === 'function' ? escapeHtml(String(value ?? '')) : String(value ?? '');
 }
 
+function learningMaterialMatchesLevel(material, level) {
+    return !level || String(material?.level_name || '').trim().toLowerCase() === String(level).trim().toLowerCase();
+}
+
 function learningReadinessClass(status) {
     if (status === 'Ready for Assessment') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
     if (status === 'Improving') return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -78,7 +82,7 @@ async function openLearningProgressEditor(index) {
     const improvementOptions = ['Technique consistency','Rhythm consistency','Reading accuracy','Practice preparation','Musical expression','Performance confidence'];
     const materials = Array.isArray(row.learning_materials) ? row.learning_materials : [];
     const optionHtml = (values, selected, placeholder) => `<option value="">${learningHtml(placeholder)}</option>${values.map(value => `<option value="${learningHtml(value)}" ${value === selected ? 'selected' : ''}>${learningHtml(value)}</option>`).join('')}`;
-    const materialOptions = level => materials.filter(material => !level || material.level_name === level);
+    const materialOptions = level => materials.filter(material => learningMaterialMatchesLevel(material, level));
     const renderMaterialOptions = level => `<option value="">No book/material selected</option>${materialOptions(level).map(material => `<option value="${learningHtml(material.material_name)}" ${material.material_name === row.book_material ? 'selected' : ''}>${learningHtml(material.material_name)}</option>`).join('')}`;
     const result = await Swal.fire({
         title: 'Create Learning Record',
@@ -300,7 +304,7 @@ async function openPromotionalExamForm(index) {
     const levels = Array.from({ length: 10 }, (_, levelIndex) => `Level ${levelIndex + 1}`);
     const materials = Array.isArray(row.learning_materials) ? row.learning_materials : [];
     const progressPreview = buildPromotionalExamProgressPreview(row);
-    const nextMaterialOptions = level => `<option value="">No next book/material</option>${materials.filter(material => !level || material.level_name === level).map(material => `<option value="${learningHtml(material.material_name)}">${learningHtml(material.material_name)}</option>`).join('')}`;
+    const nextMaterialOptions = level => `<option value="">No next book/material</option>${materials.filter(material => learningMaterialMatchesLevel(material, level)).map(material => `<option value="${learningHtml(material.material_name)}">${learningHtml(material.material_name)}</option>`).join('')}`;
     const result = await Swal.fire({
         title: `Promotional Exam · ${learningHtml(row.level_name)}`,
         width: 700,

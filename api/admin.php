@@ -461,19 +461,50 @@ class Admin
             $safeLoginId = htmlspecialchars($studentLoginId, ENT_QUOTES, 'UTF-8');
             $safeBranch = htmlspecialchars($branchName, ENT_QUOTES, 'UTF-8');
 
-            $mailer->Subject = 'Student registration approved for ' . $safeStudentName;
+            $mailer->Subject = 'Student registration approved for ' . $studentName;
+            $mailer->isHTML(true);
             $mailer->Body = '
-                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 560px;">
-                    <h2 style="margin: 0 0 12px; color: #0f172a;">Registration approved</h2>
-                    <p>Hello ' . $safeGuardianName . ',</p>
-                    <p>The academy has approved the registration for <strong>' . $safeStudentName . '</strong>' . ($safeBranch !== '' ? ' at <strong>' . $safeBranch . '</strong>' : '') . '.</p>
-                    <div style="background:#fdfaf1;border:1px solid #f9f1d5;border-radius:12px;padding:16px 18px;margin:18px 0;">
-                        <p style="margin:0 0 8px;"><strong>Student:</strong> ' . $safeStudentName . '</p>
-                        <p style="margin:0;"><strong>Student ID / Username:</strong> ' . $safeLoginId . '</p>
-                    </div>
-                    <p>You can use this Student ID together with the password created during registration when signing in for this student.</p>
-                    <p>Please keep this email for reference, especially if you manage more than one child in your guardian account.</p>
-                </div>
+                <!doctype html>
+                <html lang="en">
+                <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Registration approved</title></head>
+                <body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+                    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">The registration for ' . $safeStudentName . ' has been approved.</div>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f5f7;padding:32px 12px;">
+                        <tr><td align="center">
+                            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
+                                <tr><td style="height:7px;background-color:#d4af37;font-size:0;line-height:0;">&nbsp;</td></tr>
+                                <tr><td style="padding:25px 32px;background-color:#111827;">
+                                    <div style="font-size:12px;line-height:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#e4c65a;">Father &amp; Sons Music School</div>
+                                    <div style="margin-top:5px;font-size:13px;line-height:20px;color:#d1d5db;">Guardian registration update</div>
+                                </td></tr>
+                                <tr><td style="padding:34px 32px 14px;">
+                                    <div style="display:inline-block;padding:6px 11px;border:1px solid #d8e8d9;border-radius:999px;background-color:#f0f8f1;color:#28633b;font-size:11px;line-height:16px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Approved</div>
+                                    <h1 style="margin:15px 0 0;color:#111827;font-size:25px;line-height:32px;">Registration approved</h1>
+                                    <p style="margin:20px 0 0;font-size:15px;line-height:24px;color:#374151;">Hello ' . $safeGuardianName . ',</p>
+                                    <p style="margin:12px 0 0;font-size:15px;line-height:24px;color:#374151;">The academy has approved the registration for <strong style="color:#111827;">' . $safeStudentName . '</strong>' . ($safeBranch !== '' ? ' at <strong style="color:#111827;">' . $safeBranch . '</strong>' : '') . '.</p>
+                                </td></tr>
+                                <tr><td style="padding:16px 32px 0;">
+                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#fdfaf1;border:1px solid #f2e4b4;border-radius:12px;">
+                                        <tr><td style="padding:18px 19px;">
+                                            <div style="font-size:12px;line-height:18px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8a6500;">Student details</div>
+                                            <p style="margin:12px 0 0;font-size:14px;line-height:22px;color:#374151;"><strong style="color:#111827;">Student</strong><br>' . $safeStudentName . '</p>
+                                            <p style="margin:12px 0 0;font-size:14px;line-height:22px;color:#374151;"><strong style="color:#111827;">Student ID / Username</strong><br><span style="font-size:16px;font-weight:700;letter-spacing:.3px;color:#8a6500;">' . $safeLoginId . '</span></p>
+                                        </td></tr>
+                                    </table>
+                                </td></tr>
+                                <tr><td style="padding:22px 32px 30px;">
+                                    <p style="margin:0;font-size:14px;line-height:23px;color:#374151;">Use this Student ID together with the password created during registration when signing in as the student.</p>
+                                    <p style="margin:13px 0 0;font-size:13px;line-height:21px;color:#6b7280;">Please keep this email for reference, especially if you manage more than one child in your guardian account.</p>
+                                </td></tr>
+                                <tr><td style="padding:18px 32px;background-color:#f9fafb;border-top:1px solid #e5e7eb;">
+                                    <div style="font-size:12px;line-height:19px;font-weight:700;color:#374151;">Father &amp; Sons Music School</div>
+                                    <div style="font-size:11px;line-height:18px;color:#9ca3af;">This is an automated message about a student registration.</div>
+                                </td></tr>
+                            </table>
+                        </td></tr>
+                    </table>
+                </body>
+                </html>
             ';
             $mailer->AltBody = "Registration approved for {$studentName}. Student ID / Username: {$studentLoginId}. Use the password created during registration.";
             $mailer->send();
@@ -714,6 +745,7 @@ class Admin
                 s.last_name,
                 s.email,
                 s.phone,
+                s.created_at,
                 1000.00 AS registration_fee_amount,
                 COALESCE((
                     SELECT SUM(rp.amount)
@@ -724,6 +756,7 @@ class Admin
                 'Pending' AS registration_status
             FROM tbl_students s
             WHERE s.status = 'Inactive'
+            ORDER BY s.created_at DESC, s.student_id DESC
         ");
         $stmt->execute();
 
@@ -779,7 +812,7 @@ class Admin
                     AND rp0.status = 'Pending'
               )
               AND COALESCE(" . ($hasSourceCol ? "s.registration_source" : "'online'") . ", 'online') <> 'walkin'" . $branchSql . "
-            ORDER BY s.created_at DESC
+            ORDER BY s.created_at DESC, s.student_id DESC
         ");
         if ($branchId > 0) {
             $stmt->execute([$branchId]);
@@ -878,7 +911,7 @@ class Admin
                     AND s.status = 'Active'
                 )
             )" . $branchSql . "
-            ORDER BY s.created_at DESC
+            ORDER BY s.created_at DESC, s.student_id DESC
         ");
         if ($branchId > 0) {
             $stmt->execute([$branchId]);

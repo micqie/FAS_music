@@ -190,6 +190,16 @@ function showGradeMessage(message, type = 'info') {
     box.textContent = message;
     box.classList.remove('hidden');
     if (type === 'success') setTimeout(() => box.classList.add('hidden'), 4000);
+
+    if (type === 'success' && typeof Swal !== 'undefined' && typeof Swal.mixin === 'function') {
+        Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 4000,
+            timerProgressBar: true
+        }).fire({ icon: 'success', title: message });
+    }
 }
 
 function formatShortDate(v) {
@@ -253,6 +263,12 @@ function isTodaySession(session) {
 }
 
 // ── Attendance control ─────────────────────────────────────────────
+function hasCurrentLearningSetup(session) {
+    return Number(session?.learning_level_id || 0) > 0
+        && String(session?.current_learning_level || '').trim() !== ''
+        && String(session?.current_learning_book || '').trim() !== '';
+}
+
 // Rules:
 //   graded (progress_id > 0)          → read-only "Present — Graded" badge
 //   att = present / late              → desk-confirmed badge, Start and attendance corrections
@@ -266,6 +282,7 @@ function renderAttendanceControl(session) {
     const graded = session ? Number(session.progress_id || 0) > 0 : false;
     const att    = String(session?.attendance_status || 'Pending').toLowerCase();
     const hasRequiredAssignment = Number(session?.room_id || 0) > 0 && Number(session?.assigned_instrument_id || 0) > 0;
+    const hasLearningSetup = hasCurrentLearningSetup(session);
 
     const badge = (icon, label, cls) =>
         `<span class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold ${cls}">
@@ -293,21 +310,26 @@ function renderAttendanceControl(session) {
 
     if (['present', 'late'].includes(att)) {
         const selectedAttendance = String(session._attendanceDraft || att).toLowerCase();
-        const assignmentTitle = hasRequiredAssignment ? '' : 'title="Desk must assign a room and physical instrument first"';
+        const startTitle = !hasRequiredAssignment
+            ? 'title="Desk must assign a room and physical instrument first"'
+            : (!hasLearningSetup ? 'title="Set the student’s current level and select an approved book/material first"' : '');
+        const canStartLesson = hasRequiredAssignment && hasLearningSetup;
         const attendanceButtons = `
-            <button type="button" onclick="instructorMarkAttendance(${Number(session.session_id)}, 'present', this, true)" ${hasRequiredAssignment ? '' : 'disabled'} ${assignmentTitle} class="rounded-xl border px-4 py-2.5 text-sm font-semibold ${hasRequiredAssignment ? (selectedAttendance === 'present' ? 'border-emerald-500 bg-emerald-100 text-emerald-800 ring-2 ring-emerald-200' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100') : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'}"><i class="fas fa-check mr-2"></i>Present</button>
+            <button type="button" onclick="instructorMarkAttendance(${Number(session.session_id)}, 'present', this, true)" ${hasRequiredAssignment ? '' : 'disabled'} ${hasRequiredAssignment ? '' : 'title="Desk must assign a room and physical instrument first"'} class="rounded-xl border px-4 py-2.5 text-sm font-semibold ${hasRequiredAssignment ? (selectedAttendance === 'present' ? 'border-emerald-500 bg-emerald-100 text-emerald-800 ring-2 ring-emerald-200' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100') : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'}"><i class="fas fa-check mr-2"></i>Present</button>
             <button type="button" onclick="instructorMarkAttendance(${Number(session.session_id)}, 'absent', this, true)" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-100"><i class="fas fa-user-xmark mr-2"></i>Absent</button>`;
         const attendanceLabel = att === 'late' ? 'Late — desk checked in' : 'Present — desk checked in';
         container.innerHTML = `
             <div class="flex flex-wrap items-center gap-3">
                 ${badge('fa-circle-check', attendanceLabel, 'border-emerald-200 bg-emerald-50 text-emerald-700')}
-                <button type="button" onclick="instructorMarkAttendance(${Number(session.session_id)}, 'present', this)" ${hasRequiredAssignment ? '' : 'disabled'} ${assignmentTitle} class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold ${hasRequiredAssignment ? 'border-teal-600 bg-teal-600 text-white hover:bg-teal-700' : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'}"><i class="fas fa-play"></i>Start</button>
+                <button type="button" onclick="instructorMarkAttendance(${Number(session.session_id)}, 'present', this)" ${canStartLesson ? '' : 'disabled'} ${startTitle} class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold ${canStartLesson ? 'border-teal-600 bg-teal-600 text-white hover:bg-teal-700' : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'}"><i class="fas fa-play"></i>Start</button>
                 <details class="relative">
                     <summary class="cursor-pointer list-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Attendance options</summary>
                     <div class="absolute left-0 top-full z-10 mt-2 flex gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">${attendanceButtons}</div>
                 </details>
             </div>`;
-        if (descEl) descEl.textContent = 'Desk attendance is recorded. Start the lesson when instruction begins; use Attendance options only to correct the check-in.';
+        if (descEl) descEl.textContent = hasLearningSetup
+            ? 'Desk attendance is recorded. Start the lesson when instruction begins; use Attendance options only to correct the check-in.'
+            : 'Set the student’s current level and select an approved book/material before starting the lesson.';
         return;
     }
 
@@ -343,7 +365,10 @@ async function instructorMarkAttendance(sessionId, attendanceStatus, triggerButt
         showGradeMessage('This lesson is already in progress. Absent can no longer be selected; your ratings and timer were kept.', 'error');
         return;
     }
-    if (attendanceStatus === 'present' && !attendanceOnly) {
+    const hasLearningSetup = hasCurrentLearningSetup(session);
+    const startLesson = attendanceStatus === 'present' && !attendanceOnly && hasLearningSetup;
+    const attendanceOnlyBecauseLearningMissing = attendanceStatus === 'present' && !attendanceOnly && !hasLearningSetup;
+    if (startLesson) {
         const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
         if (triggerButton) triggerButton.disabled = true;
         try {
@@ -363,6 +388,8 @@ async function instructorMarkAttendance(sessionId, attendanceStatus, triggerButt
         return;
     }
 
+    if (attendanceOnlyBecauseLearningMissing) attendanceOnly = true;
+
     const currentAttendance = String(session.attendance_status || '').toLowerCase();
     if (!isTodaySession(session) && !['present', 'late'].includes(currentAttendance)) {
         showGradeMessage('Attendance can only be selected on the scheduled session date.', 'error');
@@ -380,8 +407,10 @@ async function instructorMarkAttendance(sessionId, attendanceStatus, triggerButt
         if (!data.success) throw new Error(data.error || 'Could not save attendance.');
         await loadGradeSessions(currentGradeFilter);
         const refreshed = instructorGradeSessions.find(s => Number(s.session_id) === Number(sessionId)) || null;
-        if (refreshed) { refreshed._attendanceDraft = 'absent'; populateGradeForm(refreshed); }
-        showGradeMessage(data.message || 'Attendance saved.', 'success');
+        if (refreshed) { refreshed._attendanceDraft = attendanceStatus; populateGradeForm(refreshed); }
+        showGradeMessage(attendanceOnlyBecauseLearningMissing
+            ? 'Attendance recorded. Set the student’s level and select an approved book/material before starting the lesson.'
+            : (data.message || 'Attendance saved.'), 'success');
     } catch (error) {
         showGradeMessage(error?.response?.data?.error || error.message || 'Unable to save attendance.', 'error');
         if (triggerButton) triggerButton.disabled = false;
@@ -564,15 +593,29 @@ function computeAverageFromInputs() {
     if (!values.length || values.length !== ids.length) return null;
     return Math.round(values.reduce((s, v) => s + v, 0) / values.length);
 }
+function deriveOverallSkillLevel(average) {
+    if (!Number.isFinite(Number(average))) return '';
+    const roundedAverage = Math.round(Number(average));
+    if (roundedAverage <= 2) return 'Beginner';
+    if (roundedAverage === 3) return 'Developing';
+    if (roundedAverage === 4) return 'Proficient';
+    return 'Advanced';
+}
 function updateScorePreview() {
     const previewEl  = document.getElementById('scorePreview');
     const badgeEl    = document.getElementById('gradeAverageBadge');
     const previewBox = document.getElementById('avgPreviewBox');
+    const levelInput = document.getElementById('skillLevelInput');
+    const levelLabel = document.getElementById('derivedSkillLevelLabel');
     const avg        = computeAverageFromInputs();
     const fields = buildScoreFields();
     const rated = fields.filter(field => Number(document.getElementById(field.inputId)?.value || 0) > 0).length;
     setGradeText('criteriaTotalLabel', `${rated} of ${fields.length} ${fields.length === 1 ? 'criterion' : 'criteria'} rated.`);
     setGradeText('criteriaRemainingCount', `${Math.max(0, fields.length - rated)} ${fields.length - rated === 1 ? 'criterion' : 'criteria'} still to rate.`);
+    if (levelInput) levelInput.value = avg === null ? '' : deriveOverallSkillLevel(avg);
+    if (levelLabel) levelLabel.textContent = avg === null
+        ? 'Rate every criterion to calculate the level.'
+        : `${deriveOverallSkillLevel(avg)} · average rating ${avg}/5`;
     if (!previewEl) return;
     if (avg === null) {
         previewEl.textContent = '—';
@@ -604,7 +647,7 @@ function getAnalyticsPreviewSession(session) {
         if (v > 0) has = true;
     });
     preview.criteria_scores = criteriaScores;
-    preview.skill_level    = document.getElementById('skillLevelInput')?.value || preview.skill_level || '';
+    preview.skill_level    = deriveOverallSkillLevel(preview.average_score) || preview.skill_level || '';
     preview.remarks        = document.getElementById('remarksInput')?.value    || preview.remarks     || '';
     preview.average_score  = computeAverageFromInputs();
     preview.__has_live_preview = has;
@@ -641,46 +684,109 @@ function renderGradeLearningProgress(session) {
     if (!card) return;
     card.classList.toggle('hidden', !session);
     const hasLearningLevel = Number(session?.learning_level_id || 0) > 0;
+    const hasLearningBook = String(session?.current_learning_book || '').trim() !== '';
     const level = document.getElementById('gradeCurrentLearningLevel');
     const book = document.getElementById('gradeCurrentLearningBook');
     const hint = document.getElementById('gradeLearningProgressHint');
     const setButton = document.getElementById('setGradeLearningLevelBtn');
     if (level) level.textContent = hasLearningLevel ? (session.current_learning_level || 'Level recorded') : 'Not set';
     if (book) book.textContent = hasLearningLevel ? (session.current_learning_book || 'No book recorded') : 'No book recorded';
-    if (hint) hint.textContent = hasLearningLevel
-        ? 'Current level and book for this student and instrument.'
-        : 'No current learning level is recorded for this instrument yet.';
-    if (setButton) setButton.classList.toggle('hidden', hasLearningLevel || !session);
+    if (hint) hint.textContent = !hasLearningLevel
+        ? 'Set the current level and select an approved book/material before starting the lesson.'
+        : (!hasLearningBook
+            ? 'Select an approved book/material before starting the lesson.'
+            : 'Current level and book for this student and instrument.');
+    if (setButton) {
+        setButton.classList.toggle('hidden', hasLearningLevel && hasLearningBook || !session);
+        setButton.textContent = hasLearningLevel ? 'Select book/material' : 'Set starting level';
+    }
 }
 
 async function setLearningLevelFromGrading() {
     const session = instructorGradeSessions.find(item => Number(item.session_id) === Number(selectedGradeSessionId)) || null;
-    if (!session || Number(session.learning_level_id || 0) > 0) return;
+    if (!session || hasCurrentLearningSetup(session)) return;
+    const user = typeof Auth !== 'undefined' ? Auth.getUser() : null;
+    if (!user?.user_id) { showGradeMessage('Your account is not available. Please log in again.', 'error'); return; }
+
+    let materials = [];
+    try {
+        const response = await axios.get(`${baseApiUrl}/teachers.php?action=get-learning-progress&user_id=${encodeURIComponent(user.user_id)}`);
+        const rows = response.data?.success && Array.isArray(response.data.learning_progress) ? response.data.learning_progress : [];
+        const learningRow = rows.find(row => Number(row.student_id) === Number(session.student_id)
+            && Number(row.instrument_id) === Number(session.learning_instrument_id || session.assigned_instrument_id));
+        materials = Array.isArray(learningRow?.learning_materials) ? learningRow.learning_materials : [];
+    } catch (error) {
+        showGradeMessage(error?.response?.data?.error || 'Unable to load approved learning materials.', 'error');
+        return;
+    }
+
     const levelOptions = ['Beginner', ...Array.from({ length: 10 }, (_, index) => `Level ${index + 1}`)];
+    const renderBookOptions = (level, selected = '') => {
+        const available = materials.filter(material => String(material.level_name || '').trim().toLowerCase() === String(level || '').trim().toLowerCase());
+        return `<option value="">${available.length ? 'Choose an approved book/material' : 'No approved book for this level — request one'}</option>${available.map(material => `<option value="${escapeHtml(material.material_name || '')}" ${String(material.material_name || '') === String(selected || '') ? 'selected' : ''}>${escapeHtml(material.material_name || '')}</option>`).join('')}`;
+    };
     const result = await Swal.fire({
         title: 'Set Starting Learning Level',
-        text: `${session.student_first_name || ''} ${session.student_last_name || ''} · ${session.instrument_name || 'Instrument'}`,
-        input: 'select',
-        inputOptions: Object.fromEntries(levelOptions.map(level => [level, level === 'Beginner' ? 'Beginner level' : level])),
-        inputPlaceholder: 'Choose current level',
+        width: 560,
         showCancelButton: true,
         confirmButtonText: 'Save Level',
         confirmButtonColor: '#4f46e5',
-        html: `<label for="gradeLearningBookInput" class="mt-3 block text-left text-xs font-bold text-slate-600">Book / material <span class="font-normal">(optional)</span></label><input id="gradeLearningBookInput" class="swal2-input !mx-0 !w-full" placeholder="Enter book or material, or leave blank">`,
-        preConfirm: level => {
+        html: `<div style="width:100%;max-width:100%;box-sizing:border-box;overflow-x:hidden;text-align:left">
+            <p style="margin:0 0 16px;color:#64748b;font-size:14px">${escapeHtml(`${session.student_first_name || ''} ${session.student_last_name || ''}`.trim())} · ${escapeHtml(session.instrument_name || 'Instrument')}</p>
+            <label for="gradeLearningLevelInput" style="display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#475569">Current level <span style="color:#dc2626">*</span></label>
+            <select id="gradeLearningLevelInput" style="display:block;width:100%;max-width:100%;height:46px;box-sizing:border-box;margin:0 0 16px;padding:0 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font-size:14px">
+                <option value="">Choose current level</option>
+                ${levelOptions.map(level => `<option value="${escapeHtml(level)}" ${String(session.current_learning_level || '') === level ? 'selected' : ''}>${level === 'Beginner' ? 'Beginner level' : escapeHtml(level)}</option>`).join('')}
+            </select>
+            <label for="gradeLearningBookInput" style="display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#475569">Book / material <span style="color:#dc2626">*</span></label>
+            <select id="gradeLearningBookInput" style="display:block;width:100%;max-width:100%;height:46px;box-sizing:border-box;margin:0;padding:0 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font-size:14px">
+                <option value="">Choose level first</option>
+            </select>
+        </div>`,
+        didOpen: () => {
+            const popup = Swal.getPopup();
+            const htmlContainer = Swal.getHtmlContainer();
+            if (popup) {
+                popup.style.width = 'min(560px, calc(100vw - 24px))';
+                popup.style.boxSizing = 'border-box';
+                popup.style.overflowX = 'hidden';
+            }
+            if (htmlContainer) {
+                htmlContainer.style.width = '100%';
+                htmlContainer.style.maxWidth = '100%';
+                htmlContainer.style.boxSizing = 'border-box';
+                htmlContainer.style.overflowX = 'hidden';
+                htmlContainer.style.margin = '0';
+            }
+            const levelSelect = document.getElementById('gradeLearningLevelInput');
+            const bookSelect = document.getElementById('gradeLearningBookInput');
+            if (bookSelect && levelSelect?.value) {
+                bookSelect.innerHTML = renderBookOptions(levelSelect.value, session.current_learning_book || '');
+            }
+            levelSelect?.addEventListener('change', () => {
+                if (bookSelect) bookSelect.innerHTML = renderBookOptions(levelSelect.value);
+            });
+        },
+        preConfirm: () => {
+            const level = document.getElementById('gradeLearningLevelInput')?.value || '';
             if (!level) { Swal.showValidationMessage('Choose the student’s current level.'); return false; }
-            return { level_name: level, book_material: document.getElementById('gradeLearningBookInput')?.value.trim() || '' };
+            const book = document.getElementById('gradeLearningBookInput')?.value || '';
+            if (!book) { Swal.showValidationMessage('Select an approved book/material before starting this lesson.'); return false; }
+            return { level_name: level, book_material: book };
         }
     });
     if (!result.isConfirmed) return;
-    const user = typeof Auth !== 'undefined' ? Auth.getUser() : null;
-    if (!user?.user_id) { showGradeMessage('Your account is not available. Please log in again.', 'error'); return; }
     try {
         const response = await axios.post(`${baseApiUrl}/teachers.php?action=save-learning-progress`, {
             action: 'save-learning-progress', user_id: Number(user.user_id),
             student_id: Number(session.student_id), instrument_id: Number(session.learning_instrument_id || session.assigned_instrument_id),
-            ...result.value, current_topic: '', skills_developing: '', areas_for_improvement: '',
-            instructor_notes: '', assessment_readiness: 'Not Ready'
+            ...result.value,
+            current_topic: session.current_learning_topic || '',
+            skills_developing: session.current_learning_skills || '',
+            areas_for_improvement: session.current_learning_improvement || '',
+            instructor_notes: session.current_learning_notes || '',
+            assessment_readiness: session.current_learning_readiness || 'Not Ready',
+            readiness_reviewed: true
         });
         if (!response.data?.success) throw new Error(response.data?.error || 'Unable to save the learning level.');
         await loadGradeSessions(currentGradeFilter);
@@ -749,15 +855,6 @@ function populateGradeForm(session) {
     if (skillEl)   skillEl.value   = session?.skill_level || '';
     if (remarksEl) remarksEl.value = session?.remarks     || '';
     
-    // Update skill level button selection
-    document.querySelectorAll('.skill-level-btn').forEach(btn => {
-        if (btn.dataset.level === session?.skill_level) {
-            btn.classList.add('selected');
-        } else {
-            btn.classList.remove('selected');
-        }
-    });
-
     const graded    = session ? Number(session.progress_id || 0) > 0 : false;
     const hasRequiredAssignment = Number(session?.room_id || 0) > 0 && Number(session?.assigned_instrument_id || 0) > 0;
     const gradeable = session ? isGradeable(session) && hasRequiredAssignment : false;
@@ -778,6 +875,16 @@ function populateGradeForm(session) {
     const saveBtn    = document.getElementById('saveGradeBtn');
     const criteriaBtn = document.getElementById('editCriteriaBtn');
 
+    if (saveStatus) {
+        saveStatus.classList.toggle('hidden', !graded);
+        saveStatus.classList.toggle('flex', graded);
+    }
+    if (saveBtn) {
+        saveBtn.innerHTML = graded
+            ? '<i class="fas fa-circle-check text-xs"></i> Graded Successfully'
+            : '<i class="fas fa-save text-xs"></i> Save Grade';
+    }
+
     if (criteriaBtn) {
         const criteriaLocked = graded || !hasRequiredAssignment;
         criteriaBtn.disabled = criteriaLocked;
@@ -785,12 +892,6 @@ function populateGradeForm(session) {
         criteriaBtn.classList.toggle('cursor-not-allowed', criteriaLocked);
         criteriaBtn.title = graded ? 'Saved grades are read-only' : (!hasRequiredAssignment ? 'Assign the room and physical instrument first' : 'Edit this session’s grading criteria');
     }
-    document.querySelectorAll('.skill-level-btn').forEach(btn => {
-        btn.disabled = !active;
-        btn.classList.toggle('opacity-40', !active);
-        btn.classList.toggle('cursor-not-allowed', !active);
-    });
-
     if (active) {
         if (lockBanner) lockBanner.classList.add('hidden');
         setScoreButtonsDisabled(false);
@@ -1091,14 +1192,8 @@ async function saveSessionGrade(event) {
         return;
     }
 
-    const skillLevelInput = document.getElementById('skillLevelInput');
-    const skillLevel = String(skillLevelInput?.value || '').trim();
-    const validSkillLevels = ['Beginner', 'Developing', 'Proficient', 'Advanced'];
-    if (!validSkillLevels.includes(skillLevel)) {
-        showGradeMessage('Choose the student’s overall level before saving the grade.', 'error');
-        document.querySelector('.skill-level-btn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-    }
+    const averageScore = criteriaScores.reduce((sum, item) => sum + item.score, 0) / criteriaScores.length;
+    const skillLevel = deriveOverallSkillLevel(averageScore);
 
     const payload = {
         action: 'save-session-grade',
@@ -1132,7 +1227,7 @@ async function saveSessionGrade(event) {
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = savedSuccessfully
-                ? '<i class="fas fa-circle-check text-xs"></i> Grade Saved'
+                ? '<i class="fas fa-circle-check text-xs"></i> Graded Successfully'
                 : '<i class="fas fa-save text-xs"></i> Save Grade';
         }
     }
@@ -1281,7 +1376,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadGradeSessions('all');
     document.getElementById('gradeSearch')?.addEventListener('input',   () => renderGradeSessions());
     document.getElementById('gradingForm')?.addEventListener('submit',  saveSessionGrade);
-    document.getElementById('skillLevelInput')?.addEventListener('change', () => { markGradeDirty(); updateScorePreview(); });
     document.getElementById('remarksInput')?.addEventListener('input',  () => { markGradeDirty(); updateScorePreview(); });
     // Close progress modal on backdrop click
     document.getElementById('progressModal')?.addEventListener('click', e => {
